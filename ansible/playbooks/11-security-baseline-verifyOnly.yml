@@ -1,0 +1,156 @@
+---
+# TYPE: VERIFY-ONLY (rc=0=pass, rc=1=fail — checks DFIR monitoring + Sysmon)
+# Layer 3: Security Baseline — Verify audit policy, PS logging, NTLM, channels, log sizes, Sysmon
+# All tasks use rc=0/1 pattern with changed_when: false, failed_when: r.rc == 1
+
+# =============================================================================
+# Play 1: Verify staging directories exist
+# =============================================================================
+- name: "Verify staging directories"
+  hosts: windows_servers
+  gather_facts: false
+  tasks:
+    - name: 'Verify C:\Tools directory exists'
+      ansible.windows.win_shell: |
+        try {
+        $ErrorActionPreference = "Stop"
+          if (Test-Path "C:\Tools") { Write-Output "PASS: C:\Tools exists"; exit 0 }
+          Write-Output "FAIL: C:\Tools not found"; exit 1
+        } catch { Write-Output "FAIL: $_"; exit 1 }
+      register: r
+      changed_when: false
+      failed_when: r.rc == 1
+
+    - name: 'Verify C:\PSTranscripts directory exists'
+      ansible.windows.win_shell: |
+        try {
+        $ErrorActionPreference = "Stop"
+          if (Test-Path "C:\PSTranscripts") { Write-Output "PASS: C:\PSTranscripts exists"; exit 0 }
+          Write-Output "FAIL: C:\PSTranscripts not found"; exit 1
+        } catch { Write-Output "FAIL: $_"; exit 1 }
+      register: r
+      changed_when: false
+      failed_when: r.rc == 1
+
+# =============================================================================
+# Play 2: Verify monitoring script exists
+# =============================================================================
+- name: "Verify monitoring script"
+  hosts: windows_servers
+  gather_facts: false
+  tasks:
+    - name: 'Verify cadre-dfir-monitoring.ps1 exists in C:\Tools'
+      ansible.windows.win_shell: |
+        try {
+        $ErrorActionPreference = "Stop"
+          if (Test-Path "C:\Tools\cadre-dfir-monitoring.ps1") { Write-Output "PASS: monitoring script exists"; exit 0 }
+          Write-Output "FAIL: monitoring script not found"; exit 1
+        } catch { Write-Output "FAIL: $_"; exit 1 }
+      register: r
+      changed_when: false
+      failed_when: r.rc == 1
+
+# =============================================================================
+# Play 3: Verify monitoring baseline key settings (6 checks — kept as-is)
+#    The script execution is omitted; these 6 tasks confirm it was applied.
+# =============================================================================
+- name: "Verify monitoring baseline key settings"
+  hosts: windows_servers
+  gather_facts: false
+  tasks:
+    - name: "[AUDIT] Verify SCENoApplyLegacyAuditPolicy = 1"
+      ansible.windows.win_shell: |
+        try {
+        $ErrorActionPreference = "Stop"
+          $v = (Get-ItemProperty "HKLM:\SYSTEM\CurrentControlSet\Control\Lsa" -Name "SCENoApplyLegacyAuditPolicy" -ErrorAction Stop).SCENoApplyLegacyAuditPolicy
+          if ($v -eq 1) { Write-Output "PASS: SCENoApplyLegacyAuditPolicy = 1"; exit 0 }
+          Write-Output "FAIL: SCENoApplyLegacyAuditPolicy = $v (expected 1)"; exit 1
+        } catch { Write-Output "FAIL: $_"; exit 1 }
+      register: r
+      changed_when: false
+      failed_when: r.rc == 1
+
+    - name: "[AUDIT] Verify ProcessCreationIncludeCmdLine = 1"
+      ansible.windows.win_shell: |
+        try {
+        $ErrorActionPreference = "Stop"
+          $v = (Get-ItemProperty "HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\System\Audit" -Name "ProcessCreationIncludeCmdLine_Enabled" -ErrorAction Stop).ProcessCreationIncludeCmdLine_Enabled
+          if ($v -eq 1) { Write-Output "PASS: ProcessCreationIncludeCmdLine enabled"; exit 0 }
+          Write-Output "FAIL: ProcessCreationIncludeCmdLine = $v (expected 1)"; exit 1
+        } catch { Write-Output "FAIL: $_"; exit 1 }
+      register: r
+      changed_when: false
+      failed_when: r.rc == 1
+
+    - name: "[AUDIT] Verify PowerShell ScriptBlock logging enabled"
+      ansible.windows.win_shell: |
+        try {
+        $ErrorActionPreference = "Stop"
+          $v = (Get-ItemProperty "HKLM:\SOFTWARE\Policies\Microsoft\Windows\PowerShell\ScriptBlockLogging" -Name "EnableScriptBlockLogging" -ErrorAction Stop).EnableScriptBlockLogging
+          if ($v -eq 1) { Write-Output "PASS: ScriptBlock logging enabled"; exit 0 }
+          Write-Output "FAIL: ScriptBlock logging = $v (expected 1)"; exit 1
+        } catch { Write-Output "FAIL: $_"; exit 1 }
+      register: r
+      changed_when: false
+      failed_when: r.rc == 1
+
+    - name: "[AUDIT] Verify PowerShell Module logging enabled"
+      ansible.windows.win_shell: |
+        try {
+        $ErrorActionPreference = "Stop"
+          $v = (Get-ItemProperty "HKLM:\SOFTWARE\Policies\Microsoft\Windows\PowerShell\ModuleLogging" -Name "EnableModuleLogging" -ErrorAction Stop).EnableModuleLogging
+          if ($v -eq 1) { Write-Output "PASS: Module logging enabled"; exit 0 }
+          Write-Output "FAIL: Module logging = $v (expected 1)"; exit 1
+        } catch { Write-Output "FAIL: $_"; exit 1 }
+      register: r
+      changed_when: false
+      failed_when: r.rc == 1
+
+    - name: "[AUDIT] Verify PowerShell Transcription enabled"
+      ansible.windows.win_shell: |
+        try {
+        $ErrorActionPreference = "Stop"
+          $v = (Get-ItemProperty "HKLM:\SOFTWARE\Policies\Microsoft\Windows\PowerShell\Transcription" -Name "EnableTranscripting" -ErrorAction Stop).EnableTranscripting
+          if ($v -eq 1) { Write-Output "PASS: Transcription enabled"; exit 0 }
+          Write-Output "FAIL: Transcription = $v (expected 1)"; exit 1
+        } catch { Write-Output "FAIL: $_"; exit 1 }
+      register: r
+      changed_when: false
+      failed_when: r.rc == 1
+
+    - name: "[AUDIT] Verify Security log size >= 1GB"
+      ansible.windows.win_shell: |
+        try {
+        $ErrorActionPreference = "Stop"
+          $log = wevtutil gl Security 2>&1 | Out-String
+          if ($log -match "maxSize: (\d+)") { $maxSize = [long]$matches[1] }
+          if ($maxSize -ge 1073741824) { Write-Output "PASS: Security log size = $maxSize bytes (>= 1GB)"; exit 0 }
+          Write-Output "FAIL: Security log size = $maxSize bytes (< 1GB)"; exit 1
+        } catch { Write-Output "FAIL: $_"; exit 1 }
+      register: r
+      changed_when: false
+      failed_when: r.rc == 1
+
+# =============================================================================
+# Play 4: Sysmon verification (service + config file)
+# =============================================================================
+- name: "Sysmon verification"
+  hosts: windows_servers
+  gather_facts: false
+  tasks:
+    - name: "[SYSMON] Check Sysmon64 service status"
+      ansible.windows.win_service:
+        name: Sysmon64
+      register: sysmon_svc
+      failed_when: false
+
+    - name: "[SYSMON] Verify Sysmon config file exists"
+      ansible.windows.win_shell: |
+        try {
+        $ErrorActionPreference = "Stop"
+          if (Test-Path "C:\Tools\Sysmon\sysmonconfig.xml") { Write-Output "PASS: Sysmon config exists"; exit 0 }
+          Write-Output "FAIL: Sysmon config not found at C:\Tools\Sysmon\sysmonconfig.xml"; exit 1
+        } catch { Write-Output "FAIL: $_"; exit 1 }
+      register: r
+      changed_when: false
+      failed_when: r.rc == 1

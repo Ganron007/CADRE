@@ -1,0 +1,1151 @@
+---
+# TYPE: DEPLOY (rc=0=skip, rc=2=applied+verified, rc=1=fail)
+# Layer 5: AD Attack Surface — Deploy ACEs, SPNs, AS-REP, delegation
+# All tasks use win_shell rc=2 pattern.
+# ACEs use Set-Acl pattern (Get-Acl/Set-Acl) for pre-check + verify.
+
+# =============================================================================
+# PART 1: ACEs — cadre.local (dc01, 14 entries)
+# =============================================================================
+- name: "dc01 — ACE group 1 (GPO delegations)"
+  hosts: dc01
+  gather_facts: false
+  tasks:
+    - name: "ACE#1 — analyst_cloud → Vulnerable-GPO: GpoEditDeleteModifySecurity"
+      ansible.windows.win_shell: |
+        $ErrorActionPreference = "Stop"
+        try {
+          $gpoName = "Vulnerable-GPO"; $targetUser = "analyst_cloud"
+          $gpo = Get-GPO -Name $gpoName -ErrorAction SilentlyContinue
+          if (-not $gpo) { Write-Output "SKIP: GPO '$gpoName' not found"; exit 0 }
+          $existing = Get-GPPermission -Name $gpoName -TargetName $targetUser -TargetType User -ErrorAction SilentlyContinue
+          if ($existing -and $existing.Permission -eq "GpoEditDeleteModifySecurity") { Write-Output "OK: Already set"; exit 0 }
+          Set-GPPermissions -Name $gpoName -TargetName $targetUser -TargetType User -PermissionLevel GpoEditDeleteModifySecurity
+          $verify = Get-GPPermission -Name $gpoName -TargetName $targetUser -TargetType User
+          if (-not $verify -or $verify.Permission -ne "GpoEditDeleteModifySecurity") { throw "Verify failed" }
+          Write-Output "APPLIED: $targetUser granted GpoEditDeleteModifySecurity on $gpoName"; exit 2
+        } catch { Write-Output "FAILED: $_"; exit 1 }
+      register: r
+      changed_when: r.rc == 2
+      failed_when: r.rc not in [0, 2]
+
+    - name: "ACE#2 — eng_agentic → WMI-Filtered-GPO: GpoEditDeleteModifySecurity"
+      ansible.windows.win_shell: |
+        $ErrorActionPreference = "Stop"
+        try {
+          $gpoName = "WMI-Filtered-GPO"; $targetUser = "eng_agentic"
+          $gpo = Get-GPO -Name $gpoName -ErrorAction SilentlyContinue
+          if (-not $gpo) { Write-Output "SKIP: GPO '$gpoName' not found"; exit 0 }
+          $existing = Get-GPPermission -Name $gpoName -TargetName $targetUser -TargetType User -ErrorAction SilentlyContinue
+          if ($existing -and $existing.Permission -eq "GpoEditDeleteModifySecurity") { Write-Output "OK: Already set"; exit 0 }
+          Set-GPPermissions -Name $gpoName -TargetName $targetUser -TargetType User -PermissionLevel GpoEditDeleteModifySecurity
+          $verify = Get-GPPermission -Name $gpoName -TargetName $targetUser -TargetType User
+          if (-not $verify -or $verify.Permission -ne "GpoEditDeleteModifySecurity") { throw "Verify failed" }
+          Write-Output "APPLIED: $targetUser granted GpoEditDeleteModifySecurity on $gpoName"; exit 2
+        } catch { Write-Output "FAILED: $_"; exit 1 }
+      register: r
+      changed_when: r.rc == 2
+      failed_when: r.rc not in [0, 2]
+
+- name: "dc01 — ACE group 2 (group ACEs)"
+  hosts: dc01
+  gather_facts: false
+  tasks:
+    - name: "ACE#3 — Engineering-Cadre → Red-Cadre: WriteDacl"
+      ansible.windows.win_shell: |
+        $ErrorActionPreference = "Stop"
+        try {
+          Import-Module ActiveDirectory
+          Set-Location AD:
+          $TargetDN = "CN=Red-Cadre,OU=RedCell,DC=cadre,DC=local"
+          $Principal = "CADRE\Engineering-Cadre"
+          $Rights = [System.DirectoryServices.ActiveDirectoryRights]::WriteDacl
+          $AccessControlType = [System.Security.AccessControl.AccessControlType]::Allow
+          $ObjectType = $null
+          $Acl = Get-Acl -Path $TargetDN
+          $Identity = New-Object System.Security.Principal.NTAccount($Principal)
+          $exists = $Acl.Access | Where-Object { $_.IdentityReference.Value -eq $Identity.Translate([System.Security.Principal.SecurityIdentifier]).Value }
+          if ($exists) { Write-Output "OK: ACE exists"; exit 0 }
+          if (-not $ObjectType) {
+            $Rule = New-Object System.DirectoryServices.ActiveDirectoryAccessRule($Identity, $Rights, $AccessControlType)
+          } else {
+            $Rule = New-Object System.DirectoryServices.ActiveDirectoryAccessRule($Identity, $Rights, $AccessControlType, $ObjectType)
+          }
+          $Acl.AddAccessRule($Rule)
+          Set-Acl -Path $TargetDN -AclObject $Acl
+          $vAcl = Get-Acl -Path $TargetDN
+          $verified = $vAcl.Access | Where-Object { $_.IdentityReference.Value -eq $Identity.Translate([System.Security.Principal.SecurityIdentifier]).Value }
+          if (-not $verified) { throw "Verify failed" }
+          Write-Output "APPLIED: Engineering-Cadre WriteDacl on Red-Cadre"; exit 2
+        } catch { Write-Output "FAILED: $_"; exit 1 }
+      register: r
+      changed_when: r.rc == 2
+      failed_when: r.rc not in [0, 2]
+
+    - name: "ACE#4 — Cloud-Cadre → Agentic-Cadre: GenericWrite"
+      ansible.windows.win_shell: |
+        $ErrorActionPreference = "Stop"
+        try {
+          Import-Module ActiveDirectory
+          Set-Location AD:
+          $TargetDN = "CN=Agentic-Cadre,OU=Agentic,DC=cadre,DC=local"
+          $Principal = "CADRE\Cloud-Cadre"
+          $Rights = [System.DirectoryServices.ActiveDirectoryRights]::GenericWrite
+          $AccessControlType = [System.Security.AccessControl.AccessControlType]::Allow
+          $ObjectType = $null
+          $Acl = Get-Acl -Path $TargetDN
+          $Identity = New-Object System.Security.Principal.NTAccount($Principal)
+          $exists = $Acl.Access | Where-Object { $_.IdentityReference.Value -eq $Identity.Translate([System.Security.Principal.SecurityIdentifier]).Value }
+          if ($exists) { Write-Output "OK: ACE exists"; exit 0 }
+          if (-not $ObjectType) {
+            $Rule = New-Object System.DirectoryServices.ActiveDirectoryAccessRule($Identity, $Rights, $AccessControlType)
+          } else {
+            $Rule = New-Object System.DirectoryServices.ActiveDirectoryAccessRule($Identity, $Rights, $AccessControlType, $ObjectType)
+          }
+          $Acl.AddAccessRule($Rule)
+          Set-Acl -Path $TargetDN -AclObject $Acl
+          $vAcl = Get-Acl -Path $TargetDN
+          $verified = $vAcl.Access | Where-Object { $_.IdentityReference.Value -eq $Identity.Translate([System.Security.Principal.SecurityIdentifier]).Value }
+          if (-not $verified) { throw "Verify failed" }
+          Write-Output "APPLIED: Cloud-Cadre GenericWrite on Agentic-Cadre"; exit 2
+        } catch { Write-Output "FAILED: $_"; exit 1 }
+      register: r
+      changed_when: r.rc == 2
+      failed_when: r.rc not in [0, 2]
+
+    - name: "ACE#5 — analyst_dfir → OU=Command: GenericAll"
+      ansible.windows.win_shell: |
+        $ErrorActionPreference = "Stop"
+        try {
+          Import-Module ActiveDirectory
+          Set-Location AD:
+          $TargetDN = "OU=Command,DC=cadre,DC=local"
+          $Principal = "CADRE\analyst_dfir"
+          $Rights = [System.DirectoryServices.ActiveDirectoryRights]::GenericAll
+          $AccessControlType = [System.Security.AccessControl.AccessControlType]::Allow
+          $ObjectType = $null
+          $InheritanceType = [System.DirectoryServices.ActiveDirectorySecurityInheritance]::All
+          $Acl = Get-Acl -Path $TargetDN
+          $Identity = New-Object System.Security.Principal.NTAccount($Principal)
+          $exists = $Acl.Access | Where-Object { $_.IdentityReference.Value -eq $Identity.Translate([System.Security.Principal.SecurityIdentifier]).Value }
+          if ($exists) { Write-Output "OK: ACE exists"; exit 0 }
+          $Rule = New-Object System.DirectoryServices.ActiveDirectoryAccessRule($Identity, $Rights, $AccessControlType, $InheritanceType)
+          $Acl.AddAccessRule($Rule)
+          Set-Acl -Path $TargetDN -AclObject $Acl
+          $vAcl = Get-Acl -Path $TargetDN
+          $verified = $vAcl.Access | Where-Object { $_.IdentityReference.Value -eq $Identity.Translate([System.Security.Principal.SecurityIdentifier]).Value }
+          if (-not $verified) { throw "Verify failed" }
+          Write-Output "APPLIED: analyst_dfir GenericAll on OU=Command"; exit 2
+        } catch { Write-Output "FAILED: $_"; exit 1 }
+      register: r
+      changed_when: r.rc == 2
+      failed_when: r.rc not in [0, 2]
+
+    - name: "ACE#6 — ops_redcell → dc01$: GenericWrite"
+      ansible.windows.win_shell: |
+        $ErrorActionPreference = "Stop"
+        try {
+          Import-Module ActiveDirectory
+          Set-Location AD:
+          $TargetDN = "CN=dc01,OU=Domain Controllers,DC=cadre,DC=local"
+          $Principal = "CADRE\ops_redcell"
+          $Rights = [System.DirectoryServices.ActiveDirectoryRights]::GenericWrite
+          $AccessControlType = [System.Security.AccessControl.AccessControlType]::Allow
+          $ObjectType = $null
+          $Acl = Get-Acl -Path $TargetDN
+          $Identity = New-Object System.Security.Principal.NTAccount($Principal)
+          $exists = $Acl.Access | Where-Object { $_.IdentityReference.Value -eq $Identity.Translate([System.Security.Principal.SecurityIdentifier]).Value }
+          if ($exists) { Write-Output "OK: ACE exists"; exit 0 }
+          if (-not $ObjectType) {
+            $Rule = New-Object System.DirectoryServices.ActiveDirectoryAccessRule($Identity, $Rights, $AccessControlType)
+          } else {
+            $Rule = New-Object System.DirectoryServices.ActiveDirectoryAccessRule($Identity, $Rights, $AccessControlType, $ObjectType)
+          }
+          $Acl.AddAccessRule($Rule)
+          Set-Acl -Path $TargetDN -AclObject $Acl
+          $vAcl = Get-Acl -Path $TargetDN
+          $verified = $vAcl.Access | Where-Object { $_.IdentityReference.Value -eq $Identity.Translate([System.Security.Principal.SecurityIdentifier]).Value }
+          if (-not $verified) { throw "Verify failed" }
+          Write-Output "APPLIED: ops_redcell GenericWrite on dc01$"; exit 2
+        } catch { Write-Output "FAILED: $_"; exit 1 }
+      register: r
+      changed_when: r.rc == 2
+      failed_when: r.rc not in [0, 2]
+
+    - name: "ACE#7 — hunter_dfir → chief_command: ForceChangePassword"
+      ansible.windows.win_shell: |
+        $ErrorActionPreference = "Stop"
+        try {
+          Import-Module ActiveDirectory
+          Set-Location AD:
+          $TargetDN = "CN=chief_command,OU=Command,DC=cadre,DC=local"
+          $Principal = "CADRE\hunter_dfir"
+          $Rights = [System.DirectoryServices.ActiveDirectoryRights]::ExtendedRight
+          $AccessControlType = [System.Security.AccessControl.AccessControlType]::Allow
+          $ObjectType = [GUID]"00299570-246d-11d0-a768-00aa006e0529"
+          $Acl = Get-Acl -Path $TargetDN
+          $Identity = New-Object System.Security.Principal.NTAccount($Principal)
+          $exists = $Acl.Access | Where-Object { $_.IdentityReference.Value -eq $Identity.Translate([System.Security.Principal.SecurityIdentifier]).Value }
+          if ($exists) { Write-Output "OK: ACE exists"; exit 0 }
+          if (-not $ObjectType) {
+            $Rule = New-Object System.DirectoryServices.ActiveDirectoryAccessRule($Identity, $Rights, $AccessControlType)
+          } else {
+            $Rule = New-Object System.DirectoryServices.ActiveDirectoryAccessRule($Identity, $Rights, $AccessControlType, $ObjectType)
+          }
+          $Acl.AddAccessRule($Rule)
+          Set-Acl -Path $TargetDN -AclObject $Acl
+          $vAcl = Get-Acl -Path $TargetDN
+          $verified = $vAcl.Access | Where-Object { $_.IdentityReference.Value -eq $Identity.Translate([System.Security.Principal.SecurityIdentifier]).Value }
+          if (-not $verified) { throw "Verify failed" }
+          Write-Output "APPLIED: hunter_dfir ForceChangePassword on chief_command"; exit 2
+        } catch { Write-Output "FAILED: $_"; exit 1 }
+      register: r
+      changed_when: r.rc == 2
+      failed_when: r.rc not in [0, 2]
+
+    - name: "ACE#8 — lead_engineering → svc_ldap: GenericAll"
+      ansible.windows.win_shell: |
+        $ErrorActionPreference = "Stop"
+        try {
+          Import-Module ActiveDirectory
+          Set-Location AD:
+          $TargetDN = "CN=svc_ldap,OU=Engineering,DC=cadre,DC=local"
+          $Principal = "CADRE\lead_engineering"
+          $Rights = [System.DirectoryServices.ActiveDirectoryRights]::GenericAll
+          $AccessControlType = [System.Security.AccessControl.AccessControlType]::Allow
+          $ObjectType = $null
+          $Acl = Get-Acl -Path $TargetDN
+          $Identity = New-Object System.Security.Principal.NTAccount($Principal)
+          $exists = $Acl.Access | Where-Object { $_.IdentityReference.Value -eq $Identity.Translate([System.Security.Principal.SecurityIdentifier]).Value }
+          if ($exists) { Write-Output "OK: ACE exists"; exit 0 }
+          if (-not $ObjectType) {
+            $Rule = New-Object System.DirectoryServices.ActiveDirectoryAccessRule($Identity, $Rights, $AccessControlType)
+          } else {
+            $Rule = New-Object System.DirectoryServices.ActiveDirectoryAccessRule($Identity, $Rights, $AccessControlType, $ObjectType)
+          }
+          $Acl.AddAccessRule($Rule)
+          Set-Acl -Path $TargetDN -AclObject $Acl
+          $vAcl = Get-Acl -Path $TargetDN
+          $verified = $vAcl.Access | Where-Object { $_.IdentityReference.Value -eq $Identity.Translate([System.Security.Principal.SecurityIdentifier]).Value }
+          if (-not $verified) { throw "Verify failed" }
+          Write-Output "APPLIED: lead_engineering GenericAll on svc_ldap"; exit 2
+        } catch { Write-Output "FAILED: $_"; exit 1 }
+      register: r
+      changed_when: r.rc == 2
+      failed_when: r.rc not in [0, 2]
+
+    - name: "ACE#9 — Purple-Cell → OU=DFIR: WriteProperty"
+      ansible.windows.win_shell: |
+        $ErrorActionPreference = "Stop"
+        try {
+          Import-Module ActiveDirectory
+          Set-Location AD:
+          $TargetDN = "OU=DFIR,DC=cadre,DC=local"
+          $Principal = "CADRE\Purple-Cell"
+          $Rights = [System.DirectoryServices.ActiveDirectoryRights]::WriteProperty
+          $AccessControlType = [System.Security.AccessControl.AccessControlType]::Allow
+          $ObjectType = $null
+          $InheritanceType = [System.DirectoryServices.ActiveDirectorySecurityInheritance]::All
+          $Acl = Get-Acl -Path $TargetDN
+          $Identity = New-Object System.Security.Principal.NTAccount($Principal)
+          $exists = $Acl.Access | Where-Object { $_.IdentityReference.Value -eq $Identity.Translate([System.Security.Principal.SecurityIdentifier]).Value }
+          if ($exists) { Write-Output "OK: ACE exists"; exit 0 }
+          $Rule = New-Object System.DirectoryServices.ActiveDirectoryAccessRule($Identity, $Rights, $AccessControlType, $InheritanceType)
+          $Acl.AddAccessRule($Rule)
+          Set-Acl -Path $TargetDN -AclObject $Acl
+          $vAcl = Get-Acl -Path $TargetDN
+          $verified = $vAcl.Access | Where-Object { $_.IdentityReference.Value -eq $Identity.Translate([System.Security.Principal.SecurityIdentifier]).Value }
+          if (-not $verified) { throw "Verify failed" }
+          Write-Output "APPLIED: Purple-Cell WriteProperty on OU=DFIR"; exit 2
+        } catch { Write-Output "FAILED: $_"; exit 1 }
+      register: r
+      changed_when: r.rc == 2
+      failed_when: r.rc not in [0, 2]
+
+    - name: "ACE#10 — eng_cloud → gmsaTools$: ReadGMSAPassword"
+      ansible.windows.win_shell: |
+        $ErrorActionPreference = "Stop"
+        try {
+          $target = Get-ADServiceAccount -Identity "gmsaTools" -ErrorAction SilentlyContinue
+          if (-not $target) { Write-Output "SKIP: gMSA gmsaTools not found (KDS delay?)"; exit 0 }
+          Import-Module ActiveDirectory
+          Set-Location AD:
+          $TargetDN = $target.DistinguishedName
+          $Principal = "CADRE\eng_cloud"
+          $Rights = [System.DirectoryServices.ActiveDirectoryRights]::ReadProperty
+          $AccessControlType = [System.Security.AccessControl.AccessControlType]::Allow
+          $ObjectType = [GUID]"5b47d60f-6090-40b2-9f37-2a4de88f3063"
+          $Acl = Get-Acl -Path $TargetDN
+          $Identity = New-Object System.Security.Principal.NTAccount($Principal)
+          $exists = $Acl.Access | Where-Object { $_.IdentityReference.Value -eq $Identity.Translate([System.Security.Principal.SecurityIdentifier]).Value }
+          if ($exists) { Write-Output "OK: ACE exists"; exit 0 }
+          if (-not $ObjectType) {
+            $Rule = New-Object System.DirectoryServices.ActiveDirectoryAccessRule($Identity, $Rights, $AccessControlType)
+          } else {
+            $Rule = New-Object System.DirectoryServices.ActiveDirectoryAccessRule($Identity, $Rights, $AccessControlType, $ObjectType)
+          }
+          $Acl.AddAccessRule($Rule)
+          Set-Acl -Path $TargetDN -AclObject $Acl
+          $vAcl = Get-Acl -Path $TargetDN
+          $verified = $vAcl.Access | Where-Object { $_.IdentityReference.Value -eq $Identity.Translate([System.Security.Principal.SecurityIdentifier]).Value }
+          if (-not $verified) { throw "Verify failed" }
+          Write-Output "APPLIED: eng_cloud ReadGMSAPassword on gmsaTools$"; exit 2
+        } catch { Write-Output "FAILED: $_"; exit 1 }
+      register: r
+      changed_when: r.rc == 2
+      failed_when: r.rc not in [0, 2]
+
+    - name: "ACE#11 — analyst_purple → Cloud-Cadre: WriteMember"
+      ansible.windows.win_shell: |
+        $ErrorActionPreference = "Stop"
+        try {
+          Import-Module ActiveDirectory
+          Set-Location AD:
+          $TargetDN = "CN=Cloud-Cadre,OU=Cloud,DC=cadre,DC=local"
+          $Principal = "CADRE\analyst_purple"
+          $Rights = [System.DirectoryServices.ActiveDirectoryRights]::WriteProperty
+          $AccessControlType = [System.Security.AccessControl.AccessControlType]::Allow
+          $ObjectType = [GUID]"bf9679c0-0de6-11d0-a285-00aa003049e2"
+          $Acl = Get-Acl -Path $TargetDN
+          $Identity = New-Object System.Security.Principal.NTAccount($Principal)
+          $exists = $Acl.Access | Where-Object { $_.IdentityReference.Value -eq $Identity.Translate([System.Security.Principal.SecurityIdentifier]).Value }
+          if ($exists) { Write-Output "OK: ACE exists"; exit 0 }
+          if (-not $ObjectType) {
+            $Rule = New-Object System.DirectoryServices.ActiveDirectoryAccessRule($Identity, $Rights, $AccessControlType)
+          } else {
+            $Rule = New-Object System.DirectoryServices.ActiveDirectoryAccessRule($Identity, $Rights, $AccessControlType, $ObjectType)
+          }
+          $Acl.AddAccessRule($Rule)
+          Set-Acl -Path $TargetDN -AclObject $Acl
+          $vAcl = Get-Acl -Path $TargetDN
+          $verified = $vAcl.Access | Where-Object { $_.IdentityReference.Value -eq $Identity.Translate([System.Security.Principal.SecurityIdentifier]).Value }
+          if (-not $verified) { throw "Verify failed" }
+          Write-Output "APPLIED: analyst_purple WriteMember on Cloud-Cadre"; exit 2
+        } catch { Write-Output "FAILED: $_"; exit 1 }
+      register: r
+      changed_when: r.rc == 2
+      failed_when: r.rc not in [0, 2]
+
+    - name: "ACE#12 — eng_agentic → OU=Agentic: AllExtendedRights"
+      ansible.windows.win_shell: |
+        $ErrorActionPreference = "Stop"
+        try {
+          Import-Module ActiveDirectory
+          Set-Location AD:
+          $TargetDN = "OU=Agentic,DC=cadre,DC=local"
+          $Principal = "CADRE\eng_agentic"
+          $Rights = [System.DirectoryServices.ActiveDirectoryRights]::ExtendedRight
+          $AccessControlType = [System.Security.AccessControl.AccessControlType]::Allow
+          $ObjectType = [GUID]"00000000-0000-0000-0000-000000000000"
+          $InheritanceType = [System.DirectoryServices.ActiveDirectorySecurityInheritance]::All
+          $Acl = Get-Acl -Path $TargetDN
+          $Identity = New-Object System.Security.Principal.NTAccount($Principal)
+          $exists = $Acl.Access | Where-Object { $_.IdentityReference.Value -eq $Identity.Translate([System.Security.Principal.SecurityIdentifier]).Value }
+          if ($exists) { Write-Output "OK: ACE exists"; exit 0 }
+          $Rule = New-Object System.DirectoryServices.ActiveDirectoryAccessRule($Identity, $Rights, $AccessControlType, $ObjectType, $InheritanceType)
+          $Acl.AddAccessRule($Rule)
+          Set-Acl -Path $TargetDN -AclObject $Acl
+          $vAcl = Get-Acl -Path $TargetDN
+          $verified = $vAcl.Access | Where-Object { $_.IdentityReference.Value -eq $Identity.Translate([System.Security.Principal.SecurityIdentifier]).Value }
+          if (-not $verified) { throw "Verify failed" }
+          Write-Output "APPLIED: eng_agentic AllExtendedRights on OU=Agentic"; exit 2
+        } catch { Write-Output "FAILED: $_"; exit 1 }
+      register: r
+      changed_when: r.rc == 2
+      failed_when: r.rc not in [0, 2]
+
+- name: "dc01 — ACE group 3 (DCSync)"
+  hosts: dc01
+  gather_facts: false
+  tasks:
+    - name: "ACE#13+14 — eng_agentic → DC=cadre: DCSync (Get-Changes + Get-Changes-All)"
+      ansible.windows.win_shell: |
+        $ErrorActionPreference = "Stop"
+        try {
+          Import-Module ActiveDirectory
+          Set-Location AD:
+          $TargetDN = "DC=cadre,DC=local"
+          $Principal = "CADRE\eng_agentic"
+          $Rights = [System.DirectoryServices.ActiveDirectoryRights]::ExtendedRight
+          $AccessControlType = [System.Security.AccessControl.AccessControlType]::Allow
+          $dcsyncGUID = [GUID]"1131f6aa-9c07-11d1-f79f-00c04fc2dcd2"
+          $dcsyncAllGUID = [GUID]"1131f6ad-9c07-11d1-f79f-00c04fc2dcd2"
+          $Acl = Get-Acl -Path $TargetDN
+          $Identity = New-Object System.Security.Principal.NTAccount($Principal)
+          $checkId = $Identity.Translate([System.Security.Principal.SecurityIdentifier]).Value
+          $exists1 = $Acl.Access | Where-Object { $_.IdentityReference.Value -eq $checkId -and $_.ObjectType -eq $dcsyncGUID }
+          $exists2 = $Acl.Access | Where-Object { $_.IdentityReference.Value -eq $checkId -and $_.ObjectType -eq $dcsyncAllGUID }
+          if ($exists1 -and $exists2) { Write-Output "OK: Both DCSync ACEs exist"; exit 0 }
+          if (-not $exists1) { $Rule1 = New-Object System.DirectoryServices.ActiveDirectoryAccessRule($Identity, $Rights, $AccessControlType, $dcsyncGUID); $Acl.AddAccessRule($Rule1) }
+          if (-not $exists2) { $Rule2 = New-Object System.DirectoryServices.ActiveDirectoryAccessRule($Identity, $Rights, $AccessControlType, $dcsyncAllGUID); $Acl.AddAccessRule($Rule2) }
+          Set-Acl -Path $TargetDN -AclObject $Acl
+          $vAcl = Get-Acl -Path $TargetDN
+          $v1 = $vAcl.Access | Where-Object { $_.IdentityReference.Value -eq $checkId -and $_.ObjectType -eq $dcsyncGUID }
+          $v2 = $vAcl.Access | Where-Object { $_.IdentityReference.Value -eq $checkId -and $_.ObjectType -eq $dcsyncAllGUID }
+          if (-not $v1 -or -not $v2) { throw "Verify failed" }
+          Write-Output "APPLIED: DCSync ACEs granted to eng_agentic"; exit 2
+        } catch { Write-Output "FAILED: $_"; exit 1 }
+      register: r
+      changed_when: r.rc == 2
+      failed_when: r.rc not in [0, 2]
+
+# =============================================================================
+# PART 2: ACEs — child.cadre.local (dc02, 6 entries)
+# =============================================================================
+- name: "dc02 — child domain ACEs"
+  hosts: dc02
+  gather_facts: false
+  tasks:
+    - name: "ACE#15 — analyst_t1 → OU=Operations: GenericWrite"
+      ansible.windows.win_shell: |
+        $ErrorActionPreference = "Stop"
+        try {
+          Import-Module ActiveDirectory
+          Set-Location AD:
+          $TargetDN = "OU=Operations,DC=child,DC=cadre,DC=local"
+          $Principal = "CHILD\analyst_t1"
+          $Rights = [System.DirectoryServices.ActiveDirectoryRights]::GenericWrite
+          $AccessControlType = [System.Security.AccessControl.AccessControlType]::Allow
+          $ObjectType = $null
+          $InheritanceType = [System.DirectoryServices.ActiveDirectorySecurityInheritance]::All
+          $Acl = Get-Acl -Path $TargetDN
+          $Identity = New-Object System.Security.Principal.NTAccount($Principal)
+          $exists = $Acl.Access | Where-Object { $_.IdentityReference.Value -eq $Identity.Translate([System.Security.Principal.SecurityIdentifier]).Value }
+          if ($exists) { Write-Output "OK: ACE exists"; exit 0 }
+          $Rule = New-Object System.DirectoryServices.ActiveDirectoryAccessRule($Identity, $Rights, $AccessControlType, $InheritanceType)
+          $Acl.AddAccessRule($Rule)
+          Set-Acl -Path $TargetDN -AclObject $Acl
+          $vAcl = Get-Acl -Path $TargetDN
+          $verified = $vAcl.Access | Where-Object { $_.IdentityReference.Value -eq $Identity.Translate([System.Security.Principal.SecurityIdentifier]).Value }
+          if (-not $verified) { throw "Verify failed" }
+          Write-Output "APPLIED: analyst_t1 GenericWrite on OU=Operations"; exit 2
+        } catch { Write-Output "FAILED: $_"; exit 1 }
+      register: r
+      changed_when: r.rc == 2
+      failed_when: r.rc not in [0, 2]
+
+    - name: "ACE#16 — lead_detection → svc_mssql: GenericAll"
+      ansible.windows.win_shell: |
+        $ErrorActionPreference = "Stop"
+        try {
+          Import-Module ActiveDirectory
+          Set-Location AD:
+          $TargetDN = "CN=svc_mssql,OU=Operations,DC=child,DC=cadre,DC=local"
+          $Principal = "CHILD\lead_detection"
+          $Rights = [System.DirectoryServices.ActiveDirectoryRights]::GenericAll
+          $AccessControlType = [System.Security.AccessControl.AccessControlType]::Allow
+          $ObjectType = $null
+          $Acl = Get-Acl -Path $TargetDN
+          $Identity = New-Object System.Security.Principal.NTAccount($Principal)
+          $exists = $Acl.Access | Where-Object { $_.IdentityReference.Value -eq $Identity.Translate([System.Security.Principal.SecurityIdentifier]).Value }
+          if ($exists) { Write-Output "OK: ACE exists"; exit 0 }
+          if (-not $ObjectType) {
+            $Rule = New-Object System.DirectoryServices.ActiveDirectoryAccessRule($Identity, $Rights, $AccessControlType)
+          } else {
+            $Rule = New-Object System.DirectoryServices.ActiveDirectoryAccessRule($Identity, $Rights, $AccessControlType, $ObjectType)
+          }
+          $Acl.AddAccessRule($Rule)
+          Set-Acl -Path $TargetDN -AclObject $Acl
+          $vAcl = Get-Acl -Path $TargetDN
+          $verified = $vAcl.Access | Where-Object { $_.IdentityReference.Value -eq $Identity.Translate([System.Security.Principal.SecurityIdentifier]).Value }
+          if (-not $verified) { throw "Verify failed" }
+          Write-Output "APPLIED: lead_detection GenericAll on svc_mssql"; exit 2
+        } catch { Write-Output "FAILED: $_"; exit 1 }
+      register: r
+      changed_when: r.rc == 2
+      failed_when: r.rc not in [0, 2]
+
+    - name: "ACE#17 — mgr_incident → Detection-Cadre: WriteMember"
+      ansible.windows.win_shell: |
+        $ErrorActionPreference = "Stop"
+        try {
+          Import-Module ActiveDirectory
+          Set-Location AD:
+          $TargetDN = "CN=Detection-Cadre,OU=Detection,DC=child,DC=cadre,DC=local"
+          $Principal = "CHILD\mgr_incident"
+          $Rights = [System.DirectoryServices.ActiveDirectoryRights]::WriteProperty
+          $AccessControlType = [System.Security.AccessControl.AccessControlType]::Allow
+          $ObjectType = [GUID]"bf9679c0-0de6-11d0-a285-00aa003049e2"
+          $Acl = Get-Acl -Path $TargetDN
+          $Identity = New-Object System.Security.Principal.NTAccount($Principal)
+          $exists = $Acl.Access | Where-Object { $_.IdentityReference.Value -eq $Identity.Translate([System.Security.Principal.SecurityIdentifier]).Value }
+          if ($exists) { Write-Output "OK: ACE exists"; exit 0 }
+          if (-not $ObjectType) {
+            $Rule = New-Object System.DirectoryServices.ActiveDirectoryAccessRule($Identity, $Rights, $AccessControlType)
+          } else {
+            $Rule = New-Object System.DirectoryServices.ActiveDirectoryAccessRule($Identity, $Rights, $AccessControlType, $ObjectType)
+          }
+          $Acl.AddAccessRule($Rule)
+          Set-Acl -Path $TargetDN -AclObject $Acl
+          $vAcl = Get-Acl -Path $TargetDN
+          $verified = $vAcl.Access | Where-Object { $_.IdentityReference.Value -eq $Identity.Translate([System.Security.Principal.SecurityIdentifier]).Value }
+          if (-not $verified) { throw "Verify failed" }
+          Write-Output "APPLIED: mgr_incident WriteMember on Detection-Cadre"; exit 2
+        } catch { Write-Output "FAILED: $_"; exit 1 }
+      register: r
+      changed_when: r.rc == 2
+      failed_when: r.rc not in [0, 2]
+
+    - name: "ACE#18 — intern_blue → analyst_t2: ForceChangePassword"
+      ansible.windows.win_shell: |
+        $ErrorActionPreference = "Stop"
+        try {
+          Import-Module ActiveDirectory
+          Set-Location AD:
+          $TargetDN = "CN=analyst_t2,OU=Detection,DC=child,DC=cadre,DC=local"
+          $Principal = "CHILD\intern_blue"
+          $Rights = [System.DirectoryServices.ActiveDirectoryRights]::ExtendedRight
+          $AccessControlType = [System.Security.AccessControl.AccessControlType]::Allow
+          $ObjectType = [GUID]"00299570-246d-11d0-a768-00aa006e0529"
+          $Acl = Get-Acl -Path $TargetDN
+          $Identity = New-Object System.Security.Principal.NTAccount($Principal)
+          $exists = $Acl.Access | Where-Object { $_.IdentityReference.Value -eq $Identity.Translate([System.Security.Principal.SecurityIdentifier]).Value }
+          if ($exists) { Write-Output "OK: ACE exists"; exit 0 }
+          if (-not $ObjectType) {
+            $Rule = New-Object System.DirectoryServices.ActiveDirectoryAccessRule($Identity, $Rights, $AccessControlType)
+          } else {
+            $Rule = New-Object System.DirectoryServices.ActiveDirectoryAccessRule($Identity, $Rights, $AccessControlType, $ObjectType)
+          }
+          $Acl.AddAccessRule($Rule)
+          Set-Acl -Path $TargetDN -AclObject $Acl
+          $vAcl = Get-Acl -Path $TargetDN
+          $verified = $vAcl.Access | Where-Object { $_.IdentityReference.Value -eq $Identity.Translate([System.Security.Principal.SecurityIdentifier]).Value }
+          if (-not $verified) { throw "Verify failed" }
+          Write-Output "APPLIED: intern_blue ForceChangePassword on analyst_t2"; exit 2
+        } catch { Write-Output "FAILED: $_"; exit 1 }
+      register: r
+      changed_when: r.rc == 2
+      failed_when: r.rc not in [0, 2]
+
+    - name: "ACE#19 — analyst_t3 → Operations-Cadre: WriteOwner"
+      ansible.windows.win_shell: |
+        $ErrorActionPreference = "Stop"
+        try {
+          Import-Module ActiveDirectory
+          Set-Location AD:
+          $TargetDN = "CN=Operations-Cadre,OU=Operations,DC=child,DC=cadre,DC=local"
+          $Principal = "CHILD\analyst_t3"
+          $Rights = [System.DirectoryServices.ActiveDirectoryRights]::WriteOwner
+          $AccessControlType = [System.Security.AccessControl.AccessControlType]::Allow
+          $ObjectType = $null
+          $Acl = Get-Acl -Path $TargetDN
+          $Identity = New-Object System.Security.Principal.NTAccount($Principal)
+          $exists = $Acl.Access | Where-Object { $_.IdentityReference.Value -eq $Identity.Translate([System.Security.Principal.SecurityIdentifier]).Value }
+          if ($exists) { Write-Output "OK: ACE exists"; exit 0 }
+          if (-not $ObjectType) {
+            $Rule = New-Object System.DirectoryServices.ActiveDirectoryAccessRule($Identity, $Rights, $AccessControlType)
+          } else {
+            $Rule = New-Object System.DirectoryServices.ActiveDirectoryAccessRule($Identity, $Rights, $AccessControlType, $ObjectType)
+          }
+          $Acl.AddAccessRule($Rule)
+          Set-Acl -Path $TargetDN -AclObject $Acl
+          $vAcl = Get-Acl -Path $TargetDN
+          $verified = $vAcl.Access | Where-Object { $_.IdentityReference.Value -eq $Identity.Translate([System.Security.Principal.SecurityIdentifier]).Value }
+          if (-not $verified) { throw "Verify failed" }
+          Write-Output "APPLIED: analyst_t3 WriteOwner on Operations-Cadre"; exit 2
+        } catch { Write-Output "FAILED: $_"; exit 1 }
+      register: r
+      changed_when: r.rc == 2
+      failed_when: r.rc not in [0, 2]
+
+    - name: "ACE#20 — dir_operations → mbr01$: GenericWrite"
+      ansible.windows.win_shell: |
+        $ErrorActionPreference = "Stop"
+        try {
+          $comp = Get-ADComputer -Identity "mbr01" -Server "dc02.child.cadre.local" -ErrorAction SilentlyContinue
+          if (-not $comp) { Write-Output "SKIP: mbr01 not found in child domain"; exit 0 }
+          Import-Module ActiveDirectory
+          Set-Location AD:
+          $TargetDN = $comp.DistinguishedName
+          $Principal = "CHILD\dir_operations"
+          $Rights = [System.DirectoryServices.ActiveDirectoryRights]::GenericWrite
+          $AccessControlType = [System.Security.AccessControl.AccessControlType]::Allow
+          $ObjectType = $null
+          $Acl = Get-Acl -Path $TargetDN
+          $Identity = New-Object System.Security.Principal.NTAccount($Principal)
+          $exists = $Acl.Access | Where-Object { $_.IdentityReference.Value -eq $Identity.Translate([System.Security.Principal.SecurityIdentifier]).Value }
+          if ($exists) { Write-Output "OK: ACE exists"; exit 0 }
+          if (-not $ObjectType) {
+            $Rule = New-Object System.DirectoryServices.ActiveDirectoryAccessRule($Identity, $Rights, $AccessControlType)
+          } else {
+            $Rule = New-Object System.DirectoryServices.ActiveDirectoryAccessRule($Identity, $Rights, $AccessControlType, $ObjectType)
+          }
+          $Acl.AddAccessRule($Rule)
+          Set-Acl -Path $TargetDN -AclObject $Acl
+          $vAcl = Get-Acl -Path $TargetDN
+          $verified = $vAcl.Access | Where-Object { $_.IdentityReference.Value -eq $Identity.Translate([System.Security.Principal.SecurityIdentifier]).Value }
+          if (-not $verified) { throw "Verify failed" }
+          Write-Output "APPLIED: dir_operations GenericWrite on mbr01$"; exit 2
+        } catch { Write-Output "FAILED: $_"; exit 1 }
+      register: r
+      changed_when: r.rc == 2
+      failed_when: r.rc not in [0, 2]
+
+# =============================================================================
+# PART 3: ACEs — range.local (dc03, 7 entries)
+# =============================================================================
+- name: "dc03 — range domain ACEs"
+  hosts: dc03
+  gather_facts: false
+  tasks:
+    - name: "ACE#21 — Intelligence-Cadre → dc03$: GenericAll"
+      ansible.windows.win_shell: |
+        $ErrorActionPreference = "Stop"
+        try {
+          Import-Module ActiveDirectory
+          Set-Location AD:
+          $TargetDN = "CN=dc03,OU=Domain Controllers,DC=range,DC=local"
+          $Principal = "RANGE\Intelligence-Cadre"
+          $Rights = [System.DirectoryServices.ActiveDirectoryRights]::GenericAll
+          $AccessControlType = [System.Security.AccessControl.AccessControlType]::Allow
+          $ObjectType = $null
+          $Acl = Get-Acl -Path $TargetDN
+          $Identity = New-Object System.Security.Principal.NTAccount($Principal)
+          $exists = $Acl.Access | Where-Object { $_.IdentityReference.Value -eq $Identity.Translate([System.Security.Principal.SecurityIdentifier]).Value }
+          if ($exists) { Write-Output "OK: ACE exists"; exit 0 }
+          if (-not $ObjectType) {
+            $Rule = New-Object System.DirectoryServices.ActiveDirectoryAccessRule($Identity, $Rights, $AccessControlType)
+          } else {
+            $Rule = New-Object System.DirectoryServices.ActiveDirectoryAccessRule($Identity, $Rights, $AccessControlType, $ObjectType)
+          }
+          $Acl.AddAccessRule($Rule)
+          Set-Acl -Path $TargetDN -AclObject $Acl
+          $vAcl = Get-Acl -Path $TargetDN
+          $verified = $vAcl.Access | Where-Object { $_.IdentityReference.Value -eq $Identity.Translate([System.Security.Principal.SecurityIdentifier]).Value }
+          if (-not $verified) { throw "Verify failed" }
+          Write-Output "APPLIED: Intelligence-Cadre GenericAll on dc03$"; exit 2
+        } catch { Write-Output "FAILED: $_"; exit 1 }
+      register: r
+      changed_when: r.rc == 2
+      failed_when: r.rc not in [0, 2]
+
+    - name: "ACE#22 — eng_tools → Adversary-Cadre: WriteDacl"
+      ansible.windows.win_shell: |
+        $ErrorActionPreference = "Stop"
+        try {
+          Import-Module ActiveDirectory
+          Set-Location AD:
+          $TargetDN = "CN=Adversary-Cadre,OU=Adversary,DC=range,DC=local"
+          $Principal = "RANGE\eng_tools"
+          $Rights = [System.DirectoryServices.ActiveDirectoryRights]::WriteDacl
+          $AccessControlType = [System.Security.AccessControl.AccessControlType]::Allow
+          $ObjectType = $null
+          $Acl = Get-Acl -Path $TargetDN
+          $Identity = New-Object System.Security.Principal.NTAccount($Principal)
+          $exists = $Acl.Access | Where-Object { $_.IdentityReference.Value -eq $Identity.Translate([System.Security.Principal.SecurityIdentifier]).Value }
+          if ($exists) { Write-Output "OK: ACE exists"; exit 0 }
+          if (-not $ObjectType) {
+            $Rule = New-Object System.DirectoryServices.ActiveDirectoryAccessRule($Identity, $Rights, $AccessControlType)
+          } else {
+            $Rule = New-Object System.DirectoryServices.ActiveDirectoryAccessRule($Identity, $Rights, $AccessControlType, $ObjectType)
+          }
+          $Acl.AddAccessRule($Rule)
+          Set-Acl -Path $TargetDN -AclObject $Acl
+          $vAcl = Get-Acl -Path $TargetDN
+          $verified = $vAcl.Access | Where-Object { $_.IdentityReference.Value -eq $Identity.Translate([System.Security.Principal.SecurityIdentifier]).Value }
+          if (-not $verified) { throw "Verify failed" }
+          Write-Output "APPLIED: eng_tools WriteDacl on Adversary-Cadre"; exit 2
+        } catch { Write-Output "FAILED: $_"; exit 1 }
+      register: r
+      changed_when: r.rc == 2
+      failed_when: r.rc not in [0, 2]
+
+    - name: "ACE#23 — analyst_osint → svc_naa: GenericAll"
+      ansible.windows.win_shell: |
+        $ErrorActionPreference = "Stop"
+        try {
+          Import-Module ActiveDirectory
+          Set-Location AD:
+          $TargetDN = "CN=svc_naa,OU=Adversary,DC=range,DC=local"
+          $Principal = "RANGE\analyst_osint"
+          $Rights = [System.DirectoryServices.ActiveDirectoryRights]::GenericAll
+          $AccessControlType = [System.Security.AccessControl.AccessControlType]::Allow
+          $ObjectType = $null
+          $Acl = Get-Acl -Path $TargetDN
+          $Identity = New-Object System.Security.Principal.NTAccount($Principal)
+          $exists = $Acl.Access | Where-Object { $_.IdentityReference.Value -eq $Identity.Translate([System.Security.Principal.SecurityIdentifier]).Value }
+          if ($exists) { Write-Output "OK: ACE exists"; exit 0 }
+          if (-not $ObjectType) {
+            $Rule = New-Object System.DirectoryServices.ActiveDirectoryAccessRule($Identity, $Rights, $AccessControlType)
+          } else {
+            $Rule = New-Object System.DirectoryServices.ActiveDirectoryAccessRule($Identity, $Rights, $AccessControlType, $ObjectType)
+          }
+          $Acl.AddAccessRule($Rule)
+          Set-Acl -Path $TargetDN -AclObject $Acl
+          $vAcl = Get-Acl -Path $TargetDN
+          $verified = $vAcl.Access | Where-Object { $_.IdentityReference.Value -eq $Identity.Translate([System.Security.Principal.SecurityIdentifier]).Value }
+          if (-not $verified) { throw "Verify failed" }
+          Write-Output "APPLIED: analyst_osint GenericAll on svc_naa"; exit 2
+        } catch { Write-Output "FAILED: $_"; exit 1 }
+      register: r
+      changed_when: r.rc == 2
+      failed_when: r.rc not in [0, 2]
+
+    - name: "ACE#24 — adversary_lead → dmsaPrivService$: GenericWrite"
+      ansible.windows.win_shell: |
+        $ErrorActionPreference = "Stop"
+        try {
+          $target = Get-ADServiceAccount -Identity "dmsaPrivService" -ErrorAction SilentlyContinue
+          if (-not $target) { Write-Output "SKIP: dMSA dmsaPrivService not found"; exit 0 }
+          Import-Module ActiveDirectory
+          Set-Location AD:
+          $TargetDN = $target.DistinguishedName
+          $Principal = "RANGE\adversary_lead"
+          $Rights = [System.DirectoryServices.ActiveDirectoryRights]::GenericWrite
+          $AccessControlType = [System.Security.AccessControl.AccessControlType]::Allow
+          $ObjectType = $null
+          $Acl = Get-Acl -Path $TargetDN
+          $Identity = New-Object System.Security.Principal.NTAccount($Principal)
+          $exists = $Acl.Access | Where-Object { $_.IdentityReference.Value -eq $Identity.Translate([System.Security.Principal.SecurityIdentifier]).Value }
+          if ($exists) { Write-Output "OK: ACE exists"; exit 0 }
+          if (-not $ObjectType) {
+            $Rule = New-Object System.DirectoryServices.ActiveDirectoryAccessRule($Identity, $Rights, $AccessControlType)
+          } else {
+            $Rule = New-Object System.DirectoryServices.ActiveDirectoryAccessRule($Identity, $Rights, $AccessControlType, $ObjectType)
+          }
+          $Acl.AddAccessRule($Rule)
+          Set-Acl -Path $TargetDN -AclObject $Acl
+          $vAcl = Get-Acl -Path $TargetDN
+          $verified = $vAcl.Access | Where-Object { $_.IdentityReference.Value -eq $Identity.Translate([System.Security.Principal.SecurityIdentifier]).Value }
+          if (-not $verified) { throw "Verify failed" }
+          Write-Output "APPLIED: adversary_lead GenericWrite on dmsaPrivService$"; exit 2
+        } catch { Write-Output "FAILED: $_"; exit 1 }
+      register: r
+      changed_when: r.rc == 2
+      failed_when: r.rc not in [0, 2]
+
+    - name: "ACE#25 — analyst_malware → svc_sccm: WriteProperty(SPN)"
+      ansible.windows.win_shell: |
+        $ErrorActionPreference = "Stop"
+        try {
+          Import-Module ActiveDirectory
+          Set-Location AD:
+          $TargetDN = "CN=svc_sccm,OU=Adversary,DC=range,DC=local"
+          $Principal = "RANGE\analyst_malware"
+          $Rights = [System.DirectoryServices.ActiveDirectoryRights]::WriteProperty
+          $AccessControlType = [System.Security.AccessControl.AccessControlType]::Allow
+          $ObjectType = [GUID]"f3a64788-5306-11d1-a9c5-0000f80367c1"
+          $Acl = Get-Acl -Path $TargetDN
+          $Identity = New-Object System.Security.Principal.NTAccount($Principal)
+          $exists = $Acl.Access | Where-Object { $_.IdentityReference.Value -eq $Identity.Translate([System.Security.Principal.SecurityIdentifier]).Value }
+          if ($exists) { Write-Output "OK: ACE exists"; exit 0 }
+          if (-not $ObjectType) {
+            $Rule = New-Object System.DirectoryServices.ActiveDirectoryAccessRule($Identity, $Rights, $AccessControlType)
+          } else {
+            $Rule = New-Object System.DirectoryServices.ActiveDirectoryAccessRule($Identity, $Rights, $AccessControlType, $ObjectType)
+          }
+          $Acl.AddAccessRule($Rule)
+          Set-Acl -Path $TargetDN -AclObject $Acl
+          $vAcl = Get-Acl -Path $TargetDN
+          $verified = $vAcl.Access | Where-Object { $_.IdentityReference.Value -eq $Identity.Translate([System.Security.Principal.SecurityIdentifier]).Value }
+          if (-not $verified) { throw "Verify failed" }
+          Write-Output "APPLIED: analyst_malware WriteProperty(SPN) on svc_sccm"; exit 2
+        } catch { Write-Output "FAILED: $_"; exit 1 }
+      register: r
+      changed_when: r.rc == 2
+      failed_when: r.rc not in [0, 2]
+
+    - name: "ACE#26 — analyst_forensic → svc_naa: AllExtendedRights"
+      ansible.windows.win_shell: |
+        $ErrorActionPreference = "Stop"
+        try {
+          Import-Module ActiveDirectory
+          Set-Location AD:
+          $TargetDN = "CN=svc_naa,OU=Adversary,DC=range,DC=local"
+          $Principal = "RANGE\analyst_forensic"
+          $Rights = [System.DirectoryServices.ActiveDirectoryRights]::ExtendedRight
+          $AccessControlType = [System.Security.AccessControl.AccessControlType]::Allow
+          $ObjectType = [GUID]"00000000-0000-0000-0000-000000000000"
+          $Acl = Get-Acl -Path $TargetDN
+          $Identity = New-Object System.Security.Principal.NTAccount($Principal)
+          $exists = $Acl.Access | Where-Object { $_.IdentityReference.Value -eq $Identity.Translate([System.Security.Principal.SecurityIdentifier]).Value }
+          if ($exists) { Write-Output "OK: ACE exists"; exit 0 }
+          if (-not $ObjectType) {
+            $Rule = New-Object System.DirectoryServices.ActiveDirectoryAccessRule($Identity, $Rights, $AccessControlType)
+          } else {
+            $Rule = New-Object System.DirectoryServices.ActiveDirectoryAccessRule($Identity, $Rights, $AccessControlType, $ObjectType)
+          }
+          $Acl.AddAccessRule($Rule)
+          Set-Acl -Path $TargetDN -AclObject $Acl
+          $vAcl = Get-Acl -Path $TargetDN
+          $verified = $vAcl.Access | Where-Object { $_.IdentityReference.Value -eq $Identity.Translate([System.Security.Principal.SecurityIdentifier]).Value }
+          if (-not $verified) { throw "Verify failed" }
+          Write-Output "APPLIED: analyst_forensic AllExtendedRights on svc_naa"; exit 2
+        } catch { Write-Output "FAILED: $_"; exit 1 }
+      register: r
+      changed_when: r.rc == 2
+      failed_when: r.rc not in [0, 2]
+
+# =============================================================================
+# PART 4: Kerberos Attack Surface (dc01 target)
+# =============================================================================
+- name: "SPN Registration — cadre.local (via dc01)"
+  hosts: dc01
+  gather_facts: false
+  tasks:
+    - name: "[SPN][WT#1][WT#33] Register SPNs: svc_ldap, chief_command, mssql-linux01"
+      ansible.windows.win_shell: |
+        $ErrorActionPreference = "Stop"
+        try {
+          $entries = @(
+            @{User="svc_ldap"; SPN="ldap/svc-ldap.cadre.local"},
+            @{User="chief_command"; SPN="HTTP/cadre-portal.cadre.local"},
+            @{User="mssql-linux01"; SPN="MSSQLSvc/linux01.cadre.local:1433"}
+          )
+          $applied = $false
+          foreach ($e in $entries) {
+            $obj = Get-ADUser -Identity $e.User -Properties ServicePrincipalNames -ErrorAction SilentlyContinue
+            if (-not $obj) { $obj = Get-ADComputer -Identity $e.User -Properties ServicePrincipalNames -ErrorAction SilentlyContinue }
+            if (-not $obj) { $obj = Get-ADServiceAccount -Identity $e.User -Properties ServicePrincipalNames -ErrorAction SilentlyContinue }
+            if (-not $obj) { continue }
+            if ($obj.ServicePrincipalNames -contains $e.SPN) { continue }
+            if ($obj.ObjectClass -eq "computer") {
+              Set-ADComputer -Identity $e.User -ServicePrincipalNames @{Add=$e.SPN}
+            } elseif ($obj.ObjectClass -eq "msDS-GroupManagedServiceAccount") {
+              Set-ADServiceAccount -Identity $e.User -ServicePrincipalNames @{Add=$e.SPN}
+            } else {
+              Set-ADUser -Identity $e.User -ServicePrincipalNames @{Add=$e.SPN}
+            }
+            $applied = $true
+          }
+          if (-not $applied) { Write-Output "OK: All SPNs already present"; exit 0 }
+          Write-Output "APPLIED: cadre.local SPNs registered"; exit 2
+        } catch { Write-Output "FAILED: $_"; exit 1 }
+      register: r
+      changed_when: r.rc == 2
+      failed_when: r.rc not in [0, 2]
+
+- name: "SPN Registration — child.cadre.local (via dc02)"
+  hosts: dc02
+  gather_facts: false
+  tasks:
+    - name: "[SPN][WT#1] Register SPN: svc_mssql (MSSQLSvc/mbr01.child)"
+      ansible.windows.win_shell: |
+        $ErrorActionPreference = "Stop"
+        try {
+          $entries = @(
+            @{User="svc_mssql"; SPN="MSSQLSvc/mbr01.child.cadre.local:1433"}
+          )
+          $applied = $false
+          foreach ($e in $entries) {
+            $obj = Get-ADUser -Identity $e.User -Properties ServicePrincipalNames -ErrorAction SilentlyContinue
+            if (-not $obj) { $obj = Get-ADComputer -Identity $e.User -Properties ServicePrincipalNames -ErrorAction SilentlyContinue }
+            if (-not $obj) { $obj = Get-ADServiceAccount -Identity $e.User -Properties ServicePrincipalNames -ErrorAction SilentlyContinue }
+            if (-not $obj) { continue }
+            if ($obj.ServicePrincipalNames -contains $e.SPN) { continue }
+            if ($obj.ObjectClass -eq "computer") {
+              Set-ADComputer -Identity $e.User -ServicePrincipalNames @{Add=$e.SPN}
+            } elseif ($obj.ObjectClass -eq "msDS-GroupManagedServiceAccount") {
+              Set-ADServiceAccount -Identity $e.User -ServicePrincipalNames @{Add=$e.SPN}
+            } else {
+              Set-ADUser -Identity $e.User -ServicePrincipalNames @{Add=$e.SPN}
+            }
+            $applied = $true
+          }
+          if (-not $applied) { Write-Output "OK: All SPNs already present"; exit 0 }
+          Write-Output "APPLIED: child.cadre.local SPNs registered"; exit 2
+        } catch { Write-Output "FAILED: $_"; exit 1 }
+      register: r
+      changed_when: r.rc == 2
+      failed_when: r.rc not in [0, 2]
+
+- name: "AS-REP for child.cadre.local (via dc02)"
+  hosts: dc02
+  gather_facts: false
+  tasks:
+    - name: "[AUTH][WT#3] AS-REP: intern_blue (child.cadre.local)"
+      ansible.windows.win_shell: |
+        $ErrorActionPreference = "Stop"
+        try {
+          $user = Get-ADUser -Identity "intern_blue" -Properties DoesNotRequirePreAuth -ErrorAction SilentlyContinue
+          if (-not $user) { Write-Output "SKIP: intern_blue not found"; exit 0 }
+          if ($user.DoesNotRequirePreAuth -eq $true) { Write-Output "OK: intern_blue already no preauth"; exit 0 }
+          Set-ADAccountControl -Identity "intern_blue" -DoesNotRequirePreAuth $true
+          $v = Get-ADUser -Identity "intern_blue" -Properties DoesNotRequirePreAuth
+          if ($v.DoesNotRequirePreAuth -ne $true) { throw "intern_blue not set" }
+          Write-Output "APPLIED: intern_blue AS-REP enabled"; exit 2
+        } catch { Write-Output "FAILED: $_"; exit 1 }
+      register: r
+      changed_when: r.rc == 2
+      failed_when: r.rc not in [0, 2]
+
+- name: "SPN Registration — range.local (via dc03)"
+  hosts: dc03
+  gather_facts: false
+  tasks:
+    - name: "[SPN][WT#2][WT#33] Register SPNs: svc_mssql, svc_sccm (range.local)"
+      ansible.windows.win_shell: |
+        $ErrorActionPreference = "Stop"
+        try {
+          $entries = @(
+            @{User="svc_mssql"; SPN="MSSQLSvc/mbr02.range.local:1433"},
+            @{User="svc_sccm"; SPN="HTTP/mbr02.range.local"}
+          )
+          $applied = $false
+          foreach ($e in $entries) {
+            $obj = Get-ADUser -Identity $e.User -Properties ServicePrincipalNames -ErrorAction SilentlyContinue
+            if (-not $obj) { $obj = Get-ADComputer -Identity $e.User -Properties ServicePrincipalNames -ErrorAction SilentlyContinue }
+            if (-not $obj) { $obj = Get-ADServiceAccount -Identity $e.User -Properties ServicePrincipalNames -ErrorAction SilentlyContinue }
+            if (-not $obj) { continue }
+            if ($obj.ServicePrincipalNames -contains $e.SPN) { continue }
+            if ($obj.ObjectClass -eq "computer") {
+              Set-ADComputer -Identity $e.User -ServicePrincipalNames @{Add=$e.SPN}
+            } elseif ($obj.ObjectClass -eq "msDS-GroupManagedServiceAccount") {
+              Set-ADServiceAccount -Identity $e.User -ServicePrincipalNames @{Add=$e.SPN}
+            } else {
+              Set-ADUser -Identity $e.User -ServicePrincipalNames @{Add=$e.SPN}
+            }
+            $applied = $true
+          }
+          if (-not $applied) { Write-Output "OK: All SPNs already present"; exit 0 }
+          Write-Output "APPLIED: range.local SPNs registered"; exit 2
+        } catch { Write-Output "FAILED: $_"; exit 1 }
+      register: r
+      changed_when: r.rc == 2
+      failed_when: r.rc not in [0, 2]
+
+    - name: "[AUTH][WT#3] AS-REP: intern_intel (range.local)"
+      ansible.windows.win_shell: |
+        $ErrorActionPreference = "Stop"
+        try {
+          $user = Get-ADUser -Identity "intern_intel" -Server "dc03.range.local" -Properties DoesNotRequirePreAuth -ErrorAction SilentlyContinue
+          if (-not $user) { Write-Output "SKIP: intern_intel not found"; exit 0 }
+          if ($user.DoesNotRequirePreAuth -eq $true) { Write-Output "OK: intern_intel already no preauth"; exit 0 }
+          Set-ADAccountControl -Identity "intern_intel" -Server "dc03.range.local" -DoesNotRequirePreAuth $true
+          $v = Get-ADUser -Identity "intern_intel" -Server "dc03.range.local" -Properties DoesNotRequirePreAuth
+          if ($v.DoesNotRequirePreAuth -ne $true) { throw "intern_intel not set" }
+          Write-Output "APPLIED: intern_intel AS-REP enabled"; exit 2
+        } catch { Write-Output "FAILED: $_"; exit 1 }
+      register: r
+      changed_when: r.rc == 2
+      failed_when: r.rc not in [0, 2]
+
+- name: "Kerberoast SPN encryption + AS-REP for cadre.local (dc01)"
+  hosts: dc01
+  gather_facts: false
+  tasks:
+    # AES128+AES256 (24) — NOT RC4-only. RC4 is non-viable on Server 2025 (KDC blocks it),
+    # so RC4-only accounts can't obtain tickets at all; these are DA/service accounts used
+    # by DCSync/Golden Ticket/campaign chains, so they MUST be AES-capable. They remain
+    # real AES Kerberoast targets (WT#002).
+    - name: "[AUTH][WT#2] AES Kerberoast targets: chief_command, svc_ldap"
+      ansible.windows.win_shell: |
+        $ErrorActionPreference = "Stop"
+        try {
+          $applied = $false
+          $targets = @("chief_command", "svc_ldap")
+          foreach ($u in $targets) {
+            $user = Get-ADUser -Identity $u -Properties msDS-SupportedEncryptionTypes
+            if ($user.'msDS-SupportedEncryptionTypes' -eq 24) { Write-Output "OK: $u already AES128+AES256"; continue }
+            Set-ADUser -Identity $u -Replace @{"msDS-SupportedEncryptionTypes"=24}
+            $v = Get-ADUser -Identity $u -Properties msDS-SupportedEncryptionTypes
+            if ($v.'msDS-SupportedEncryptionTypes' -ne 24) { throw "$u AES enc-types not applied" }
+            Write-Output "APPLIED: $u set to AES128+AES256"; $applied = $true
+          }
+          if (-not $applied) { Write-Output "OK: All already AES128+AES256"; exit 0 }
+          exit 2
+        } catch { Write-Output "FAILED: $_"; exit 1 }
+      register: r
+      changed_when: r.rc == 2
+      failed_when: r.rc not in [0, 2]
+
+    - name: "[AUTH][WT#3] AS-REP: analyst_purple (cadre.local)"
+      ansible.windows.win_shell: |
+        $ErrorActionPreference = "Stop"
+        try {
+          $user = Get-ADUser -Identity "analyst_purple" -Properties DoesNotRequirePreAuth -ErrorAction SilentlyContinue
+          if (-not $user) { Write-Output "SKIP: analyst_purple not found"; exit 0 }
+          if ($user.DoesNotRequirePreAuth -eq $true) { Write-Output "OK: analyst_purple already no preauth"; exit 0 }
+          Set-ADAccountControl -Identity "analyst_purple" -DoesNotRequirePreAuth $true
+          $v = Get-ADUser -Identity "analyst_purple" -Properties DoesNotRequirePreAuth
+          if ($v.DoesNotRequirePreAuth -ne $true) { throw "analyst_purple not set" }
+          Write-Output "APPLIED: analyst_purple AS-REP enabled"; exit 2
+        } catch { Write-Output "FAILED: $_"; exit 1 }
+      register: r
+      changed_when: r.rc == 2
+      failed_when: r.rc not in [0, 2]
+
+- name: "CVE-2026-25177 + SPN Unicode"
+  hosts: dc01
+  gather_facts: false
+  tasks:
+    - name: "SPN Unicode Jacking — Self ValidatedWriteSPN on analyst_cloud"
+      ansible.windows.win_shell: |
+        $ErrorActionPreference = "Stop"
+        try {
+          $self = [System.Security.Principal.SecurityIdentifier]"S-1-5-10"
+          $vwSpnGUID = [GUID]"f3a64788-5306-11d1-a9c5-0000f80367c1"
+          $desc = (Get-ADObject "CN=analyst_cloud,OU=Cloud,DC=cadre,DC=local" -Properties ntSecurityDescriptor).ntSecurityDescriptor
+          $exists = $desc.Access | Where-Object { $_.ObjectType -eq $vwSpnGUID -and $_.IdentityReference -match "SELF" }
+          if ($exists) { Write-Output "OK: Self ACE exists"; exit 0 }
+          $ace = New-Object System.DirectoryServices.ActiveDirectoryAccessRule($self, [System.DirectoryServices.ActiveDirectoryRights]::Self, [System.Security.AccessControl.AccessControlType]::Allow, $vwSpnGUID)
+          $desc.AddAccessRule($ace)
+          Set-ADObject "CN=analyst_cloud,OU=Cloud,DC=cadre,DC=local" -Replace @{ntSecurityDescriptor=$desc}
+          $vDesc = (Get-ADObject "CN=analyst_cloud,OU=Cloud,DC=cadre,DC=local" -Properties ntSecurityDescriptor).ntSecurityDescriptor
+          $ver = $vDesc.Access | Where-Object { $_.ObjectType -eq $vwSpnGUID -and $_.IdentityReference -match "SELF" }
+          if (-not $ver) { throw "Verify failed" }
+          Write-Output "APPLIED: Self ValidatedWriteSPN on analyst_cloud"; exit 2
+        } catch { Write-Output "FAILED: $_"; exit 1 }
+      register: r
+      changed_when: r.rc == 2
+      failed_when: r.rc not in [0, 2]
+
+    - name: "[PREP][WT#27] SPN uniqueness check disabled (SpnSuffixesValidationDisabled)"
+      ansible.windows.win_regedit:
+        path: HKLM:\SYSTEM\CurrentControlSet\Services\NTDS\Parameters
+        name: SpnSuffixesValidationDisabled
+        data: 1
+        type: dword
+
+# =============================================================================
+# PART 4b: CVE-2026-25177 — Pre-stage Cyrillic homoglyph SPN (dc02)
+# =============================================================================
+- name: "CVE-2026-25177 — Pre-stage homoglyph SPN"
+  hosts: dc02
+  gather_facts: false
+  tasks:
+    - name: "[PREP][WT#27] Pre-stage Cyrillic homoglyph SPN on analyst_t1"
+      ansible.windows.win_shell: |
+        $ErrorActionPreference = "Stop"
+        try {
+          $obj = Get-ADUser -Identity "analyst_t1" -Properties ServicePrincipalNames -ErrorAction SilentlyContinue
+          if (-not $obj) { $obj = Get-ADComputer -Identity "analyst_t1" -Properties ServicePrincipalNames -ErrorAction SilentlyContinue }
+          if (-not $obj) { $obj = Get-ADServiceAccount -Identity "analyst_t1" -Properties ServicePrincipalNames -ErrorAction SilentlyContinue }
+          if (-not $obj) { Write-Output "SKIP: analyst_t1 not found"; exit 0 }
+          $homoglyphSPN = "MSSQLSvc/mbr01.child.c$([char]0x0430)dre.loc$([char]0x0430)l:1433"
+          if ($obj.ServicePrincipalNames -contains $homoglyphSPN) { Write-Output "OK: Homoglyph SPN already present"; exit 0 }
+          Set-ADUser -Identity "analyst_t1" -ServicePrincipalNames @{Add=$homoglyphSPN}
+          $verify = Get-ADUser -Identity "analyst_t1" -Properties ServicePrincipalNames
+          if ($verify.ServicePrincipalNames -notcontains $homoglyphSPN) { throw "Verify failed" }
+          Write-Output "APPLIED: Cyrillic homoglyph SPN registered on analyst_t1"; exit 2
+        } catch { Write-Output "FAILED: $_"; exit 1 }
+      register: r
+      changed_when: r.rc == 2
+      failed_when: r.rc not in [0, 2]
+
+# =============================================================================
+# PART 5: AES-only encryption on range.local (dc03)
+# =============================================================================
+- name: "dc03 — AES-only encryption on all accounts"
+  hosts: dc03
+  gather_facts: false
+  tasks:
+    - name: "[AUTH][WT#2] AES-only (type 24): all range.local accounts"
+      ansible.windows.win_shell: |
+        $ErrorActionPreference = "Stop"
+        try {
+          $applied = $false
+          $users = Get-ADUser -Filter * -SearchBase "DC=range,DC=local" -Properties msDS-SupportedEncryptionTypes
+          foreach ($u in $users) {
+            if ($u.'msDS-SupportedEncryptionTypes' -ne 24) {
+              Set-ADUser -Identity $u.DistinguishedName -Replace @{"msDS-SupportedEncryptionTypes"=24}
+              $applied = $true
+            }
+          }
+          $svcAccts = Get-ADServiceAccount -Filter * -SearchBase "DC=range,DC=local" -ErrorAction SilentlyContinue
+          foreach ($s in $svcAccts) {
+            if ($s.'msDS-SupportedEncryptionTypes' -ne 24) {
+              Set-ADServiceAccount -Identity $s.DistinguishedName -Replace @{"msDS-SupportedEncryptionTypes"=24}
+              $applied = $true
+            }
+          }
+          $vUsers = Get-ADUser -Filter * -SearchBase "DC=range,DC=local" -Properties msDS-SupportedEncryptionTypes
+          $bad = $vUsers | Where-Object { $_."msDS-SupportedEncryptionTypes" -ne 24 }
+          if ($bad) { throw "$($bad.Count) accounts still wrong" }
+          if (-not $applied) { Write-Output "OK: All already AES-only"; exit 0 }
+          Write-Output "APPLIED: All accounts set to AES-only and verified"; exit 2
+        } catch { Write-Output "FAILED: $_"; exit 1 }
+      register: r
+      changed_when: r.rc == 2
+      failed_when: r.rc not in [0, 2]
+
+# =============================================================================
+# PART 6: Delegation settings (dc02 + dc03)
+# =============================================================================
+- name: "dc02 — Unconstrained delegation + RBCD"
+  hosts: dc02
+  gather_facts: false
+  tasks:
+    - name: "[DELEG][WT#4] Unconstrained delegation on mbr01$"
+      ansible.windows.win_shell: |
+        $ErrorActionPreference = "Stop"
+        try {
+          $comp = Get-ADComputer -Identity "mbr01" -Server "dc02.child.cadre.local" -Properties TrustedForDelegation -ErrorAction Stop
+          if ($comp.TrustedForDelegation) { Write-Output "OK: mbr01 already trusted for delegation"; exit 0 }
+          Set-ADComputer -Identity "mbr01" -Server "dc02.child.cadre.local" -TrustedForDelegation $true
+          $v = Get-ADComputer -Identity "mbr01" -Server "dc02.child.cadre.local" -Properties TrustedForDelegation
+          if (-not $v.TrustedForDelegation) { throw "Verify failed" }
+          Write-Output "APPLIED: mbr01 TrustedForDelegation set and verified"; exit 2
+        } catch { Write-Output "FAILED: $_"; exit 1 }
+      register: r
+      changed_when: r.rc == 2
+      failed_when: r.rc not in [0, 2]
+
+    - name: "RBCD — analyst_t1 WriteProperty on mbr01$ (msDS-AllowedToActOnBehalfOfOtherIdentity)"
+      ansible.windows.win_shell: |
+        $ErrorActionPreference = "Stop"
+        try {
+          $comp = Get-ADComputer -Identity "mbr01" -Server "dc02.child.cadre.local" -ErrorAction Stop
+          $src = Get-ADUser -Identity "analyst_t1" -Server "dc02.child.cadre.local"
+          $sourceSID = $src.SID.Value
+          $rbcdGUID = [GUID]"3f78c3e5-f79a-46bd-a0b8-9d18116ddc79"
+          $desc = (Get-ADObject $comp.DistinguishedName -Properties ntSecurityDescriptor).ntSecurityDescriptor
+          $exists = $desc.Access | Where-Object { try { $_.IdentityReference.Translate([System.Security.Principal.SecurityIdentifier]).Value -eq $sourceSID } catch { $false } }
+          if ($exists) { Write-Output "OK: ACE exists"; exit 0 }
+          $ace = New-Object System.DirectoryServices.ActiveDirectoryAccessRule([System.Security.Principal.SecurityIdentifier]$sourceSID, [System.DirectoryServices.ActiveDirectoryRights]::WriteProperty, [System.Security.AccessControl.AccessControlType]::Allow, $rbcdGUID)
+          $desc.AddAccessRule($ace)
+          Set-ADObject $comp.DistinguishedName -Replace @{ntSecurityDescriptor=$desc}
+          $vDesc = (Get-ADObject $comp.DistinguishedName -Properties ntSecurityDescriptor).ntSecurityDescriptor
+          $ver = $vDesc.Access | Where-Object { try { $_.IdentityReference.Translate([System.Security.Principal.SecurityIdentifier]).Value -eq $sourceSID } catch { $false } }
+          if (-not $ver) { throw "Verify failed" }
+          Write-Output "APPLIED: RBCD analyst_t1 -> mbr01$ set and verified"; exit 2
+        } catch { Write-Output "FAILED: $_"; exit 1 }
+      register: r
+      changed_when: r.rc == 2
+      failed_when: r.rc not in [0, 2]
+
+- name: "dc03 — Constrained delegation"
+  hosts: dc03
+  gather_facts: false
+  tasks:
+    - name: "[DELEG][WT#5] Constrained delegation mbr02$ (prototrans)"
+      ansible.windows.win_shell: |
+        $ErrorActionPreference = "Stop"
+        try {
+          $computer = Get-ADComputer -Identity "mbr02" -Server "dc03.range.local" -Properties msDS-AllowedToDelegateTo, userAccountControl
+          if (-not $computer) { Write-Output "SKIP: mbr02 not found"; exit 0 }
+          $expectedSPNs = @("cifs/dc03.range.local", "ldap/dc03.range.local")
+          $currentSPNs = @($computer."msDS-AllowedToDelegateTo")
+          $hasSPNs = ($currentSPNs.Count -ge 2 -and $currentSPNs -contains $expectedSPNs[0] -and $currentSPNs -contains $expectedSPNs[1])
+          $hasProtoTrans = ($computer.userAccountControl -band 0x0080000) -eq 0x0080000
+          if ($hasSPNs -and $hasProtoTrans) { Write-Output "OK: Already configured"; exit 0 }
+          if (-not $hasSPNs) { Set-ADComputer -Identity "mbr02" -Server "dc03.range.local" -Add @{ "msDS-AllowedToDelegateTo" = [string[]]@("cifs/dc03.range.local", "ldap/dc03.range.local") } }
+          if (-not $hasProtoTrans) { Set-ADComputer -Identity "mbr02" -Server "dc03.range.local" -Replace @{"userAccountControl"=$computer.userAccountControl -bor 0x0080000} }
+          $v = Get-ADComputer -Identity "mbr02" -Server "dc03.range.local" -Properties msDS-AllowedToDelegateTo, userAccountControl
+          $vSPNs = @($v."msDS-AllowedToDelegateTo")
+          if (-not ($vSPNs -contains $expectedSPNs[0] -and $vSPNs -contains $expectedSPNs[1])) { throw "SPNs not set" }
+          if (($v.userAccountControl -band 0x0080000) -ne 0x0080000) { throw "Prototrans flag not set" }
+          Write-Output "APPLIED: mbr02 constrained delegation (prototrans) configured and verified"; exit 2
+        } catch { Write-Output "FAILED: $_"; exit 1 }
+      register: r
+      changed_when: r.rc == 2
+      failed_when: r.rc not in [0, 2]
+
+    - name: "[DELEG][WT#6] Constrained delegation svc_sccm (no prototrans)"
+      ansible.windows.win_shell: |
+        $ErrorActionPreference = "Stop"
+        try {
+          $user = Get-ADUser -Identity "svc_sccm" -Server "dc03.range.local" -Properties msDS-AllowedToDelegateTo
+          if (-not $user) { Write-Output "SKIP: svc_sccm not found"; exit 0 }
+          $expectedSPN = "HTTP/mbr02.range.local"
+          $currentSPNs = @($user."msDS-AllowedToDelegateTo")
+          if ($currentSPNs -contains $expectedSPN) { Write-Output "OK: Already configured"; exit 0 }
+          Set-ADUser -Identity "svc_sccm" -Server "dc03.range.local" -Add @{ "msDS-AllowedToDelegateTo" = [string[]]@($expectedSPN) }
+          $v = Get-ADUser -Identity "svc_sccm" -Server "dc03.range.local" -Properties msDS-AllowedToDelegateTo
+          $vSPNs = @($v."msDS-AllowedToDelegateTo")
+          if (-not ($vSPNs -contains $expectedSPN)) { throw "SPN not applied" }
+          Write-Output "APPLIED: svc_sccm constrained delegation configured and verified"; exit 2
+        } catch { Write-Output "FAILED: $_"; exit 1 }
+      register: r
+      changed_when: r.rc == 2
+      failed_when: r.rc not in [0, 2]

@@ -1,0 +1,76 @@
+---
+# TYPE: VERIFY-ONLY (rc=0=pass, rc=1=fail — checks IIS/WSUS features exist)
+# Layer 4a: Windows Features Verification — IIS (mbr01), WSUS (mbr02)
+# Runs after 04-windows-features.yml.
+
+- name: "Verify IIS features on mbr01"
+  hosts: mbr01
+  gather_facts: false
+  tasks:
+    - name: "[VERIFY] Check IIS Web Server + ASP.NET features are installed"
+      ansible.windows.win_shell: |
+        $ErrorActionPreference = "Stop"
+        try {
+          $features = @("Web-Server", "Web-Asp-Net45", "Web-Net-Ext45")
+          $missing = @()
+          foreach ($f in $features) {
+            $installed = Get-WindowsFeature -Name $f | Select-Object -ExpandProperty Installed
+            if (-not $installed) { $missing += $f }
+          }
+          if ($missing.Count -eq 0) { Write-Output "PASS: All IIS features installed"; exit 0 }
+          Write-Output "FAIL: Missing features: $($missing -join ', ')"; exit 1
+        } catch { Write-Output "FAILED: $_"; exit 1 }
+      register: r
+      changed_when: false
+      failed_when: r.rc == 1
+
+- name: "Verify WSUS features and configuration on mbr02"
+  hosts: mbr02
+  gather_facts: false
+  tasks:
+    - name: "[VERIFY] Check WSUS features are installed"
+      ansible.windows.win_shell: |
+        $ErrorActionPreference = "Stop"
+        try {
+          $features = @("UpdateServices-Services", "UpdateServices-WidDB", "UpdateServices-RSAT")
+          $missing = @()
+          foreach ($f in $features) {
+            $installed = Get-WindowsFeature -Name $f | Select-Object -ExpandProperty Installed
+            if (-not $installed) { $missing += $f }
+          }
+          if ($missing.Count -eq 0) { Write-Output "PASS: All WSUS features installed"; exit 0 }
+          Write-Output "FAIL: Missing features: $($missing -join ', ')"; exit 1
+        } catch { Write-Output "FAILED: $_"; exit 1 }
+      register: r
+      changed_when: false
+      failed_when: r.rc == 1
+
+    - name: "[PREP][WT#XX] Verify WSUS postinstall complete"
+      ansible.windows.win_shell: |
+        $ErrorActionPreference = "Stop"
+        try {
+          $path = "HKLM:\SOFTWARE\Microsoft\Update Services\Server\Setup"
+          $prop = Get-ItemProperty -Path $path -Name "ContentDir" -ErrorAction SilentlyContinue
+          if ($null -ne $prop) {
+              Write-Output "PASS: WSUS postinstall complete (ContentDir exists)"; exit 0
+          }
+          Write-Output "FAIL: WSUS postinstall not done (ContentDir missing)"; exit 1
+        } catch {
+          Write-Output "FAILED: $_"; exit 1
+        }
+      register: r
+      failed_when: r.rc == 1
+
+    - name: "[VERIFY] Check WSUS sync from Microsoft Update"
+      ansible.windows.win_shell: |
+        $ErrorActionPreference = "Stop"
+        try {
+          $wsus = Get-WsusServer -ErrorAction SilentlyContinue
+          if (-not $wsus) { Write-Output "FAIL: WSUS server object not available"; exit 1 }
+          $config = $wsus.GetConfiguration()
+          if ($config.SyncFromMicrosoftUpdate -eq $true) { Write-Output "PASS: WSUS syncing from MU"; exit 0 }
+          Write-Output "FAIL: WSUS not configured to sync from MU"; exit 1
+        } catch { Write-Output "FAILED: $_"; exit 1 }
+      register: r
+      changed_when: false
+      failed_when: r.rc == 1

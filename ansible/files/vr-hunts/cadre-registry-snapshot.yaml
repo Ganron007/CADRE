@@ -1,0 +1,14 @@
+name: CADRE.Hunts.RegistrySnapshot
+description: |
+  Registry hive snapshot — SAM, SECURITY, SYSTEM.
+  Part of the CADRE pre-built hunt library.
+sources:
+  - name: SAM
+    queries:
+      - SELECT * FROM Artifact.Windows.Registry.SAM()
+  - name: SECURITY
+    queries:
+      - SELECT * FROM Artifact.Windows.Registry.SECURITY()
+  - name: SYSTEM
+    queries:
+      - SELECT * FROM Artifact.Windows.Registry.SYSTEM()

@@ -1,0 +1,463 @@
+---
+# TYPE: VERIFY-ONLY (rc=0=pass, rc=1=fail — checks Zeek + Suricata + Arkime + tcpdump + SiLK)
+# ============================================================
+# net-monitor extension — verification only (no deploy actions)
+# ============================================================
+
+- name: "Play 1 — Verify Zeek + Suricata on monitor VM"
+  hosts: monitor
+  gather_facts: true
+  become: yes
+  vars:
+    promisc_iface: eth1
+    management_iface: eth0
+    ubuntu_release: "24.04"
+    elastic_agent_version: "9.4.1"
+    arkime_password: "arkime"
+    es_port: 9200
+  tasks:
+    - name: Check system dependencies installed
+      ansible.builtin.shell: |
+        for pkg in apt-transport-https ca-certificates cmake curl g++ libcap2-bin libcurl4-openssl-dev libjson-c-dev libmagic-dev libpcap-dev libssl-dev make perl pkg-config python3 python3-pip wget jq; do
+          dpkg -l "$pkg" 2>/dev/null | grep -q "^ii" || { echo "MISSING: $pkg"; exit 1; }
+        done
+      register: r_install_deps
+      changed_when: false
+      failed_when: r_install_deps.rc == 1
+
+    - name: Check Zeek OBS repository key
+      ansible.builtin.shell: apt-key list 2>&1 | grep -qE "download.opensuse.org|security:zeek"
+      register: r_zeek_key
+      changed_when: false
+      failed_when: r_zeek_key.rc == 1
+
+    - name: Check Zeek OBS repository configured
+      ansible.builtin.shell: grep -qR "download.opensuse.org/repositories/security:/zeek" /etc/apt/sources.list /etc/apt/sources.list.d/ 2>/dev/null
+      register: r_zeek_repo
+      changed_when: false
+      failed_when: r_zeek_repo.rc == 1
+
+    - name: Check Zeek package installed
+      ansible.builtin.shell: dpkg -l zeek-8.0 2>/dev/null | grep -q "^ii"
+      register: r_zeek_install
+      changed_when: false
+      failed_when: r_zeek_install.rc == 1
+
+    - name: Check Zeek networks.cfg exists
+      ansible.builtin.shell: test -f /opt/zeek/etc/networks.cfg
+      register: r_zeek_networks
+      changed_when: false
+      failed_when: r_zeek_networks.rc == 1
+
+    - name: Check Zeek node.cfg exists
+      ansible.builtin.shell: test -f /opt/zeek/etc/node.cfg
+      register: r_zeek_node
+      changed_when: false
+      failed_when: r_zeek_node.rc == 1
+
+    - name: Check JSON log output enabled in Zeek
+      ansible.builtin.shell: grep -q '@load policy/tuning/json-logs.zeek' /opt/zeek/share/zeek/site/local.zeek 2>/dev/null
+      register: r_zeek_json
+      changed_when: false
+      failed_when: r_zeek_json.rc == 1
+
+    - name: Check Zeek is running (zeekctl status)
+      ansible.builtin.shell: /opt/zeek/bin/zeekctl status 2>&1 | grep -q "zeek.*running"
+      register: r_zeek_running
+      changed_when: false
+      failed_when: r_zeek_running.rc == 1
+
+    - name: Check Zeek systemd service unit exists
+      ansible.builtin.shell: test -f /etc/systemd/system/zeek.service
+      register: r_zeek_svc_unit
+      changed_when: false
+      failed_when: r_zeek_svc_unit.rc == 1
+
+    - name: Check Zeek systemd enabled and active
+      ansible.builtin.shell: systemctl is-enabled zeek && systemctl is-active zeek
+      register: r_zeek_enabled
+      changed_when: false
+      failed_when: r_zeek_enabled.rc == 1
+
+    - name: Check Zeek log retention configured
+      ansible.builtin.shell: grep -q "LogExpireInterval = 2" /opt/zeek/etc/zeekctl.cfg 2>/dev/null
+      register: r_zeek_logret
+      changed_when: false
+      failed_when: r_zeek_logret.rc == 1
+
+    - name: Check zeekctl cron exists
+      ansible.builtin.shell: test -f /etc/cron.d/zeekctl
+      register: r_zeek_cron
+      changed_when: false
+      failed_when: r_zeek_cron.rc == 1
+
+    - name: Check Suricata OISF PPA configured
+      ansible.builtin.shell: grep -qR "oisf/suricata-stable" /etc/apt/sources.list /etc/apt/sources.list.d/ 2>/dev/null
+      register: r_suricata_repo
+      changed_when: false
+      failed_when: r_suricata_repo.rc == 1
+
+    - name: Check Suricata package installed
+      ansible.builtin.shell: dpkg -l suricata 2>/dev/null | grep -q "^ii"
+      register: r_suricata_install
+      changed_when: false
+      failed_when: r_suricata_install.rc == 1
+
+    - name: Check Suricata is running
+      ansible.builtin.shell: systemctl is-active suricata
+      register: r_suricata_running
+      changed_when: false
+      failed_when: r_suricata_running.rc == 1
+
+    - name: Check Suricata config exists
+      ansible.builtin.shell: test -f /etc/suricata/suricata.yaml
+      register: r_suricata_config
+      changed_when: false
+      failed_when: r_suricata_config.rc == 1
+
+    - name: Check Suricata systemd enabled and active
+      ansible.builtin.shell: systemctl is-enabled suricata && systemctl is-active suricata
+      register: r_suricata_started
+      changed_when: false
+      failed_when: r_suricata_started.rc == 1
+
+    - name: Check Suricata logrotate config exists
+      ansible.builtin.shell: test -f /etc/logrotate.d/suricata
+      register: r_suricata_logrotate
+      changed_when: false
+      failed_when: r_suricata_logrotate.rc == 1
+
+- name: "Play 2 — Verify local ES for Arkime"
+  hosts: monitor
+  gather_facts: true
+  become: yes
+  vars:
+    es_port: 9200
+  tasks:
+    - name: Check ES system dependencies installed
+      ansible.builtin.shell: |
+        for pkg in apt-transport-https ca-certificates curl gnupg; do
+          dpkg -l "$pkg" 2>/dev/null | grep -q "^ii" || { echo "MISSING: $pkg"; exit 1; }
+        done
+      register: r_es_deps
+      changed_when: false
+      failed_when: r_es_deps.rc == 1
+
+    - name: Check Elastic GPG key
+      ansible.builtin.shell: apt-key list 2>&1 | grep -qi elastic
+      register: r_es_key
+      changed_when: false
+      failed_when: r_es_key.rc == 1
+
+    - name: Check Elastic APT repository configured
+      ansible.builtin.shell: grep -qR "artifacts.elastic.co" /etc/apt/sources.list /etc/apt/sources.list.d/ 2>/dev/null
+      register: r_es_repo
+      changed_when: false
+      failed_when: r_es_repo.rc == 1
+
+    - name: Check Elasticsearch package installed
+      ansible.builtin.shell: dpkg -l elasticsearch 2>/dev/null | grep -q "^ii"
+      register: r_es_install
+      changed_when: false
+      failed_when: r_es_install.rc == 1
+
+    - name: Check ES heap config exists
+      ansible.builtin.shell: test -f /etc/elasticsearch/jvm.options.d/heap.options
+      register: r_es_heap
+      changed_when: false
+      failed_when: r_es_heap.rc == 1
+
+    - name: Check ES elasticsearch.yml exists
+      ansible.builtin.shell: test -f /etc/elasticsearch/elasticsearch.yml
+      register: r_es_config
+      changed_when: false
+      failed_when: r_es_config.rc == 1
+
+    - name: Check ES systemd enabled and active
+      ansible.builtin.shell: systemctl is-enabled elasticsearch && systemctl is-active elasticsearch
+      register: r_es_started
+      changed_when: false
+      failed_when: r_es_started.rc == 1
+
+    - name: Wait for local ES to be ready
+      ansible.builtin.wait_for:
+        port: "{{ es_port }}"
+        delay: 15
+        timeout: 180
+      register: r_es_wait
+      changed_when: false
+
+    - name: Check ES cluster settings (0 replicas)
+      ansible.builtin.uri:
+        url: "http://127.0.0.1:{{ es_port }}/_cluster/settings"
+        method: GET
+        status_code: [200]
+      register: r_es_replicas
+      changed_when: false
+      failed_when: r_es_replicas.status|int != 200
+
+- name: "Play 3 — Verify Arkime + tcpdump + SiLK"
+  hosts: monitor
+  gather_facts: true
+  become: yes
+  vars:
+    promisc_iface: eth1
+    arkime_version: 6.3.1
+  tasks:
+    - name: Check Arkime system deps installed
+      ansible.builtin.shell: |
+        for pkg in curl wget; do
+          dpkg -l "$pkg" 2>/dev/null | grep -q "^ii" || { echo "MISSING: $pkg"; exit 1; }
+        done
+      register: r_ark_deps
+      changed_when: false
+      failed_when: r_ark_deps.rc == 1
+
+    - name: Check Arkime .deb downloaded
+      ansible.builtin.shell: test -f /tmp/arkime.deb
+      register: r_ark_deb
+      changed_when: false
+      failed_when: r_ark_deb.rc == 1
+
+    - name: Check Arkime installed
+      ansible.builtin.shell: test -d /opt/arkime/bin
+      register: r_ark_installed
+      changed_when: false
+      failed_when: r_ark_installed.rc == 1
+
+    - name: Check Arkime config directory exists
+      ansible.builtin.shell: test -d /opt/arkime/etc
+      register: r_ark_cfg_dir
+      changed_when: false
+      failed_when: r_ark_cfg_dir.rc == 1
+
+    - name: Check Arkime config.ini exists
+      ansible.builtin.shell: test -f /opt/arkime/etc/config.ini
+      register: r_ark_ini
+      changed_when: false
+      failed_when: r_ark_ini.rc == 1
+
+    - name: Check Arkime database initialized (sessions index exists)
+      ansible.builtin.shell: curl -s -o /dev/null -w "%{http_code}" http://127.0.0.1:9200/arkime_sessions3*/_count 2>/dev/null | grep -q 200
+      register: r_ark_db
+      changed_when: false
+      failed_when: r_ark_db.rc == 1
+
+    - name: Check Arkime admin user exists
+      ansible.builtin.shell: |
+        if [ -f /opt/arkime/etc/users ] && grep -q "admin" /opt/arkime/etc/users 2>/dev/null; then
+          exit 0
+        else
+          exit 1
+        fi
+      register: r_ark_user
+      changed_when: false
+      failed_when: r_ark_user.rc == 1
+
+    - name: Check PCAP raw directory exists
+      ansible.builtin.shell: test -d /opt/arkime/raw
+      register: r_ark_rawdir
+      changed_when: false
+      failed_when: r_ark_rawdir.rc == 1
+
+    - name: Check arkimeviewer enabled and active
+      ansible.builtin.shell: systemctl is-enabled arkimeviewer && systemctl is-active arkimeviewer
+      register: r_ark_viewer
+      changed_when: false
+      failed_when: r_ark_viewer.rc == 1
+
+    - name: Check arkimecapture disabled
+      ansible.builtin.shell: |
+        systemctl is-enabled arkimecapture 2>&1 | grep -qE "disabled|could not be found|not-found" && \
+        systemctl is-active arkimecapture 2>&1 | grep -qE "inactive|dead|could not be found|not-found"
+      register: r_ark_capture
+      changed_when: false
+      failed_when: r_ark_capture.rc == 1
+
+    - name: Check PCAP directories exist
+      ansible.builtin.shell: test -d /opt/pcap && test -d /opt/pcap/manual
+      register: r_pcap_dirs
+      changed_when: false
+      failed_when: r_pcap_dirs.rc == 1
+
+    - name: Check tcpdump capture script exists
+      ansible.builtin.shell: test -f /usr/local/bin/cadre-pcap-capture-manual.sh
+      register: r_tcpdump_script
+      changed_when: false
+      failed_when: r_tcpdump_script.rc == 1
+
+    - name: Check Arkime import script exists
+      ansible.builtin.shell: test -f /usr/local/bin/cadre-arkime-import.sh
+      register: r_ark_import_script
+      changed_when: false
+      failed_when: r_ark_import_script.rc == 1
+
+    - name: Check Arkime logrotate config exists
+      ansible.builtin.shell: test -f /etc/logrotate.d/cadre-arkime
+      register: r_ark_logrotate
+      changed_when: false
+      failed_when: r_ark_logrotate.rc == 1
+
+    - name: Check ES disk watermark thresholds
+      ansible.builtin.shell: |
+        for entry in "low:80%" "high:85%" "flood_stage:90%"; do
+          key="${entry%%:*}"
+          val="${entry#*:}"
+          grep -qE "^\s*cluster\.routing\.allocation\.disk\.watermark\.$key:\s*$val" /etc/elasticsearch/elasticsearch.yml 2>/dev/null || { echo "MISSING watermark $key=$val"; exit 1; }
+        done
+      register: r_es_watermark
+      changed_when: false
+      failed_when: r_es_watermark.rc == 1
+
+    - name: Check Elasticsearch is running (after watermark config)
+      ansible.builtin.shell: systemctl is-active elasticsearch
+      register: r_es_active
+      changed_when: false
+      failed_when: r_es_active.rc == 1
+
+    - name: Wait for ES to be ready
+      ansible.builtin.wait_for:
+        port: 9200
+        delay: 10
+        timeout: 60
+      register: r_es_wait2
+      changed_when: false
+
+    - name: Check ES ILM policy exists
+      ansible.builtin.uri:
+        url: "http://127.0.0.1:9200/_ilm/policy/cadre-arkime"
+        method: GET
+        status_code: [200, 404]
+      register: r_policy_check
+      changed_when: false
+      failed_when: r_policy_check.status|int not in [200, 404]
+
+    - name: Check catch-all template status
+      ansible.builtin.uri:
+        url: "http://127.0.0.1:9200/_index_template/cadre-monitor"
+        method: GET
+        status_code: [200, 404]
+      register: r_template_remove
+      changed_when: false
+      failed_when: r_template_remove.status|int not in [200, 404]
+
+    - name: Check Arkime-specific template exists
+      ansible.builtin.uri:
+        url: "http://127.0.0.1:9200/_index_template/cadre-arkime"
+        method: GET
+        status_code: [200, 404]
+      register: r_template_create
+      changed_when: false
+      failed_when: r_template_create.status|int not in [200, 404]
+
+    - name: Check nfdump installed
+      ansible.builtin.shell: dpkg -l nfdump 2>/dev/null | grep -q "^ii"
+      register: r_nfdump
+      changed_when: false
+      failed_when: r_nfdump.rc == 1
+
+    - name: Check SiLK build dependencies installed
+      ansible.builtin.shell: |
+        for pkg in build-essential libfixbuf-dev python3-dev libpcap-dev; do
+          dpkg -l "$pkg" 2>/dev/null | grep -q "^ii" || { echo "MISSING: $pkg"; exit 1; }
+        done
+      register: r_silk_deps
+      changed_when: false
+      failed_when: r_silk_deps.rc == 1
+
+    - name: Check SiLK source downloaded
+      ansible.builtin.shell: test -f /tmp/silk.tar.gz
+      register: r_silk_tar
+      changed_when: false
+      failed_when: r_silk_tar.rc == 1
+
+    - name: Check SiLK binary exists (rwfilter)
+      ansible.builtin.shell: test -f /opt/silk/bin/rwfilter
+      register: r_silk_build
+      changed_when: false
+      failed_when: r_silk_build.rc == 1
+
+    - name: Check SiLK data directories exist
+      ansible.builtin.shell: test -d /opt/silk/data && test -d /opt/silk/data/incoming && test -d /opt/silk/scripts
+      register: r_silk_dirs
+      changed_when: false
+      failed_when: r_silk_dirs.rc == 1
+
+    - name: Check SiLK flow generation script exists
+      ansible.builtin.shell: test -f /opt/silk/scripts/process-pcaps.sh
+      register: r_silk_script
+      changed_when: false
+      failed_when: r_silk_script.rc == 1
+
+    - name: Check firewall ports open
+      ansible.builtin.shell: ufw status | grep -qE "^\s*22/tcp" && ufw status | grep -qE "^\s*8005/tcp"
+      register: r_ufw_ports
+      changed_when: false
+      failed_when: r_ufw_ports.rc == 1
+
+- name: "Play 4 — Verify Elastic Agent enrollment (if reachable)"
+  hosts: monitor
+  gather_facts: true
+  vars:
+    elk_host: 192.168.77.50
+    fleet_port: 8220
+  tasks:
+    - name: Check if Elastic Agent is already enrolled
+      ansible.builtin.stat:
+        path: /etc/elastic-agent/elastic-agent.yml
+      register: agent_cfg
+      changed_when: false
+
+    - name: Probe Fleet server reachability
+      ansible.builtin.uri:
+        url: "http://{{ elk_host }}:5601/api/status"
+        method: GET
+        timeout: 5
+        status_code: 200
+      register: fleet_probe
+      failed_when: false
+      when: not agent_cfg.stat.exists
+
+    - name: Set fleet_available fact
+      ansible.builtin.set_fact:
+        fleet_available: "{{ fleet_probe is defined and fleet_probe.status is defined and fleet_probe.status == 200 }}"
+
+    - name: Fetch Fleet enrollment API keys
+      ansible.builtin.uri:
+        url: "http://{{ elk_host }}:5601/api/fleet/enrollment_api_keys"
+        method: GET
+        user: elastic
+        password: "elastic_CADRE_2026!"
+        force_basic_auth: true
+        headers:
+          kbn-xsrf: "true"
+        validate_certs: false
+        status_code: 200
+      register: enroll_resp
+      delegate_to: localhost
+      when: fleet_available and not agent_cfg.stat.exists
+
+    - name: Get CADRE-Monitor policy ID
+      ansible.builtin.uri:
+        url: "http://{{ elk_host }}:5601/api/fleet/agent_policies"
+        method: GET
+        user: elastic
+        password: "elastic_CADRE_2026!"
+        force_basic_auth: true
+        headers:
+          kbn-xsrf: "true"
+        validate_certs: false
+        status_code: 200
+      register: policy_resp
+      delegate_to: localhost
+      when: fleet_available and not agent_cfg.stat.exists
+
+    - name: Resolve CADRE-Monitor policy ID
+      ansible.builtin.set_fact:
+        cadre_mon_id: "{{ (policy_resp.json['items'] | selectattr('name', 'equalto', 'CADRE-Monitor') | first).id }}"
+      when: fleet_available and not agent_cfg.stat.exists and policy_resp is defined
+
+    - name: Resolve CADRE-Monitor enrollment token
+      ansible.builtin.set_fact:
+        cadre_mon_token: "{{ (enroll_resp.json['items'] | selectattr('policy_id', 'equalto', cadre_mon_id) | first).api_key }}"
+      when: fleet_available and not agent_cfg.stat.exists and enroll_resp is defined and cadre_mon_id is defined

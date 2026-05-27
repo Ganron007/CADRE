@@ -1,0 +1,208 @@
+---
+# TYPE: DEPLOY (rc=0=exists, rc=1=fail — confirms 00-domain-deploy.yml deployed correctly)
+# Layer 1: Core AD — Verify domains, trusts, DNS
+# Verify only — no changes made to any machine.
+# DNS section entirely skipped (exists from initial deploy).
+# See docs/internal/plan0-recreate-playbook-native.md §Layer1 for details.
+
+- name: "Verify cadre.local domain exists"
+  hosts: dc01
+  gather_facts: false
+  tasks:
+    - name: "[VERIFY] cadre.local domain exists"
+      ansible.windows.win_shell: |
+        $ErrorActionPreference = "Stop"
+        try {
+          $d = Get-ADDomain -Identity cadre.local -ErrorAction Stop
+          Write-Output "PASS: cadre.local found (DNS root: $($d.DNSRoot))"
+          exit 0
+        } catch { Write-Output "FAIL: cadre.local not found: $_"; exit 1 }
+      register: r
+      changed_when: false
+      failed_when: r.rc == 1
+
+    - name: "[VERIFY][WT#33] Forest trust cadre↔range.local exists (dc01)"
+      ansible.windows.win_shell: |
+        $ErrorActionPreference = "Stop"
+        try {
+          $t = Get-ADTrust -Filter "Name -eq 'range.local'" -ErrorAction Stop
+          Write-Output "PASS: Forest trust to range.local exists (direction: $($t.Direction))"
+          exit 0
+        } catch { Write-Output "FAIL: Forest trust range.local not found: $_"; exit 1 }
+      register: r
+      changed_when: false
+      failed_when: r.rc == 1
+
+    - name: "[VERIFY] Parent-child trust cadre↔child exists"
+      ansible.windows.win_shell: |
+        $ErrorActionPreference = "Stop"
+        try {
+          $t = Get-ADTrust -Filter "Name -eq 'child.cadre.local'" -ErrorAction Stop
+          Write-Output "PASS: Parent-child trust to child.cadre.local exists"
+          exit 0
+        } catch { Write-Output "FAIL: Parent-child trust not found: $_"; exit 1 }
+
+    - name: "[VERIFY][WT#33] SID filtering disabled on range.local trust (dc01)"
+      ansible.windows.win_shell: |
+        $ErrorActionPreference = "Stop"
+        try {
+          $t = Get-ADTrust -Filter "Name -eq 'range.local'" -ErrorAction Stop
+          if ($t.SIDFilteringQuarantined -eq $false) { Write-Output "PASS: SID filtering disabled on range.local trust (WT#33 attack surface)"; exit 0 }
+          Write-Output "FAIL: SID filtering enabled (SIDFilteringQuarantined=$($t.SIDFilteringQuarantined)) — run 00-domain-deploy.yml to disable"; exit 1
+        } catch { Write-Output "FAIL: SID filtering check error: $_"; exit 1 }
+
+    - name: "[VERIFY][WT#33] Selective auth disabled on range.local trust (dc01)"
+      ansible.windows.win_shell: |
+        $ErrorActionPreference = "Stop"
+        try {
+          $t = Get-ADTrust -Filter "Name -eq 'range.local'" -ErrorAction Stop
+          if ($t.SelectiveAuthentication -eq $false) { Write-Output "PASS: Selective authentication disabled on range.local trust"; exit 0 }
+          Write-Output "FAIL: Selective authentication enabled (SelectiveAuthentication=$($t.SelectiveAuthentication))"; exit 1
+        } catch { Write-Output "FAIL: Selective auth check error: $_"; exit 1 }
+      register: r
+      changed_when: false
+      failed_when: r.rc == 1
+
+    - name: "[VERIFY] DNS forwarders set to 1.1.1.1, 8.8.8.8 [dns]"
+      tags: [dns]
+      ansible.windows.win_shell: |
+        $ErrorActionPreference = "Stop"
+        try {
+          $fwd = (Get-DnsServerForwarder -ErrorAction Stop).IPAddress
+          if ($fwd -contains "1.1.1.1" -and $fwd -contains "8.8.8.8") {
+            Write-Output "PASS: DNS forwarders set ($($fwd -join ', '))"
+            exit 0
+          }
+          Write-Output "FAIL: Expected 1.1.1.1,8.8.8.8 but found $($fwd -join ', ')"
+          exit 1
+        } catch { Write-Output "FAIL: DNS forwarder check error: $_"; exit 1 }
+      register: r
+      changed_when: false
+      failed_when: r.rc == 1
+
+    - name: "[VERIFY] Conditional forwarder range.local→192.168.77.12 [dns]"
+      tags: [dns]
+      ansible.windows.win_shell: |
+        $ErrorActionPreference = "Stop"
+        try {
+          $z = Get-DnsServerConditionalForwarderZone -Name "range.local" -ErrorAction Stop
+          Write-Output "PASS: Conditional forwarder range.local exists -> $($z.MasterServers)"
+          exit 0
+        } catch { Write-Output "FAIL: Conditional forwarder range.local not found: $_"; exit 1 }
+      register: r
+      changed_when: false
+      failed_when: r.rc == 1
+
+    - name: "[VERIFY] Conditional forwarder child.cadre.local→192.168.77.11 [dns]"
+      tags: [dns]
+      ansible.windows.win_shell: |
+        $ErrorActionPreference = "Stop"
+        try {
+          $z = Get-DnsServerConditionalForwarderZone -Name "child.cadre.local" -ErrorAction Stop
+          Write-Output "PASS: Conditional forwarder child.cadre.local exists -> $($z.MasterServers)"
+          exit 0
+        } catch { Write-Output "FAIL: Conditional forwarder child.cadre.local not found: $_"; exit 1 }
+      register: r
+      changed_when: false
+      failed_when: r.rc == 1
+
+    - name: "[VERIFY] Reverse lookup zone 77.168.192.in-addr.arpa [dns]"
+      tags: [dns]
+      ansible.windows.win_shell: |
+        $ErrorActionPreference = "Stop"
+        try {
+          $z = Get-DnsServerZone -Name "77.168.192.in-addr.arpa" -ErrorAction Stop
+          Write-Output "PASS: Reverse lookup zone 77.168.192.in-addr.arpa exists"
+          exit 0
+        } catch { Write-Output "FAIL: Reverse lookup zone not found: $_"; exit 1 }
+      register: r
+      changed_when: false
+      failed_when: r.rc == 1
+
+    - name: "[VERIFY] DNS listener restricted to 192.168.77.10 [dns]"
+      tags: [dns]
+      ansible.windows.win_shell: |
+        $ErrorActionPreference = "Stop"
+        try {
+          $r = dnscmd . /ResetListenAddresses 2>&1 | Out-String
+          if ($r -match "restricted") { Write-Output "PASS: DNS listener is restricted"; exit 0 }
+          else { Write-Output "INFO: DNS listener check — $r"; exit 0 }
+        } catch { Write-Output "FAIL: DNS listener check error: $_"; exit 1 }
+      register: r
+      changed_when: false
+      failed_when: r.rc == 1
+
+- name: "Verify range.local domain + trust cadre.local side"
+  hosts: dc03
+  gather_facts: false
+  tasks:
+    - name: "[VERIFY] range.local domain exists"
+      ansible.windows.win_shell: |
+        $ErrorActionPreference = "Stop"
+        try {
+          $d = Get-ADDomain -Identity range.local -ErrorAction Stop
+          Write-Output "PASS: range.local found (DNS root: $($d.DNSRoot))"
+          exit 0
+        } catch { Write-Output "FAIL: range.local not found: $_"; exit 1 }
+      register: r
+      changed_when: false
+      failed_when: r.rc == 1
+
+    - name: "[VERIFY][WT#33] Forest trust cadre↔range.local exists (dc03)"
+      ansible.windows.win_shell: |
+        $ErrorActionPreference = "Stop"
+        try {
+          $t = Get-ADTrust -Filter "Name -eq 'cadre.local'" -ErrorAction Stop
+          Write-Output "PASS: Forest trust to cadre.local exists (direction: $($t.Direction))"
+          exit 0
+        } catch { Write-Output "FAIL: Forest trust cadre.local not found: $_"; exit 1 }
+      register: r
+      changed_when: false
+      failed_when: r.rc == 1
+
+    - name: "[VERIFY][WT#33] SID filtering disabled on cadre.local trust (dc03)"
+      ansible.windows.win_shell: |
+        $ErrorActionPreference = "Stop"
+        try {
+          $t = Get-ADTrust -Filter "Name -eq 'cadre.local'" -ErrorAction Stop
+          if ($t.SIDFilteringQuarantined -eq $false) { Write-Output "PASS: SID filtering disabled on cadre.local trust (WT#33 attack surface)"; exit 0 }
+          Write-Output "FAIL: SID filtering enabled (SIDFilteringQuarantined=$($t.SIDFilteringQuarantined)) — run 00-domain-deploy.yml to disable"; exit 1
+        } catch { Write-Output "FAIL: SID filtering check error: $_"; exit 1 }
+
+    - name: "[VERIFY][WT#33] Selective auth disabled on cadre.local trust (dc03)"
+      ansible.windows.win_shell: |
+        $ErrorActionPreference = "Stop"
+        try {
+          $t = Get-ADTrust -Filter "Name -eq 'cadre.local'" -ErrorAction Stop
+          if ($t.SelectiveAuthentication -eq $false) { Write-Output "PASS: Selective authentication disabled on cadre.local trust"; exit 0 }
+          Write-Output "FAIL: Selective authentication enabled (SelectiveAuthentication=$($t.SelectiveAuthentication))"; exit 1
+        } catch { Write-Output "FAIL: Selective auth check error: $_"; exit 1 }
+
+    - name: "[VERIFY] Conditional forwarder cadre.local→192.168.77.10 [dns]"
+      tags: [dns]
+      ansible.windows.win_shell: |
+        $ErrorActionPreference = "Stop"
+        try {
+          $z = Get-DnsServerConditionalForwarderZone -Name "cadre.local" -ErrorAction Stop
+          Write-Output "PASS: Conditional forwarder cadre.local exists -> $($z.MasterServers)"
+          exit 0
+        } catch { Write-Output "FAIL: Conditional forwarder cadre.local not found: $_"; exit 1 }
+      register: r
+      changed_when: false
+      failed_when: r.rc == 1
+
+- name: "Verify child.cadre.local domain"
+  hosts: dc02
+  gather_facts: false
+  tasks:
+    - name: "[VERIFY] child.cadre.local domain exists"
+      ansible.windows.win_shell: |
+        $ErrorActionPreference = "Stop"
+        try {
+          $d = Get-ADDomain -Identity child.cadre.local -ErrorAction Stop
+          Write-Output "PASS: child.cadre.local found (DNS root: $($d.DNSRoot))"
+          exit 0
+        } catch { Write-Output "FAIL: child.cadre.local not found: $_"; exit 1 }
+      register: r
+      changed_when: false
+      failed_when: r.rc == 1

@@ -1,0 +1,655 @@
+---
+# TYPE: DEPLOY (rc=0=skip, rc=2=applied+verified, rc=1=fail)
+# ============================================================
+# net-monitor extension — Zeek + Suricata + Arkime + tcpdump
+# + SiLK + Elastic Agent enrollment (CADRE-Monitor policy)
+# ============================================================
+
+- name: "Play 1 — Install Zeek + Suricata on monitor VM"
+  hosts: monitor
+  gather_facts: true
+  become: yes
+  vars:
+    promisc_iface: eth1
+    management_iface: eth0
+    ubuntu_release: "24.04"
+    elastic_agent_version: "9.4.1"
+    arkime_password: "arkime"
+    es_port: 9200
+  tasks:
+    - name: Install system dependencies
+      ansible.builtin.apt:
+        name:
+          - apt-transport-https
+          - ca-certificates
+          - cmake
+          - curl
+          - g++
+          - libcap2-bin
+          - libcurl4-openssl-dev
+          - libjson-c-dev
+          - libmagic-dev
+          - libpcap-dev
+          - libssl-dev
+          - make
+          - perl
+          - pkg-config
+          - python3
+          - python3-pip
+          - wget
+          - jq
+        state: present
+        update_cache: true
+
+    - name: Add Zeek OBS repository key
+      ansible.builtin.apt_key:
+        url: "https://download.opensuse.org/repositories/security:zeek/xUbuntu_{{ ubuntu_release }}/Release.key"
+        state: present
+
+    - name: Add Zeek OBS repository
+      ansible.builtin.apt_repository:
+        repo: "deb https://download.opensuse.org/repositories/security:/zeek/xUbuntu_{{ ubuntu_release }}/ /"
+        state: present
+
+    - name: Install Zeek (8.x LTS)
+      ansible.builtin.apt:
+        name: zeek-8.0
+        state: present
+        update_cache: true
+
+    - name: Configure Zeek networks
+      ansible.builtin.copy:
+        dest: /opt/zeek/etc/networks.cfg
+        content: |
+          192.168.77.0/24          Lab Network
+          10.0.0.0/8               RFC1918
+          172.16.0.0/12            RFC1918
+        mode: "0644"
+
+    - name: Configure Zeek to listen on promiscuous interface
+      ansible.builtin.copy:
+        dest: /opt/zeek/etc/node.cfg
+        content: |
+          [zeek]
+          type=standalone
+          host=192.168.77.55
+          interface={{ promisc_iface }}
+        mode: "0644"
+
+    - name: Enable JSON log output in Zeek
+      ansible.builtin.lineinfile:
+        path: /opt/zeek/share/zeek/site/local.zeek
+        line: '@load policy/tuning/json-logs.zeek'
+        create: true
+        mode: "0644"
+
+    - name: Deploy Zeek (first-run config + start)
+      ansible.builtin.shell: |
+        /opt/zeek/bin/zeekctl deploy
+      register: zeek_deploy
+      changed_when: zeek_deploy.rc == 0
+      failed_when: false
+
+    - name: Set up Zeek systemd for boot-time start (not deploy)
+      ansible.builtin.copy:
+        dest: /etc/systemd/system/zeek.service
+        content: |
+          [Unit]
+          Description=Zeek Network Security Monitor
+          After=network.target
+          [Service]
+          Type=forking
+          ExecStart=/opt/zeek/bin/zeekctl start
+          ExecStop=/opt/zeek/bin/zeekctl stop
+          ExecReload=/opt/zeek/bin/zeekctl restart
+          User=root
+          [Install]
+          WantedBy=multi-user.target
+        mode: "0644"
+
+    - name: Enable Zeek systemd unit
+      ansible.builtin.systemd:
+        name: zeek
+        enabled: true
+        daemon_reload: true
+
+    - name: Set Zeek log retention to 2 days
+      ansible.builtin.lineinfile:
+        path: /opt/zeek/etc/zeekctl.cfg
+        regexp: "^LogExpireInterval ="
+        line: "LogExpireInterval = 2"
+
+    - name: Add zeekctl cron for log rotation and cleanup
+      ansible.builtin.copy:
+        dest: /etc/cron.d/zeekctl
+        content: |
+          */5 * * * * root /opt/zeek/bin/zeekctl cron >/dev/null 2>&1
+        mode: "0644"
+
+    - name: Add Suricata OISF PPA for latest stable (7.x)
+      ansible.builtin.apt_repository:
+        repo: ppa:oisf/suricata-stable
+        state: present
+
+    - name: Install Suricata from OISF PPA
+      ansible.builtin.apt:
+        name: suricata
+        state: present
+        update_cache: true
+
+    - name: Update Emerging Threats Open rules
+      ansible.builtin.shell: |
+        suricata-update
+      register: suricata_update
+      changed_when: "'Downloading' in suricata_update.stdout"
+      failed_when: false
+
+    - name: Configure Suricata for promiscuous interface
+      ansible.builtin.copy:
+        dest: /etc/suricata/suricata.yaml
+        content: |
+          %YAML 1.1
+          ---
+          vars:
+            address-groups:
+              HOME_NET: "[192.168.77.0/24]"
+              EXTERNAL_NET: "!$HOME_NET"
+          af-packet:
+            - interface: {{ promisc_iface }}
+              cluster-id: 99
+              cluster-type: cluster_flow
+              defrag: yes
+          outputs:
+            - eve-log:
+                enabled: yes
+                filetype: regular
+                filename: eve.json
+                types:
+                  - alert
+                  - http
+                  - dns
+                  - tls
+                  - ssh
+                  - smtp
+                  - krb5
+                  - smb
+        mode: "0644"
+
+    - name: Start Suricata
+      ansible.builtin.systemd:
+        name: suricata
+        state: started
+        enabled: true
+
+    - name: Configure logrotate for Suricata eve.json (max 500MB)
+      ansible.builtin.copy:
+        dest: /etc/logrotate.d/suricata
+        content: |
+          /var/log/suricata/*.json
+          /var/log/suricata/*.log
+          {
+              daily
+              rotate 2
+              size 500M
+              missingok
+              compress
+              delaycompress
+              copytruncate
+              notifempty
+              su suricata suricata
+          }
+        mode: "0644"
+
+- name: "Play 2 — Local ES for Arkime"
+  hosts: monitor
+  gather_facts: true
+  become: yes
+  vars:
+    es_port: 9200
+  tasks:
+    - name: Install system dependencies for ES
+      ansible.builtin.apt:
+        name:
+          - apt-transport-https
+          - ca-certificates
+          - curl
+          - gnupg
+        state: present
+
+    - name: Add Elastic GPG key
+      ansible.builtin.apt_key:
+        url: https://artifacts.elastic.co/GPG-KEY-elasticsearch
+        state: present
+
+    - name: Add Elastic APT repository
+      ansible.builtin.apt_repository:
+        repo: "deb https://artifacts.elastic.co/packages/9.x/apt stable main"
+        state: present
+        update_cache: true
+
+    - name: Install local Elasticsearch for Arkime
+      ansible.builtin.apt:
+        name: elasticsearch
+        state: present
+
+    - name: Set ES heap for Arkime (2GB limit)
+      ansible.builtin.copy:
+        dest: /etc/elasticsearch/jvm.options.d/heap.options
+        content: |
+          -Xms2g
+          -Xmx2g
+        mode: "0644"
+
+    - name: Configure local ES for Arkime (single-node, no SSL)
+      ansible.builtin.copy:
+        dest: /etc/elasticsearch/elasticsearch.yml
+        content: |
+          cluster.name: cadre-arkime
+          node.name: monitor
+          path.data: /var/lib/elasticsearch
+          path.logs: /var/log/elasticsearch
+          network.host: 127.0.0.1
+          http.port: {{ es_port }}
+          discovery.type: single-node
+          xpack.security.enabled: false
+        mode: "0644"
+
+    - name: Start local ES for Arkime
+      ansible.builtin.systemd:
+        name: elasticsearch
+        state: started
+        enabled: true
+        daemon_reload: true
+
+    - name: Wait for local ES to be ready
+      ansible.builtin.wait_for:
+        port: "{{ es_port }}"
+        delay: 15
+        timeout: 180
+
+    - name: Set 0 replicas cluster-wide for single-node cluster
+      ansible.builtin.uri:
+        url: "http://127.0.0.1:{{ es_port }}/_cluster/settings"
+        method: PUT
+        body_format: json
+        body:
+          persistent:
+            index.number_of_replicas: 0
+        status_code: [200]
+
+- name: "Play 3 — Arkime (Full PCAP) + tcpdump + SiLK"
+  hosts: monitor
+  gather_facts: true
+  become: yes
+  vars:
+    promisc_iface: eth1
+    arkime_version: 6.3.1
+  tasks:
+    - name: Install Arkime system deps (curl, wget)
+      ansible.builtin.apt:
+        name:
+          - curl
+          - wget
+        state: present
+
+    - name: Download Arkime .deb package
+      ansible.builtin.get_url:
+        url: "https://github.com/arkime/arkime/releases/download/v{{ arkime_version }}/arkime_{{ arkime_version }}-1.ubuntu2404_amd64.deb"
+        dest: /tmp/arkime.deb
+      register: arkime_dl
+      retries: 3
+      delay: 5
+
+    - name: Install Arkime
+      ansible.builtin.apt:
+        deb: /tmp/arkime.deb
+      when: arkime_dl is success
+
+    - name: Create Arkime config directory
+      ansible.builtin.file:
+        path: /opt/arkime/etc
+        state: directory
+        mode: "0755"
+
+    - name: Write Arkime config.ini directly (skip interactive Configure)
+      ansible.builtin.copy:
+        dest: /opt/arkime/etc/config.ini
+        content: |
+          [default]
+          elasticsearch=http://127.0.0.1:9200
+          pcapDir=/opt/arkime/raw
+          pcapSnaplen=65535
+          interface={{ promisc_iface }}
+          tls=false
+          arkimeTitle=CADRE - Arkime
+          adminPassword={{ arkime_password }}
+          installDir=/opt/arkime
+          logDir=/opt/arkime/logs
+          maxFileSize=2048
+          flushInterval=30
+        mode: "0644"
+
+    - name: Initialize Arkime database (idempotent via version check)
+      ansible.builtin.shell: |
+        /opt/arkime/db/db.pl http://127.0.0.1:9200 init
+      register: arkime_db
+      failed_when: false
+      changed_when: "'already' not in arkime_db.stdout"
+
+    - name: Create Arkime admin user
+      ansible.builtin.shell: |
+        /opt/arkime/bin/arkime_add_user.sh admin "Admin" arkime --admin
+      register: arkime_user
+      failed_when: false
+      changed_when: "'User admin already exists' not in arkime_user.stdout"
+
+    - name: Create PCAP raw directory for Arkime
+      ansible.builtin.file:
+        path: /opt/arkime/raw
+        state: directory
+        mode: "0755"
+
+    - name: Enable and start Arkime viewer only (manual capture workflow)
+      ansible.builtin.systemd:
+        name: arkimeviewer
+        enabled: true
+        state: started
+        daemon_reload: true
+      ignore_errors: true
+
+    - name: Disable arkimecapture (manual offline workflow)
+      ansible.builtin.systemd:
+        name: arkimecapture
+        enabled: false
+        state: stopped
+      ignore_errors: true
+
+    - name: Create PCAP directories for manual capture
+      ansible.builtin.file:
+        path: "{{ item }}"
+        state: directory
+        mode: "0755"
+      loop:
+        - /opt/pcap
+        - /opt/pcap/manual
+
+    - name: Deploy manual tcpdump capture script
+      ansible.builtin.copy:
+        dest: /usr/local/bin/cadre-pcap-capture-manual.sh
+        mode: "0755"
+        content: |
+          #!/bin/bash
+          INTERFACE="${1:-eth1}"
+          DIR="/opt/pcap/manual"
+          FILE="capture-$(date +%Y%m%d-%H%M%S).pcap"
+          FULLPATH="$DIR/$FILE"
+          mkdir -p "$DIR"
+          echo "Capturing on $INTERFACE -> $FULLPATH"
+          echo "Press Ctrl+C to stop."
+          /usr/bin/tcpdump -i "$INTERFACE" -w "$FULLPATH"
+
+    - name: Deploy Arkime offline import script
+      ansible.builtin.copy:
+        dest: /usr/local/bin/cadre-arkime-import.sh
+        mode: "0755"
+        content: |
+          #!/bin/bash
+          FILE="$1"
+          if [ -z "$FILE" ]; then
+            echo "Usage: $0 <pcap-file>" >&2
+            exit 1
+          fi
+          if [ ! -f "$FILE" ]; then
+            echo "Error: file not found: $FILE" >&2
+            exit 1
+          fi
+          echo "Importing $FILE into Arkime..."
+          /opt/arkime/bin/capture -c /opt/arkime/etc/config.ini -r "$FILE"
+          echo "Done. Check viewer at http://$(hostname):8005"
+
+    - name: Logrotate for Arkime raw PCAPs (keep 2 rotations)
+      ansible.builtin.copy:
+        dest: /etc/logrotate.d/cadre-arkime
+        mode: "0644"
+        content: |
+          /opt/arkime/raw/*.pcap {
+              daily
+              rotate 2
+              compress
+              delaycompress
+              missingok
+              notifempty
+          }
+
+    - name: Configure ES disk watermark thresholds (prevent disk-full crash)
+      ansible.builtin.lineinfile:
+        path: /etc/elasticsearch/elasticsearch.yml
+        regexp: "^cluster\\.routing\\.allocation\\.disk\\.watermark\\.{{ item.key }}"
+        line: "{{ item.key }}: {{ item.value }}"
+      loop:
+        - { key: "low", value: "80%" }
+        - { key: "high", value: "85%" }
+        - { key: "flood_stage", value: "90%" }
+      register: es_watermark
+
+    - name: Restart Elasticsearch to apply watermark changes
+      ansible.builtin.systemd:
+        name: elasticsearch
+        state: restarted
+      when: es_watermark is changed
+
+    - name: Wait for ES to be ready after restart
+      ansible.builtin.wait_for:
+        port: 9200
+        delay: 10
+        timeout: 60
+
+    - name: Create ES ILM policy for Arkime indices (3-day retention)
+      ansible.builtin.uri:
+        url: "http://127.0.0.1:9200/_ilm/policy/cadre-arkime"
+        method: PUT
+        body_format: json
+        body:
+          policy:
+            phases:
+              hot:
+                min_age: "0d"
+                actions:
+                  rollover:
+                    max_age: "1d"
+                    max_size: "2gb"
+              delete:
+                min_age: "3d"
+                actions:
+                  delete: {}
+        status_code: [200, 409]
+
+    - name: Remove catch-all template (interferes with Arkime dynamic templates)
+      ansible.builtin.uri:
+        url: "http://127.0.0.1:9200/_index_template/cadre-monitor"
+        method: DELETE
+        status_code: [200, 404]
+
+    - name: Create Arkime-specific template with ILM + 0 replicas
+      ansible.builtin.uri:
+        url: "http://127.0.0.1:9200/_index_template/cadre-arkime"
+        method: PUT
+        body_format: json
+        body:
+          index_patterns: ["arkime_sessions3-*", "arkime_history*"]
+          priority: 200
+          template:
+            settings:
+              index.number_of_replicas: 0
+              index.lifecycle.name: "cadre-arkime"
+        status_code: [200, 409]
+
+    - name: Install nfdump (NetFlow CLI analysis)
+      ansible.builtin.apt:
+        name: nfdump
+        state: present
+
+    - name: Install SiLK build dependencies
+      ansible.builtin.apt:
+        name:
+          - build-essential
+          - libfixbuf-dev
+          - python3-dev
+          - libpcap-dev
+        state: present
+
+    - name: Download SiLK source
+      ansible.builtin.get_url:
+        url: https://tools.netsa.cert.org/releases/silk-3.24.1.tar.gz
+        dest: /tmp/silk.tar.gz
+      register: silk_dl
+      retries: 3
+      delay: 5
+
+    - name: Extract and build SiLK
+      ansible.builtin.shell: |
+        cd /tmp && tar xzf silk.tar.gz
+        cd silk-3.24.1
+        ./configure --prefix=/opt/silk --enable-data-rootdir=/opt/silk/data
+        make -j$(nproc) && make install
+      args:
+        creates: /opt/silk/bin/rwfilter
+      when: silk_dl is success
+
+    - name: Create SiLK data directories
+      ansible.builtin.file:
+        path: "{{ item }}"
+        state: directory
+        mode: "0755"
+      loop:
+        - /opt/silk/data
+        - /opt/silk/data/incoming
+        - /opt/silk/scripts
+
+    - name: Deploy SiLK flow generation script
+      ansible.builtin.copy:
+        dest: /opt/silk/scripts/process-pcaps.sh
+        mode: "0755"
+        content: |
+          #!/bin/bash
+          PCAP_DIR="/opt/pcap"
+          SILK_DIR="/opt/silk/data"
+          for f in "$PCAP_DIR"/*.pcap; do
+            [ -f "$f" ] || continue
+            base=$(basename "$f" .pcap)
+            /opt/silk/bin/rwptoflow "$f" > "$SILK_DIR/incoming/$base.flows"
+            mv "$f" "$f.processed"
+          done
+
+    - name: Open firewall ports
+      ansible.builtin.ufw:
+        rule: allow
+        port: "{{ item }}"
+        proto: tcp
+      loop:
+        - 22
+        - 8005
+
+- name: "Play 4 — Enroll Elastic Agent (if elk-fleet reachable)"
+  hosts: monitor
+  gather_facts: true
+  vars:
+    elk_host: 192.168.77.50
+    fleet_port: 8220
+  tasks:
+    - name: Check if Elastic Agent is already enrolled
+      ansible.builtin.stat:
+        path: /etc/elastic-agent/elastic-agent.yml
+      register: agent_cfg
+
+    - name: Probe Fleet server reachability
+      ansible.builtin.uri:
+        url: "http://{{ elk_host }}:5601/api/status"
+        method: GET
+        timeout: 5
+        status_code: 200
+      register: fleet_probe
+      failed_when: false
+      when: not agent_cfg.stat.exists
+
+    - name: Set fleet_available fact
+      ansible.builtin.set_fact:
+        fleet_available: "{{ fleet_probe is defined and fleet_probe.status is defined and fleet_probe.status == 200 }}"
+
+    - name: Fetch Fleet policies from elk to get CADRE-Monitor token
+      ansible.builtin.uri:
+        url: "http://{{ elk_host }}:5601/api/fleet/enrollment_api_keys"
+        method: GET
+        user: elastic
+        password: "elastic_CADRE_2026!"
+        force_basic_auth: true
+        headers:
+          kbn-xsrf: "true"
+        validate_certs: false
+        status_code: 200
+      register: enroll_resp
+      delegate_to: localhost
+      when: fleet_available and not agent_cfg.stat.exists
+
+    - name: Get CADRE-Monitor policy ID
+      ansible.builtin.uri:
+        url: "http://{{ elk_host }}:5601/api/fleet/agent_policies"
+        method: GET
+        user: elastic
+        password: "elastic_CADRE_2026!"
+        force_basic_auth: true
+        headers:
+          kbn-xsrf: "true"
+        validate_certs: false
+        status_code: 200
+      register: policy_resp
+      delegate_to: localhost
+      when: fleet_available and not agent_cfg.stat.exists
+
+    - name: Resolve CADRE-Monitor policy ID
+      ansible.builtin.set_fact:
+        cadre_mon_id: "{{ (policy_resp.json['items'] | selectattr('name', 'equalto', 'CADRE-Monitor') | first).id }}"
+      when: fleet_available and not agent_cfg.stat.exists and policy_resp is defined
+
+    - name: Resolve CADRE-Monitor enrollment token
+      ansible.builtin.set_fact:
+        cadre_mon_token: "{{ (enroll_resp.json['items'] | selectattr('policy_id', 'equalto', cadre_mon_id) | first).api_key }}"
+      when: fleet_available and not agent_cfg.stat.exists and enroll_resp is defined and cadre_mon_id is defined
+
+    - name: Download Elastic Agent for Linux
+      ansible.builtin.get_url:
+        url: "https://artifacts.elastic.co/downloads/beats/elastic-agent/elastic-agent-{{ elastic_agent_version }}-linux-x86_64.tar.gz"
+        dest: /tmp/elastic-agent.tar.gz
+        mode: "0644"
+      when: fleet_available and not agent_cfg.stat.exists
+
+    - name: Extract Elastic Agent
+      ansible.builtin.unarchive:
+        src: /tmp/elastic-agent.tar.gz
+        dest: /tmp/
+        remote_src: true
+        creates: /tmp/elastic-agent-{{ elastic_agent_version }}-linux-x86_64
+      when: fleet_available and not agent_cfg.stat.exists
+
+    - name: Enroll and install Elastic Agent into CADRE-Monitor
+      ansible.builtin.shell: |
+        cd /tmp/elastic-agent-{{ elastic_agent_version }}-linux-x86_64
+        ./elastic-agent install \
+          --url=https://{{ elk_host }}:{{ fleet_port }} \
+          --enrollment-token={{ cadre_mon_token }} \
+          --insecure \
+          --non-interactive \
+          --force
+      args:
+        creates: /etc/elastic-agent/elastic-agent.yml
+      when: fleet_available and not agent_cfg.stat.exists
+      register: agent_install
+      failed_when: false
+
+    - name: Ensure elastic-agent is running on monitor
+      ansible.builtin.systemd:
+        name: elastic-agent
+        state: started
+        enabled: true
+        daemon_reload: true
+      when: fleet_available

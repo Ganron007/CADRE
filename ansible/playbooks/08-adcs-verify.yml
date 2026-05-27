@@ -1,0 +1,277 @@
+---
+# TYPE: VERIFY-ONLY (rc=0=pass, rc=1=fail — manual install required)
+# Layer 8: ADCS Verification — Verify only, no changes
+# Every check exits 0 (pass) or 1 (fail). User investigates and fixes failures manually.
+
+- name: "ADCS verification — dc01"
+  hosts: dc01
+  gather_facts: false
+  tasks:
+    - name: "[ADCS] CA service running (certutil -ping)"
+      ansible.windows.win_shell: |
+        try {
+          $ErrorActionPreference = "Stop"
+          certutil -ping 2>&1 | Out-Null
+          Write-Output "PASS: CA is running"
+          exit 0
+        } catch { 
+          Write-Output "FAIL: CA not running: $_"
+          exit 1 
+        }
+      register: r
+      changed_when: false
+      failed_when: r.rc == 1
+
+    - name: "[ADCS] CA name = cadre-CA"
+      ansible.windows.win_shell: |
+        try {
+        $ErrorActionPreference = "Stop"
+          $caName = (Get-ChildItem "HKLM:\SYSTEM\CurrentControlSet\Services\CertSvc\Configuration" | Select-Object -First 1 -ExpandProperty PSChildName)
+          if ($caName -eq "cadre-CA") { Write-Output "PASS: CA name is cadre-CA"; exit 0 }
+          Write-Output "FAIL: CA name is $caName (expected cadre-CA)"; exit 1
+        } catch { Write-Output "FAIL: $($_.Exception.Message)"; exit 1 }
+      register: r
+      changed_when: false
+      failed_when: r.rc == 1
+
+    - name: "ESC6 — SAN injection enabled"
+      ansible.windows.win_shell: |
+        try {
+        $ErrorActionPreference = "Stop"
+          $flags = certutil -getreg CA\EditFlags 2>&1 | Out-String
+          if ($flags -match "EDITF_ATTRIBUTESUBJECTALTNAME2") { Write-Output "PASS: ESC6 SAN injection enabled"; exit 0 }
+          Write-Output "FAIL: ESC6 not enabled"; exit 1
+        } catch { Write-Output "FAIL: $($_.Exception.Message)"; exit 1 }
+      register: r
+      changed_when: false
+      failed_when: r.rc == 1
+
+    - name: "ESC7 — lead_engineering has ManageCA"
+      ansible.windows.win_shell: |
+        try {
+        $ErrorActionPreference = "Stop"
+          $caName = (Get-ChildItem "HKLM:\SYSTEM\CurrentControlSet\Services\CertSvc\Configuration" | Select-Object -First 1 -ExpandProperty PSChildName)
+          $binary = (Get-ItemProperty -Path "HKLM:\SYSTEM\CurrentControlSet\Services\CertSvc\Configuration\$caName" -Name "Security" -ErrorAction Stop).Security
+          $sd = New-Object System.Security.AccessControl.RawSecurityDescriptor($binary, 0)
+          $user = Get-ADUser lead_engineering
+          $ace = $sd.DiscretionaryAcl | Where-Object { $_.SecurityIdentifier -eq $user.SID }
+          if ($ace) {
+            $mask = $ace.AccessMask
+            $hasManageCA = ($mask -band 0x100) -eq 0x100
+            $hasIssue = ($mask -band 0x1) -eq 0x1
+            if ($hasManageCA -and $hasIssue) { Write-Output "PASS: ESC7 lead_engineering has ManageCA+Issue (mask=0x$('{0:x}' -f $mask))"; exit 0 }
+            Write-Output "FAIL: lead_engineering ACE found but wrong rights (mask=0x$('{0:x}' -f $mask))"; exit 1
+          }
+          Write-Output "FAIL: lead_engineering not found in CA ACL"; exit 1
+        } catch { Write-Output "FAIL: ESC7 check error: $_"; exit 1 }
+      register: r
+      changed_when: false
+      failed_when: r.rc == 1
+
+    - name: "ESC8 — Web Enrollment exists"
+      ansible.windows.win_shell: |
+        try {
+        $ErrorActionPreference = "Stop"
+          Import-Module WebAdministration
+          $app = Get-WebApplication -Site "Default Web Site" | Where-Object { $_.path -eq "/CertSrv" }
+          if (-not $app) { Write-Output "FAIL: ESC8 /CertSrv not found"; exit 1 }
+          $pool = Get-ItemProperty "IIS:\AppPools\CertSrv" -Name processModel -ErrorAction SilentlyContinue
+          if ($pool.identityType -ne 2 -and $pool.identityType -ne "NetworkService") { Write-Output "FAIL: ESC8 app pool identity not NetworkService (got: $($pool.identityType))"; exit 1 }
+          Write-Output "PASS: ESC8 Web Enrollment exists (NetworkService)"; exit 0
+        } catch { Write-Output "FAIL: ESC8 check error: $_"; exit 1 }
+      register: r
+      changed_when: false
+      failed_when: r.rc == 1
+
+    - name: "ESC8 — SSL disabled on /CertSrv"
+      ansible.windows.win_shell: |
+        try {
+        $ErrorActionPreference = "Stop"
+          $result = & $env:SystemRoot\system32\inetsrv\appcmd.exe list config "Default Web Site/CertSrv" /section:access 2>&1 | Out-String
+          if ($result -match "sslFlags.*None" -or $result -notmatch "sslFlags") {
+            Write-Output "PASS: ESC8 SSL disabled on /CertSrv"; exit 0
+          }
+          Write-Output "FAIL: ESC8 SSL not disabled"; exit 1
+        } catch { Write-Output "FAIL: ESC8 SSL check error: $_"; exit 1 }
+      register: r
+      changed_when: false
+      failed_when: r.rc == 1
+
+    - name: "ESC10 — Kdc StrongCertificateBindingEnforcement=0"
+      ansible.windows.win_shell: |
+        try {
+        $ErrorActionPreference = "Stop"
+          $v = (Get-ItemProperty "HKLM:\SYSTEM\CurrentControlSet\Services\Kdc" -Name "StrongCertificateBindingEnforcement" -ErrorAction Stop).StrongCertificateBindingEnforcement
+          if ($v -eq 0) { Write-Output "PASS: ESC10 Kdc enforcement disabled"; exit 0 }
+          Write-Output "FAIL: Kdc StrongCertificateBindingEnforcement=$v (expected 0)"; exit 1
+        } catch { Write-Output "FAIL: $($_.Exception.Message)"; exit 1 }
+      register: r
+      changed_when: false
+      failed_when: r.rc == 1
+
+    - name: "ESC10 — Schannel CertificateMappingMethods=31"
+      ansible.windows.win_shell: |
+        try {
+        $ErrorActionPreference = "Stop"
+          $v = (Get-ItemProperty "HKLM:\SYSTEM\CurrentControlSet\Control\SecurityProviders\Schannel" -Name "CertificateMappingMethods" -ErrorAction Stop).CertificateMappingMethods
+          if ($v -eq 31) { Write-Output "PASS: ESC10 Schannel mapping methods=31"; exit 0 }
+          Write-Output "FAIL: Schannel CertificateMappingMethods=$v (expected 31)"; exit 1
+        } catch { Write-Output "FAIL: $($_.Exception.Message)"; exit 1 }
+      register: r
+      changed_when: false
+      failed_when: r.rc == 1
+
+    - name: "ESC11 — ICPR enabled + integrity removed"
+      ansible.windows.win_shell: |
+        try {
+        $ErrorActionPreference = "Stop"
+          $caName = (Get-ChildItem "HKLM:\SYSTEM\CurrentControlSet\Services\CertSvc\Configuration" | Select-Object -First 1 -ExpandProperty PSChildName).Trim()
+          $flagsPath = "HKLM:\SYSTEM\CurrentControlSet\Services\CertSvc\Configuration\$caName"
+          $flags = (Get-ItemProperty -Path $flagsPath -Name "Flags" -ErrorAction Stop).Flags
+          $hasICPR = ($flags -band 0x4000000) -eq 0x4000000
+          $noIntegrity = ($flags -band 0x200) -ne 0x200
+          if ($hasICPR -and $noIntegrity) { Write-Output "PASS: ESC11 ICPR enabled, integrity removed (flags=0x$('{0:x}' -f $flags))"; exit 0 }
+          Write-Output "FAIL: ESC11 flags wrong (flags=0x$('{0:x}' -f $flags), ICPR=$hasICPR, noIntegrity=$noIntegrity)"; exit 1
+        } catch { Write-Output "FAIL: $($_.Exception.Message)"; exit 1 }
+      register: r
+      changed_when: false
+      failed_when: r.rc == 1
+
+    - name: "[ADCS] 8 CADRE-ESC templates published"
+      ansible.windows.win_shell: |
+        $ErrorActionPreference = "Stop"
+        try {
+          $expected = @("CADRE-ESC1","CADRE-ESC2","CADRE-ESC3-Agent","CADRE-ESC3-Target","CADRE-ESC4","CADRE-ESC9","CADRE-ESC13","CADRE-ESC14")
+          $rawOutput = (certutil -catemplates 2>$null) -join "`n"
+          $missing = $expected | Where-Object { $rawOutput -notmatch $_ }
+          if ($missing.Count -eq 0) { Write-Output "PASS: All 8 CADRE-ESC templates published"; exit 0 }
+          Write-Output "FAIL: Missing templates: $($missing -join ', ')"; exit 1
+        } catch { Write-Output "FAIL: $($_.Exception.Message)"; exit 1 }
+      register: r
+      changed_when: false
+      failed_when: r.rc == 1
+
+    - name: "ESC1 — ENROLLEE_SUPPLIES_SUBJECT flag verified"
+      ansible.windows.win_shell: |
+        try {
+        $ErrorActionPreference = "Stop"
+          $configNC = (Get-ADRootDSE).configurationNamingContext
+          $tpl = Get-ADObject "CN=CADRE-ESC1,CN=Certificate Templates,CN=Public Key Services,CN=Services,$configNC" -Properties msPKI-Certificate-Name-Flag -ErrorAction Stop
+          $flag = [int]$tpl.'msPKI-Certificate-Name-Flag'
+          if (($flag -band 1) -eq 1) { Write-Output "PASS: ESC1 ENROLLEE_SUPPLIES_SUBJECT enabled (flag=$flag)"; exit 0 }
+          Write-Output "FAIL: ESC1 ENROLLEE_SUPPLIES_SUBJECT not set (flag=$flag)"; exit 1
+        } catch { Write-Output "FAIL: ESC1 check error: $_"; exit 1 }
+      register: r
+      changed_when: false
+      failed_when: r.rc == 1
+
+    - name: "ESC2 — Any Purpose EKU (2.5.29.37.0) verified"
+      ansible.windows.win_shell: |
+        try {
+        $ErrorActionPreference = "Stop"
+          $configNC = (Get-ADRootDSE).configurationNamingContext
+          $tpl = Get-ADObject "CN=CADRE-ESC2,CN=Certificate Templates,CN=Public Key Services,CN=Services,$configNC" -Properties msPKI-Certificate-Application-Policy -ErrorAction Stop
+          $ekus = @($tpl.'msPKI-Certificate-Application-Policy')
+          if ($ekus -contains "2.5.29.37.0") { Write-Output "PASS: ESC2 has Any Purpose EKU"; exit 0 }
+          Write-Output "FAIL: ESC2 missing Any Purpose EKU (found: $($ekus -join ', '))"; exit 1
+        } catch { Write-Output "FAIL: ESC2 check error: $_"; exit 1 }
+      register: r
+      changed_when: false
+      failed_when: r.rc == 1
+
+    - name: "ESC3-Agent — Certificate Request Agent EKU verified"
+      ansible.windows.win_shell: |
+        try {
+        $ErrorActionPreference = "Stop"
+          $configNC = (Get-ADRootDSE).configurationNamingContext
+          $tpl = Get-ADObject "CN=CADRE-ESC3-Agent,CN=Certificate Templates,CN=Public Key Services,CN=Services,$configNC" -Properties msPKI-Certificate-Application-Policy -ErrorAction Stop
+          $ekus = @($tpl.'msPKI-Certificate-Application-Policy')
+          if ($ekus -contains "1.3.6.1.4.1.311.20.2.1") { Write-Output "PASS: ESC3-Agent has Certificate Request Agent EKU"; exit 0 }
+          Write-Output "FAIL: ESC3-Agent missing Certificate Request Agent EKU"; exit 1
+        } catch { Write-Output "FAIL: ESC3-Agent check error: $_"; exit 1 }
+      register: r
+      changed_when: false
+      failed_when: r.rc == 1
+
+    - name: "ESC3-Target — RA signature requirement verified"
+      ansible.windows.win_shell: |
+        try {
+        $ErrorActionPreference = "Stop"
+          $configNC = (Get-ADRootDSE).configurationNamingContext
+          $tpl = Get-ADObject "CN=CADRE-ESC3-Target,CN=Certificate Templates,CN=Public Key Services,CN=Services,$configNC" -Properties msPKI-RA-Signature -ErrorAction Stop
+          $sig = [int]$tpl.'msPKI-RA-Signature'
+          if ($sig -ge 1) { Write-Output "PASS: ESC3-Target requires authorized signature (count=$sig)"; exit 0 }
+          Write-Output "FAIL: ESC3-Target does not require authorized signature (count=$sig)"; exit 1
+        } catch { Write-Output "FAIL: ESC3-Target check error: $_"; exit 1 }
+      register: r
+      changed_when: false
+      failed_when: r.rc == 1
+
+    - name: "ESC4 — WriteDacl ACL on template verified"
+      ansible.windows.win_shell: |
+        try {
+        $ErrorActionPreference = "Stop"
+          $configNC = (Get-ADRootDSE).configurationNamingContext
+          $tpl = Get-ADObject "CN=CADRE-ESC4,CN=Certificate Templates,CN=Public Key Services,CN=Services,$configNC" -Properties nTSecurityDescriptor -ErrorAction Stop
+          $desc = $tpl.nTSecurityDescriptor
+          $engSid = (Get-ADGroup "Engineering-Cadre").SID.Value
+          $hasWriteDacl = $desc.Access | Where-Object {
+            try { $_.IdentityReference.Translate([System.Security.Principal.SecurityIdentifier]).Value -eq $engSid -and ($_.ActiveDirectoryRights -band [System.DirectoryServices.ActiveDirectoryRights]::WriteDacl) -ne 0 } catch { $false }
+          }
+          if ($hasWriteDacl) { Write-Output "PASS: ESC4 Engineering-Cadre has WriteDacl"; exit 0 }
+          Write-Output "FAIL: ESC4 Engineering-Cadre WriteDacl not found"; exit 1
+        } catch { Write-Output "FAIL: ESC4 check error: $_"; exit 1 }
+      register: r
+      changed_when: false
+      failed_when: r.rc == 1
+
+    - name: "ESC9 — NO_SECURITY_EXTENSION flag verified"
+      ansible.windows.win_shell: |
+        try {
+        $ErrorActionPreference = "Stop"
+          $configNC = (Get-ADRootDSE).configurationNamingContext
+          $tpl = Get-ADObject "CN=CADRE-ESC9,CN=Certificate Templates,CN=Public Key Services,CN=Services,$configNC" -Properties msPKI-Enrollment-Flag -ErrorAction Stop
+          $flag = [int]$tpl.'msPKI-Enrollment-Flag'
+          if (($flag -band 0x80000) -eq 0x80000) { Write-Output "PASS: ESC9 NO_SECURITY_EXTENSION enabled (flag=$flag)"; exit 0 }
+          Write-Output "FAIL: ESC9 NO_SECURITY_EXTENSION not set (flag=$flag)"; exit 1
+        } catch { Write-Output "FAIL: ESC9 check error: $_"; exit 1 }
+      register: r
+      changed_when: false
+      failed_when: r.rc == 1
+
+    - name: "ESC13 — Issuance Policy OID linked to ESC13-Vulnerable-Target (Universal Group)"
+      ansible.windows.win_shell: |
+        try {
+          $ErrorActionPreference = "Stop"
+          $configNC = (Get-ADRootDSE).configurationNamingContext
+          $oidContainer = "CN=OID,CN=Public Key Services,CN=Services,$configNC"
+          $linkedOIDs = Get-ADObject -SearchBase $oidContainer -Filter { msDS-OIDToGroupLink -like "*" } -Properties msDS-OIDToGroupLink -ErrorAction SilentlyContinue
+          
+          # FIX: Targeting the Universal group workaround from Session Q
+          $targetGroup = "CN=ESC13-Vulnerable-Target,OU=Command,DC=cadre,DC=local"
+          
+          $match = $linkedOIDs | Where-Object { $_.'msDS-OIDToGroupLink' -eq $targetGroup }
+          if ($match) { Write-Output "PASS: ESC13 OID correctly linked to Universal target group"; exit 0 }
+          
+          if ($linkedOIDs) {
+            $found = $linkedOIDs | ForEach-Object { $_.'msDS-OIDToGroupLink' }
+            Write-Output "FAIL: ESC13 OID links found but none point to target (found: $($found -join '; '))"; exit 1
+          }
+          Write-Output "FAIL: ESC13 no OID-to-group link found"; exit 1
+        } catch { Write-Output "FAIL: ESC13 check error: $_"; exit 1 }
+      register: r
+      changed_when: false
+      failed_when: r.rc == 1
+
+    - name: "[ADCS][WT#62] ESC14 — Explicit Certificate Mapping template published"
+      ansible.windows.win_shell: |
+        try {
+          $ErrorActionPreference = "Stop"
+          $configNC = (Get-ADRootDSE).configurationNamingContext
+          $tpl = Get-ADObject -Filter { Name -eq "CADRE-ESC14" } -SearchBase "CN=Certificate Templates,CN=Public Key Services,CN=Services,$configNC" -ErrorAction SilentlyContinue
+          if ($tpl) { Write-Output "PASS: CADRE-ESC14 template exists"; exit 0 }
+          Write-Output "FAIL: CADRE-ESC14 template not found"; exit 1
+        } catch { Write-Output "FAIL: ESC14 check error: $_"; exit 1 }
+      register: r
+      changed_when: false
+      failed_when: r.rc == 1

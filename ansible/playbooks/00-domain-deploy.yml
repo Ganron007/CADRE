@@ -1,0 +1,393 @@
+---
+# TYPE: DEPLOY (rc=0=skip, rc=2=applied+verified, rc=1=fail)
+# Layer 00: Domain Deploy — Domain promotion, DNS infra, forest trusts
+# Fresh deploy only — run once before 01-core-ad.yml.
+# Each task uses win_shell rc=2 pattern with pre-check → apply → verify.
+# DNS forwarders to internet (1.1.1.1, 8.8.8.8) skipped — needs investigation.
+# Conditional DNS forwarders skipped — user handles manually.
+#
+# Run order: dc01 (forest root) → dc02 (child, needs dc01) → dc03 (independent forest)
+#
+# DSRM passwords:
+#   cadre.local:    S@feMode_CADRE_2026!
+#   child.cadre.local: S@feMode_Ch1ld_2026!
+#   range.local:    S@feMode_R@ng3_2026!
+
+- name: "dc01 — Install AD-DS + promote cadre.local forest"
+  hosts: dc01
+  gather_facts: false
+  tasks:
+    - name: "[PREP] Install AD-Domain-Services feature"
+      ansible.windows.win_shell: |
+        $ErrorActionPreference = "Stop"
+        try {
+          $f = Get-WindowsFeature -Name AD-Domain-Services
+          if ($f.Installed) { Write-Output "OK: AD-DS already installed"; exit 0 }
+          Install-WindowsFeature -Name AD-Domain-Services -IncludeManagementTools
+          $v = Get-WindowsFeature -Name AD-Domain-Services
+          if (-not $v.Installed) { throw "AD-DS feature not installed" }
+          Write-Output "APPLIED: AD-DS feature installed and verified"; exit 2
+        } catch { Write-Output "FAILED: $_"; exit 1 }
+      register: r
+      changed_when: r.rc == 2
+      failed_when: r.rc == 1
+
+    - name: "[PREP] Promote forest root — cadre.local"
+      ansible.windows.win_shell: |
+        $ErrorActionPreference = "Stop"
+        try {
+          $domain = Get-ADDomain -Identity cadre.local -ErrorAction SilentlyContinue
+          if ($domain) { Write-Output "OK: cadre.local already exists"; exit 0 }
+          $secPwd = ConvertTo-SecureString "S@feMode_CADRE_2026!" -AsPlainText -Force
+          Install-ADDSForest -DomainName cadre.local -DomainNetbiosName CADRE `
+            -SafeModeAdministratorPassword $secPwd -CreateDnsDelegation:$false -Force -NoRebootOnCompletion
+          $v = Get-ADDomain -Identity cadre.local -ErrorAction SilentlyContinue
+          if (-not $v) { throw "cadre.local not found after promotion" }
+          Write-Output "APPLIED: cadre.local forest promoted and verified"; exit 2
+        } catch { Write-Output "FAILED: $_"; exit 1 }
+      register: r
+      changed_when: r.rc == 2
+      failed_when: r.rc == 1
+
+    - name: "[PREP] Reboot after forest promotion"
+      ansible.windows.win_reboot:
+        reboot_timeout: 1200
+      when: r.rc == 2
+
+    - name: "[PREP] Install DNS role"
+      ansible.windows.win_shell: |
+        $ErrorActionPreference = "Stop"
+        try {
+          $f = Get-WindowsFeature -Name DNS
+          if ($f.Installed) { Write-Output "OK: DNS already installed"; exit 0 }
+          Install-WindowsFeature -Name DNS
+          $v = Get-WindowsFeature -Name DNS
+          if (-not $v.Installed) { throw "DNS not installed" }
+          Write-Output "APPLIED: DNS role installed and verified"; exit 2
+        } catch { Write-Output "FAILED: $_"; exit 1 }
+      register: r
+      changed_when: r.rc == 2
+      failed_when: r.rc == 1
+
+    - name: "[PREP] Create reverse lookup zone"
+      ansible.windows.win_shell: |
+        $ErrorActionPreference = "Stop"
+        try {
+          $z = Get-DnsServerZone -Name "77.168.192.in-addr.arpa" -ErrorAction SilentlyContinue
+          if ($z) { Write-Output "OK: Reverse zone already exists"; exit 0 }
+          Add-DnsServerPrimaryZone -NetworkId "192.168.77.0/24" -ReplicationScope Domain -PassThru
+          $v = Get-DnsServerZone -Name "77.168.192.in-addr.arpa" -ErrorAction Stop
+          if (-not $v) { throw "Reverse zone not found" }
+          Write-Output "APPLIED: Reverse lookup zone created and verified"; exit 2
+        } catch { Write-Output "FAILED: $_"; exit 1 }
+      register: r
+      changed_when: r.rc == 2
+      failed_when: r.rc == 1
+
+    - name: "[PREP] Detect NAT adapter + disable DNS registration"
+      ansible.windows.win_shell: |
+        $ErrorActionPreference = "Stop"
+        try {
+          $domainIP = "{{ ansible_host }}"
+          $adapters = Get-NetAdapter | Where-Object { $_.Status -eq "Up" }
+          $applied = $false
+          foreach ($if in $adapters) {
+            $ip = Get-NetIPAddress -InterfaceIndex $if.ifIndex -AddressFamily IPv4 -ErrorAction SilentlyContinue
+            $current = (Get-DnsClient -InterfaceIndex $if.ifIndex -ErrorAction SilentlyContinue).RegisterThisConnectionsAddress
+            if ($ip.IPAddress -ne $domainIP -and $current -ne $false) {
+              Set-DnsClient -InterfaceIndex $if.ifIndex -RegisterThisConnectionsAddress $false
+              $applied = $true
+              Write-Output "Disabled DNS registration on $($if.Name)"
+            }
+          }
+          if (-not $applied) { Write-Output "OK: DNS registration already correct"; exit 0 }
+          Write-Output "APPLIED: NAT adapter DNS registration disabled"; exit 2
+        } catch { Write-Output "FAILED: $_"; exit 1 }
+      register: r
+      changed_when: r.rc == 2
+      failed_when: r.rc == 1
+
+    - name: "[PREP] Restrict DNS listener to domain IP"
+      ansible.windows.win_shell: |
+        $ErrorActionPreference = "Stop"
+        try {
+          $ip = "{{ ansible_host }}"
+          $r = dnscmd . /ResetListenAddresses $ip 2>&1 | Out-String
+          if ($LASTEXITCODE -ne 0) { throw "dnscmd failed: $r" }
+          Write-Output "APPLIED: DNS listener restricted to $ip"; exit 2
+        } catch { Write-Output "FAILED: $_"; exit 1 }
+      register: r
+      changed_when: r.rc == 2
+      failed_when: r.rc == 1
+
+- name: "dc02 — Install AD-DS + promote child.cadre.local domain"
+  hosts: dc02
+  gather_facts: false
+  tasks:
+    - name: "[PREP] Set DNS to dc01 for domain join operations"
+      ansible.windows.win_dns_client:
+        adapter_names: "*"
+        ipv4_addresses:
+          - "192.168.77.10"
+
+    - name: "[PREP] Install AD-Domain-Services feature"
+      ansible.windows.win_shell: |
+        $ErrorActionPreference = "Stop"
+        try {
+          $f = Get-WindowsFeature -Name AD-Domain-Services
+          if ($f.Installed) { Write-Output "OK: AD-DS already installed"; exit 0 }
+          Install-WindowsFeature -Name AD-Domain-Services -IncludeManagementTools
+          $v = Get-WindowsFeature -Name AD-Domain-Services
+          if (-not $v.Installed) { throw "AD-DS not installed" }
+          Write-Output "APPLIED: AD-DS feature installed and verified"; exit 2
+        } catch { Write-Output "FAILED: $_"; exit 1 }
+      register: r
+      changed_when: r.rc == 2
+      failed_when: r.rc == 1
+
+    - name: "[PREP] Promote child domain — child.cadre.local"
+      ansible.windows.win_shell: |
+        $ErrorActionPreference = "Stop"
+        try {
+          $domain = Get-ADDomain -Identity child.cadre.local -ErrorAction SilentlyContinue
+          if ($domain) { Write-Output "OK: child.cadre.local already exists"; exit 0 }
+          $secPwd = ConvertTo-SecureString "S@feMode_Ch1ld_2026!" -AsPlainText -Force
+          $cred = New-Object System.Management.Automation.PSCredential("cadre.local\Administrator", (ConvertTo-SecureString "vagrant" -AsPlainText -Force))
+          Install-ADDSDomain -NewDomainName child -ParentDomainName cadre.local `
+            -DomainNetbiosName CHILD -SafeModeAdministratorPassword $secPwd `
+            -Credential $cred -Force -NoRebootOnCompletion
+          $v = Get-ADDomain -Identity child.cadre.local -ErrorAction SilentlyContinue
+          if (-not $v) { throw "child.cadre.local not found after promotion" }
+          Write-Output "APPLIED: child.cadre.local child domain promoted and verified"; exit 2
+        } catch { Write-Output "FAILED: $_"; exit 1 }
+      register: r
+      changed_when: r.rc == 2
+      failed_when: r.rc == 1
+
+    - name: "[PREP] Reboot after child domain promotion"
+      ansible.windows.win_reboot:
+        reboot_timeout: 1200
+      when: r.rc == 2
+
+    - name: "[PREP] Install DNS role"
+      ansible.windows.win_shell: |
+        $ErrorActionPreference = "Stop"
+        try {
+          $f = Get-WindowsFeature -Name DNS
+          if ($f.Installed) { Write-Output "OK: DNS already installed"; exit 0 }
+          Install-WindowsFeature -Name DNS
+          $v = Get-WindowsFeature -Name DNS
+          if (-not $v.Installed) { throw "DNS not installed" }
+          Write-Output "APPLIED: DNS role installed and verified"; exit 2
+        } catch { Write-Output "FAILED: $_"; exit 1 }
+      register: r
+      changed_when: r.rc == 2
+      failed_when: r.rc == 1
+
+    - name: "[PREP] Create reverse lookup zone"
+      ansible.windows.win_shell: |
+        $ErrorActionPreference = "Stop"
+        try {
+          $z = Get-DnsServerZone -Name "77.168.192.in-addr.arpa" -ErrorAction SilentlyContinue
+          if ($z) { Write-Output "OK: Reverse zone already exists"; exit 0 }
+          Add-DnsServerPrimaryZone -NetworkId "192.168.77.0/24" -ReplicationScope Domain -PassThru
+          $v = Get-DnsServerZone -Name "77.168.192.in-addr.arpa" -ErrorAction Stop
+          if (-not $v) { throw "Reverse zone not found" }
+          Write-Output "APPLIED: Reverse lookup zone created and verified"; exit 2
+        } catch { Write-Output "FAILED: $_"; exit 1 }
+      register: r
+      changed_when: r.rc == 2
+      failed_when: r.rc == 1
+
+    - name: "[PREP] Detect NAT adapter + disable DNS registration"
+      ansible.windows.win_shell: |
+        $ErrorActionPreference = "Stop"
+        try {
+          $domainIP = "{{ ansible_host }}"
+          $adapters = Get-NetAdapter | Where-Object { $_.Status -eq "Up" }
+          $applied = $false
+          foreach ($if in $adapters) {
+            $ip = Get-NetIPAddress -InterfaceIndex $if.ifIndex -AddressFamily IPv4 -ErrorAction SilentlyContinue
+            $current = (Get-DnsClient -InterfaceIndex $if.ifIndex -ErrorAction SilentlyContinue).RegisterThisConnectionsAddress
+            if ($ip.IPAddress -ne $domainIP -and $current -ne $false) {
+              Set-DnsClient -InterfaceIndex $if.ifIndex -RegisterThisConnectionsAddress $false
+              $applied = $true
+            }
+          }
+          if (-not $applied) { Write-Output "OK: DNS registration already correct"; exit 0 }
+          Write-Output "APPLIED: NAT adapter DNS registration disabled"; exit 2
+        } catch { Write-Output "FAILED: $_"; exit 1 }
+      register: r
+      changed_when: r.rc == 2
+      failed_when: r.rc == 1
+
+    - name: "[PREP] Restrict DNS listener to domain IP"
+      ansible.windows.win_shell: |
+        $ErrorActionPreference = "Stop"
+        try {
+          $ip = "{{ ansible_host }}"
+          $r = dnscmd . /ResetListenAddresses $ip 2>&1 | Out-String
+          if ($LASTEXITCODE -ne 0) { throw "dnscmd failed: $r" }
+          Write-Output "APPLIED: DNS listener restricted to $ip"; exit 2
+        } catch { Write-Output "FAILED: $_"; exit 1 }
+      register: r
+      changed_when: r.rc == 2
+      failed_when: r.rc == 1
+
+- name: "dc03 — Install AD-DS + promote range.local forest"
+  hosts: dc03
+  gather_facts: false
+  tasks:
+    - name: "[PREP] Set DNS to dc01 for initial operations"
+      ansible.windows.win_dns_client:
+        adapter_names: "*"
+        ipv4_addresses:
+          - "192.168.77.10"
+
+    - name: "[PREP] Install AD-Domain-Services feature"
+      ansible.windows.win_shell: |
+        $ErrorActionPreference = "Stop"
+        try {
+          $f = Get-WindowsFeature -Name AD-Domain-Services
+          if ($f.Installed) { Write-Output "OK: AD-DS already installed"; exit 0 }
+          Install-WindowsFeature -Name AD-Domain-Services -IncludeManagementTools
+          $v = Get-WindowsFeature -Name AD-Domain-Services
+          if (-not $v.Installed) { throw "AD-DS not installed" }
+          Write-Output "APPLIED: AD-DS feature installed and verified"; exit 2
+        } catch { Write-Output "FAILED: $_"; exit 1 }
+      register: r
+      changed_when: r.rc == 2
+      failed_when: r.rc == 1
+
+    - name: "[PREP] Promote forest root — range.local"
+      ansible.windows.win_shell: |
+        $ErrorActionPreference = "Stop"
+        try {
+          $domain = Get-ADDomain -Identity range.local -ErrorAction SilentlyContinue
+          if ($domain) { Write-Output "OK: range.local already exists"; exit 0 }
+          $secPwd = ConvertTo-SecureString "S@feMode_R@ng3_2026!" -AsPlainText -Force
+          Install-ADDSForest -DomainName range.local -DomainNetbiosName RANGE `
+            -SafeModeAdministratorPassword $secPwd -CreateDnsDelegation:$false -Force -NoRebootOnCompletion
+          $v = Get-ADDomain -Identity range.local -ErrorAction SilentlyContinue
+          if (-not $v) { throw "range.local not found after promotion" }
+          Write-Output "APPLIED: range.local forest promoted and verified"; exit 2
+        } catch { Write-Output "FAILED: $_"; exit 1 }
+      register: r
+      changed_when: r.rc == 2
+      failed_when: r.rc == 1
+
+    - name: "[PREP] Reboot after forest promotion"
+      ansible.windows.win_reboot:
+        reboot_timeout: 1200
+      when: r.rc == 2
+
+    - name: "[PREP] Install DNS role"
+      ansible.windows.win_shell: |
+        $ErrorActionPreference = "Stop"
+        try {
+          $f = Get-WindowsFeature -Name DNS
+          if ($f.Installed) { Write-Output "OK: DNS already installed"; exit 0 }
+          Install-WindowsFeature -Name DNS
+          $v = Get-WindowsFeature -Name DNS
+          if (-not $v.Installed) { throw "DNS not installed" }
+          Write-Output "APPLIED: DNS role installed and verified"; exit 2
+        } catch { Write-Output "FAILED: $_"; exit 1 }
+      register: r
+      changed_when: r.rc == 2
+      failed_when: r.rc == 1
+
+    - name: "[PREP] Create reverse lookup zone"
+      ansible.windows.win_shell: |
+        $ErrorActionPreference = "Stop"
+        try {
+          $z = Get-DnsServerZone -Name "77.168.192.in-addr.arpa" -ErrorAction SilentlyContinue
+          if ($z) { Write-Output "OK: Reverse zone already exists"; exit 0 }
+          Add-DnsServerPrimaryZone -NetworkId "192.168.77.0/24" -ReplicationScope Domain -PassThru
+          $v = Get-DnsServerZone -Name "77.168.192.in-addr.arpa" -ErrorAction Stop
+          if (-not $v) { throw "Reverse zone not found" }
+          Write-Output "APPLIED: Reverse lookup zone created and verified"; exit 2
+        } catch { Write-Output "FAILED: $_"; exit 1 }
+      register: r
+      changed_when: r.rc == 2
+      failed_when: r.rc == 1
+
+    - name: "[PREP] Detect NAT adapter + disable DNS registration"
+      ansible.windows.win_shell: |
+        $ErrorActionPreference = "Stop"
+        try {
+          $domainIP = "{{ ansible_host }}"
+          $adapters = Get-NetAdapter | Where-Object { $_.Status -eq "Up" }
+          $applied = $false
+          foreach ($if in $adapters) {
+            $ip = Get-NetIPAddress -InterfaceIndex $if.ifIndex -AddressFamily IPv4 -ErrorAction SilentlyContinue
+            $current = (Get-DnsClient -InterfaceIndex $if.ifIndex -ErrorAction SilentlyContinue).RegisterThisConnectionsAddress
+            if ($ip.IPAddress -ne $domainIP -and $current -ne $false) {
+              Set-DnsClient -InterfaceIndex $if.ifIndex -RegisterThisConnectionsAddress $false
+              $applied = $true
+            }
+          }
+          if (-not $applied) { Write-Output "OK: DNS registration already correct"; exit 0 }
+          Write-Output "APPLIED: NAT adapter DNS registration disabled"; exit 2
+        } catch { Write-Output "FAILED: $_"; exit 1 }
+      register: r
+      changed_when: r.rc == 2
+      failed_when: r.rc == 1
+
+    - name: "[PREP] Restrict DNS listener to domain IP"
+      ansible.windows.win_shell: |
+        $ErrorActionPreference = "Stop"
+        try {
+          $ip = "{{ ansible_host }}"
+          $r = dnscmd . /ResetListenAddresses $ip 2>&1 | Out-String
+          if ($LASTEXITCODE -ne 0) { throw "dnscmd failed: $r" }
+          Write-Output "APPLIED: DNS listener restricted to $ip"; exit 2
+        } catch { Write-Output "FAILED: $_"; exit 1 }
+      register: r
+      changed_when: r.rc == 2
+      failed_when: r.rc == 1
+
+- name: "Create forest trust — cadre.local side"
+  hosts: dc01
+  gather_facts: false
+  tasks:
+    - name: "[PREP][WT#33] Establish bidirectional trust to range.local"
+      ansible.windows.win_shell: |
+        $ErrorActionPreference = "Stop"
+        try {
+          Import-Module ActiveDirectory
+          $localForest = Get-ADForest -Current LocalComputer
+          $existing = $localForest.Trusts | Where-Object { $_.Target -eq "range.local" }
+          if ($existing) { Write-Output "OK: Trust to range.local already exists"; exit 0 }
+          $context = New-Object System.DirectoryServices.ActiveDirectory.DirectoryContext('Forest', $localForest.Name)
+          $forestObj = [System.DirectoryServices.ActiveDirectory.Forest]::GetForest($context)
+          $forestObj.CreateLocalSideOfTrustRelationship("range.local", 'Bidirectional', "S@fe_CADRE_Trust_2026!")
+          $v = Get-ADTrust -Filter "Name -eq 'range.local'" -ErrorAction Stop
+          if (-not $v) { throw "Trust not found after creation" }
+          Write-Output "APPLIED: Forest trust cadre.local→range.local created and verified"; exit 2
+        } catch { Write-Output "FAILED: $_"; exit 1 }
+      register: r
+      changed_when: r.rc == 2
+      failed_when: r.rc == 1
+
+- name: "Create forest trust — range.local side"
+  hosts: dc03
+  gather_facts: false
+  tasks:
+    - name: "[PREP][WT#33] Establish bidirectional trust to cadre.local"
+      ansible.windows.win_shell: |
+        $ErrorActionPreference = "Stop"
+        try {
+          Import-Module ActiveDirectory
+          $localForest = Get-ADForest -Current LocalComputer
+          $existing = $localForest.Trusts | Where-Object { $_.Target -eq "cadre.local" }
+          if ($existing) { Write-Output "OK: Trust to cadre.local already exists"; exit 0 }
+          $context = New-Object System.DirectoryServices.ActiveDirectory.DirectoryContext('Forest', $localForest.Name)
+          $forestObj = [System.DirectoryServices.ActiveDirectory.Forest]::GetForest($context)
+          $forestObj.CreateLocalSideOfTrustRelationship("cadre.local", 'Bidirectional', "S@fe_CADRE_Trust_2026!")
+          $v = Get-ADTrust -Filter "Name -eq 'cadre.local'" -ErrorAction Stop
+          if (-not $v) { throw "Trust not found after creation" }
+          Write-Output "APPLIED: Forest trust range.local→cadre.local created and verified"; exit 2
+        } catch { Write-Output "FAILED: $_"; exit 1 }
+      register: r
+      changed_when: r.rc == 2
+      failed_when: r.rc == 1

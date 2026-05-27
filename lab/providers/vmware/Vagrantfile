@@ -1,0 +1,152 @@
+# -*- mode: ruby -*-
+# vi: set ft=ruby :
+#
+# CADRE — Vagrantfile (VMware Desktop provider)
+# 7 core VMs on vmnet2 host-only network 192.168.77.0/24
+# Provider plugins required: vagrant-vmware-desktop, vagrant-reload
+#
+# Topology:
+#   Windows Server 2025:  dc01 .10  dc02 .11  dc03 .12  mbr01 .22  mbr02 .23
+#   Linux:                linux01 .40  provisioning .60
+#
+# Extension VMs (elk .50, vr .51, monitor .55) are defined HERE but gated behind
+# the CADRE_EXTENSIONS env var (comma-separated extension names). `vagrant up` brings
+# up only the 7 core VMs by default; cadre.py sets CADRE_EXTENSIONS from `-e` so the
+# matching extension VM(s) are added to this same Vagrantfile run. One Vagrantfile,
+# one `.vagrant/` state. Example: CADRE_EXTENSIONS="elk-fleet,net-monitor" vagrant up
+#
+# Total RAM budget: ~30 GB core + ~22 GB extensions (elk=12, monitor=8, vr=2)
+
+ENV["VAGRANT_DEFAULT_PROVIDER"] = "vmware_desktop"
+
+# ----- Box pins (kept centralized so swaps are one-liners) -----
+WIN_SERVER_BOX   = "gusztavvargadr/windows-server-2025-standard"
+UBUNTU_2404_BOX  = "bento/ubuntu-24.04"
+UBUNTU_2204_BOX  = "bento/ubuntu-22.04"
+
+# ----- Network -----
+VMNET = "vmnet2"   # Configure as host-only 192.168.77.0/24 in VMware Virtual Network Editor (DHCP disabled)
+
+# Per-VM spec: [hostname, IP, RAM_MB, CPU, box, os_family]
+VMS = [
+  # Domain controllers
+  { name: "dc01",         ip: "192.168.77.10", ram: 4096, cpus: 2, box: WIN_SERVER_BOX,  family: "windows" },
+  { name: "dc02",         ip: "192.168.77.11", ram: 4096, cpus: 2, box: WIN_SERVER_BOX,  family: "windows" },
+  { name: "dc03",         ip: "192.168.77.12", ram: 4096, cpus: 2, box: WIN_SERVER_BOX,  family: "windows" },
+
+  # Member servers
+  { name: "mbr01",        ip: "192.168.77.22", ram: 4096, cpus: 2, box: WIN_SERVER_BOX,  family: "windows" },
+  { name: "mbr02",        ip: "192.168.77.23", ram: 8192, cpus: 4, box: WIN_SERVER_BOX,  family: "windows" },  # SCCM site server
+
+  # Linux substrate
+  { name: "linux01",      ip: "192.168.77.40", ram: 4096, cpus: 2, box: UBUNTU_2404_BOX, family: "linux"   },
+
+  # Ansible runner (replaces WSL2)
+  { name: "provisioning", ip: "192.168.77.60", ram: 2048, cpus: 2, box: UBUNTU_2404_BOX, family: "linux"   },
+]
+
+# ----- Extension VMs (gated by CADRE_EXTENSIONS env var) -----
+# Keyed by extension name (must match cadre.py's extension identifiers).
+# monitor carries a promiscuous second NIC for traffic capture (net-monitor).
+EXT_VMS = {
+  "elk-fleet"    => { name: "elk",     ip: "192.168.77.50", ram: 12288, cpus: 6, box: UBUNTU_2404_BOX, family: "linux" },
+  "velociraptor" => { name: "vr",      ip: "192.168.77.51", ram: 2048,  cpus: 2, box: UBUNTU_2404_BOX, family: "linux" },
+  "net-monitor"  => { name: "monitor", ip: "192.168.77.55", ram: 8192,  cpus: 4, box: UBUNTU_2404_BOX, family: "linux", promisc: true },
+}
+
+# Append only the extension VM(s) named in CADRE_EXTENSIONS (comma-separated).
+(ENV["CADRE_EXTENSIONS"] || "").split(",").map(&:strip).reject(&:empty?).each do |ext|
+  VMS << EXT_VMS[ext] if EXT_VMS.key?(ext)
+end
+
+Vagrant.configure("2") do |config|
+
+  # ----- Default options applied to every VM unless overridden -----
+  config.vm.boot_timeout       = 1800
+  config.ssh.insert_key        = false
+  config.vm.synced_folder ".", "/vagrant", disabled: true   # we copy via SCP in cadre.py, not synced folders
+
+  VMS.each do |vm|
+    config.vm.define vm[:name] do |m|
+
+      m.vm.box      = vm[:box]
+      m.vm.hostname = vm[:name]
+
+      # ---- Static IP on vmnet2 ----
+      m.vm.network "private_network",
+                   ip: vm[:ip],
+                   netmask: "255.255.255.0"
+
+      # ---- Provider settings ----
+      m.vm.provider "vmware_desktop" do |v|
+        v.gui            = false
+        v.linked_clone   = true
+        v.memory = vm[:ram]
+        v.cpus   = vm[:cpus]
+        v.vmx["displayname"]            = "cadre-#{vm[:name]}"
+
+        # ---- Promiscuous second NIC on vmnet2 for the monitor VM (net-monitor capture) ----
+        if vm[:promisc]
+          v.vmx["ethernet1.present"]          = "TRUE"
+          v.vmx["ethernet1.connectiontype"]   = "custom"
+          v.vmx["ethernet1.vnet"]             = VMNET
+          v.vmx["ethernet1.virtualdev"]       = "e1000"
+          v.vmx["ethernet1.startconnected"]   = "TRUE"
+          v.vmx["ethernet1.allowPromiscuous"] = "TRUE"
+          v.vmx["ethernet1.addresstype"]      = "generated"
+        end
+      end
+
+      # ---- OS-family-specific communicator + credentials ----
+      if vm[:family] == "windows"
+        m.vm.communicator = "winrm"
+        m.winrm.username  = "vagrant"
+        m.winrm.password  = "vagrant"
+        m.winrm.transport = :plaintext
+        m.winrm.basic_auth_only = true
+        m.vm.boot_timeout = 1800
+
+        # Make sure WinRM is reachable on the static IP after first boot
+        # Also set static IP since VMware cannot auto-configure Windows static IPs
+        m.vm.provision "shell", privileged: true, inline: <<-PS, name: "WinRM + static IP setup"
+          winrm quickconfig -quiet -force
+          Set-Item -Path WSMan:\\localhost\\Service\\Auth\\Basic -Value $true -Force
+          Set-Item -Path WSMan:\\localhost\\Service\\AllowUnencrypted -Value $true -Force
+          netsh advfirewall firewall add rule name="WinRM-HTTP" dir=in action=allow protocol=TCP localport=5985 2>\$null
+          netsh advfirewall firewall add rule name="ICMPv4" dir=in action=allow protocol=ICMPv4 2>\$null
+          \$ip      = "#{vm[:ip]}"
+          \$gateway = "192.168.77.1"
+          \$prefix  = "24"
+          # Find vmnet2 adapter: Ethernet1 typically, or any adapter with 192.168.77.x DHCP lease
+          \$adapter = Get-NetAdapter -Name "Ethernet1" -ErrorAction SilentlyContinue
+          if (-not \$adapter) {
+            \$adapter = Get-NetAdapter | Where-Object { \$_.Status -eq "Up" } | Sort-Object Name | Select-Object -Last 1
+          }
+          if (\$adapter) {
+            \$currentIp = Get-NetIPAddress -InterfaceAlias \$adapter.Name -AddressFamily IPv4 -ErrorAction SilentlyContinue
+            if (\$currentIp.IPAddress -ne \$ip) {
+              New-NetIPAddress -InterfaceAlias \$adapter.Name -IPAddress \$ip -PrefixLength \$prefix -ErrorAction SilentlyContinue | Out-Null
+            }
+          }
+        PS
+      else
+        m.vm.communicator = "ssh"
+        m.ssh.username  = "vagrant"
+        m.ssh.password  = "vagrant"
+      end
+
+      # ---- provisioning VM extras: install Ansible 2.16+ + python deps ----
+      if vm[:name] == "provisioning"
+        m.vm.provision "shell", privileged: true, inline: <<-SH, name: "Install Ansible runner toolchain"
+          set -e
+          export DEBIAN_FRONTEND=noninteractive
+          apt-get update -qq
+          apt-get install -y software-properties-common curl python3-pip python3-venv openssh-client
+          apt-add-repository --yes --update ppa:ansible/ansible
+          apt-get install -y ansible sshpass
+          ansible --version
+        SH
+      end
+    end
+  end
+end

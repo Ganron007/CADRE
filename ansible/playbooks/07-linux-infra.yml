@@ -1,0 +1,114 @@
+---
+# TYPE: DEPLOY (rc=0=skip, rc=2=applied+verified, rc=1=fail)
+# Layer 7a: Linux Deploy — Infrastructure setup for linux01
+# Runs before 07-linux.yml (which configures SSSD, auditd, NFS, podman).
+# Covers: realm join, NFS packages, Podman packages, auditd, rsyslog
+# SQL Server on Linux is MANUAL install — see sql-integration-guide.md
+# Uses ansible.builtin.* native modules for idempotency.
+
+- name: "Deploy linux01 infrastructure"
+  hosts: linux01
+  gather_facts: true
+  become: true
+  tasks:
+    - name: "[LINUX] Update apt cache"
+      ansible.builtin.apt:
+        update_cache: true
+        cache_valid_time: 3600
+
+    - name: "[LINUX] Install AD integration packages"
+      ansible.builtin.apt:
+        name:
+          - realmd
+          - sssd
+          - sssd-tools
+          - libnss-sss
+          - libpam-sss
+          - adcli
+          - krb5-user
+          - oddjob
+          - oddjob-mkhomedir
+          - packagekit
+        state: present
+
+    - name: "[LINUX] Configure Kerberos"
+      ansible.builtin.copy:
+        dest: /etc/krb5.conf
+        mode: "0644"
+        content: |
+          [libdefaults]
+          dns_lookup_kdc = true
+          default_realm = CADRE.LOCAL
+          allow_weak_crypto = false
+          rdns = false
+
+    - name: "[LINUX] Join linux01 to cadre.local domain"
+      ansible.builtin.shell: |
+        if realm list | grep -q "cadre.local"; then
+          echo "OK: Already domain-joined"
+          exit 0
+        fi
+        echo "C0mm@nd_Ch1ef!" | realm join --user chief_command@CADRE.LOCAL cadre.local -v
+        realm list | grep -q "cadre.local" || { echo "FAIL: realm join did not stick"; exit 1; }
+        echo "APPLIED: Domain-joined to cadre.local"
+      register: r
+      changed_when: "'APPLIED' in r.stdout"
+      failed_when: r.rc != 0
+
+    - name: "[LINUX] Install Podman + podman-docker"
+      ansible.builtin.apt:
+        name:
+          - podman
+          - podman-docker
+        state: present
+
+    - name: "[LINUX] Install NFS server packages"
+      ansible.builtin.apt:
+        name:
+          - nfs-kernel-server
+          - rpcbind
+        state: present
+
+    - name: "[LINUX] Install auditd + plugins"
+      ansible.builtin.apt:
+        name:
+          - auditd
+          - audispd-plugins
+          - acct
+        state: present
+
+    - name: "[LINUX] Install python3-pymssql (SQL client)"
+      ansible.builtin.apt:
+        name: python3-pymssql
+        state: present
+
+    - name: "[LINUX] Configure rsyslog sysmon forward"
+      ansible.builtin.copy:
+        dest: /etc/rsyslog.d/30-sysmon.conf
+        mode: "0644"
+        content: |
+          if $programname == 'sysmon' then /var/log/sysmon.log
+          & stop
+      notify: restart rsyslog
+
+    - name: "[LINUX] Configure logrotate for sysmon.log"
+      ansible.builtin.copy:
+        dest: /etc/logrotate.d/sysmon
+        mode: "0644"
+        content: |
+          /var/log/sysmon.log {
+              rotate 4
+              weekly
+              missingok
+              notifempty
+              compress
+              delaycompress
+              copytruncate
+              su root adm
+          }
+
+  handlers:
+    - name: restart rsyslog
+      ansible.builtin.systemd:
+        name: rsyslog
+        state: restarted

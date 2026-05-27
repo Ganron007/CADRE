@@ -1,0 +1,233 @@
+---
+# TYPE: VERIFY-ONLY (rc=0=pass, rc=1=fail — checks Velociraptor server + client enrollment)
+
+- name: "Play 1 — Verify Velociraptor server on vr VM"
+  hosts: vr
+  gather_facts: true
+  become: yes
+  vars:
+    vr_release_tag: "0.76"
+    vr_binary_version: "0.76.1"
+    vr_host: "192.168.77.51"
+    vr_gui_port: 8889
+    vr_api_port: 8001
+    vr_frontend_port: 8000
+    vr_admin_password: "VelociraptorDefault!"
+  tasks:
+    - name: Verify system dependencies installed
+      ansible.builtin.shell: dpkg -l ca-certificates curl python3 python3-pip wget
+      changed_when: false
+      failed_when: result.rc == 1
+      register: result
+
+    - name: Verify Velociraptor directories exist
+      ansible.builtin.shell: test -d "{{ item }}"
+      changed_when: false
+      failed_when: result.rc == 1
+      register: result
+      loop:
+        - /etc/velociraptor
+        - /var/lib/velociraptor
+        - /var/lib/velociraptor/files
+        - /var/log/velociraptor
+
+    - name: Verify Velociraptor binary exists
+      ansible.builtin.shell: test -f /usr/local/bin/velociraptor
+      changed_when: false
+      failed_when: result.rc == 1
+      register: result
+
+    - name: Verify server config exists
+      ansible.builtin.shell: test -f /etc/velociraptor/server.config.yaml
+      changed_when: false
+      failed_when: result.rc == 1
+      register: result
+
+    - name: Verify admin user exists in Velociraptor
+      ansible.builtin.shell: /usr/local/bin/velociraptor --config /etc/velociraptor/server.config.yaml user show | grep admin
+      changed_when: false
+      failed_when: result.rc == 1
+      register: result
+
+    - name: Verify systemd service file exists
+      ansible.builtin.shell: test -f /etc/systemd/system/velociraptor.service
+      changed_when: false
+      failed_when: result.rc == 1
+      register: result
+
+    - name: Verify Velociraptor server is active and enabled
+      ansible.builtin.shell: systemctl is-active velociraptor && systemctl is-enabled velociraptor
+      changed_when: false
+      failed_when: result.rc == 1
+      register: result
+
+    - name: Wait for Velociraptor GUI
+      ansible.builtin.wait_for:
+        port: "{{ vr_gui_port }}"
+        delay: 5
+        timeout: 30
+
+    - name: Verify client config exists
+      ansible.builtin.shell: test -f /etc/velociraptor/client.config.yaml
+      changed_when: false
+      failed_when: result.rc == 1
+      register: result
+
+    - name: Verify client config mode is world-readable
+      ansible.builtin.shell: |
+        mode=$(stat -c "%a" /etc/velociraptor/client.config.yaml 2>/dev/null || echo "000")
+        [ "$mode" = "644" ] || exit 1
+      changed_when: false
+      failed_when: result.rc == 1
+      register: result
+
+    - name: Verify Windows MSI downloaded to tmp
+      ansible.builtin.shell: test -f /tmp/velociraptor.msi
+      changed_when: false
+      failed_when: result.rc == 1
+      register: result
+
+    - name: Verify repacked client MSI exists
+      ansible.builtin.shell: test -f /var/lib/velociraptor/files/velociraptor-client-cadre.msi
+      changed_when: false
+      failed_when: result.rc == 1
+      register: result
+
+    - name: Verify MSI mode is world-readable
+      ansible.builtin.shell: |
+        mode=$(stat -c "%a" /var/lib/velociraptor/files/velociraptor-client-cadre.msi 2>/dev/null || echo "000")
+        [ "$mode" = "644" ] || exit 1
+      changed_when: false
+      failed_when: result.rc == 1
+      register: result
+
+    - name: Verify custom artifacts directory exists
+      ansible.builtin.shell: test -d /opt/cadre-artifacts/
+      changed_when: false
+      failed_when: result.rc == 1
+      register: result
+
+    - name: Verify artifacts were imported
+      ansible.builtin.shell: test -f /var/lib/velociraptor/.artifacts_imported
+      changed_when: false
+      failed_when: result.rc == 1
+      register: result
+
+    - name: Verify custom hunts directory exists
+      ansible.builtin.shell: test -d /opt/cadre-hunts/
+      changed_when: false
+      failed_when: result.rc == 1
+      register: result
+
+    - name: Verify hunts were imported
+      ansible.builtin.shell: test -f /var/lib/velociraptor/.hunts_imported
+      changed_when: false
+      failed_when: result.rc == 1
+      register: result
+
+    - name: Verify UFW ports are allowed
+      ansible.builtin.shell: |
+        for port in {{ vr_frontend_port }} {{ vr_gui_port }} {{ vr_api_port }} 8002; do
+          ufw status | grep -q "${port}.*ALLOW" || { echo "Port $port not allowed in UFW"; exit 1; }
+        done
+      changed_when: false
+      failed_when: result.rc == 1
+      register: result
+
+    - name: Verify vr self-enrolled client config exists
+      ansible.builtin.shell: test -f /etc/velociraptor/client.config.yaml
+      changed_when: false
+      failed_when: result.rc == 1
+      register: result
+
+    - name: Verify vr client systemd service file exists
+      ansible.builtin.shell: test -f /etc/systemd/system/velociraptor-client.service
+      changed_when: false
+      failed_when: result.rc == 1
+      register: result
+
+    - name: Verify vr client service is active and enabled
+      ansible.builtin.shell: systemctl is-active velociraptor-client && systemctl is-enabled velociraptor-client
+      changed_when: false
+      failed_when: result.rc == 1
+      register: result
+
+- name: "Play 2 — Verify Velociraptor client on Windows VMs"
+  hosts: windows_servers
+  gather_facts: true
+  tasks:
+    - name: Verify Tools directory exists
+      ansible.windows.win_shell: |
+        if (-not (Test-Path 'C:\Tools')) { exit 1 }
+      changed_when: false
+      failed_when: result.rc == 1
+      register: result
+
+    - name: Verify MSI exists on Windows VM
+      ansible.windows.win_shell: |
+        if (-not (Test-Path 'C:\Tools\velociraptor-client.msi')) { exit 1 }
+      changed_when: false
+      failed_when: result.rc == 1
+      register: result
+
+    - name: Verify Velociraptor Windows service exists
+      ansible.windows.win_shell: |
+        $svc = Get-Service -Name 'Velociraptor' -ErrorAction SilentlyContinue
+        if (-not $svc) { exit 1 }
+      changed_when: false
+      failed_when: result.rc == 1
+      register: result
+
+    - name: Verify Velociraptor Windows service is running
+      ansible.windows.win_shell: |
+        $svc = Get-Service -Name 'Velociraptor' -ErrorAction SilentlyContinue
+        if (-not $svc -or $svc.Status -ne 'Running') { exit 1 }
+      changed_when: false
+      failed_when: result.rc == 1
+      register: result
+
+- name: "Play 3 — Verify Velociraptor client on linux01"
+  hosts: linux_members
+  gather_facts: true
+  become: yes
+  vars:
+    vr_host: 192.168.77.51
+    vr_frontend_port: 8000
+    vr_release_tag: "0.76"
+    vr_binary_version: "0.76.1"
+  tasks:
+    - name: Check if Velociraptor client binary exists
+      ansible.builtin.stat:
+        path: /usr/local/bin/velociraptor-client
+      register: vr_bin
+      changed_when: false
+
+    - name: Verify Velociraptor Linux client binary exists
+      ansible.builtin.shell: test -f /usr/local/bin/velociraptor-client
+      changed_when: false
+      failed_when: result.rc == 1
+      register: result
+
+    - name: Verify Velociraptor config directory exists
+      ansible.builtin.shell: test -d /etc/velociraptor
+      changed_when: false
+      failed_when: result.rc == 1
+      register: result
+
+    - name: Verify Linux client config exists
+      ansible.builtin.shell: test -f /etc/velociraptor/client.config.yaml
+      changed_when: false
+      failed_when: result.rc == 1
+      register: result
+
+    - name: Verify Linux client systemd service file exists
+      ansible.builtin.shell: test -f /etc/systemd/system/velociraptor-client.service
+      changed_when: false
+      failed_when: result.rc == 1
+      register: result
+
+    - name: Verify Velociraptor client is active on linux01
+      ansible.builtin.shell: systemctl is-active velociraptor-client
+      changed_when: false
+      failed_when: result.rc == 1
+      register: result

@@ -1,0 +1,43 @@
+---
+attack_id: T003
+walkthrough: attack-matrix/01-walkthroughs/WT003-asrep-roasting.md
+mitre_technique: T1558.004
+campaign: A
+domain: child.cadre.local
+target_vm: dc02
+starting_credential: None (anonymous)
+tools: [impacket, hashcat]
+difficulty: Easy
+certifications: [CRTP, OSCP+]
+post_exploit_chain: "AS-REP hash (hashcat 18200) → crack → intern_blue plaintext → low-priv foothold in child.cadre.local"
+
+telemetry:
+  elastic:
+    - index: logs-system.security-*
+      event_code: 4768
+      field_filters:
+        PreAuthType: "0"
+        TargetUserName: intern_blue
+      threshold: 1
+      note: Kerberos AS-REQ without pre-authentication for AS-REP roastable user
+      detection_rule: cadre-002-asrep-roast
+
+  zeek:
+    - log: kerberos.log
+      field_filters:
+        request_type: AS
+        success: true
+      note: Zeek captures the Kerberos AS exchange on monitor VM
+
+  velociraptor:
+    - hunt: cadre-credential-access
+      artifact: Windows.Registry.NTUser
+      note: Post-attack forensic artifact collection
+
+detection_rules:
+  - rule_id: cadre-002-asrep-roast
+    name: AS-REP Roasting
+    expected_trigger: true
+    note: Fires on EID 4768 with PreAuthType:0 — deterministic trigger
+
+time_estimate: 30s

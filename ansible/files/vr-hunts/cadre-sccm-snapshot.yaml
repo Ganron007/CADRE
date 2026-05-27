@@ -1,0 +1,14 @@
+name: CADRE.Hunts.SCCMSnapshot
+description: |
+  SCCM configuration snapshot — site boundaries, client push, NAA via WMI.
+  Part of the CADRE pre-built hunt library.
+sources:
+  - name: NAA
+    queries:
+      - SELECT * FROM wmi(query="SELECT * FROM SMS_NAA WHERE SiteCode='C01'")
+  - name: ClientPush
+    queries:
+      - SELECT * FROM wmi(query="SELECT * FROM SMS_SCI_ClientComp WHERE ClientComponent='Client Push Installation'")
+  - name: Boundaries
+    queries:
+      - SELECT * FROM wmi(query="SELECT * FROM SMS_DP_Boundaries")

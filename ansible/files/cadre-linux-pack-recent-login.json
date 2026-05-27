@@ -1,0 +1,16 @@
+{
+    "name": "cadre-linux-pack-long",
+    "description": "CADRE Linux 30-min state — deb packages + recent logins",
+    "queries": {
+      "deb_packages": {
+        "query": "SELECT name, version, source, size, arch, revision FROM deb_packages;",
+        "interval": 1800,
+        "platform": "linux"
+      },
+      "recent_logins": {
+        "query": "SELECT username, tty, host, time, type FROM last WHERE time > (strftime('%s','now') - 1800);",
+        "interval": 1800,
+        "platform": "linux"
+      }
+    }
+  }

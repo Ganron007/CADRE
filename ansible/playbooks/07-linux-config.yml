@@ -1,0 +1,248 @@
+---
+# TYPE: DEPLOY (rc=0=skip, rc=2=applied+verified, rc=1=fail)
+# Layer 7b: Linux Configuration — SSSD, auditd, NFS, podman events
+# SQL Server config is verify-only (manual install) — see 09-sql-wsus-verify.yml
+# Uses ansible.builtin.* native modules (copy, shell, lineinfile, systemd).
+# Idempotent — checksums prevent re-copy, lineinfile checks existence.
+
+- name: "Deploy linux01 — SSSD, Podman, NFS, auditd"
+  hosts: linux01
+  gather_facts: true
+  become: true
+  tasks:
+    - name: "[LINUX] Verify linux01 is domain-joined to cadre.local"
+      ansible.builtin.shell: |
+        realm list | grep -q "cadre.local" || { echo "FAIL: Not domain-joined"; exit 1; }
+        echo "PASS: Domain-joined to cadre.local"
+      register: r_realm
+      changed_when: false
+      failed_when: r_realm.rc != 0
+
+    - name: "[LINUX][WT#46] SSSD debug_level=5"
+      ansible.builtin.lineinfile:
+        path: /etc/sssd/sssd.conf
+        regexp: "^{{ item.k }}"
+        line: "{{ item.v }}"
+        mode: "0600"
+      loop:
+        - { k: "debug_level", v: "debug_level = 5" }
+      notify: restart sssd
+
+    - name: "[LINUX] Stop sssd for restart"
+      ansible.builtin.systemd:
+        name: sssd
+        state: restarted
+      when: true
+
+    - name: "[LINUX][WT#46] SSSD debug conf.d file"
+      ansible.builtin.copy:
+        dest: /etc/sssd/conf.d/99-cadre-debug.conf
+        mode: "0600"
+        content: |
+          [sssd]
+          debug_level = 5
+          [domain/cadre.local]
+          debug_level = 5
+          [pam]
+          debug_level = 5
+      notify: restart sssd
+
+    - name: "[LINUX] Deploy 45+ auditd rules"
+      ansible.builtin.copy:
+        dest: /etc/audit/rules.d/cadre.rules
+        mode: "0600"
+        content: |
+          -b 16384
+          -f 1
+          -a always,exit -F arch=b64 -S execve -k proc_exec
+          -a always,exit -F arch=b32 -S execve -k proc_exec
+          -w /etc/shadow -p wa -k shadow_access
+          -w /etc/gshadow -p wa -k gshadow_access
+          -w /etc/passwd -p wa -k passwd_access
+          -w /etc/group -p wa -k group_access
+          -w /etc/sudoers -p wa -k sudoers_access
+          -w /etc/sudoers.d/ -p wa -k sudoers_dir
+          -w /etc/krb5.conf -p wa -k krb5_config
+          -w /etc/krb5.keytab -p wa -k keytab_access
+          -w /var/opt/mssql/secrets/mssql.keytab -p wa -k mssql_keytab
+          -w /etc/sssd/ -p wa -k sssd_config
+          -w /var/lib/sss/db/ -p wa -k sssd_db
+          -w /var/lib/sss/secrets/ -p wa -k sssd_secrets
+          -a always,exit -S execve -F path=/usr/sbin/realm -k realmd_exec
+          -a always,exit -S execve -F path=/usr/sbin/adcli -k adcli_exec
+          -w /etc/ssh/sshd_config -p wa -k sshd_config
+          -w /root/.ssh/ -p wa -k root_ssh
+          -w /home/ -p wa -k home_access
+          -w /etc/pam.d/ -p wa -k pam_config
+          -w /etc/nsswitch.conf -p wa -k nsswitch_config
+          -w /etc/exports -p wa -k nfs_exports
+          -w /etc/idmapd.conf -p wa -k nfs_idmap
+          -a always,exit -S execve -F path=/usr/sbin/exportfs -k nfs_exportfs
+          -a always,exit -S mount -k nfs_mount
+          -w /run/podman/podman.sock -p wa -k podman_sock
+          -w /etc/containers/ -p wa -k containers_config
+          -a always,exit -S execve -F path=/usr/bin/podman -k podman_exec
+          -a always,exit -S execve -F path=/usr/bin/runc -k runc_exec
+          -a always,exit -S setns -k container_escape
+          -a always,exit -S unshare -k container_escape
+          -a always,exit -S pivot_root -k container_escape
+          -w /etc/ld.so.preload -p wa -k preload_hijack
+          -w /etc/ld.so.conf.d/ -p wa -k ldconfig_hijack
+          -a always,exit -S init_module -S finit_module -S delete_module -k kernel_module
+          -a always,exit -S chmod -S fchmod -S fchmodat -F auid>=1000 -F auid!=-1 -k setuid_change
+          -w /etc/cron.d/ -p wa -k cron_dir
+          -w /etc/cron.daily/ -p wa -k cron_daily
+          -w /etc/cron.hourly/ -p wa -k cron_hourly
+          -w /etc/systemd/system/ -p wa -k systemd_units
+          -w /etc/profile.d/ -p wa -k profile_dir
+          -w /etc/bash.bashrc -p wa -k bashrc
+          -e 2
+      notify: restart auditd
+
+    - name: "[LINUX][WT#48] Create NFS secure share directory"
+      ansible.builtin.file:
+        path: /exports/secure-share
+        state: directory
+        mode: "0755"
+
+    - name: "[LINUX][WT#48] NFS sec=krb5p export config"
+      ansible.builtin.copy:
+        dest: /etc/exports
+        mode: "0644"
+        content: |
+          /exports/secure-share *(sec=krb5p,rw,sync,no_subtree_check)
+      notify: restart nfs
+
+    - name: "[LINUX][WT#48] Export NFS shares"
+      ansible.builtin.shell: exportfs -ra
+      changed_when: false
+
+    - name: "[LINUX][WT#45] FreeTDS config for SQL linked server"
+      ansible.builtin.copy:
+        dest: /etc/freetds/freetds.conf
+        mode: "0644"
+        content: |
+          [global]
+          tds version = 7.4
+          client charset = UTF-8
+          encryption = require
+
+    - name: "[LINUX][WT#49] Podman events streaming systemd unit"
+      ansible.builtin.copy:
+        dest: /etc/systemd/system/podman-events-log.service
+        mode: "0644"
+        content: |
+          [Unit]
+          Description=Stream podman events to /var/log/podman-events.log for Elastic Agent
+          After=podman.socket
+          Wants=podman.socket
+          [Service]
+          Type=simple
+          ExecStartPre=/bin/touch /var/log/podman-events.log
+          ExecStart=/usr/bin/podman events --format=json
+          StandardOutput=append:/var/log/podman-events.log
+          StandardError=append:/var/log/podman-events.log
+          Restart=always
+          [Install]
+          WantedBy=multi-user.target
+      notify: start podman-events
+
+    - name: "[LINUX][WT#49] Enable + start podman events"
+      ansible.builtin.systemd:
+        name: podman-events-log
+        enabled: true
+        state: started
+        daemon_reload: true
+
+    - name: "[LINUX][WT#49] Logrotate for podman-events.log"
+      ansible.builtin.copy:
+        dest: /etc/logrotate.d/podman-events
+        mode: "0644"
+        content: |
+          /var/log/podman-events.log {
+              rotate 4
+              weekly
+              missingok
+              notifempty
+              compress
+              delaycompress
+              copytruncate
+              su root root
+          }
+
+    - name: "[LINUX] Bump auditd log retention (200/20/ROTATE)"
+      ansible.builtin.lineinfile:
+        path: /etc/audit/auditd.conf
+        regexp: "^{{ item.k }}\\s*="
+        line: "{{ item.k }} = {{ item.v }}"
+      loop:
+        - { k: "max_log_file", v: "200" }
+        - { k: "num_logs", v: "20" }
+        - { k: "max_log_file_action", v: "ROTATE" }
+        - { k: "space_left_action", v: "SYSLOG" }
+
+    - name: "[LINUX] Enable + start auditd"
+      ansible.builtin.systemd:
+        name: auditd
+        enabled: true
+        state: started
+
+    - name: "[LINUX][WT#49] Verify Podman container (cadre-monitor) running"
+      ansible.builtin.shell: |
+        if podman container exists cadre-monitor; then
+          podman start cadre-monitor
+        else
+          podman run -d --restart=unless-stopped --name cadre-monitor --privileged --pid=host alpine sleep infinity
+        fi
+      register: r_podman
+      changed_when: r_podman.rc == 0
+
+    - name: "[LINUX] Verify auditd rules loaded (>= 10)"
+      ansible.builtin.shell: auditctl -l | wc -l
+      register: r_audit_rules
+      changed_when: false
+      failed_when: r_audit_rules.stdout | int < 10
+
+    - name: "[LINUX] Verify SSSD service running"
+      ansible.builtin.systemd:
+        name: sssd
+        state: started
+        enabled: true
+
+    - name: "[LINUX][WT#48] Verify NFS services running"
+      ansible.builtin.systemd:
+        name: "{{ item }}"
+        state: started
+        enabled: true
+      loop:
+        - nfs-server
+        - rpc-gssd
+
+    - name: "[LINUX][WT#48] Verify NFS export active"
+      ansible.builtin.shell: exportfs -v | grep secure-share
+      register: r_nfs
+      changed_when: false
+      failed_when: r_nfs.rc != 0
+
+  handlers:
+    - name: restart sssd
+      ansible.builtin.systemd:
+        name: sssd
+        state: restarted
+
+    - name: restart auditd
+      ansible.builtin.systemd:
+        name: auditd
+        state: restarted
+
+    - name: restart nfs
+      ansible.builtin.systemd:
+        name: nfs-server
+        state: restarted
+
+    - name: start podman-events
+      ansible.builtin.systemd:
+        name: podman-events-log
+        enabled: true
+        state: started
+        daemon_reload: true

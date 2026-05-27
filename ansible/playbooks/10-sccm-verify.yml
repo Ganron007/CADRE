@@ -1,0 +1,103 @@
+---
+# TYPE: VERIFY-ONLY (rc=0=pass, rc=1=fail — manual install required)
+# Layer 10: SCCM Verification — Manual install required
+# All tasks are verify-only (rc=0: pass, rc=1: fail).
+# Run after manually installing SCCM Site Server (see sccm-integration-guide.md)
+#
+# Usage:
+#   ansible-playbook -i inventories/hosts playbooks/10-sccm-verify.yml
+
+# =============================================================================
+# SCCM Verification — mbr02 (range.local)
+# =============================================================================
+- name: "SCCM verification — mbr02"
+  hosts: mbr02
+  gather_facts: false
+  tasks:
+    - name: "[SCCM] Services running (verify)"
+      ansible.windows.win_shell: |
+        $ErrorActionPreference = "Stop"
+        try {
+          $svcs = Get-Service -Name "SMS_EXECUTIVE", "SMS_NOTIFICATION_SERVER", "SMS_SITE_COMPONENT_MANAGER" -ErrorAction SilentlyContinue
+          $missing = $svcs | Where-Object { $_.Status -ne "Running" }
+          if ($missing.Count -eq 0) { Write-Output "PASS: All SCCM services running"; exit 0 }
+          Write-Output "FAIL: SCCM services not running (missing/stopped: $($missing.Name -join ','))"; exit 1
+        } catch { Write-Output "FAIL: SCCM service check error: $_"; exit 1 }
+      register: r
+      changed_when: false
+      failed_when: r.rc == 1
+
+    - name: "[SCCM][WT#34] NAA configured — CRED-1 (verify)"
+      ansible.windows.win_shell: |
+        $ErrorActionPreference = "Stop"
+        try {
+          $naa = Get-WmiObject -Namespace "root\SMS\site_CAD" -Class SMS_SCI_Reserved -Filter "ItemName like '%NAA%'" -ErrorAction SilentlyContinue
+          if ($naa) { Write-Output "PASS: NAA configured"; exit 0 }
+          Write-Output "FAIL: NAA not configured"; exit 1
+        } catch { Write-Output "FAIL: NAA check error: $_"; exit 1 }
+      register: r
+      changed_when: false
+      failed_when: r.rc == 1
+
+    - name: "[SCCM][WT#34] Task seq referencing NAA — CRED-2 (verify)"
+      ansible.windows.win_shell: |
+        $ErrorActionPreference = "Stop"
+        try {
+          $ts = Get-WmiObject -Namespace "root\SMS\site_CAD" -Class SMS_TaskSequencePackage -ErrorAction SilentlyContinue
+          if ($ts) { Write-Output "PASS: $($ts.Count) task sequence(s) found"; exit 0 }
+          Write-Output "FAIL: No SCCM task sequence found (CRED-2 requires a task sequence referencing NAA). Create in SCCM Console."; exit 1
+        } catch { Write-Output "FAIL: CRED-2 check error: $_"; exit 1 }
+      register: r
+      changed_when: false
+      failed_when: r.rc == 1
+
+    - name: "[SCCM][WT#36] Client push enabled — ELEVATE-2 (verify)"
+      ansible.windows.win_shell: |
+        $ErrorActionPreference = "Stop"
+        try {
+          $push = Get-WmiObject -Namespace "root\SMS\site_CAD" -Class SMS_SCI_ClientComp -Filter "ClientComponentName = 'Software Distribution'" -ErrorAction SilentlyContinue
+          if ($push) { Write-Output "PASS: Client push component configured (Flags=$($push.Flags))"; exit 0 }
+          Write-Output "FAIL: Client push component not found. Configure via SCCM Console."; exit 1
+        } catch { Write-Output "FAIL: Client push check error: $_"; exit 1 }
+      register: r
+      changed_when: false
+      failed_when: r.rc == 1
+
+    - name: "[SCCM][WT#35] PXE enabled w/o password — CRED-3 (verify)"
+      ansible.windows.win_shell: |
+        $ErrorActionPreference = "Stop"
+        try {
+          $pxe = Get-WmiObject -Namespace "root\SMS\site_CAD" -Class SMS_PXECertificateInfo -ErrorAction SilentlyContinue
+          if ($pxe) { Write-Output "PASS: PXE configured ($($pxe.Count) cert(s))"; exit 0 }
+          Write-Output "FAIL: PXE not found. Configure via SCCM Console."; exit 1
+        } catch { Write-Output "FAIL: PXE check error: $_"; exit 1 }
+      register: r
+      changed_when: false
+      failed_when: r.rc == 1
+
+    - name: "[SCCM][WT#30] WSUS installed + configured (verify)"
+      ansible.windows.win_shell: |
+        $ErrorActionPreference = "Stop"
+        try {
+          $contentDir = Get-ItemPropertyValue -Path "HKLM:\SOFTWARE\Microsoft\Update Services\Server\Setup" -Name "ContentDir" -ErrorAction SilentlyContinue
+          if ($contentDir) { Write-Output "PASS: WSUS configured (ContentDir: $contentDir)"; exit 0 }
+          $svc = Get-Service WsusService -ErrorAction SilentlyContinue
+          if (-not $svc) { Write-Output "FAIL: WSUS not installed"; exit 1 }
+          Write-Output "FAIL: WSUS service running but registry path not found"; exit 1
+        } catch { Write-Output "FAIL: WSUS check error: $_"; exit 1 }
+      register: r
+      changed_when: false
+      failed_when: r.rc == 1
+
+    - name: "[SCCM][WT#37-40] svc_sccm is SCCM Full Administrator (verify)"
+      ansible.windows.win_shell: |
+        $ErrorActionPreference = "Stop"
+        try {
+          $sid = ([System.Security.Principal.NTAccount]"RANGE\svc_sccm").Translate([System.Security.Principal.SecurityIdentifier]).Value
+          $admin = Get-WmiObject -Namespace "root\SMS\site_CAD" -Class SMS_Admin -ErrorAction SilentlyContinue | Where-Object { $_.AdminSid -eq $sid }
+          if ($admin) { Write-Output "PASS: svc_sccm is SCCM Full Administrator"; exit 0 }
+          Write-Output "FAIL: svc_sccm is not an SCCM admin. Run 06-member-services.yml or add manually via SCCM Console."; exit 1
+        } catch { Write-Output "FAIL: svc_sccm admin check error: $_"; exit 1 }
+      register: r
+      changed_when: false
+      failed_when: r.rc == 1

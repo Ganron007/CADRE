@@ -1,0 +1,11 @@
+name: CADRE.Hunts.ADCSSnapshot
+description: |
+  ADCS certificate authority database and CA configuration dump.
+  Part of the CADRE pre-built hunt library.
+sources:
+  - name: CARegistry
+    queries:
+      - SELECT * FROM exec(argv=["certutil", "-config", "-", "-getreg", "CA\\"])
+  - name: EnrollmentServer
+    queries:
+      - SELECT * FROM exec(argv=["certutil", "-enrollmentserver", "CA"])

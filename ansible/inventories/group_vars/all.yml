@@ -1,0 +1,15 @@
+---
+# CADRE-wide variables — available in every play, every host.
+# Pin tool versions here so extension plays don't have to redeclare.
+
+elastic_agent_version: "9.0.0"
+elk_package_version: "9.0.0"
+elk_major: "9"
+elastic_password: "elastic_CADRE_2026!"
+
+vr_release_tag: "0.76"
+vr_binary_version: "0.76.1"
+
+ubuntu_release: "xUbuntu_24.04"
+arkime_password: "arkime"
+arkime_interface: "eth0"

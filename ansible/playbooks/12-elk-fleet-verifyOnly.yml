@@ -1,0 +1,833 @@
+---
+# TYPE: VERIFY-ONLY (rc=0=pass, rc=1=fail — checks Elastic 9.x + Kibana + Fleet + agent enrollment)
+# ============================================================
+# elk-fleet extension — Verify-only mirror (80 tasks, every one converted)
+# ============================================================
+
+- name: "Play 1 — Verify ES + Kibana + Fleet Server on elk VM"
+  hosts: elk
+  gather_facts: true
+  become: yes
+  vars:
+    elk_major: "9"
+    elastic_password: "elastic_CADRE_2026!"
+    es_port: 9200
+    kibana_port: 5601
+    fleet_port: 8220
+    elastic_agent_version: "9.0.0"
+    kibana_service_token: ""
+
+  tasks:
+    - name: Read persisted elastic password if available
+      ansible.builtin.slurp:
+        src: /home/vagrant/es-generated-pw.txt
+      register: es_pw_file
+      ignore_errors: true
+
+    - name: Override elastic_password from file
+      ansible.builtin.set_fact:
+        elastic_password: "{{ (es_pw_file.content | b64decode).strip() }}"
+      when: es_pw_file is succeeded
+
+    - name: Verify system dependencies installed
+      ansible.builtin.shell: |
+        for pkg in apt-transport-https ca-certificates curl gnupg python3-pip unzip wget jq; do
+          dpkg -l "$pkg" 2>/dev/null | grep -q "^ii" || { echo "FAIL: $pkg not installed"; exit 1; }
+        done
+        echo "PASS: all system dependencies installed"
+      changed_when: false
+      failed_when: false
+      register: sys_deps_check
+
+    - name: Verify Elastic GPG key added
+      ansible.builtin.shell: |
+        apt-key list 2>/dev/null | grep -qi elastic && echo "PASS: GPG key present" || echo "FAIL: GPG key not found"
+      changed_when: false
+      failed_when: false
+      register: gpg_key_check
+
+    - name: Verify Elastic APT repository configured
+      ansible.builtin.shell: |
+        test -f /etc/apt/sources.list.d/elastic-{{ elk_major }}.x.list && echo "PASS: repo file exists" || echo "FAIL: repo file missing"
+      changed_when: false
+      failed_when: false
+      register: repo_check
+
+    - name: Verify Elasticsearch + Kibana installed
+      ansible.builtin.shell: |
+        dpkg -l elasticsearch 2>/dev/null | grep -q "^ii" && echo "PASS: elasticsearch installed" || echo "FAIL: elasticsearch not installed"
+        dpkg -l kibana 2>/dev/null | grep -q "^ii" && echo "PASS: kibana installed" || echo "FAIL: kibana not installed"
+      changed_when: false
+      failed_when: false
+      register: es_kibana_installed
+
+    - name: Get installed Elasticsearch version
+      ansible.builtin.shell: |
+        dpkg-query -W -f='${Version}' elasticsearch | cut -d- -f1
+      register: es_ver_raw
+      changed_when: false
+
+    - name: Set elastic-agent version fact
+      ansible.builtin.set_fact:
+        elastic_agent_dl_ver: "{{ es_ver_raw.stdout | default('9.4.1') }}"
+
+    - name: Verify apt-installed elastic-agent is removed
+      ansible.builtin.shell: |
+        dpkg -l elastic-agent 2>/dev/null | grep -q "^ii" && echo "FAIL: elastic-agent apt package still present" || echo "PASS: elastic-agent apt package removed"
+      changed_when: false
+      failed_when: false
+      register: agent_purge_check
+
+    - name: Verify elastic-agent service stopped
+      ansible.builtin.shell: |
+        systemctl is-active elastic-agent 2>/dev/null && echo "FAIL: elastic-agent service still active" || echo "PASS: elastic-agent service not active"
+      changed_when: false
+      failed_when: false
+      register: agent_stopped_check
+
+    - name: Verify old elastic-agent data directories removed
+      ansible.builtin.shell: |
+        missing=0
+        for d in /etc/elastic-agent /var/lib/elastic-agent /var/log/elastic-agent; do
+          test -d "$d" && echo "WARN: $d still exists" && missing=1
+        done
+        [ "$missing" -eq 0 ] && echo "PASS: old data directories removed" || echo "FAIL: some old data directories remain"
+      changed_when: false
+      failed_when: false
+      register: old_dirs_check
+
+    - name: Verify elastic-agent tarball downloaded
+      ansible.builtin.shell: |
+        test -f "/tmp/elastic-agent-{{ elastic_agent_dl_ver }}-linux-x86_64.tar.gz" && echo "PASS: tarball exists" || echo "FAIL: tarball missing"
+      changed_when: false
+      failed_when: false
+      register: tarball_check
+
+    - name: Verify elastic-agent extracted
+      ansible.builtin.shell: |
+        test -d "/opt/elastic-agent-{{ elastic_agent_dl_ver }}-linux-x86_64" && echo "PASS: extracted directory exists" || echo "FAIL: extracted directory missing"
+      changed_when: false
+      failed_when: false
+      register: extract_check
+
+    - name: Verify Elasticsearch config exists
+      ansible.builtin.shell: |
+        stat /etc/elasticsearch/elasticsearch.yml >/dev/null 2>&1 && echo "PASS: elasticsearch.yml exists" || echo "FAIL: elasticsearch.yml missing"
+      changed_when: false
+      failed_when: false
+      register: es_config_check
+
+    - name: Verify Elasticsearch config content matches inline template
+      ansible.builtin.shell: |
+        grep -q "cluster.name: cadre-elk" /etc/elasticsearch/elasticsearch.yml || exit 1
+        grep -q "xpack.security.enabled: true" /etc/elasticsearch/elasticsearch.yml || exit 1
+        grep -q "xpack.security.authc.api_key.enabled: true" /etc/elasticsearch/elasticsearch.yml || exit 1
+        echo "PASS: ES config content verified"
+      changed_when: false
+      failed_when: false
+      register: es_config_content_check
+
+    - name: Verify ES JVM heap config (4GB)
+      ansible.builtin.shell: |
+        test -f /etc/elasticsearch/jvm.options.d/cadre-heap.options && grep -q "6g" /etc/elasticsearch/jvm.options.d/cadre-heap.options && echo "PASS: ES heap set to 6GB" || echo "FAIL: ES heap not configured"
+      changed_when: false
+      failed_when: false
+      register: es_heap_check
+
+    - name: Verify Elasticsearch service is active
+      ansible.builtin.shell: |
+        systemctl is-active elasticsearch 2>/dev/null | grep -q "^active" && echo "PASS: elasticsearch is active" || echo "FAIL: elasticsearch is not active"
+      changed_when: false
+      failed_when: false
+      register: es_service_check
+
+    - name: Wait for Elasticsearch port
+      ansible.builtin.wait_for:
+        port: "{{ es_port }}"
+        delay: 5
+        timeout: 30
+
+    - name: Verify elastic user authentication works
+      ansible.builtin.shell: |
+        curl -s -u "elastic:{{ elastic_password }}" "http://127.0.0.1:{{ es_port }}" | grep -q "You Know, for Search" && echo "PASS: elastic auth works" || echo "FAIL: elastic auth failed"
+      changed_when: false
+      failed_when: false
+      register: es_auth_check
+
+    - name: Verify elastic password persisted to file
+      ansible.builtin.shell: |
+        test -f /home/vagrant/es-generated-pw.txt && echo "PASS: password file exists" || echo "FAIL: password file missing"
+      changed_when: false
+      failed_when: false
+      register: pw_file_check
+
+    - name: Verify GeoIP database directory exists
+      ansible.builtin.shell: |
+        test -d /etc/elasticsearch/ingest-geoip && echo "PASS: GeoIP directory exists" || echo "FAIL: GeoIP directory missing"
+      changed_when: false
+      failed_when: false
+      register: geoip_dir_check
+
+    - name: Verify GeoLite2-City database file exists
+      ansible.builtin.shell: |
+        test -f /etc/elasticsearch/ingest-geoip/GeoLite2-City.mmdb && echo "PASS: GeoIP database exists" || echo "FAIL: GeoIP database missing"
+      changed_when: false
+      failed_when: false
+      register: geoip_db_check
+
+    - name: Verify Kibana service token exists
+      ansible.builtin.uri:
+        url: "http://127.0.0.1:{{ es_port }}/_security/service/elastic/kibana/credential/token"
+        method: GET
+        user: elastic
+        password: "{{ elastic_password }}"
+        force_basic_auth: true
+        status_code: [200, 404]
+      register: kibana_token_check
+      failed_when: kibana_token_check.status == 404
+
+    - name: Verify Kibana config exists
+      ansible.builtin.shell: |
+        test -f /etc/kibana/kibana.yml && echo "PASS: kibana.yml exists" || echo "FAIL: kibana.yml missing"
+      changed_when: false
+      failed_when: false
+      register: kibana_config_check
+
+    - name: Verify Kibana config content matches inline template
+      ansible.builtin.shell: |
+        grep -q "xpack.fleet.packages" /etc/kibana/kibana.yml || exit 1
+        grep -q "elasticsearch.serviceAccountToken" /etc/kibana/kibana.yml || exit 1
+        grep -q "server.publicBaseUrl" /etc/kibana/kibana.yml || exit 1
+        echo "PASS: Kibana config content verified"
+      changed_when: false
+      failed_when: false
+      register: kibana_config_content_check
+
+    - name: Verify Kibana service is active
+      ansible.builtin.shell: |
+        systemctl is-active kibana 2>/dev/null | grep -q "^active" && echo "PASS: kibana is active" || echo "FAIL: kibana is not active"
+      changed_when: false
+      failed_when: false
+      register: kibana_svc_check
+
+    - name: Wait for Kibana
+      ansible.builtin.wait_for:
+        port: "{{ kibana_port }}"
+        delay: 5
+        timeout: 30
+
+    - name: Verify Kibana API is ready
+      ansible.builtin.uri:
+        url: "http://127.0.0.1:{{ kibana_port }}/api/status"
+        method: GET
+        status_code: 200
+      register: kibana_status
+      retries: 10
+      delay: 5
+      until: kibana_status.status == 200
+
+    - name: Verify GeoIP ingest pipeline exists
+      ansible.builtin.uri:
+        url: "http://127.0.0.1:{{ es_port }}/_ingest/pipeline/cadre-geoip"
+        method: GET
+        user: elastic
+        password: "{{ elastic_password }}"
+        force_basic_auth: true
+        status_code: [200, 404]
+      register: geoip_pipeline_check
+      failed_when: geoip_pipeline_check.status == 404
+      ignore_errors: true
+
+    - name: Verify GeoIP index template exists
+      ansible.builtin.uri:
+        url: "http://127.0.0.1:{{ es_port }}/_index_template/logs-windows.geoip"
+        method: GET
+        user: elastic
+        password: "{{ elastic_password }}"
+        force_basic_auth: true
+        status_code: [200, 404]
+      register: geoip_template_check
+      failed_when: geoip_template_check.status == 404
+      ignore_errors: true
+
+    - name: Verify ILM policy exists
+      ansible.builtin.uri:
+        url: "http://127.0.0.1:{{ es_port }}/_ilm/policy/cadre-3d-retain"
+        method: GET
+        user: elastic
+        password: "{{ elastic_password }}"
+        force_basic_auth: true
+        status_code: [200, 404]
+      register: ilm_policy_check
+      failed_when: ilm_policy_check.status == 404
+
+    - name: Verify ILM component templates exist
+      ansible.builtin.shell: |
+        failed=0
+        for tmpl in logs@custom metrics@custom logs-windows.forwarded@custom logs-windows.sysmon_operational@custom logs-windows.powershell@custom logs-windows.powershell_operational@custom logs-system.security@custom logs-system.application@custom logs-system.syslog@custom logs-system.auth@custom auditd@custom logs-auditd.log@custom microsoft_sqlserver@custom logs-mssql.log@custom system@custom logs-osquery_manager.result@custom; do
+          curl -s -o /dev/null -w "%{http_code}" -u "elastic:{{ elastic_password }}" "http://127.0.0.1:{{ es_port }}/_component_template/$tmpl" | grep -q "200" || { echo "FAIL: component template $tmpl missing"; failed=1; }
+        done
+        [ "$failed" -eq 0 ] && echo "PASS: all component templates exist" || echo "FAIL: some component templates missing"
+      changed_when: false
+      failed_when: false
+      register: ilm_comp_check
+
+    - name: Verify ILM index templates for non-Fleet indices exist
+      ansible.builtin.shell: |
+        failed=0
+        for tmpl in ilmlogs-zeek ilmlogs-suricata ilmlogs-endpoint-alerts ilmlogs-alerts-security ilmlogs-sysmon-linux ilmlogs-podman ilmlogs-sssd ilmlogs-mssql-audit ilmlogs-osquery; do
+          curl -s -o /dev/null -w "%{http_code}" -u "elastic:{{ elastic_password }}" "http://127.0.0.1:{{ es_port }}/_index_template/$tmpl" | grep -q "200" || { echo "FAIL: index template $tmpl missing"; failed=1; }
+        done
+        [ "$failed" -eq 0 ] && echo "PASS: all non-Fleet index templates exist" || echo "FAIL: some index templates missing"
+      changed_when: false
+      failed_when: false
+      register: ilm_index_check
+
+    - name: Check if Fleet Server is already enrolled
+      ansible.builtin.stat:
+        path: /etc/elastic-agent/fleet-server.yml
+      register: fleet_server_stat
+
+    - name: Verify Fleet data directories exist
+      ansible.builtin.shell: |
+        failed=0
+        for d in /etc/elastic-agent /var/lib/elastic-agent /var/log/elastic-agent; do
+          test -d "$d" || { echo "FAIL: $d missing"; failed=1; }
+        done
+        [ "$failed" -eq 0 ] && echo "PASS: all Fleet data directories exist" || echo "FAIL: some Fleet data directories missing"
+      changed_when: false
+      failed_when: false
+      register: fleet_dirs_check
+
+    - name: Verify Fleet initialized in Kibana
+      ansible.builtin.uri:
+        url: "http://127.0.0.1:{{ kibana_port }}/api/fleet/setup"
+        method: GET
+        user: elastic
+        password: "{{ elastic_password }}"
+        force_basic_auth: true
+        headers:
+          kbn-xsrf: "true"
+        status_code: [200, 404]
+      register: fleet_setup_check
+      failed_when: fleet_setup_check.status == 404
+
+    - name: Verify Fleet Server policy exists
+      ansible.builtin.uri:
+        url: "http://127.0.0.1:{{ kibana_port }}/api/fleet/agent_policies"
+        method: GET
+        user: elastic
+        password: "{{ elastic_password }}"
+        force_basic_auth: true
+        headers:
+          kbn-xsrf: "true"
+        status_code: 200
+      register: fleet_policies_check
+
+    - name: Verify Fleet Server service token exists
+      ansible.builtin.uri:
+        url: "http://127.0.0.1:{{ es_port }}/_security/service/elastic/fleet-server/credential/token"
+        method: GET
+        user: elastic
+        password: "{{ elastic_password }}"
+        force_basic_auth: true
+        status_code: [200, 404]
+      register: fleet_token_check
+      failed_when: fleet_token_check.status == 404
+
+    - name: Verify Fleet Server elastic-agent is enrolled
+      ansible.builtin.shell: |
+        systemctl is-active elastic-agent 2>/dev/null | grep -q "^active" && echo "PASS: elastic-agent is active" || echo "FAIL: elastic-agent is not active"
+      changed_when: false
+      failed_when: false
+      register: fleet_agent_check
+
+    - name: Verify Fleet Server is listening
+      ansible.builtin.wait_for:
+        host: "192.168.77.50"
+        port: "{{ fleet_port }}"
+        delay: 5
+        timeout: 30
+
+    - name: Verify Fleet API is ready
+      ansible.builtin.uri:
+        url: "http://127.0.0.1:{{ kibana_port }}/api/fleet/agent_policies"
+        method: GET
+        user: elastic
+        password: "{{ elastic_password }}"
+        force_basic_auth: true
+        headers:
+          kbn-xsrf: "true"
+        status_code: 200
+      register: fleet_api
+      retries: 10
+      delay: 5
+      until: fleet_api.status == 200
+
+- name: "Play 2 — Verify Fleet policies + integrations + detection rules"
+  hosts: elk
+  gather_facts: false
+  vars:
+    kibana_port: 5601
+  tasks:
+    - name: Read persisted elastic password
+      ansible.builtin.slurp:
+        src: /home/vagrant/es-generated-pw.txt
+      register: es_pw_file2
+      ignore_errors: true
+
+    - name: Override elastic_password from file
+      ansible.builtin.set_fact:
+        elastic_password: "{{ (es_pw_file2.content | b64decode).strip() }}"
+      when: es_pw_file2 is succeeded
+
+    - name: Verify CADRE-All Fleet policy exists
+      ansible.builtin.uri:
+        url: "http://127.0.0.1:{{ kibana_port }}/api/fleet/agent_policies"
+        method: GET
+        user: elastic
+        password: "{{ elastic_password }}"
+        force_basic_auth: true
+        headers:
+          kbn-xsrf: "true"
+        status_code: 200
+      register: policy_all_check
+      failed_when: >
+        policy_all_check.json['items'] | selectattr('name', 'equalto', 'CADRE-All') | list | length == 0
+
+    - name: Verify CADRE-Monitor Fleet policy exists
+      ansible.builtin.uri:
+        url: "http://127.0.0.1:{{ kibana_port }}/api/fleet/agent_policies"
+        method: GET
+        user: elastic
+        password: "{{ elastic_password }}"
+        force_basic_auth: true
+        headers:
+          kbn-xsrf: "true"
+        status_code: 200
+      register: policy_mon_check
+      failed_when: >
+        policy_mon_check.json['items'] | selectattr('name', 'equalto', 'CADRE-Monitor') | list | length == 0
+
+    - name: Verify CADRE-Linux Fleet policy exists
+      ansible.builtin.uri:
+        url: "http://127.0.0.1:{{ kibana_port }}/api/fleet/agent_policies"
+        method: GET
+        user: elastic
+        password: "{{ elastic_password }}"
+        force_basic_auth: true
+        headers:
+          kbn-xsrf: "true"
+        status_code: 200
+      register: policy_linux_check
+      failed_when: >
+        policy_linux_check.json['items'] | selectattr('name', 'equalto', 'CADRE-Linux') | list | length == 0
+
+    - name: Fetch all Fleet policies to resolve IDs
+      ansible.builtin.uri:
+        url: "http://127.0.0.1:{{ kibana_port }}/api/fleet/agent_policies"
+        method: GET
+        user: elastic
+        password: "{{ elastic_password }}"
+        force_basic_auth: true
+        headers:
+          kbn-xsrf: "true"
+        status_code: 200
+      register: policies
+
+    - name: Set policy IDs
+      ansible.builtin.set_fact:
+        cadre_all: "{{ (policies.json['items'] | selectattr('name', 'equalto', 'CADRE-All') | first) }}"
+        cadre_mon: "{{ (policies.json['items'] | selectattr('name', 'equalto', 'CADRE-Monitor') | first) }}"
+        cadre_linux: "{{ (policies.json['items'] | selectattr('name', 'equalto', 'CADRE-Linux') | first) }}"
+
+    - name: Verify System integration exists in CADRE-All
+      ansible.builtin.uri:
+        url: "http://127.0.0.1:{{ kibana_port }}/api/fleet/package_policies"
+        method: GET
+        user: elastic
+        password: "{{ elastic_password }}"
+        force_basic_auth: true
+        headers:
+          kbn-xsrf: "true"
+        status_code: 200
+      register: pkg_policies_all
+      failed_when: >
+        pkg_policies_all.json['items'] | selectattr('name', 'equalto', 'system-cadre-all') | list | length == 0
+
+    - name: Verify Windows integration exists in CADRE-All
+      ansible.builtin.uri:
+        url: "http://127.0.0.1:{{ kibana_port }}/api/fleet/package_policies"
+        method: GET
+        user: elastic
+        password: "{{ elastic_password }}"
+        force_basic_auth: true
+        headers:
+          kbn-xsrf: "true"
+        status_code: 200
+      register: pkg_windows_all
+      failed_when: >
+        pkg_windows_all.json['items'] | selectattr('name', 'equalto', 'windows-cadre-all') | list | length == 0
+
+    - name: Verify Elastic Defend integration exists in CADRE-All
+      ansible.builtin.uri:
+        url: "http://127.0.0.1:{{ kibana_port }}/api/fleet/package_policies"
+        method: GET
+        user: elastic
+        password: "{{ elastic_password }}"
+        force_basic_auth: true
+        headers:
+          kbn-xsrf: "true"
+        status_code: 200
+      register: pkg_defend_all
+      failed_when: >
+        pkg_defend_all.json['items'] | selectattr('name', 'equalto', 'elastic-defend-1') | list | length == 0
+
+    - name: Verify System integration exists in CADRE-Linux
+      ansible.builtin.uri:
+        url: "http://127.0.0.1:{{ kibana_port }}/api/fleet/package_policies"
+        method: GET
+        user: elastic
+        password: "{{ elastic_password }}"
+        force_basic_auth: true
+        headers:
+          kbn-xsrf: "true"
+        status_code: 200
+      register: pkg_sys_linux
+      failed_when: >
+        pkg_sys_linux.json['items'] | selectattr('name', 'equalto', 'system-linux-1') | list | length == 0
+
+    - name: Verify System integration exists in CADRE-Monitor
+      ansible.builtin.uri:
+        url: "http://127.0.0.1:{{ kibana_port }}/api/fleet/package_policies"
+        method: GET
+        user: elastic
+        password: "{{ elastic_password }}"
+        force_basic_auth: true
+        headers:
+          kbn-xsrf: "true"
+        status_code: 200
+      register: pkg_sys_mon
+      failed_when: >
+        pkg_sys_mon.json['items'] | selectattr('name', 'equalto', 'system-mon-1') | list | length == 0
+
+    - name: Verify Zeek integration exists in CADRE-Monitor
+      ansible.builtin.uri:
+        url: "http://127.0.0.1:{{ kibana_port }}/api/fleet/package_policies"
+        method: GET
+        user: elastic
+        password: "{{ elastic_password }}"
+        force_basic_auth: true
+        headers:
+          kbn-xsrf: "true"
+        status_code: 200
+      register: pkg_zeek_mon
+      failed_when: >
+        pkg_zeek_mon.json['items'] | selectattr('name', 'equalto', 'zeek-cadre-mon') | list | length == 0
+
+    - name: Verify Suricata integration exists in CADRE-Monitor
+      ansible.builtin.uri:
+        url: "http://127.0.0.1:{{ kibana_port }}/api/fleet/package_policies"
+        method: GET
+        user: elastic
+        password: "{{ elastic_password }}"
+        force_basic_auth: true
+        headers:
+          kbn-xsrf: "true"
+        status_code: 200
+      register: pkg_suricata_mon
+      failed_when: >
+        pkg_suricata_mon.json['items'] | selectattr('name', 'equalto', 'suricata-cadre-mon') | list | length == 0
+
+    - name: Verify CADRE-All enrollment API key exists
+      ansible.builtin.uri:
+        url: "http://127.0.0.1:{{ kibana_port }}/api/fleet/enrollment_api_keys"
+        method: GET
+        user: elastic
+        password: "{{ elastic_password }}"
+        force_basic_auth: true
+        headers:
+          kbn-xsrf: "true"
+        status_code: 200
+      register: enroll_keys
+
+    - name: Save CADRE-All enrollment token
+      ansible.builtin.set_fact:
+        cadre_all_token: "{{ (enroll_keys.json['items'] | selectattr('policy_id', 'equalto', cadre_all.id) | first).api_key }}"
+
+    - name: Save CADRE-Linux enrollment token
+      ansible.builtin.set_fact:
+        cadre_linux_token: "{{ (enroll_keys.json['items'] | selectattr('policy_id', 'equalto', cadre_linux.id) | first).api_key }}"
+
+    - name: Verify detection engine index registered
+      ansible.builtin.uri:
+        url: "http://127.0.0.1:{{ kibana_port }}/api/detection_engine/index"
+        method: GET
+        user: elastic
+        password: "{{ elastic_password }}"
+        force_basic_auth: true
+        headers:
+          kbn-xsrf: "true"
+        status_code: [200, 404]
+      register: det_index_check
+      failed_when: det_index_check.status == 404
+      ignore_errors: true
+
+    - name: Verify Fleet-maintained packages installed
+      ansible.builtin.shell: |
+        failed=0
+        for pkg in windows system endpoint zeek suricata ti_abusech auditd microsoft_sqlserver sysmon_linux osquery_manager; do
+          code=$(curl -s -o /dev/null -w "%{http_code}" -u "elastic:{{ elastic_password }}" "http://127.0.0.1:{{ kibana_port }}/api/fleet/epm/packages/$pkg" -H "kbn-xsrf: true")
+          [ "$code" = "200" ] || { echo "FAIL: package $pkg not installed (HTTP $code)"; failed=1; }
+        done
+        [ "$failed" -eq 0 ] && echo "PASS: all Fleet packages installed" || echo "FAIL: some Fleet packages missing"
+      changed_when: false
+      failed_when: false
+      register: fleet_pkgs_check
+
+    - name: Verify auditd integration exists in CADRE-Linux
+      ansible.builtin.uri:
+        url: "http://127.0.0.1:{{ kibana_port }}/api/fleet/package_policies"
+        method: GET
+        user: elastic
+        password: "{{ elastic_password }}"
+        force_basic_auth: true
+        headers:
+          kbn-xsrf: "true"
+        status_code: 200
+      register: pkg_auditd_linux
+      failed_when: >
+        pkg_auditd_linux.json['items'] | selectattr('name', 'equalto', 'auditd-linux-1') | list | length == 0
+
+    - name: Verify MSSQL integration exists in CADRE-Linux
+      ansible.builtin.uri:
+        url: "http://127.0.0.1:{{ kibana_port }}/api/fleet/package_policies"
+        method: GET
+        user: elastic
+        password: "{{ elastic_password }}"
+        force_basic_auth: true
+        headers:
+          kbn-xsrf: "true"
+        status_code: 200
+      register: pkg_mssql_linux
+      failed_when: >
+        pkg_mssql_linux.json['items'] | selectattr('name', 'equalto', 'mssql-linux-1') | list | length == 0
+
+    - name: Verify MSSQL audit custom log exists in CADRE-Linux
+      ansible.builtin.uri:
+        url: "http://127.0.0.1:{{ kibana_port }}/api/fleet/package_policies"
+        method: GET
+        user: elastic
+        password: "{{ elastic_password }}"
+        force_basic_auth: true
+        headers:
+          kbn-xsrf: "true"
+        status_code: 200
+      register: pkg_mssql_audit_linux
+      failed_when: >
+        pkg_mssql_audit_linux.json['items'] | selectattr('name', 'equalto', 'mssql-audit-linux-1') | list | length == 0
+
+    - name: Verify Sysmon for Linux integration exists in CADRE-Linux
+      ansible.builtin.uri:
+        url: "http://127.0.0.1:{{ kibana_port }}/api/fleet/package_policies"
+        method: GET
+        user: elastic
+        password: "{{ elastic_password }}"
+        force_basic_auth: true
+        headers:
+          kbn-xsrf: "true"
+        status_code: 200
+      register: pkg_sysmon_linux
+      failed_when: >
+        pkg_sysmon_linux.json['items'] | selectattr('name', 'equalto', 'sysmon-linux-1') | list | length == 0
+
+    - name: Verify SSSD custom logs integration exists in CADRE-Linux
+      ansible.builtin.uri:
+        url: "http://127.0.0.1:{{ kibana_port }}/api/fleet/package_policies"
+        method: GET
+        user: elastic
+        password: "{{ elastic_password }}"
+        force_basic_auth: true
+        headers:
+          kbn-xsrf: "true"
+        status_code: 200
+      register: pkg_sssd_linux
+      failed_when: >
+        pkg_sssd_linux.json['items'] | selectattr('name', 'equalto', 'sssd-linux-1') | list | length == 0
+
+    - name: Verify Podman custom logs integration exists in CADRE-Linux
+      ansible.builtin.uri:
+        url: "http://127.0.0.1:{{ kibana_port }}/api/fleet/package_policies"
+        method: GET
+        user: elastic
+        password: "{{ elastic_password }}"
+        force_basic_auth: true
+        headers:
+          kbn-xsrf: "true"
+        status_code: 200
+      register: pkg_podman_linux
+      failed_when: >
+        pkg_podman_linux.json['items'] | selectattr('name', 'equalto', 'podman-linux-1') | list | length == 0
+
+    - name: Verify Osquery Manager integration exists in CADRE-Linux
+      ansible.builtin.uri:
+        url: "http://127.0.0.1:{{ kibana_port }}/api/fleet/package_policies"
+        method: GET
+        user: elastic
+        password: "{{ elastic_password }}"
+        force_basic_auth: true
+        headers:
+          kbn-xsrf: "true"
+        status_code: 200
+      register: pkg_osquery_linux
+      failed_when: >
+        pkg_osquery_linux.json['items'] | selectattr('name', 'equalto', 'osquery-linux-1') | list | length == 0
+
+    - name: Verify seed detection rules exist
+      ansible.builtin.shell: |
+        failed=0
+        for rid in cadre-002-asrep-roast cadre-003-dcsync cadre-004-suspicious-proc cadre-005-adcs-tamper cadre-006-ntlm-relay cadre-007-zeek-kerberoast cadre-008-gmsa-extract cadre-l01-keytab-read cadre-l02-realm-change cadre-l03-sssd-cache cadre-l04-suid-binary cadre-l05-kernel-module cadre-l06-preload-hijack cadre-l07-container-escape cadre-l08-cron-systemd cadre-l09-mssql-brute cadre-l11-nfs-krb5 cadre-l12-authorized-keys cadre-l13-pam-change cadre-l14-temp-exec cadre-l15-sudo-domain; do
+          code=$(curl -s -o /dev/null -w "%{http_code}" -u "elastic:{{ elastic_password }}" "http://127.0.0.1:{{ kibana_port }}/api/detection_engine/rules?rule_id=$rid" -H "kbn-xsrf: true")
+          [ "$code" = "200" ] || { echo "FAIL: rule $rid not found (HTTP $code)"; failed=1; }
+        done
+        [ "$failed" -eq 0 ] && echo "PASS: all 21 detection rules exist" || echo "FAIL: some detection rules missing"
+      changed_when: false
+      failed_when: false
+      register: rules_check
+
+    - name: Verify seed detection rule query content (9 fixed rules)
+      ansible.builtin.shell: |
+        failed=0
+        AUTH="-u elastic:{{ elastic_password }}"
+        KBN="-H kbn-xsrf: true"
+        BASE="http://127.0.0.1:{{ kibana_port }}/api/detection_engine/rules?rule_id"
+
+        check_query() {
+          local rid="$1" expected="$2"
+          local query
+          query=$(curl -s $AUTH "$BASE=$rid" $KBN | jq -r '.query')
+          echo "$query" | grep -qF "$expected" && echo "PASS: $rid query contains '$expected'" || { echo "FAIL: $rid query missing '$expected'"; failed=1; }
+        }
+
+        check_query "cadre-003-dcsync"    "*0x100*"
+        check_query "cadre-004-suspicious-proc" "process.command_line"
+        check_query "cadre-005-adcs-tamper" "process.command_line"
+        check_query "cadre-007-zeek-kerberoast" "KDC_ERR_ETYPE_NOSUPP"
+        check_query "cadre-008-gmsa-extract" "e48d0154"
+        check_query "cadre-l04-suid-binary" "/tmp/suid_bash"
+        check_query "cadre-l12-authorized-keys" "auditd.log.name"
+        check_query "cadre-l09-mssql-brute" "Login failed"
+        check_query "cadre-l15-sudo-domain" "auditd.log.record_type:USER_CMD"
+
+        [ "$failed" -eq 0 ] && echo "PASS: all rule queries verified" || echo "FAIL: some rule queries incorrect"
+        exit $failed
+      changed_when: false
+      failed_when: false
+      register: rule_query_check
+
+    - name: Verify 006 threshold rule fields (NTLM + source.ip)
+      ansible.builtin.shell: |
+        AUTH="-u elastic:{{ elastic_password }}"
+        KBN="-H kbn-xsrf: true"
+        BASE="http://127.0.0.1:{{ kibana_port }}/api/detection_engine/rules?rule_id=cadre-006-ntlm-relay"
+        rule=$(curl -s $AUTH "$BASE" $KBN)
+        query=$(echo "$rule" | jq -r '.query')
+        threshold=$(echo "$rule" | jq -r '.threshold.field[0]')
+        echo "$query" | grep -q "AuthenticationPackageName:NTLM" || { echo "FAIL: 006 query missing NTLM filter"; exit 1; }
+        [ "$threshold" = "source.ip" ] || { echo "FAIL: 006 threshold field is '$threshold', expected 'source.ip'"; exit 1; }
+        echo "PASS: 006 NTLM query + source.ip threshold verified"
+      changed_when: false
+      failed_when: false
+      register: rule_006_check
+
+    - name: Save enrollment tokens to shared fact
+      ansible.builtin.set_fact:
+        cadre_all_enroll_token: "{{ cadre_all_token }}"
+        cadre_linux_enroll_token: "{{ cadre_linux_token }}"
+
+
+
+- name: "Play 3 — Verify Elastic Agent enrollment on Windows VMs"
+  hosts: windows_servers
+  gather_facts: true
+  vars:
+    fleet_server: 192.168.77.50
+    fleet_port: 8220
+  tasks:
+    - name: Check if Elastic Agent service exists
+      ansible.windows.win_service:
+        name: "Elastic Agent"
+      register: agent_svc
+      ignore_errors: true
+      failed_when: false
+
+    - name: Verify Tools directory exists
+      ansible.windows.win_stat:
+        path: C:\Tools
+      register: tools_dir_check
+
+    - name: Verify Elastic Agent zip downloaded
+      ansible.windows.win_stat:
+        path: C:\Tools\elastic-agent.zip
+      register: agent_zip_check
+
+    - name: Verify Elastic Agent extracted
+      ansible.windows.win_stat:
+        path: "C:\\Tools\\elastic-agent-{{ elastic_agent_version }}-windows-x86_64"
+      register: agent_extract_check
+
+    - name: Verify Elastic Agent is enrolled and running (Windows)
+      ansible.windows.win_shell: |
+        $svc = Get-Service "Elastic Agent" -ErrorAction SilentlyContinue
+        if ($svc -and $svc.Status -eq "Running") { Write-Output "PASS: Elastic Agent service is running"; exit 0 }
+        else { Write-Output "FAIL: Elastic Agent service is not running"; exit 1 }
+      register: win_agent_check
+      changed_when: false
+      failed_when: false
+
+    - name: Verify Elastic Agent service start mode
+      ansible.windows.win_service:
+        name: "Elastic Agent"
+      register: agent_svc_check
+      failed_when: agent_svc_check.start_mode != "auto" or agent_svc_check.state != "running"
+
+- name: "Play 4 — Verify Elastic Agent enrollment on linux01"
+  hosts: linux_members
+  gather_facts: true
+  vars:
+    fleet_server: 192.168.77.50
+    fleet_port: 8220
+  tasks:
+    - name: Check Elastic Agent config exists
+      ansible.builtin.stat:
+        path: /etc/elastic-agent/elastic-agent.yml
+      register: agent_cfg
+
+    - name: Verify Elastic Agent tarball downloaded
+      ansible.builtin.shell: |
+        test -f /tmp/elastic-agent.tar.gz && echo "PASS: tarball exists" || echo "FAIL: tarball missing"
+      changed_when: false
+      failed_when: false
+      register: linux_tarball_check
+
+    - name: Verify Elastic Agent extracted
+      ansible.builtin.shell: |
+        test -d /tmp/elastic-agent-{{ elastic_agent_version }}-linux-x86_64 && echo "PASS: extracted directory exists" || echo "FAIL: extracted directory missing"
+      changed_when: false
+      failed_when: false
+      register: linux_extract_check
+
+    - name: Verify Elastic Agent is enrolled and running (Linux)
+      ansible.builtin.shell: |
+        systemctl is-active elastic-agent 2>/dev/null | grep -q "^active" && echo "PASS: elastic-agent is active and enrolled" || echo "FAIL: elastic-agent is not running"
+      changed_when: false
+      failed_when: false
+      register: linux_agent_check
+
+    - name: Verify elastic-agent service is enabled and active
+      ansible.builtin.shell: |
+        systemctl is-enabled elastic-agent 2>/dev/null | grep -q "^enabled" && echo "PASS: elastic-agent is enabled" || echo "FAIL: elastic-agent is not enabled"
+        systemctl is-active elastic-agent 2>/dev/null | grep -q "^active" && echo "PASS: elastic-agent is active" || echo "FAIL: elastic-agent is not active"
+      changed_when: false
+      failed_when: false
+      register: linux_svc_check

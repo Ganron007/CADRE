@@ -1,0 +1,6 @@
+---
+domain_action: forest
+domain_name: range.local
+domain_netbios: RANGE
+safe_mode_password: "S@feMode_R@ng3_2026!"
+domain_type: external_forest

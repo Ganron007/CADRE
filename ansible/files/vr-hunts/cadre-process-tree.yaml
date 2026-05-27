@@ -1,0 +1,11 @@
+name: CADRE.Hunts.ProcessTree
+description: |
+  Process tree snapshot — collect Pslist and scheduled tasks.
+  Part of the CADRE pre-built hunt library.
+sources:
+  - name: Pslist
+    queries:
+      - SELECT * FROM pslist()
+  - name: ScheduledTasks
+    queries:
+      - SELECT * FROM Artifact.Windows.System.TaskScheduler()

@@ -1,0 +1,363 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 -30 1920 930"
+     preserveAspectRatio="xMidYMid meet"
+     style="max-width:100%;height:auto;display:block;background:#ffffff"
+     font-family="Inter, 'Segoe UI', system-ui, sans-serif">
+
+  <defs>
+    <marker id="arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto">
+      <path d="M0 0 L10 5 L0 10 z" fill="#000000"/>
+    </marker>
+    <style>
+      .card    { fill: #f6f7f9; stroke: #1a1a1a; stroke-width: 1.2; }
+      .panel   { fill: #ffffff; stroke: #1a1a1a; stroke-width: 1.2; }
+      .h1      { font-size: 68px; font-weight: 900; fill: #000000; letter-spacing: 12px; }
+      .tag     { font-size: 13px; fill: #1a1a1a; letter-spacing: 5px; font-weight: 600; }
+      .section { font-size: 11px; fill: #1a1a1a; letter-spacing: 3px; font-weight: 800; }
+      .label   { font-size: 10px; fill: #555555; letter-spacing: 2px; font-weight: 700; }
+      .vm      { font-size: 15px; font-weight: 800; fill: #000000; }
+      .ip      { font-size: 9px; fill: #555555; font-family: ui-monospace,'Cascadia Code',monospace; }
+      .body    { font-size: 11px; fill: #1a1a1a; }
+      .small   { font-size: 10px; fill: #1a1a1a; }
+      .meta    { font-size: 9px; fill: #666666; }
+      .mono    { font-family: ui-monospace,'Cascadia Code',monospace; }
+      .divider { stroke: #cccccc; stroke-width: 1; }
+      .thick   { stroke: #1a1a1a; stroke-width: 2; }
+    </style>
+  </defs>
+
+  <!-- ============================================================
+       HEADER
+       ============================================================ -->
+  <g transform="translate(60, 52)">
+    <text class="h1" x="0" y="0">CADRE</text>
+    <text class="tag" x="3" y="28">CLOUD  ·  AGENTIC  ·  DFIR  ·  RED-TEAM  ·  ENVIRONMENT</text>
+    <line class="divider" x1="0" y1="42" x2="520" y2="42"/>
+    <text x="0" y="60" fill="#555555" font-size="10" font-weight="500">Open-source purple-team AD lab  ·  MIT licensed  ·  $0 baseline cost</text>
+  </g>
+
+  <g transform="translate(1860, 52)" text-anchor="end">
+    <text x="0" y="0" fill="#000000" font-size="20" font-weight="800" letter-spacing="1">Agentic AI  ·  DFIR  ·  Red-Team Lab</text>
+    <text x="0" y="22" fill="#1a1a1a" font-size="12" font-weight="600">7 core VMs + 3 extensions  ·  3 forests  ·  8 certifications</text>
+    <text x="0" y="40" fill="#555555" font-size="11">Server 2025  ·  Elastic 9.x  ·  LangGraph + MCP . DFIR ToolChain</text>
+  </g>
+
+  <line class="thick" x1="60" y1="118" x2="1860" y2="118"/>
+
+  <!-- ============================================================
+       FIVE PILLARS
+       ============================================================ -->
+  <g transform="translate(60, 146)">
+    <text class="section" x="0"   y="0">C | CLOUD</text>
+    <text class="section" x="200" y="0">A | AGENTIC</text>
+    <text class="section" x="400" y="0">D | DFIR</text>
+    <text class="section" x="600" y="0">R | RED-TEAM</text>
+    <text class="section" x="800" y="0">E | ENVIRONMENT</text>
+    <text x="1800" y="0" text-anchor="end" class="meta">Cloud + Agentic augment the pipeline  ·  Red Team attacks  ·  Environment emits telemetry  ·  DFIR analyzes</text>
+  </g>
+
+  <line class="divider" x1="60" y1="162" x2="1860" y2="162"/>
+
+  <!-- ============================================================
+       CLOUD + AGENTIC  side by side
+       ============================================================ -->
+  <g transform="translate(60, 172)">
+    <rect class="panel" x="0" y="0" width="920" height="76" rx="4"/>
+    <rect fill="#000000" x="0" y="0" width="4" height="76"/>
+    <text class="section" x="20" y="22">C | CLOUD</text>
+    <text class="body"  x="20" y="42">Microsoft Entra ID (free dev tenant)  ·  Azure RM (free trial)  ·  Entra Cloud Sync agent on dc01</text>
+    <text class="meta"  x="20" y="60">Azure attack scenarios  ·  Hybrid chains on-prem ↔ cloud  ·  CARTP + CARTE coverage</text>
+  </g>
+
+  <g transform="translate(1000, 172)">
+    <rect class="panel" x="0" y="0" width="860" height="76" rx="4"/>
+    <rect fill="#000000" x="0" y="0" width="4" height="76"/>
+    <text class="section" x="20" y="22">A | AGENTIC</text>
+    <text class="body"  x="20" y="42">LangGraph multi-agent pipeline  ·  DFIR-Nexus evidence schema  ·  Multi-LLM router</text>
+    <text class="meta"  x="20" y="60">Velociraptor MCP for natural-language VQL (Plan 7)  ·  Claude · OpenCode · Codex · CrofAI</text>
+  </g>
+
+  <!-- ============================================================
+       MAIN ROW: RED-TEAM (280) | ENVIRONMENT (940) | DFIR (540)
+       ============================================================ -->
+
+  <!-- ===== LEFT COLUMN — RED-TEAM (280px) ===== -->
+  <g transform="translate(60, 260)">
+    <rect class="panel" x="0" y="0" width="280" height="610" rx="4"/>
+    <rect fill="#000000" x="0" y="0" width="4" height="610"/>
+    <text class="section" x="20" y="24">R | RED-TEAM</text>
+
+    <text class="label" x="20" y="60">WHAT CADRE PROVIDES</text>
+    <g transform="translate(20, 76)">
+      <text class="small" y="0">62 scripted attack walkthroughs</text>
+      <text class="meta"  y="14">against live multi-domain AD substrate</text>
+      <text class="small" y="34">59 Linux automation scripts</text>
+      <text class="meta"  y="48">bash scripts with common.sh helper lib</text>
+      <text class="small" y="68">4 organic attack campaigns</text>
+      <text class="meta"  y="82">Campaign A: Kali zero-creds → 3 domains</text>
+      <text class="small" y="102">Ground-truth telemetry for every attack</text>
+      <text class="meta"  y="116">Sysmon · Elastic · Zeek · Velociraptor</text>
+    </g>
+
+    <text class="label" x="20" y="218">62 WALKTHROUGHS</text>
+    <g transform="translate(20, 234)">
+      <text class="small" y="0">001-033  On-prem AD attacks</text>
+      <text class="meta"  y="14">Kerberos · ACL · delegation · coercion</text>
+      <text class="small" y="34">034-049  SCCM · Linux · CVEs</text>
+      <text class="meta"  y="48">MSSQL · NFS · Podman escape</text>
+      <text class="small" y="68">050-062  ADCS ESC1-15 (14/15)</text>
+      <text class="meta"  y="82">CA cadre-CA running, templates published</text>
+      <text class="small" y="102">C01-C09  Azure scenarios + Cloud Sync</text>
+      <text class="small" y="120">H01-H04  Hybrid on-prem ↔ cloud</text>
+      <text class="small" y="138">A01-A04  Azure RM (PIM, multi-tenant)</text>
+    </g>
+
+    <text class="label" x="20" y="400">8 CERTIFICATIONS</text>
+    <g transform="translate(20, 416)" class="small">
+      <text y="0">CRTP  ·  CRTE  ·  CESP-ADCS</text>
+      <text y="16">HTB CAPE  ·  OSCP+  ·  WKL OADOC</text>
+      <text y="32">CARTP  ·  CARTE</text>
+    </g>
+
+    <g transform="translate(20, 474)">
+      <rect class="card" width="240" height="120" rx="4" stroke-width="2"/>
+      <text class="section" x="14" y="22">ATTACK FLOW</text>
+      <line class="divider" x1="14" y1="30" x2="226" y2="30"/>
+      <text class="small" x="14" y="48">1. Pick walkthrough or campaign</text>
+      <text class="small" x="14" y="64">2. Run scripted attack from Kali</text>
+      <text class="small" x="14" y="80">3. Observe telemetry across all sources</text>
+      <text class="small" x="14" y="96">4. Investigate · export · reset · repeat</text>
+    </g>
+  </g>
+
+  <!-- ===== CENTER COLUMN — ENVIRONMENT (940px) ===== -->
+  <g transform="translate(360, 260)">
+    <rect class="panel" x="0" y="0" width="940" height="610" rx="4"/>
+    <rect fill="#000000" x="0" y="0" width="4" height="610"/>
+    <text class="section" x="20" y="24">E | ENVIRONMENT  ·  vmnet2  192.168.77.0/24</text>
+    <text fill="#000000" font-size="10" font-weight="700" x="660" y="22" text-anchor="start">telemetry flow</text>
+    <line x1="750" y1="20" x2="920" y2="20" stroke="#000000" stroke-width="2" marker-end="url(#arr)"/>
+    <text class="meta" x="20" y="42">All DCs on Server 2025  ·  provisioning VM runs Ansible (no WSL2)  ·  26-play self-contained playbook</text>
+
+    <!-- ROW 1: 3 forest DCs + provisioning -->
+    <g transform="translate(20, 58)">
+      <g>
+        <text class="label" x="0" y="0">FOREST · cadre.local</text>
+        <g transform="translate(0, 14)">
+          <rect class="card" width="200" height="110" rx="4"/>
+          <text class="vm" x="14" y="24">dc01</text>
+          <text class="ip" x="14" y="40">192.168.77.10</text>
+          <line class="divider" x1="14" y1="48" x2="186" y2="48"/>
+          <text class="small" x="14" y="64">Root DC  ·  DNS  ·  KDC</text>
+          <text class="small" x="14" y="80">ADCS CA  ·  ESC1-15 templates</text>
+          <text class="small" x="14" y="96">Cloud Sync agent (Plan 11)</text>
+        </g>
+      </g>
+
+      <line class="divider" x1="200" y1="148" x2="220" y2="148" stroke-dasharray="3 2"/>
+      <text class="meta" x="200" y="142">parent-child</text>
+
+      <g transform="translate(220, 0)">
+        <text class="label" x="0" y="0">CHILD · child.cadre.local</text>
+        <g transform="translate(0, 14)">
+          <rect class="card" width="200" height="110" rx="4"/>
+          <text class="vm" x="14" y="24">dc02</text>
+          <text class="ip" x="14" y="40">192.168.77.11</text>
+          <line class="divider" x1="14" y1="48" x2="186" y2="48"/>
+          <text class="small" x="14" y="64">Child DC  ·  DNS</text>
+          <text class="small" x="14" y="80">3 AS-REP-roastable accounts</text>
+          <text class="small" x="14" y="96">Cross-domain bait</text>
+        </g>
+      </g>
+
+      <line class="divider" x1="420" y1="148" x2="440" y2="148" stroke-dasharray="5 2"/>
+      <text class="meta" x="420" y="142">forest trust</text>
+
+      <g transform="translate(440, 0)">
+        <text class="label" x="0" y="0">FOREST · range.local</text>
+        <g transform="translate(0, 14)">
+          <rect class="card" width="200" height="110" rx="4"/>
+          <text class="vm" x="14" y="24">dc03</text>
+          <text class="ip" x="14" y="40">192.168.77.12</text>
+          <line class="divider" x1="14" y1="48" x2="186" y2="48"/>
+          <text class="small" x="14" y="64">External DC  ·  AES-only</text>
+          <text class="small" x="14" y="80">dMSA / BadSuccessor target</text>
+          <text class="small" x="14" y="96">KDS root key  ·  gMSA</text>
+        </g>
+      </g>
+
+      <g transform="translate(680, 0)">
+        <text class="label" x="0" y="0">PROVISIONING</text>
+        <g transform="translate(0, 14)">
+          <rect class="card" width="200" height="110" rx="4"/>
+          <text class="vm" x="14" y="24">provisioning</text>
+          <text class="ip" x="14" y="40">192.168.77.60</text>
+          <line class="divider" x1="14" y1="48" x2="186" y2="48"/>
+          <text class="small" x="14" y="64">Ubuntu 22.04  ·  Ansible runner</text>
+          <text class="small" x="14" y="80">replaces WSL2 dependency</text>
+          <text class="small" x="14" y="96">orchestrates 26 plays</text>
+        </g>
+      </g>
+    </g>
+
+    <!-- ROW 2: 3 members -->
+    <g transform="translate(20, 220)">
+      <text class="label" x="0" y="0">MEMBER SERVERS</text>
+
+      <g transform="translate(0, 14)">
+        <rect class="card" width="200" height="130" rx="4"/>
+        <text class="vm" x="14" y="24">mbr01</text>
+        <text class="ip" x="14" y="40">192.168.77.22  ·  child.cadre.local</text>
+        <line class="divider" x1="14" y1="48" x2="186" y2="48"/>
+        <text class="small" x="14" y="66">MSSQL Server 2022 + IIS</text>
+        <text class="small" x="14" y="82">Unconstrained delegation</text>
+        <text class="small" x="14" y="98">Linked servers → mbr02 + linux01</text>
+        <text class="small" x="14" y="114">xp_cmdshell  ·  CLR  ·  impersonate</text>
+      </g>
+
+      <g transform="translate(216, 14)">
+        <rect class="card" width="200" height="130" rx="4"/>
+        <text class="vm" x="14" y="24">mbr02</text>
+        <text class="ip" x="14" y="40">192.168.77.23  ·  range.local</text>
+        <line class="divider" x1="14" y1="48" x2="186" y2="48"/>
+        <text class="small" x="14" y="66">SCCM 2509 site server (site CAD)</text>
+        <text class="small" x="14" y="82">WSUS  ·  Virtual Smart Card CA</text>
+        <text class="small" x="14" y="98">NAA  ·  PXE  ·  auto client push</text>
+        <text class="small" x="14" y="114">Constrained deleg (proto-trans)</text>
+      </g>
+
+      <g transform="translate(432, 14)">
+        <rect class="card" width="200" height="130" rx="4"/>
+        <text class="vm" x="14" y="24">linux01</text>
+        <text class="ip" x="14" y="40">192.168.77.40  ·  cadre.local AD</text>
+        <line class="divider" x1="14" y1="48" x2="186" y2="48"/>
+        <text class="small" x="14" y="66">Ubuntu 24.04  ·  SSSD + realmd</text>
+        <text class="small" x="14" y="82">MSSQL-on-Linux + krb5 keytab</text>
+        <text class="small" x="14" y="98">NFS sec=krb5p  ·  Podman privileged</text>
+        <text class="small" x="14" y="114">auditd ≥45 rules  ·  SSSD debug=5</text>
+      </g>
+
+      <g transform="translate(680, 0)">
+        <rect fill="#eef0f2" stroke="#1a1a1a" stroke-width="3" x="0" y="0" width="190" height="200" rx="6"/>
+        <text font-size="22" font-weight="900" fill="#000000" text-anchor="middle" x="95" y="46">The Only</text>
+        <text font-size="22" font-weight="900" fill="#000000" text-anchor="middle" x="95" y="72">Open-source</text>
+        <text font-size="22" font-weight="900" fill="#000000" text-anchor="middle" x="95" y="98">Lab</text>
+        <line stroke="#1a1a1a" stroke-width="1" x1="30" y1="112" x2="160" y2="112"/>
+        <text font-size="10" fill="#1a1a1a" text-anchor="middle" x="95" y="130">SCCM · SQL · ADCS instrumented</text>
+        <text font-size="10" fill="#1a1a1a" text-anchor="middle" x="95" y="144">Attack → investigation chain</text>
+        <text font-size="10" fill="#1a1a1a" text-anchor="middle" x="95" y="158">5 unique telemetry sources</text>
+        <text font-size="10" fill="#1a1a1a" text-anchor="middle" x="95" y="172">End-to-end kernel → SIEM</text>
+        <text font-size="10" fill="#1a1a1a" text-anchor="middle" x="95" y="186">Forensic-ready by design</text>
+      </g>
+    </g>
+
+    <!-- ROW 3: Attack surface summary -->
+    <g transform="translate(20, 394)">
+      <text class="label" x="0" y="0">CONFIGURED ATTACK SURFACE</text>
+      <g transform="translate(0, 18)" class="small">
+        <text y="0">·  19 ACL abuse paths across 3 domains</text>
+        <text y="16">·  5 Kerberoasting SPNs  ·  3 AS-REP targets</text>
+        <text y="32">·  Unconstrained  ·  constrained  ·  RBCD delegation</text>
+        <text y="48">·  ADCS ESC1-15 (14/15 implementable)</text>
+        <text y="64">·  MSSQL linked servers mbr01 ↔ mbr02 ↔ linux01</text>
+      </g>
+      <g transform="translate(260, 18)" class="small">
+        <text y="0">·  SCCM Misconfiguration-Manager full matrix</text>
+        <text y="16">·  Coercion: PrinterBug  ·  PetitPotam  ·  DFSCoerce</text>
+        <text y="32">·  dMSA / BadSuccessor  ·  gMSA  ·  KDS root key</text>
+        <text y="48">·  2026 CVEs: RC4 deprecation  ·  SPN Unicode</text>
+        <text y="64">·  Shares + bait files  ·  WDigest  ·  LSA off</text>
+      </g>
+    </g>
+
+    <!-- ROW 4: The Cycle -->
+    <g transform="translate(20, 508)">
+      <rect class="card" width="900" height="40" rx="4" stroke-width="2"/>
+      <text class="section" x="14" y="20">THE CYCLE</text>
+      <text class="small" x="14" y="36">revert  →  attack from VM  →  observe telemetry  →  investigate  →  export evidence  →  reset  →  repeat</text>
+    </g>
+
+    <!-- ROW 5: Single-source Windows telemetry baseline -->
+    <g transform="translate(20, 556)">
+      <rect class="card" width="900" height="40" rx="4" stroke-width="2"/>
+      <text class="section" x="14" y="20">SINGLE-SOURCE WINDOWS TELEMETRY BASELINE</text>
+      <text class="small" x="14" y="36">11-security-baseline.yml  →  cadre-dfir-monitoring.ps1  —  49 audit subcats  ·  PS deep visibility  ·  NTLM  ·  26 channels  ·  Security log 1 GB</text>
+    </g>
+  </g>
+
+  <!-- ===== RIGHT COLUMN — DFIR (540px) ===== -->
+  <g transform="translate(1320, 260)">
+    <rect class="panel" x="0" y="0" width="540" height="610" rx="4"/>
+    <rect fill="#000000" x="0" y="0" width="4" height="610"/>
+    <text class="section" x="20" y="24">D | DFIR  ·  TELEMETRY + INVESTIGATION</text>
+
+    <!-- elk -->
+    <g transform="translate(20, 46)">
+      <rect class="card" width="500" height="140" rx="4"/>
+      <text class="vm" x="14" y="24">elk</text>
+      <text class="ip" x="56" y="24">192.168.77.50</text>
+      <text class="section" x="170" y="22">SIEM + EDR + FLEET</text>
+      <line class="divider" x1="14" y1="34" x2="486" y2="34"/>
+      <text class="small" x="14" y="52">Elasticsearch 9.x  ·  Kibana  ·  Fleet Server  ·  Elastic Defend (DETECT)</text>
+      <text class="small" x="14" y="68">Sysmon (Olaf Hartong sysmon-modular) on all Windows VMs</text>
+      <text class="small" x="14" y="84">Threat Intel: AbuseCh + OTX  ·  GeoIP enrichment</text>
+      <line class="divider" x1="14" y1="94" x2="486" y2="94"/>
+      <text class="meta" x="14" y="108">Fleet policies:</text>
+      <text class="small" x="14" y="122">CADRE-All (5 Win)  ·  CADRE-Linux (auditd/mssql/sssd/podman/osquery)</text>
+      <text class="small" x="14" y="134">CADRE-Monitor (Zeek + Suricata)</text>
+    </g>
+
+    <!-- monitor -->
+    <g transform="translate(20, 198)">
+      <rect class="card" width="500" height="116" rx="4"/>
+      <text class="vm" x="14" y="24">monitor</text>
+      <text class="ip" x="100" y="24">192.168.77.55</text>
+      <text class="section" x="204" y="22">NETWORK</text>
+      <line class="divider" x1="14" y1="34" x2="486" y2="34"/>
+      <text class="small" x="14" y="52">Promiscuous NIC sees all vmnet2 — no MITM needed</text>
+      <text class="small" x="14" y="68">Zeek (20+ protocols)  ·  Suricata + ET Open  ·  Arkime full PCAP</text>
+      <text class="small" x="14" y="84">tcpdump hourly rotation  ·  SiLK offline flows</text>
+      <text class="meta mono" x="14" y="100">logs-zeek-*  ·  logs-suricata-*  ·  Arkime viewer :8005</text>
+    </g>
+
+    <!-- vr -->
+    <g transform="translate(20, 326)">
+      <rect class="card" width="500" height="116" rx="4"/>
+      <text class="vm" x="14" y="24">vr</text>
+      <text class="ip" x="44" y="24">192.168.77.51</text>
+      <text class="section" x="146" y="22">VELOCIRAPTOR</text>
+      <line class="divider" x1="14" y1="34" x2="486" y2="34"/>
+      <text class="small" x="14" y="52">DFIR server  ·  MSI on 5 Win VMs  ·  Linux client on linux01</text>
+      <text class="small" x="14" y="68">10 hunts (process · creds · network · MFT · EVTX · ADCS · SCCM)</text>
+      <text class="small" x="14" y="84">cadre-linux-triage + CADRE.Linux.KeytabFingerprints artifact</text>
+      <text class="meta mono" x="14" y="100">server :8889  ·  5 Windows + 1 Linux client enrolled</text>
+    </g>
+
+    <!-- DFIR analyst toolchain -->
+    <g transform="translate(20, 454)">
+      <rect class="card" width="500" height="100" rx="4"/>
+      <text class="section" x="14" y="20">DFIR TOOLCHAIN</text>
+      <line class="divider" x1="14" y1="28" x2="486" y2="28"/>
+      <text class="small" x="14" y="44">Hayabusa  ·  Plaso / Timesketch  ·  Chainsaw</text>
+      <text class="small" x="14" y="60">KAPE  ·  WinPMEM / AVML  ·  Volatility 3</text>
+      <text class="small" x="14" y="76">BloodHound CE  ·  certipy  ·  ADExplorer  ·  RECmd</text>
+      <text class="small" x="14" y="92">Velociraptor MCP :8002  (Plan 7 — natural-language VQL via agentic pipeline)</text>
+    </g>
+
+    <!-- Investigation flow -->
+    <g transform="translate(20, 560)">
+      <rect class="card" width="500" height="42" rx="4" stroke-width="2"/>
+      <text class="section" x="14" y="18">INVESTIGATE MANUALLY OR VIA AGENTIC PIPELINE</text>
+      <text class="small" x="14" y="34">Export evidence bundle  ·  reset  ·  repeat</text>
+    </g>
+  </g>
+
+  <!-- ============================================================
+       FOOTER
+       ============================================================ -->
+  <g transform="translate(60, 890)">
+    <text x="0" y="0" fill="#999999" font-size="9">github.com/Ganron007/CADRE  ·  MIT License  ·  Server 2025 + Ubuntu 24.04  ·  VMware (vmnet2)  ·  Ansible + Python</text>
+    <text x="1800" y="0" text-anchor="end" fill="#999999" font-size="9">1920×1080  ·  v4  ·  2026</text>
+  </g>
+
+</svg>

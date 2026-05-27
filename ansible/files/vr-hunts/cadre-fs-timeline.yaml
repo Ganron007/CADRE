@@ -1,0 +1,11 @@
+name: CADRE.Hunts.FilesystemTimeline
+description: |
+  Filesystem timeline — MFT and USN journal.
+  Part of the CADRE pre-built hunt library.
+sources:
+  - name: MFT
+    queries:
+      - SELECT * FROM Artifact.Windows.Forensics.NTFS.MFT()
+  - name: USN
+    queries:
+      - SELECT * FROM Artifact.Windows.Forensics.USN()

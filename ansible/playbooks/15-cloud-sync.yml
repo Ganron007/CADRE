@@ -1,0 +1,38 @@
+---
+# TYPE: DEPLOY (rc=0=skip, rc=2=applied+verified, rc=1=fail)
+# Layer 13: Cloud Sync — Entra Cloud Sync provisioning agent
+# Pre-installs the agent on dc01 so only tenant config remains manual.
+# Executable: ansible/files/executables/AADConnectProvisioningAgentSetup.exe
+#   (executables live in ansible/files/executables/, scripts in ansible/files/)
+# Standalone playbook — no ordering dependencies.
+
+- name: "Deploy Entra Cloud Sync agent on dc01"
+  hosts: dc01
+  gather_facts: false
+  tasks:
+    - name: "[CLOUD] Create Cloud Sync agent directory"
+      ansible.windows.win_file:
+        path: C:\ProgramData\Microsoft\Azure\CloudSync
+        state: directory
+
+    - name: "[CLOUD] Copy Cloud Sync provisioning agent"
+      ansible.windows.win_copy:
+        src: ../files/executables/AADConnectProvisioningAgentSetup.exe
+        dest: C:\Windows\Temp\AADConnectProvisioningAgentSetup.exe
+      register: r_copy
+      failed_when: false
+
+    - name: "[CLOUD] Install Entra Cloud Sync agent"
+      ansible.windows.win_shell: |
+        $ErrorActionPreference = "Stop"
+        try {
+          $exe = "C:\Windows\Temp\AADConnectProvisioningAgentSetup.exe"
+          if (-not (Test-Path $exe)) { Write-Output "SKIP: Installer not found at $exe"; exit 0 }
+          $existing = Get-Service -Name "AADConnectProvisioningAgent" -ErrorAction SilentlyContinue
+          if ($existing -and $existing.Status -eq "Running") { Write-Output "OK: Agent already installed and running"; exit 0 }
+          Start-Process -Wait -FilePath $exe -ArgumentList @("/quiet", "/norestart", "ACCEPT_EULA=1") -PassThru
+          Write-Output "APPLIED: Cloud Sync provisioning agent installed (configure tenant manually)"; exit 2
+        } catch { Write-Output "FAILED: $_"; exit 1 }
+      register: r
+      changed_when: r.rc == 2
+      failed_when: r.rc == 1

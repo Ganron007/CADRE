@@ -1,0 +1,193 @@
+---
+# TYPE: DEPLOY (rc=0=skip, rc=2=applied+verified, rc=1=fail)
+# Layer 3: Security Baseline — Deploy audit policy, PS logging, NTLM, channels, log sizes, Sysmon
+# Uses cadre-dfir-monitoring.ps1 (deployed as-is, already tested on Server 2025).
+# Deploy tasks use rc=0/1/2 pattern; verify tasks use exit 0/1.
+
+# =============================================================================
+# Play 1: Create staging directories
+# =============================================================================
+- name: "Create staging directories"
+  hosts: windows_servers
+  gather_facts: false
+  tasks:
+    - name: 'Create C:\Tools directory'
+      ansible.windows.win_file:
+        path: C:\Tools
+        state: directory
+
+    - name: 'Create C:\PSTranscripts directory'
+      ansible.windows.win_file:
+        path: C:\PSTranscripts
+        state: directory
+
+# =============================================================================
+# Play 2: Deploy monitoring script
+# =============================================================================
+- name: "Deploy monitoring script"
+  hosts: windows_servers
+  gather_facts: false
+  tasks:
+    - name: 'Copy cadre-dfir-monitoring.ps1 to C:\Tools'
+      ansible.windows.win_copy:
+        src: ../files/cadre-dfir-monitoring.ps1
+        dest: C:\Tools\cadre-dfir-monitoring.ps1
+
+# =============================================================================
+# Play 3: Execute monitoring baseline (rc=2 pattern)
+# =============================================================================
+- name: "Execute DFIR monitoring baseline"
+  hosts: windows_servers
+  gather_facts: false
+  tasks:
+    - name: "[AUDIT] Apply 49 audit subcats + PS logging + NTLM + 26 channels"
+      ansible.windows.win_shell: |
+        $ErrorActionPreference = "Stop"
+        try {
+          $lsa = (Get-ItemProperty "HKLM:\SYSTEM\CurrentControlSet\Control\Lsa" -Name "SCENoApplyLegacyAuditPolicy" -ErrorAction SilentlyContinue).SCENoApplyLegacyAuditPolicy
+          if ($lsa -eq 1) {
+            $spot = auditpol /get /subcategory:"Logon" 2>&1 | Select-String "Success and Failure"
+            if ($spot) { Write-Output "OK: Monitoring already applied"; exit 0 }
+          }
+          $result = & C:\Tools\cadre-dfir-monitoring.ps1
+          if ($LASTEXITCODE -ne 0) { throw "Script exited with code $LASTEXITCODE" }
+          $v1 = (Get-ItemProperty "HKLM:\SYSTEM\CurrentControlSet\Control\Lsa" -Name "SCENoApplyLegacyAuditPolicy" -ErrorAction Stop).SCENoApplyLegacyAuditPolicy
+          $v2 = (Get-ItemProperty "HKLM:\SOFTWARE\Policies\Microsoft\Windows\PowerShell\ScriptBlockLogging" -Name "EnableScriptBlockLogging" -ErrorAction Stop).EnableScriptBlockLogging
+          if ($v1 -ne 1 -or $v2 -ne 1) { throw "Verify failed: LSA=$v1 PS=$v2" }
+          Write-Output "APPLIED: Monitoring baseline applied and verified"; exit 2
+        } catch { Write-Output "FAILED: $_"; exit 1 }
+      register: r
+      changed_when: r.rc == 2
+      failed_when: r.rc == 1
+
+# =============================================================================
+# Play 4: Verify key settings (verify only — exit 0/1)
+# =============================================================================
+- name: "Verify monitoring baseline key settings"
+  hosts: windows_servers
+  gather_facts: false
+  tasks:
+    - name: "[AUDIT] Verify SCENoApplyLegacyAuditPolicy = 1"
+      ansible.windows.win_shell: |
+        try {
+        $ErrorActionPreference = "Stop"
+          $v = (Get-ItemProperty "HKLM:\SYSTEM\CurrentControlSet\Control\Lsa" -Name "SCENoApplyLegacyAuditPolicy" -ErrorAction Stop).SCENoApplyLegacyAuditPolicy
+          if ($v -eq 1) { Write-Output "PASS: SCENoApplyLegacyAuditPolicy = 1"; exit 0 }
+          Write-Output "FAIL: SCENoApplyLegacyAuditPolicy = $v (expected 1)"; exit 1
+        } catch { Write-Output "FAIL: $_"; exit 1 }
+      register: r
+      changed_when: false
+      failed_when: r.rc == 1
+
+    - name: "[AUDIT] Verify ProcessCreationIncludeCmdLine = 1"
+      ansible.windows.win_shell: |
+        try {
+        $ErrorActionPreference = "Stop"
+          $v = (Get-ItemProperty "HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\System\Audit" -Name "ProcessCreationIncludeCmdLine_Enabled" -ErrorAction Stop).ProcessCreationIncludeCmdLine_Enabled
+          if ($v -eq 1) { Write-Output "PASS: ProcessCreationIncludeCmdLine enabled"; exit 0 }
+          Write-Output "FAIL: ProcessCreationIncludeCmdLine = $v (expected 1)"; exit 1
+        } catch { Write-Output "FAIL: $_"; exit 1 }
+      register: r
+      changed_when: false
+      failed_when: r.rc == 1
+
+    - name: "[AUDIT] Verify PowerShell ScriptBlock logging enabled"
+      ansible.windows.win_shell: |
+        try {
+        $ErrorActionPreference = "Stop"
+          $v = (Get-ItemProperty "HKLM:\SOFTWARE\Policies\Microsoft\Windows\PowerShell\ScriptBlockLogging" -Name "EnableScriptBlockLogging" -ErrorAction Stop).EnableScriptBlockLogging
+          if ($v -eq 1) { Write-Output "PASS: ScriptBlock logging enabled"; exit 0 }
+          Write-Output "FAIL: ScriptBlock logging = $v (expected 1)"; exit 1
+        } catch { Write-Output "FAIL: $_"; exit 1 }
+      register: r
+      changed_when: false
+      failed_when: r.rc == 1
+
+    - name: "[AUDIT] Verify PowerShell Module logging enabled"
+      ansible.windows.win_shell: |
+        try {
+        $ErrorActionPreference = "Stop"
+          $v = (Get-ItemProperty "HKLM:\SOFTWARE\Policies\Microsoft\Windows\PowerShell\ModuleLogging" -Name "EnableModuleLogging" -ErrorAction Stop).EnableModuleLogging
+          if ($v -eq 1) { Write-Output "PASS: Module logging enabled"; exit 0 }
+          Write-Output "FAIL: Module logging = $v (expected 1)"; exit 1
+        } catch { Write-Output "FAIL: $_"; exit 1 }
+      register: r
+      changed_when: false
+      failed_when: r.rc == 1
+
+    - name: "[AUDIT] Verify PowerShell Transcription enabled"
+      ansible.windows.win_shell: |
+        try {
+        $ErrorActionPreference = "Stop"
+          $v = (Get-ItemProperty "HKLM:\SOFTWARE\Policies\Microsoft\Windows\PowerShell\Transcription" -Name "EnableTranscripting" -ErrorAction Stop).EnableTranscripting
+          if ($v -eq 1) { Write-Output "PASS: Transcription enabled"; exit 0 }
+          Write-Output "FAIL: Transcription = $v (expected 1)"; exit 1
+        } catch { Write-Output "FAIL: $_"; exit 1 }
+      register: r
+      changed_when: false
+      failed_when: r.rc == 1
+
+    - name: "[AUDIT] Verify Security log size >= 1GB"
+      ansible.windows.win_shell: |
+        try {
+        $ErrorActionPreference = "Stop"
+          $log = wevtutil gl Security 2>&1 | Out-String
+          if ($log -match "maxSize: (\d+)") { $maxSize = [long]$matches[1] }
+          if ($maxSize -ge 1073741824) { Write-Output "PASS: Security log size = $maxSize bytes (>= 1GB)"; exit 0 }
+          Write-Output "FAIL: Security log size = $maxSize bytes (< 1GB)"; exit 1
+        } catch { Write-Output "FAIL: $_"; exit 1 }
+      register: r
+      changed_when: false
+      failed_when: r.rc == 1
+
+# =============================================================================
+# Play 5: Sysmon installation
+# =============================================================================
+- name: "Sysmon installation"
+  hosts: windows_servers
+  gather_facts: false
+  tasks:
+    - name: "[SYSMON] Check Sysmon64 service status"
+      ansible.windows.win_service:
+        name: Sysmon64
+      register: sysmon_svc
+      failed_when: false
+
+    - name: "[SYSMON] Download Sysmon from Sysinternals"
+      ansible.windows.win_get_url:
+        url: https://download.sysinternals.com/files/Sysmon.zip
+        dest: C:\Tools\Sysmon.zip
+      when: sysmon_svc.exists is not defined or not sysmon_svc.exists
+
+    - name: "[SYSMON] Extract Sysmon to C:\\Tools\\Sysmon"
+      community.windows.win_unzip:
+        src: C:\Tools\Sysmon.zip
+        dest: C:\Tools\Sysmon
+        creates: C:\Tools\Sysmon\Sysmon64.exe
+      when: sysmon_svc.exists is not defined or not sysmon_svc.exists
+
+    - name: "[SYSMON] Download Olaf Hartong sysmon-modular config"
+      ansible.windows.win_get_url:
+        url: https://raw.githubusercontent.com/olafhartong/sysmon-modular/master/sysmonconfig.xml
+        dest: C:\Tools\Sysmon\sysmonconfig.xml
+      when: sysmon_svc.exists is not defined or not sysmon_svc.exists
+
+    - name: "[SYSMON] Install Sysmon with sysmon-modular config"
+      ansible.windows.win_shell: C:\Tools\Sysmon\Sysmon64.exe -accepteula -i C:\Tools\Sysmon\sysmonconfig.xml
+      when: sysmon_svc.exists is not defined or not sysmon_svc.exists
+      register: sysmon_install
+      changed_when: "'Sysmon installed' in sysmon_install.stdout"
+      failed_when: sysmon_install.rc != 0
+
+    - name: "[SYSMON] Update Sysmon config (existing install)"
+      ansible.windows.win_shell: C:\Tools\Sysmon\Sysmon64.exe -c C:\Tools\Sysmon\sysmonconfig.xml
+      when: sysmon_svc.exists is defined and sysmon_svc.exists
+      register: sysmon_update
+      changed_when: "'Configuration updated' in sysmon_update.stdout"
+      failed_when: sysmon_update.rc != 0
+
+    - name: "[SYSMON] Ensure Sysmon64 service running (auto-start)"
+      ansible.windows.win_service:
+        name: Sysmon64
+        state: started
+        start_mode: auto

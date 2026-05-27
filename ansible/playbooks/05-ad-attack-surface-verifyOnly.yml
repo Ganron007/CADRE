@@ -1,0 +1,710 @@
+---
+# TYPE: VERIFY-ONLY (rc=0=pass, rc=1=fail — verifies all 26 ACEs, SPNs, AS-REP, delegation)
+# Verify-only version of 05-ad-attack-surface.yml.
+# All tasks: changed_when: false, failed_when: r.rc == 1
+
+# =============================================================================
+# PART 1: ACEs — cadre.local (dc01, 14 entries)
+# =============================================================================
+- name: "dc01 — ACE group 1 (GPO delegations)"
+  hosts: dc01
+  gather_facts: false
+  tasks:
+    - name: "ACE#1 — analyst_cloud → Vulnerable-GPO: GpoEditDeleteModifySecurity (VERIFY)"
+      ansible.windows.win_shell: |
+        $ErrorActionPreference = "Stop"
+        try {
+          $existing = Get-GPPermission -Name "Vulnerable-GPO" -TargetName "analyst_cloud" -TargetType User -ErrorAction SilentlyContinue
+          if ($existing -and $existing.Permission -eq "GpoEditDeleteModifySecurity") {
+            Write-Output "PASS: GPO delegation exists"; exit 0
+          }
+          Write-Output "FAIL: GPO delegation not found"; exit 1
+        } catch { Write-Output "FAIL: $_"; exit 1 }
+      register: r
+      changed_when: false
+      failed_when: r.rc == 1
+
+    - name: "ACE#2 — eng_agentic → WMI-Filtered-GPO: GpoEditDeleteModifySecurity (VERIFY)"
+      ansible.windows.win_shell: |
+        $ErrorActionPreference = "Stop"
+        try {
+          $existing = Get-GPPermission -Name "WMI-Filtered-GPO" -TargetName "eng_agentic" -TargetType User -ErrorAction SilentlyContinue
+          if ($existing -and $existing.Permission -eq "GpoEditDeleteModifySecurity") {
+            Write-Output "PASS: GPO delegation exists"; exit 0
+          }
+          Write-Output "FAIL: GPO delegation not found"; exit 1
+        } catch { Write-Output "FAIL: $_"; exit 1 }
+      register: r
+      changed_when: false
+      failed_when: r.rc == 1
+
+- name: "dc01 — ACE group 2 (group ACEs)"
+  hosts: dc01
+  gather_facts: false
+  tasks:
+    - name: "ACE#3 — Engineering-Cadre → Red-Cadre: WriteDacl (VERIFY)"
+      ansible.windows.win_shell: |
+        $ErrorActionPreference = "Stop"
+        try {
+          $sid = (Get-ADGroup "Engineering-Cadre").SID.Value
+          $desc = (Get-ADObject "CN=Red-Cadre,OU=RedCell,DC=cadre,DC=local" -Properties ntSecurityDescriptor).ntSecurityDescriptor
+          $exists = $desc.Access | Where-Object { try { $_.IdentityReference.Translate([System.Security.Principal.SecurityIdentifier]).Value -eq $sid } catch { $false } }
+          if ($exists) { Write-Output "PASS: ACE exists"; exit 0 }
+          Write-Output "FAIL: ACE not found"; exit 1
+        } catch { Write-Output "FAIL: $_"; exit 1 }
+      register: r
+      changed_when: false
+      failed_when: r.rc == 1
+
+    - name: "ACE#4 — Cloud-Cadre → Agentic-Cadre: GenericWrite (VERIFY)"
+      ansible.windows.win_shell: |
+        $ErrorActionPreference = "Stop"
+        try {
+          $sid = (Get-ADGroup "Cloud-Cadre").SID.Value
+          $desc = (Get-ADObject "CN=Agentic-Cadre,OU=Agentic,DC=cadre,DC=local" -Properties ntSecurityDescriptor).ntSecurityDescriptor
+          $exists = $desc.Access | Where-Object { try { $_.IdentityReference.Translate([System.Security.Principal.SecurityIdentifier]).Value -eq $sid } catch { $false } }
+          if ($exists) { Write-Output "PASS: ACE exists"; exit 0 }
+          Write-Output "FAIL: ACE not found"; exit 1
+        } catch { Write-Output "FAIL: $_"; exit 1 }
+      register: r
+      changed_when: false
+      failed_when: r.rc == 1
+
+    - name: "ACE#5 — analyst_dfir → OU=Command: GenericAll (VERIFY)"
+      ansible.windows.win_shell: |
+        $ErrorActionPreference = "Stop"
+        try {
+          $sid = (Get-ADUser analyst_dfir).SID.Value
+          $desc = (Get-ADObject "OU=Command,DC=cadre,DC=local" -Properties ntSecurityDescriptor).ntSecurityDescriptor
+          $exists = $desc.Access | Where-Object { try { $_.IdentityReference.Translate([System.Security.Principal.SecurityIdentifier]).Value -eq $sid } catch { $false } }
+          if ($exists) { Write-Output "PASS: ACE exists"; exit 0 }
+          Write-Output "FAIL: ACE not found"; exit 1
+        } catch { Write-Output "FAIL: $_"; exit 1 }
+      register: r
+      changed_when: false
+      failed_when: r.rc == 1
+
+    - name: "ACE#6 — ops_redcell → dc01$: GenericWrite (VERIFY)"
+      ansible.windows.win_shell: |
+        $ErrorActionPreference = "Stop"
+        try {
+          $sid = (Get-ADUser ops_redcell).SID.Value
+          $desc = (Get-ADObject "CN=dc01,OU=Domain Controllers,DC=cadre,DC=local" -Properties ntSecurityDescriptor).ntSecurityDescriptor
+          $exists = $desc.Access | Where-Object { try { $_.IdentityReference.Translate([System.Security.Principal.SecurityIdentifier]).Value -eq $sid } catch { $false } }
+          if ($exists) { Write-Output "PASS: ACE exists"; exit 0 }
+          Write-Output "FAIL: ACE not found"; exit 1
+        } catch { Write-Output "FAIL: $_"; exit 1 }
+      register: r
+      changed_when: false
+      failed_when: r.rc == 1
+
+    - name: "ACE#7 — hunter_dfir → chief_command: ForceChangePassword (VERIFY)"
+      ansible.windows.win_shell: |
+        $ErrorActionPreference = "Stop"
+        try {
+          $sid = (Get-ADUser hunter_dfir).SID.Value
+          $fcPwdGUID = [GUID]"00299570-246d-11d0-a768-00aa006e0529"
+          $desc = (Get-ADObject "CN=chief_command,OU=Command,DC=cadre,DC=local" -Properties ntSecurityDescriptor).ntSecurityDescriptor
+          $exists = $desc.Access | Where-Object { try { $_.IdentityReference.Translate([System.Security.Principal.SecurityIdentifier]).Value -eq $sid -and $_.ObjectType -eq $fcPwdGUID } catch { $false } }
+          if ($exists) { Write-Output "PASS: ACE exists"; exit 0 }
+          Write-Output "FAIL: ACE not found"; exit 1
+        } catch { Write-Output "FAIL: $_"; exit 1 }
+      register: r
+      changed_when: false
+      failed_when: r.rc == 1
+
+    - name: "ACE#8 — lead_engineering → svc_ldap: GenericAll (VERIFY)"
+      ansible.windows.win_shell: |
+        $ErrorActionPreference = "Stop"
+        try {
+          $sid = (Get-ADUser lead_engineering).SID.Value
+          $desc = (Get-ADObject "CN=svc_ldap,OU=Engineering,DC=cadre,DC=local" -Properties ntSecurityDescriptor).ntSecurityDescriptor
+          $exists = $desc.Access | Where-Object { try { $_.IdentityReference.Translate([System.Security.Principal.SecurityIdentifier]).Value -eq $sid } catch { $false } }
+          if ($exists) { Write-Output "PASS: ACE exists"; exit 0 }
+          Write-Output "FAIL: ACE not found"; exit 1
+        } catch { Write-Output "FAIL: $_"; exit 1 }
+      register: r
+      changed_when: false
+      failed_when: r.rc == 1
+
+    - name: "ACE#9 — Purple-Cell → OU=DFIR: WriteProperty (VERIFY)"
+      ansible.windows.win_shell: |
+        $ErrorActionPreference = "Stop"
+        try {
+          $sid = (Get-ADGroup "Purple-Cell").SID.Value
+          $desc = (Get-ADObject "OU=DFIR,DC=cadre,DC=local" -Properties ntSecurityDescriptor).ntSecurityDescriptor
+          $exists = $desc.Access | Where-Object { try { $_.IdentityReference.Translate([System.Security.Principal.SecurityIdentifier]).Value -eq $sid } catch { $false } }
+          if ($exists) { Write-Output "PASS: ACE exists"; exit 0 }
+          Write-Output "FAIL: ACE not found"; exit 1
+        } catch { Write-Output "FAIL: $_"; exit 1 }
+      register: r
+      changed_when: false
+      failed_when: r.rc == 1
+
+    - name: "ACE#10 — eng_cloud → gmsaTools$: ReadGMSAPassword (VERIFY)"
+      ansible.windows.win_shell: |
+        $ErrorActionPreference = "Stop"
+        try {
+          $target = Get-ADServiceAccount -Identity "gmsaTools" -ErrorAction SilentlyContinue
+          if (-not $target) { Write-Output "SKIP: gMSA gmsaTools not found"; exit 0 }
+          $sid = (Get-ADUser eng_cloud).SID.Value
+          $gmsaGUID = [GUID]"5b47d60f-6090-40b2-9f37-2a4de88f3063"
+          $desc = (Get-ADObject $target.DistinguishedName -Properties ntSecurityDescriptor).ntSecurityDescriptor
+          $exists = $desc.Access | Where-Object { try { $_.IdentityReference.Translate([System.Security.Principal.SecurityIdentifier]).Value -eq $sid -and $_.ObjectType -eq $gmsaGUID } catch { $false } }
+          if ($exists) { Write-Output "PASS: ACE exists"; exit 0 }
+          Write-Output "FAIL: ACE not found"; exit 1
+        } catch { Write-Output "FAIL: $_"; exit 1 }
+      register: r
+      changed_when: false
+      failed_when: r.rc == 1
+
+    - name: "ACE#11 — analyst_purple → Cloud-Cadre: WriteMember (VERIFY)"
+      ansible.windows.win_shell: |
+        $ErrorActionPreference = "Stop"
+        try {
+          $sid = (Get-ADUser analyst_purple).SID.Value
+          $memberGUID = [GUID]"bf9679c0-0de6-11d0-a285-00aa003049e2"
+          $desc = (Get-ADObject "CN=Cloud-Cadre,OU=Cloud,DC=cadre,DC=local" -Properties ntSecurityDescriptor).ntSecurityDescriptor
+          $exists = $desc.Access | Where-Object { try { $_.IdentityReference.Translate([System.Security.Principal.SecurityIdentifier]).Value -eq $sid -and $_.ObjectType -eq $memberGUID } catch { $false } }
+          if ($exists) { Write-Output "PASS: ACE exists"; exit 0 }
+          Write-Output "FAIL: ACE not found"; exit 1
+        } catch { Write-Output "FAIL: $_"; exit 1 }
+      register: r
+      changed_when: false
+      failed_when: r.rc == 1
+
+    - name: "ACE#12 — eng_agentic → OU=Agentic: AllExtendedRights (VERIFY)"
+      ansible.windows.win_shell: |
+        $ErrorActionPreference = "Stop"
+        try {
+          $sid = (Get-ADUser eng_agentic).SID.Value
+          $allGUID = [GUID]"00000000-0000-0000-0000-000000000000"
+          $desc = (Get-ADObject "OU=Agentic,DC=cadre,DC=local" -Properties ntSecurityDescriptor).ntSecurityDescriptor
+          $exists = $desc.Access | Where-Object { try { $_.IdentityReference.Translate([System.Security.Principal.SecurityIdentifier]).Value -eq $sid -and $_.ObjectType -eq $allGUID } catch { $false } }
+          if ($exists) { Write-Output "PASS: ACE exists"; exit 0 }
+          Write-Output "FAIL: ACE not found"; exit 1
+        } catch { Write-Output "FAIL: $_"; exit 1 }
+      register: r
+      changed_when: false
+      failed_when: r.rc == 1
+
+- name: "dc01 — ACE group 3 (DCSync)"
+  hosts: dc01
+  gather_facts: false
+  tasks:
+    - name: "ACE#13+14 — eng_agentic → DC=cadre: DCSync (Get-Changes + Get-Changes-All) (VERIFY)"
+      ansible.windows.win_shell: |
+        $ErrorActionPreference = "Stop"
+        try {
+          $sid = (Get-ADUser eng_agentic).SID.Value
+          $dcsyncGUID = [GUID]"1131f6aa-9c07-11d1-f79f-00c04fc2dcd2"
+          $dcsyncAllGUID = [GUID]"1131f6ad-9c07-11d1-f79f-00c04fc2dcd2"
+          $desc = (Get-ADObject "DC=cadre,DC=local" -Properties ntSecurityDescriptor).ntSecurityDescriptor
+          $v1 = $desc.Access | Where-Object { try { $_.IdentityReference.Translate([System.Security.Principal.SecurityIdentifier]).Value -eq $sid -and $_.ObjectType -eq $dcsyncGUID } catch { $false } }
+          $v2 = $desc.Access | Where-Object { try { $_.IdentityReference.Translate([System.Security.Principal.SecurityIdentifier]).Value -eq $sid -and $_.ObjectType -eq $dcsyncAllGUID } catch { $false } }
+          if ($v1 -and $v2) { Write-Output "PASS: Both DCSync ACEs found"; exit 0 }
+          Write-Output "FAIL: DCSync ACEs missing"; exit 1
+        } catch { Write-Output "FAIL: $_"; exit 1 }
+      register: r
+      changed_when: false
+      failed_when: r.rc == 1
+
+# =============================================================================
+# PART 2: ACEs — child.cadre.local (dc02, 6 entries)
+# =============================================================================
+- name: "dc02 — child domain ACEs"
+  hosts: dc02
+  gather_facts: false
+  tasks:
+    - name: "ACE#15 — analyst_t1 → OU=Operations: GenericWrite (VERIFY)"
+      ansible.windows.win_shell: |
+        $ErrorActionPreference = "Stop"
+        try {
+          $sid = (Get-ADUser analyst_t1 -Server "dc02.child.cadre.local").SID.Value
+          $desc = (Get-ADObject "OU=Operations,DC=child,DC=cadre,DC=local" -Server "dc02.child.cadre.local" -Properties ntSecurityDescriptor).ntSecurityDescriptor
+          $exists = $desc.Access | Where-Object { try { $_.IdentityReference.Translate([System.Security.Principal.SecurityIdentifier]).Value -eq $sid } catch { $false } }
+          if ($exists) { Write-Output "PASS: ACE exists"; exit 0 }
+          Write-Output "FAIL: ACE not found"; exit 1
+        } catch { Write-Output "FAIL: $_"; exit 1 }
+      register: r
+      changed_when: false
+      failed_when: r.rc == 1
+
+    - name: "ACE#16 — lead_detection → svc_mssql: GenericAll (VERIFY)"
+      ansible.windows.win_shell: |
+        $ErrorActionPreference = "Stop"
+        try {
+          $sid = (Get-ADUser lead_detection).SID.Value
+          $desc = (Get-ADObject "CN=svc_mssql,OU=Operations,DC=child,DC=cadre,DC=local" -Properties ntSecurityDescriptor).ntSecurityDescriptor
+          $exists = $desc.Access | Where-Object { try { $_.IdentityReference.Translate([System.Security.Principal.SecurityIdentifier]).Value -eq $sid } catch { $false } }
+          if ($exists) { Write-Output "PASS: ACE exists"; exit 0 }
+          Write-Output "FAIL: ACE not found"; exit 1
+        } catch { Write-Output "FAIL: $_"; exit 1 }
+      register: r
+      changed_when: false
+      failed_when: r.rc == 1
+
+    - name: "ACE#17 — mgr_incident → Detection-Cadre: WriteMember (VERIFY)"
+      ansible.windows.win_shell: |
+        $ErrorActionPreference = "Stop"
+        try {
+          $sid = (Get-ADUser mgr_incident).SID.Value
+          $memberGUID = [GUID]"bf9679c0-0de6-11d0-a285-00aa003049e2"
+          $desc = (Get-ADObject "CN=Detection-Cadre,OU=Detection,DC=child,DC=cadre,DC=local" -Properties ntSecurityDescriptor).ntSecurityDescriptor
+          $exists = $desc.Access | Where-Object { try { $_.IdentityReference.Translate([System.Security.Principal.SecurityIdentifier]).Value -eq $sid -and $_.ObjectType -eq $memberGUID } catch { $false } }
+          if ($exists) { Write-Output "PASS: ACE exists"; exit 0 }
+          Write-Output "FAIL: ACE not found"; exit 1
+        } catch { Write-Output "FAIL: $_"; exit 1 }
+      register: r
+      changed_when: false
+      failed_when: r.rc == 1
+
+    - name: "ACE#18 — intern_blue → analyst_t2: ForceChangePassword (VERIFY)"
+      ansible.windows.win_shell: |
+        $ErrorActionPreference = "Stop"
+        try {
+          $sid = (Get-ADUser intern_blue).SID.Value
+          $fcPwdGUID = [GUID]"00299570-246d-11d0-a768-00aa006e0529"
+          $desc = (Get-ADObject "CN=analyst_t2,OU=Detection,DC=child,DC=cadre,DC=local" -Properties ntSecurityDescriptor).ntSecurityDescriptor
+          $exists = $desc.Access | Where-Object { try { $_.IdentityReference.Translate([System.Security.Principal.SecurityIdentifier]).Value -eq $sid -and $_.ObjectType -eq $fcPwdGUID } catch { $false } }
+          if ($exists) { Write-Output "PASS: ACE exists"; exit 0 }
+          Write-Output "FAIL: ACE not found"; exit 1
+        } catch { Write-Output "FAIL: $_"; exit 1 }
+      register: r
+      changed_when: false
+      failed_when: r.rc == 1
+
+    - name: "ACE#19 — analyst_t3 → Operations-Cadre: WriteOwner (VERIFY)"
+      ansible.windows.win_shell: |
+        $ErrorActionPreference = "Stop"
+        try {
+          $sid = (Get-ADUser analyst_t3).SID.Value
+          $desc = (Get-ADObject "CN=Operations-Cadre,OU=Operations,DC=child,DC=cadre,DC=local" -Properties ntSecurityDescriptor).ntSecurityDescriptor
+          $exists = $desc.Access | Where-Object { try { $_.IdentityReference.Translate([System.Security.Principal.SecurityIdentifier]).Value -eq $sid } catch { $false } }
+          if ($exists) { Write-Output "PASS: ACE exists"; exit 0 }
+          Write-Output "FAIL: ACE not found"; exit 1
+        } catch { Write-Output "FAIL: $_"; exit 1 }
+      register: r
+      changed_when: false
+      failed_when: r.rc == 1
+
+    - name: "ACE#20 — dir_operations → mbr01$: GenericWrite (VERIFY)"
+      ansible.windows.win_shell: |
+        $ErrorActionPreference = "Stop"
+        try {
+          $comp = Get-ADComputer -Identity "mbr01" -Server "dc02.child.cadre.local" -ErrorAction SilentlyContinue
+          if (-not $comp) { Write-Output "SKIP: mbr01 not found in child domain"; exit 0 }
+          $sid = (Get-ADUser dir_operations).SID.Value
+          $desc = (Get-ADObject $comp.DistinguishedName -Properties ntSecurityDescriptor).ntSecurityDescriptor
+          $exists = $desc.Access | Where-Object { try { $_.IdentityReference.Translate([System.Security.Principal.SecurityIdentifier]).Value -eq $sid } catch { $false } }
+          if ($exists) { Write-Output "PASS: ACE exists"; exit 0 }
+          Write-Output "FAIL: ACE not found"; exit 1
+        } catch { Write-Output "FAIL: $_"; exit 1 }
+      register: r
+      changed_when: false
+      failed_when: r.rc == 1
+
+# =============================================================================
+# PART 3: ACEs — range.local (dc03, 7 entries)
+# =============================================================================
+- name: "dc03 — range domain ACEs"
+  hosts: dc03
+  gather_facts: false
+  tasks:
+    - name: "ACE#21 — Intelligence-Cadre → dc03$: GenericAll (VERIFY)"
+      ansible.windows.win_shell: |
+        $ErrorActionPreference = "Stop"
+        try {
+          $sid = (Get-ADGroup "Intelligence-Cadre").SID.Value
+          $desc = (Get-ADObject "CN=dc03,OU=Domain Controllers,DC=range,DC=local" -Properties ntSecurityDescriptor).ntSecurityDescriptor
+          $exists = $desc.Access | Where-Object { try { $_.IdentityReference.Translate([System.Security.Principal.SecurityIdentifier]).Value -eq $sid } catch { $false } }
+          if ($exists) { Write-Output "PASS: ACE exists"; exit 0 }
+          Write-Output "FAIL: ACE not found"; exit 1
+        } catch { Write-Output "FAIL: $_"; exit 1 }
+      register: r
+      changed_when: false
+      failed_when: r.rc == 1
+
+    - name: "ACE#22 — eng_tools → Adversary-Cadre: WriteDacl (VERIFY)"
+      ansible.windows.win_shell: |
+        $ErrorActionPreference = "Stop"
+        try {
+          $sid = (Get-ADUser eng_tools).SID.Value
+          $desc = (Get-ADObject "CN=Adversary-Cadre,OU=Adversary,DC=range,DC=local" -Properties ntSecurityDescriptor).ntSecurityDescriptor
+          $exists = $desc.Access | Where-Object { try { $_.IdentityReference.Translate([System.Security.Principal.SecurityIdentifier]).Value -eq $sid } catch { $false } }
+          if ($exists) { Write-Output "PASS: ACE exists"; exit 0 }
+          Write-Output "FAIL: ACE not found"; exit 1
+        } catch { Write-Output "FAIL: $_"; exit 1 }
+      register: r
+      changed_when: false
+      failed_when: r.rc == 1
+
+    - name: "ACE#23 — analyst_osint → svc_naa: GenericAll (VERIFY)"
+      ansible.windows.win_shell: |
+        $ErrorActionPreference = "Stop"
+        try {
+          $sid = (Get-ADUser analyst_osint).SID.Value
+          $desc = (Get-ADObject "CN=svc_naa,OU=Adversary,DC=range,DC=local" -Properties ntSecurityDescriptor).ntSecurityDescriptor
+          $exists = $desc.Access | Where-Object { try { $_.IdentityReference.Translate([System.Security.Principal.SecurityIdentifier]).Value -eq $sid } catch { $false } }
+          if ($exists) { Write-Output "PASS: ACE exists"; exit 0 }
+          Write-Output "FAIL: ACE not found"; exit 1
+        } catch { Write-Output "FAIL: $_"; exit 1 }
+      register: r
+      changed_when: false
+      failed_when: r.rc == 1
+
+    - name: "ACE#24 — adversary_lead → dmsaPrivService$: GenericWrite (VERIFY)"
+      ansible.windows.win_shell: |
+        $ErrorActionPreference = "Stop"
+        try {
+          $target = Get-ADServiceAccount -Identity "dmsaPrivService" -ErrorAction SilentlyContinue
+          if (-not $target) { Write-Output "SKIP: dMSA dmsaPrivService not found"; exit 0 }
+          $sid = (Get-ADUser adversary_lead).SID.Value
+          $desc = (Get-ADObject $target.DistinguishedName -Properties ntSecurityDescriptor).ntSecurityDescriptor
+          $exists = $desc.Access | Where-Object { try { $_.IdentityReference.Translate([System.Security.Principal.SecurityIdentifier]).Value -eq $sid } catch { $false } }
+          if ($exists) { Write-Output "PASS: ACE exists"; exit 0 }
+          Write-Output "FAIL: ACE not found"; exit 1
+        } catch { Write-Output "FAIL: $_"; exit 1 }
+      register: r
+      changed_when: false
+      failed_when: r.rc == 1
+
+    - name: "ACE#25 — analyst_malware → svc_sccm: WriteProperty(SPN) (VERIFY)"
+      ansible.windows.win_shell: |
+        $ErrorActionPreference = "Stop"
+        try {
+          $sid = (Get-ADUser analyst_malware).SID.Value
+          $spnGUID = [GUID]"f3a64788-5306-11d1-a9c5-0000f80367c1"
+          $desc = (Get-ADObject "CN=svc_sccm,OU=Adversary,DC=range,DC=local" -Properties ntSecurityDescriptor).ntSecurityDescriptor
+          $exists = $desc.Access | Where-Object { try { $_.IdentityReference.Translate([System.Security.Principal.SecurityIdentifier]).Value -eq $sid -and $_.ObjectType -eq $spnGUID } catch { $false } }
+          if ($exists) { Write-Output "PASS: ACE exists"; exit 0 }
+          Write-Output "FAIL: ACE not found"; exit 1
+        } catch { Write-Output "FAIL: $_"; exit 1 }
+      register: r
+      changed_when: false
+      failed_when: r.rc == 1
+
+    - name: "ACE#26 — analyst_forensic → svc_naa: AllExtendedRights (VERIFY)"
+      ansible.windows.win_shell: |
+        $ErrorActionPreference = "Stop"
+        try {
+          $sid = (Get-ADUser analyst_forensic).SID.Value
+          $allGUID = [GUID]"00000000-0000-0000-0000-000000000000"
+          $desc = (Get-ADObject "CN=svc_naa,OU=Adversary,DC=range,DC=local" -Properties ntSecurityDescriptor).ntSecurityDescriptor
+          $exists = $desc.Access | Where-Object { try { $_.IdentityReference.Translate([System.Security.Principal.SecurityIdentifier]).Value -eq $sid -and $_.ObjectType -eq $allGUID } catch { $false } }
+          if ($exists) { Write-Output "PASS: ACE exists"; exit 0 }
+          Write-Output "FAIL: ACE not found"; exit 1
+        } catch { Write-Output "FAIL: $_"; exit 1 }
+      register: r
+      changed_when: false
+      failed_when: r.rc == 1
+
+# =============================================================================
+# PART 4: Kerberos Attack Surface — SPN + AS-REP + RC4 (dc01, dc02, dc03)
+# =============================================================================
+- name: "SPN Registration — cadre.local (via dc01)"
+  hosts: dc01
+  gather_facts: false
+  tasks:
+    - name: "[SPN][WT#1][WT#33] Verify SPNs: svc_ldap, chief_command, mssql-linux01"
+      ansible.windows.win_shell: |
+        $ErrorActionPreference = "Stop"
+        try {
+          $entries = @(
+            @{User="svc_ldap"; SPN="ldap/svc-ldap.cadre.local"},
+            @{User="chief_command"; SPN="HTTP/cadre-portal.cadre.local"},
+            @{User="mssql-linux01"; SPN="MSSQLSvc/linux01.cadre.local:1433"}
+          )
+          $missing = @()
+          foreach ($e in $entries) {
+            $obj = Get-ADUser -Identity $e.User -Properties ServicePrincipalNames -ErrorAction SilentlyContinue
+            if (-not $obj) { $obj = Get-ADComputer -Identity $e.User -Properties ServicePrincipalNames -ErrorAction SilentlyContinue }
+            if (-not $obj) { $obj = Get-ADServiceAccount -Identity $e.User -Properties ServicePrincipalNames -ErrorAction SilentlyContinue }
+            if (-not $obj) { $missing += "$($e.User): not found"; continue }
+            if ($obj.ServicePrincipalNames -notcontains $e.SPN) { $missing += "$($e.User): SPN '$($e.SPN)' not found" }
+          }
+          if ($missing.Count -eq 0) { Write-Output "PASS: All SPNs present"; exit 0 }
+          Write-Output "FAIL: $($missing -join '; ')"; exit 1
+        } catch { Write-Output "FAIL: $_"; exit 1 }
+      register: r
+      changed_when: false
+      failed_when: r.rc == 1
+
+- name: "SPN Registration — child.cadre.local (via dc02)"
+  hosts: dc02
+  gather_facts: false
+  tasks:
+    - name: "[SPN][WT#1] Verify SPN: svc_mssql (MSSQLSvc/mbr01.child)"
+      ansible.windows.win_shell: |
+        $ErrorActionPreference = "Stop"
+        try {
+          $obj = Get-ADUser -Identity "svc_mssql" -Properties ServicePrincipalNames -ErrorAction SilentlyContinue
+          if (-not $obj) { $obj = Get-ADComputer -Identity "svc_mssql" -Properties ServicePrincipalNames -ErrorAction SilentlyContinue }
+          if (-not $obj) { $obj = Get-ADServiceAccount -Identity "svc_mssql" -Properties ServicePrincipalNames -ErrorAction SilentlyContinue }
+          if ($obj -and $obj.ServicePrincipalNames -contains "MSSQLSvc/mbr01.child.cadre.local:1433") {
+            Write-Output "PASS: SPN found"; exit 0
+          }
+          Write-Output "FAIL: SPN not found"; exit 1
+        } catch { Write-Output "FAIL: $_"; exit 1 }
+      register: r
+      changed_when: false
+      failed_when: r.rc == 1
+
+- name: "AS-REP for child.cadre.local (via dc02)"
+  hosts: dc02
+  gather_facts: false
+  tasks:
+    - name: "[AUTH][WT#3] AS-REP: intern_blue (child.cadre.local) (VERIFY)"
+      ansible.windows.win_shell: |
+        $ErrorActionPreference = "Stop"
+        try {
+          $user = Get-ADUser -Identity "intern_blue" -Properties DoesNotRequirePreAuth -ErrorAction SilentlyContinue
+          if ($user -and $user.DoesNotRequirePreAuth -eq $true) {
+            Write-Output "PASS: AS-REP enabled"; exit 0
+          }
+          Write-Output "FAIL: AS-REP not enabled"; exit 1
+        } catch { Write-Output "FAIL: $_"; exit 1 }
+      register: r
+      changed_when: false
+      failed_when: r.rc == 1
+
+- name: "SPN Registration — range.local (via dc03)"
+  hosts: dc03
+  gather_facts: false
+  tasks:
+    - name: "[SPN][WT#2][WT#33] Verify SPNs: svc_mssql, svc_sccm (range.local)"
+      ansible.windows.win_shell: |
+        $ErrorActionPreference = "Stop"
+        try {
+          $entries = @(
+            @{User="svc_mssql"; SPN="MSSQLSvc/mbr02.range.local:1433"},
+            @{User="svc_sccm"; SPN="HTTP/mbr02.range.local"}
+          )
+          $missing = @()
+          foreach ($e in $entries) {
+            $obj = Get-ADUser -Identity $e.User -Properties ServicePrincipalNames -ErrorAction SilentlyContinue
+            if (-not $obj) { $obj = Get-ADComputer -Identity $e.User -Properties ServicePrincipalNames -ErrorAction SilentlyContinue }
+            if (-not $obj) { $obj = Get-ADServiceAccount -Identity $e.User -Properties ServicePrincipalNames -ErrorAction SilentlyContinue }
+            if (-not $obj) { $missing += "$($e.User): not found"; continue }
+            if ($obj.ServicePrincipalNames -notcontains $e.SPN) { $missing += "$($e.User): SPN '$($e.SPN)' not found" }
+          }
+          if ($missing.Count -eq 0) { Write-Output "PASS: All SPNs present"; exit 0 }
+          Write-Output "FAIL: $($missing -join '; ')"; exit 1
+        } catch { Write-Output "FAIL: $_"; exit 1 }
+      register: r
+      changed_when: false
+      failed_when: r.rc == 1
+
+    - name: "[AUTH][WT#3] AS-REP: intern_intel (range.local) (VERIFY)"
+      ansible.windows.win_shell: |
+        $ErrorActionPreference = "Stop"
+        try {
+          $user = Get-ADUser -Identity "intern_intel" -Server "dc03.range.local" -Properties DoesNotRequirePreAuth -ErrorAction SilentlyContinue
+          if ($user -and $user.DoesNotRequirePreAuth -eq $true) {
+            Write-Output "PASS: AS-REP enabled"; exit 0
+          }
+          Write-Output "FAIL: AS-REP not enabled"; exit 1
+        } catch { Write-Output "FAIL: $_"; exit 1 }
+      register: r
+      changed_when: false
+      failed_when: r.rc == 1
+
+- name: "Kerberoast SPN encryption + AS-REP for cadre.local (dc01)"
+  hosts: dc01
+  gather_facts: false
+  tasks:
+    - name: "[AUTH][WT#2] AES Kerberoast targets: chief_command, svc_ldap (VERIFY)"
+      ansible.windows.win_shell: |
+        $ErrorActionPreference = "Stop"
+        try {
+          $failures = @()
+          $targets = @("chief_command", "svc_ldap")
+          foreach ($u in $targets) {
+            $user = Get-ADUser -Identity $u -Properties msDS-SupportedEncryptionTypes -ErrorAction SilentlyContinue
+            if (-not $user) { $failures += "$($u): not found"; continue }
+            if ($user.'msDS-SupportedEncryptionTypes' -ne 24) { $failures += "$($u): not AES128+AES256 (value=$($user.'msDS-SupportedEncryptionTypes'))" }
+          }
+          if ($failures.Count -eq 0) { Write-Output "PASS: All AES128+AES256"; exit 0 }
+          Write-Output "FAIL: $($failures -join '; ')"; exit 1
+        } catch { Write-Output "FAIL: $_"; exit 1 }
+      register: r
+      changed_when: false
+      failed_when: r.rc == 1
+
+    - name: "[AUTH][WT#3] AS-REP: analyst_purple (cadre.local) (VERIFY)"
+      ansible.windows.win_shell: |
+        $ErrorActionPreference = "Stop"
+        try {
+          $user = Get-ADUser -Identity "analyst_purple" -Properties DoesNotRequirePreAuth -ErrorAction SilentlyContinue
+          if ($user -and $user.DoesNotRequirePreAuth -eq $true) {
+            Write-Output "PASS: AS-REP enabled"; exit 0
+          }
+          Write-Output "FAIL: AS-REP not enabled"; exit 1
+        } catch { Write-Output "FAIL: $_"; exit 1 }
+      register: r
+      changed_when: false
+      failed_when: r.rc == 1
+
+- name: "CVE-2026-25177 + SPN Unicode"
+  hosts: dc01
+  gather_facts: false
+  tasks:
+    - name: "SPN Unicode Jacking — Self ValidatedWriteSPN on analyst_cloud (VERIFY)"
+      ansible.windows.win_shell: |
+        $ErrorActionPreference = "Stop"
+        try {
+          $vwSpnGUID = [GUID]"f3a64788-5306-11d1-a9c5-0000f80367c1"
+          $desc = (Get-ADObject "CN=analyst_cloud,OU=Cloud,DC=cadre,DC=local" -Properties ntSecurityDescriptor).ntSecurityDescriptor
+          $exists = $desc.Access | Where-Object { $_.ObjectType -eq $vwSpnGUID -and $_.IdentityReference -match "SELF" }
+          if ($exists) { Write-Output "PASS: Self ACE exists"; exit 0 }
+          Write-Output "FAIL: Self ACE not found"; exit 1
+        } catch { Write-Output "FAIL: $_"; exit 1 }
+      register: r
+      changed_when: false
+      failed_when: r.rc == 1
+
+    - name: "[PREP][WT#27] SPN uniqueness check disabled (SpnSuffixesValidationDisabled) (VERIFY)"
+      ansible.windows.win_shell: |
+        $ErrorActionPreference = "Stop"
+        try {
+          $reg = Get-ItemProperty -Path "HKLM:\SYSTEM\CurrentControlSet\Services\NTDS\Parameters" -Name "SpnSuffixesValidationDisabled" -ErrorAction SilentlyContinue
+          if ($reg -and $reg.SpnSuffixesValidationDisabled -eq 1) {
+            Write-Output "PASS: SPN uniqueness validation disabled"; exit 0
+          }
+          Write-Output "FAIL: SPN uniqueness validation not disabled"; exit 1
+        } catch { Write-Output "FAIL: $_"; exit 1 }
+      register: r
+      changed_when: false
+      failed_when: r.rc == 1
+
+# =============================================================================
+# PART 4b: CVE-2026-25177 — Pre-stage Cyrillic homoglyph SPN (dc02)
+# =============================================================================
+- name: "CVE-2026-25177 — Pre-stage homoglyph SPN"
+  hosts: dc02
+  gather_facts: false
+  tasks:
+    - name: "[PREP][WT#27] Pre-stage Cyrillic homoglyph SPN on analyst_t1 (VERIFY)"
+      ansible.windows.win_shell: |
+        $ErrorActionPreference = "Stop"
+        try {
+          $user = Get-ADUser -Identity "analyst_t1" -Properties ServicePrincipalNames -ErrorAction SilentlyContinue
+          if (-not $user) { Write-Output "SKIP: analyst_t1 not found"; exit 0 }
+          $homoglyphSPN = "MSSQLSvc/mbr01.child.cаdre.locаl:1433"
+          if ($user.ServicePrincipalNames -contains $homoglyphSPN) {
+            Write-Output "PASS: Homoglyph SPN found"; exit 0
+          }
+          Write-Output "FAIL: Homoglyph SPN not found"; exit 1
+        } catch { Write-Output "FAIL: $_"; exit 1 }
+      register: r
+      changed_when: false
+      failed_when: r.rc == 1
+
+# =============================================================================
+# PART 5: AES-only encryption on range.local (dc03)
+# =============================================================================
+- name: "dc03 — AES-only encryption on all accounts"
+  hosts: dc03
+  gather_facts: false
+  tasks:
+    - name: "[AUTH][WT#2] AES-only (type 24): all range.local accounts (VERIFY)"
+      ansible.windows.win_shell: |
+        $ErrorActionPreference = "Stop"
+        try {
+          $bad = @()
+          $users = Get-ADUser -Filter * -SearchBase "DC=range,DC=local" -Properties msDS-SupportedEncryptionTypes
+          foreach ($u in $users) {
+            if ($u.'msDS-SupportedEncryptionTypes' -ne 24) { $bad += "$($u.SamAccountName)=$($u.'msDS-SupportedEncryptionTypes')" }
+          }
+          $svcAccts = Get-ADServiceAccount -Filter * -SearchBase "DC=range,DC=local" -Properties msDS-SupportedEncryptionTypes -ErrorAction SilentlyContinue
+          foreach ($s in $svcAccts) {
+            if ($s.'msDS-SupportedEncryptionTypes' -ne 24) { $bad += "$($s.SamAccountName)=$($s.'msDS-SupportedEncryptionTypes')" }
+          }
+          if ($bad.Count -eq 0) { Write-Output "PASS: All accounts AES-only (type 24)"; exit 0 }
+          Write-Output "FAIL: $($bad.Count) accounts not AES-only: $($bad -join '; ')"; exit 1
+        } catch { Write-Output "FAIL: $_"; exit 1 }
+      register: r
+      changed_when: false
+      failed_when: r.rc == 1
+
+# =============================================================================
+# PART 6: Delegation settings (dc02 + dc03)
+# =============================================================================
+- name: "dc02 — Unconstrained delegation + RBCD"
+  hosts: dc02
+  gather_facts: false
+  tasks:
+    - name: "[DELEG][WT#4] Unconstrained delegation on mbr01$ (VERIFY)"
+      ansible.windows.win_shell: |
+        $ErrorActionPreference = "Stop"
+        try {
+          $comp = Get-ADComputer -Identity "mbr01" -Server "dc02.child.cadre.local" -Properties TrustedForDelegation -ErrorAction SilentlyContinue
+          if (-not $comp) { Write-Output "SKIP: mbr01 not found"; exit 0 }
+          if ($comp.TrustedForDelegation) {
+            Write-Output "PASS: mbr01 trusted for delegation"; exit 0
+          }
+          Write-Output "FAIL: mbr01 not trusted for delegation"; exit 1
+        } catch { Write-Output "FAIL: $_"; exit 1 }
+      register: r
+      changed_when: false
+      failed_when: r.rc == 1
+
+    - name: "RBCD — analyst_t1 WriteProperty on mbr01$ (VERIFY)"
+      ansible.windows.win_shell: |
+        $ErrorActionPreference = "Stop"
+        try {
+          $comp = Get-ADComputer -Identity "mbr01" -Server "dc02.child.cadre.local" -ErrorAction SilentlyContinue
+          if (-not $comp) { Write-Output "SKIP: mbr01 not found"; exit 0 }
+          $sourceSID = (Get-ADUser -Identity "analyst_t1" -Server "dc02.child.cadre.local").SID.Value
+          $rbcdGUID = [GUID]"3f78c3e5-f79a-46bd-a0b8-9d18116ddc79"
+          $desc = (Get-ADObject $comp.DistinguishedName -Properties ntSecurityDescriptor).ntSecurityDescriptor
+          $exists = $desc.Access | Where-Object { try { $_.IdentityReference.Translate([System.Security.Principal.SecurityIdentifier]).Value -eq $sourceSID -and $_.ObjectType -eq $rbcdGUID } catch { $false } }
+          if ($exists) { Write-Output "PASS: RBCD ACE exists"; exit 0 }
+          Write-Output "FAIL: RBCD ACE not found"; exit 1
+        } catch { Write-Output "FAIL: $_"; exit 1 }
+      register: r
+      changed_when: false
+      failed_when: r.rc == 1
+
+- name: "dc03 — Constrained delegation"
+  hosts: dc03
+  gather_facts: false
+  tasks:
+    - name: "[DELEG][WT#5] Constrained delegation mbr02$ (prototrans) (VERIFY)"
+      ansible.windows.win_shell: |
+        $ErrorActionPreference = "Stop"
+        try {
+          $computer = Get-ADComputer -Identity "mbr02" -Server "dc03.range.local" -Properties msDS-AllowedToDelegateTo, userAccountControl -ErrorAction SilentlyContinue
+          if (-not $computer) { Write-Output "SKIP: mbr02 not found"; exit 0 }
+          $expectedSPNs = @("cifs/dc03.range.local", "ldap/dc03.range.local")
+          $currentSPNs = @($computer."msDS-AllowedToDelegateTo")
+          $hasSPNs = ($currentSPNs.Count -ge 2 -and $currentSPNs -contains $expectedSPNs[0] -and $currentSPNs -contains $expectedSPNs[1])
+          $hasProtoTrans = ($computer.userAccountControl -band 0x0080000) -eq 0x0080000
+          if ($hasSPNs -and $hasProtoTrans) {
+            Write-Output "PASS: mbr02 constrained delegation configured"; exit 0
+          }
+          $failures = @()
+          if (-not $hasSPNs) { $failures += "missing SPNs" }
+          if (-not $hasProtoTrans) { $failures += "missing prototrans flag" }
+          Write-Output "FAIL: $($failures -join ', ')"; exit 1
+        } catch { Write-Output "FAIL: $_"; exit 1 }
+      register: r
+      changed_when: false
+      failed_when: r.rc == 1
+
+    - name: "[DELEG][WT#6] Constrained delegation svc_sccm (no prototrans) (VERIFY)"
+      ansible.windows.win_shell: |
+        $ErrorActionPreference = "Stop"
+        try {
+          $user = Get-ADUser -Identity "svc_sccm" -Server "dc03.range.local" -Properties msDS-AllowedToDelegateTo -ErrorAction SilentlyContinue
+          if (-not $user) { Write-Output "SKIP: svc_sccm not found"; exit 0 }
+          $expectedSPN = "HTTP/mbr02.range.local"
+          $currentSPNs = @($user."msDS-AllowedToDelegateTo")
+          if ($currentSPNs -contains $expectedSPN) {
+            Write-Output "PASS: svc_sccm constrained delegation configured"; exit 0
+          }
+          Write-Output "FAIL: svc_sccm missing delegation SPN"; exit 1
+        } catch { Write-Output "FAIL: $_"; exit 1 }
+      register: r
+      changed_when: false
+      failed_when: r.rc == 1

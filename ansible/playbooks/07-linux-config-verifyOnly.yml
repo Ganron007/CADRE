@@ -1,0 +1,142 @@
+---
+# TYPE: VERIFY-ONLY (rc=0=pass, rc=1=fail — checks Linux config: SSSD, auditd, NFS, podman)
+# Layer 7b: Linux Configuration — SSSD, auditd, NFS, podman events
+# All deploy tasks converted to stat/grep/systemctl passive checks.
+# NO handlers, NO changed_when: rc==2, NO exit 2.
+
+- name: "Verify linux01 — SSSD, Podman, NFS, auditd"
+  hosts: linux01
+  gather_facts: true
+  become: true
+  tasks:
+    - name: "[LINUX] Verify linux01 is domain-joined to cadre.local"
+      ansible.builtin.shell: |
+        realm list | grep -q "cadre.local" || { echo "FAIL: Not domain-joined"; exit 1; }
+        echo "PASS: Domain-joined to cadre.local"
+      register: r_realm
+      changed_when: false
+      failed_when: r_realm.rc != 0
+
+    - name: "[LINUX][WT#46] SSSD debug_level=5 in sssd.conf"
+      ansible.builtin.shell: grep -q "^debug_level = 5$" /etc/sssd/sssd.conf
+      register: r
+      changed_when: false
+      failed_when: r.rc != 0
+
+    - name: "[LINUX][WT#46] SSSD debug conf.d file exists"
+      ansible.builtin.stat:
+        path: /etc/sssd/conf.d/99-cadre-debug.conf
+      register: r
+      changed_when: false
+      failed_when: not r.stat.exists
+
+    - name: "[LINUX] 45+ auditd rules file exists"
+      ansible.builtin.stat:
+        path: /etc/audit/rules.d/cadre.rules
+      register: r
+      changed_when: false
+      failed_when: not r.stat.exists
+
+    - name: "[LINUX][L02] Verify realm audit rule path uses /usr/sbin/realm (not realmd)"
+      ansible.builtin.shell: |
+        grep -q "/usr/sbin/realm" /etc/audit/rules.d/cadre.rules || { echo "FAIL: realm path not found in audit rules"; exit 1; }
+        grep -q "/usr/sbin/realmd" /etc/audit/rules.d/cadre.rules && { echo "FAIL: stale realmd path still present"; exit 1; } || true
+        echo "PASS: audit rule uses /usr/sbin/realm"
+      register: r
+      changed_when: false
+      failed_when: r.rc != 0
+
+    - name: "[LINUX][WT#48] NFS secure share directory exists"
+      ansible.builtin.stat:
+        path: /exports/secure-share
+      register: r
+      changed_when: false
+      failed_when: not r.stat.exists
+
+    - name: "[LINUX][WT#48] NFS sec=krb5p export config exists"
+      ansible.builtin.stat:
+        path: /etc/exports
+      register: r
+      changed_when: false
+      failed_when: not r.stat.exists
+
+    - name: "[LINUX][WT#48] NFS export active"
+      ansible.builtin.shell: exportfs -v | grep secure-share
+      register: r
+      changed_when: false
+      failed_when: r.rc != 0
+
+    - name: "[LINUX][WT#45] FreeTDS config exists"
+      ansible.builtin.stat:
+        path: /etc/freetds/freetds.conf
+      register: r
+      changed_when: false
+      failed_when: not r.stat.exists
+
+    - name: "[LINUX][WT#49] Podman events streaming systemd unit exists"
+      ansible.builtin.stat:
+        path: /etc/systemd/system/podman-events-log.service
+      register: r
+      changed_when: false
+      failed_when: not r.stat.exists
+
+    - name: "[LINUX][WT#49] Podman events logrotate exists"
+      ansible.builtin.stat:
+        path: /etc/logrotate.d/podman-events
+      register: r
+      changed_when: false
+      failed_when: not r.stat.exists
+
+    - name: "[LINUX] Auditd log retention max_log_file=200"
+      ansible.builtin.shell: grep -q "^max_log_file = 200$" /etc/audit/auditd.conf
+      register: r
+      changed_when: false
+      failed_when: r.rc != 0
+
+    - name: "[LINUX] Auditd log retention num_logs=20"
+      ansible.builtin.shell: grep -q "^num_logs = 20$" /etc/audit/auditd.conf
+      register: r
+      changed_when: false
+      failed_when: r.rc != 0
+
+    - name: "[LINUX] Auditd service running"
+      ansible.builtin.shell: systemctl is-active auditd
+      register: r
+      changed_when: false
+      failed_when: r.rc != 0
+
+    - name: "[LINUX][WT#49] Podman cadre-monitor running"
+      ansible.builtin.shell: podman container exists cadre-monitor
+      register: r
+      changed_when: false
+      failed_when: r.rc != 0
+
+    - name: "[LINUX] Auditd rules loaded >= 10"
+      ansible.builtin.shell: auditctl -l | wc -l
+      register: r_audit_rules
+      changed_when: false
+      failed_when: r_audit_rules.stdout | int < 10
+
+    - name: "[LINUX] SSSD service running"
+      ansible.builtin.shell: systemctl is-active sssd
+      register: r
+      changed_when: false
+      failed_when: r.rc != 0
+
+    - name: "[LINUX][WT#48] NFS services running"
+      ansible.builtin.shell: systemctl is-active nfs-server
+      register: r
+      changed_when: false
+      failed_when: r.rc != 0
+
+    - name: "[LINUX][WT#48] rpc-gssd running"
+      ansible.builtin.shell: systemctl is-active rpc-gssd
+      register: r
+      changed_when: false
+      failed_when: r.rc != 0
+
+    - name: "[LINUX][WT#49] podman-events-log service running"
+      ansible.builtin.shell: systemctl is-active podman-events-log
+      register: r
+      changed_when: false
+      failed_when: r.rc != 0

@@ -1,0 +1,60 @@
+---
+# TYPE: DEPLOY (rc=0=skip, rc=2=applied+verified, rc=1=fail)
+# Layer 3: Member Domain Joins — mbr01→child.cadre.local, mbr02→range.local
+# Runs after 02-ad-objects.yml (OUs must exist for OU=Operations target).
+# Each join uses pre-check → apply → reboot pattern.
+# Idempotent — already-joined servers skip with OK(exit 0).
+
+- name: "Join mbr01 to child.cadre.local"
+  hosts: mbr01
+  gather_facts: false
+  tasks:
+    - name: "[PREP] Join mbr01 to child.cadre.local (OU=Operations)"
+      ansible.windows.win_shell: |
+        $ErrorActionPreference = "Stop"
+        try {
+          $domain = "child.cadre.local"
+          $current = (Get-WmiObject Win32_ComputerSystem).Domain
+          if ($current -eq $domain) { Write-Output "OK: Already domain-joined to $domain"; exit 0 }
+          $secPwd = ConvertTo-SecureString "vagrant" -AsPlainText -Force
+          $cred = New-Object System.Management.Automation.PSCredential("CADRE\Administrator", $secPwd)
+          Add-Computer -DomainName $domain -Credential $cred -OUPath "OU=Operations,DC=child,DC=cadre,DC=local" -Force
+          $v = (Get-WmiObject Win32_ComputerSystem).Domain
+          if ($v -eq $domain) { Write-Output "APPLIED: Domain join complete"; exit 2 }
+          Write-Output "APPLIED: Domain join initiated (reboot pending)"; exit 2
+        } catch { Write-Output "FAILED: $_"; exit 1 }
+      register: r
+      changed_when: r.rc == 2
+      failed_when: r.rc == 1
+
+    - name: "[PREP] Reboot after domain join"
+      ansible.windows.win_reboot:
+        reboot_timeout: 600
+      when: r.rc == 2
+
+- name: "Join mbr02 to range.local"
+  hosts: mbr02
+  gather_facts: false
+  tasks:
+    - name: "[PREP] Join mbr02 to range.local"
+      ansible.windows.win_shell: |
+        $ErrorActionPreference = "Stop"
+        try {
+          $domain = "range.local"
+          $current = (Get-WmiObject Win32_ComputerSystem).Domain
+          if ($current -eq $domain) { Write-Output "OK: Already domain-joined to $domain"; exit 0 }
+          $secPwd = ConvertTo-SecureString "vagrant" -AsPlainText -Force
+          $cred = New-Object System.Management.Automation.PSCredential("RANGE\Administrator", $secPwd)
+          Add-Computer -DomainName $domain -Credential $cred -Force
+          $v = (Get-WmiObject Win32_ComputerSystem).Domain
+          if ($v -eq $domain) { Write-Output "APPLIED: Domain join complete"; exit 2 }
+          Write-Output "APPLIED: Domain join initiated (reboot pending)"; exit 2
+        } catch { Write-Output "FAILED: $_"; exit 1 }
+      register: r
+      changed_when: r.rc == 2
+      failed_when: r.rc == 1
+
+    - name: "[PREP] Reboot after domain join"
+      ansible.windows.win_reboot:
+        reboot_timeout: 600
+      when: r.rc == 2

@@ -1,0 +1,280 @@
+# CADRE — Telemetry Catalog Schema
+# Schema version: 1.0
+# All catalog entries under attack-matrix/06-telemetry-catalog/ validate against this.
+
+attack_id:
+  type: string
+  pattern: ^(T\d{3}|ART-T\d{3,4}(\.\d{1,3})?)$
+  description: "Unique attack ID. T002-T062 for CADRE walkthroughs (numbering starts at T002 — no T001, RC4 non-viable on Server 2025); ART- prefix for Atomic Red Team entries."
+  examples: ["T002", "T003", "ART-T1059.001"]
+
+walkthrough:
+  type: string
+  pattern: ^attack-matrix/01-walkthroughs/WT\d{3}-.*\.md$
+  required: true
+  description: "Relative path to the walkthrough markdown file. Must exist and be resolvable."
+
+mitre_technique:
+  type: string
+  pattern: ^T\d{4}(\.\d{3})?$
+  required: true
+  description: "MITRE ATT&CK technique ID."
+  examples: ["T1558.003", "T1558.004"]
+
+campaign:
+  type: string
+  enum: ["A", "B", "C", "D"]
+  required: true
+  description: "Campaign from CAMPAIGNS.md. A=From the Network, B=Shadow in Root, C=From the Edge, D=Linux Pivot."
+
+domain:
+  type: string
+  required: true
+  description: "Primary domain affected by the attack."
+  examples: ["cadre.local", "child.cadre.local", "range.local"]
+
+target_vm:
+  type: string
+  required: true
+  description: "Short name of the primary target VM."
+  examples: ["dc01", "dc02", "dc03", "mbr01", "mbr02", "linux01"]
+
+starting_credential:
+  type: string
+  required: false
+  description: "Credential or access required to start the attack. 'None' for unauth attacks."
+  examples: ["analyst_osint / 0S1NT_An@lyst!", "None (anonymous)", "Post-compromise (local or domain user on linux01)"]
+
+tools:
+  type: array
+  items: string
+  required: true
+  description: "Tools needed to execute the attack."
+  examples: [["impacket", "hashcat"], ["certipy-ad", "bloodyAD"]]
+
+difficulty:
+  type: string
+  enum: ["Easy", "Medium", "Hard"]
+  required: true
+
+certifications:
+  type: array
+  items: string
+  required: true
+  description: "Certifications that cover this technique."
+  examples: [["CRTP", "OSCP+"], ["CRTE"], ["CAPE"]]
+
+post_exploit_chain:
+  type: string
+  required: true
+  description: "Brief summary of what the attacker gains and what it enables next."
+
+# ────────────────────────────────────────────────────────────
+# Telemetry section
+# ────────────────────────────────────────────────────────────
+telemetry:
+  type: object
+  required: true
+  properties:
+    elastic:
+      type: array
+      required: true
+      description: "Elasticsearch index patterns and expected events."
+      items:
+        type: object
+        properties:
+          index:
+            type: string
+            required: true
+            description: "Elastic index pattern. Must exist in index-reference.yml."
+          event_code:
+            type: [integer, "null"]
+            required: false
+            description: "Windows Event ID. Null if not applicable."
+          field_filters:
+            type: object
+            required: false
+            description: "KQL field:value pairs that distinguish this attack's events."
+          threshold:
+            type: integer
+            required: true
+            minimum: 0
+            description: "Minimum expected document count. ≥1 for deterministic attacks, 0 with note otherwise."
+          note:
+            type: string
+            required: false
+          detection_rule:
+            type: [string, "null"]
+            required: false
+            description: "Seed rule ID that should fire on this attack, or null if none."
+
+    zeek:
+      type: array
+      required: false
+      items:
+        type: object
+        properties:
+          log:
+            type: string
+            required: true
+            description: "Zeek log file name."
+            examples: ["kerberos.log", "smb_files.log", "dns.log"]
+          field_filters:
+            type: object
+            required: false
+          note:
+            type: string
+            required: false
+
+    suricata:
+      type: array
+      required: false
+      items:
+        type: object
+        properties:
+          signature_id:
+            type: [integer, string]
+            required: false
+          note:
+            type: string
+            required: false
+
+    arkime:
+      type: array
+      required: false
+      items:
+        type: object
+        properties:
+          protocol:
+            type: string
+            required: true
+          note:
+            type: string
+            required: false
+
+    velociraptor:
+      type: array
+      required: false
+      items:
+        type: object
+        properties:
+          hunt:
+            type: string
+            required: true
+            description: "Name of the pre-built hunt. Must exist in index-reference.yml."
+            examples: ["cadre-credential-access", "cadre-event-logs"]
+          artifact:
+            type: string
+            required: false
+            description: "Specific artifact within the hunt."
+          note:
+            type: string
+            required: false
+
+    auditd:
+      type: array
+      required: false
+      items:
+        type: object
+        properties:
+          key:
+            type: string
+            required: true
+            description: "auditd rule key name."
+          note:
+            type: string
+            required: false
+
+    mssql_audit:
+      type: array
+      required: false
+      items:
+        type: object
+        properties:
+          event_type:
+            type: string
+            required: true
+            description: "MSSQL audit group or statement pattern."
+          note:
+            type: string
+            required: false
+
+    podman_events:
+      type: array
+      required: false
+      items:
+        type: object
+        properties:
+          action:
+            type: string
+            required: true
+          note:
+            type: string
+            required: false
+
+    osquery:
+      type: array
+      required: false
+      items:
+        type: object
+        properties:
+          pack:
+            type: string
+            required: true
+          note:
+            type: string
+            required: false
+
+# ────────────────────────────────────────────────────────────
+# Detection rules section
+# ────────────────────────────────────────────────────────────
+detection_rules:
+  type: array
+  required: true
+  items:
+    type: object
+    properties:
+      rule_id:
+        type: [string, "null"]
+        required: true
+        description: "Rule ID from seed rules list. Null if no rule exists for this attack."
+      name:
+        type: [string, "null"]
+        required: false
+      expected_trigger:
+        type: boolean
+        required: true
+        description: "True if this attack should fire ≥1 alert for this rule. False if the rule exists but the attack blends with legitimate traffic."
+      note:
+        type: string
+        required: false
+
+# ────────────────────────────────────────────────────────────
+# Timing section
+# ────────────────────────────────────────────────────────────
+time_estimate:
+  type: string
+  required: true
+  pattern: ^\d+[smh]$
+  description: "Time from attack execution to telemetry landing in Elastic. Format: ISO 8601 duration."
+  examples: ["30s", "2m", "5m"]
+
+# ────────────────────────────────────────────────────────────
+# Alternative paths section
+# ────────────────────────────────────────────────────────────
+alternative_paths:
+  type: array
+  required: false
+  items:
+    type: object
+    properties:
+      technique:
+        type: string
+        required: true
+      wt_ref:
+        type: string
+        required: false
+        description: "WT# reference if the alternative is a separate walkthrough."
+      note:
+        type: string
+        required: false

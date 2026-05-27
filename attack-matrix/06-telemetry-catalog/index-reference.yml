@@ -1,0 +1,423 @@
+# CADRE — Telemetry Source Index Reference
+# Schema version: 1.0
+# VERIFIED against ansible/playbooks/12-elk-fleet.yml (executable source).
+# Fleet integrations define datasets; ILM policies and seed rule indices
+# confirm the patterns listed here. E2E tests can validate runtime existence.
+
+# ────────────────────────────────────────────────────────────
+# Elasticsearch Index Patterns (sorted by policy)
+#
+# Dataset convention: Fleet integration defines data_stream.dataset.
+# The index pattern is {logs|metrics}-{dataset}-{namespace}.
+# ILM patterns here match what 12-elk-fleet.yml configures.
+# ────────────────────────────────────────────────────────────
+elastic_indices:
+  # ═══════════ CADRE-All policy — Windows Server 2025 hosts ═══════════
+  # Fleet integration: system (dataset: system.security)
+  # Seed rules: cadre-002, 003, 005, 006
+  - pattern: logs-system.security-*
+    source: Windows Security Event Log
+    fleet_policy: CADRE-All
+    targets: [dc01, dc02, dc03, mbr01, mbr02]
+    relevant_eids: [4624, 4625, 4634, 4647, 4648, 4649, 4662, 4672, 4688, 4692, 4703,
+                    4720, 4724, 4727, 4738, 4740, 4741, 4742, 4743, 4754, 4768, 4769,
+                    4770, 4771, 4776, 4781, 4886, 4887, 4898, 4899, 4900, 4902, 4928,
+                    4932, 4933, 4964, 5136, 5137, 5138, 5139, 5140, 5141, 5156, 5378]
+
+  # Fleet integration: windows (dataset: windows.forwarded)
+  # Note: This is the raw forwarded event channel, not the parsed integration
+  - pattern: logs-windows.forwarded-*
+    source: Windows Forwarded Events
+    fleet_policy: CADRE-All
+    targets: [dc01, dc02, dc03, mbr01, mbr02]
+
+  # Fleet integration: windows (dataset: windows.sysmon_operational)
+  # Seed rules: cadre-004
+  - pattern: logs-windows.sysmon_operational-*
+    source: Sysmon (sysmon-modular)
+    fleet_policy: CADRE-All
+    targets: [dc01, dc02, dc03, mbr01, mbr02]
+    relevant_eids: [1, 3, 7, 8, 10, 11, 12, 13, 14, 15, 22, 25]
+
+  # Fleet integration: windows (dataset: windows.powershell, event IDs 400,403,600,800)
+  - pattern: logs-windows.powershell-*
+    source: "PowerShell event log (provider events: start/stop)"
+    fleet_policy: CADRE-All
+    targets: [dc01, dc02, dc03, mbr01, mbr02]
+    relevant_eids: [400, 403, 600, 800]
+
+  # Fleet integration: windows (dataset: windows.powershell_operational, 4103-4106)
+  - pattern: logs-windows.powershell_operational-*
+    source: PowerShell ScriptBlock/Module logging
+    fleet_policy: CADRE-All
+    targets: [dc01, dc02, dc03, mbr01, mbr02]
+    relevant_eids: [4103, 4104, 4105, 4106]
+
+  # Component template (line 280) defines catch-all: logs-windows.*-*
+  - pattern: logs-windows.*-*
+    source: Windows operational channels (26 channels, broad match)
+    fleet_policy: CADRE-All
+    targets: [dc01, dc02, dc03, mbr01, mbr02]
+    note: Matches Kerberos/Operational, KDC/Operational, Security-Mitigations, etc.
+
+  # Fleet integration: elastic_defend
+  - pattern: logs-endpoint.events.*
+    source: Elastic Defend — events
+    fleet_policy: CADRE-All
+    targets: [dc01, dc02, dc03, mbr01, mbr02, linux01]
+
+  # Fleet integration: elastic_defend
+  # ILM policy: ilmlogs-endpoint-alerts → logs-endpoint.alerts-*
+  - pattern: logs-endpoint.alerts-*
+    source: Elastic Defend — alerts (DETECT mode)
+    fleet_policy: CADRE-All
+    targets: [dc01, dc02, dc03, mbr01, mbr02, linux01]
+
+  # ═══════════ CADRE-Linux policy — linux01 only ═══════════
+  # Fleet integration: auditd (dataset: auditd.log)
+  # ECS field path for keys is auditd.log.key (NOT auditd.key)
+  # Seed rules: cadre-l01, l02, l03, l05, l06, l07, l08, l11, l12, l13, l14
+  - pattern: logs-auditd.log-*
+    source: Linux auditd
+    fleet_policy: CADRE-Linux
+    targets: [linux01]
+    relevant_keys: [proc_exec, cred_access, kerberos_config, keytab_access, mssql_keytab,
+                    sssd_config, sssd_cache, sssd_secrets, realmd_exec, ssh_config, ssh_keys,
+                    home_dir_writes, pam_config, nss_config, nfs_config, nfs_exec,
+                    mount_syscall, podman_socket, container_config, podman_exec, runc_exec,
+                    container_escape, preload_hijack, kernel_module, suid_change,
+                    persistence_cron, persistence_systemd, persistence_profile]
+
+  # Fleet integration: microsoft_sqlserver (dataset: microsoft_sqlserver.log)
+  # Reads /var/opt/mssql/log/error* — the SQL Server errorlog
+  - pattern: logs-microsoft_sqlserver.log-*
+    source: MSSQL errorlog (linux01)
+    fleet_policy: CADRE-Linux
+    targets: [linux01]
+    note: Errorlog — connection errors, xp_cmdshell hits, CLR loads, login failures
+
+  # Custom filestream (dataset: mssql_audit, dynamic)
+  # Reads /var/opt/mssql/audit/*.sqlaudit — the CADRE_Audit SQL audit binary files
+  # ILM policy: ilmlogs-mssql-audit → logs-mssql.audit-*
+  # ⚠️ Data stream may diverge from ILM pattern if dynamic_dataset resolves to mssql_audit
+  - pattern: logs-mssql.audit-*
+    source: MSSQL Server Audit binary files (linux01)
+    fleet_policy: CADRE-Linux
+    targets: [linux01]
+    relevant_groups: [FAILED_LOGIN_GROUP, SUCCESSFUL_LOGIN_GROUP,
+                      SERVER_ROLE_MEMBER_CHANGE_GROUP, DATABASE_ROLE_MEMBER_CHANGE_GROUP,
+                      SERVER_PERMISSION_CHANGE_GROUP, DATABASE_PERMISSION_CHANGE_GROUP,
+                      SCHEMA_OBJECT_PERMISSION_CHANGE_GROUP, BACKUP_RESTORE_GROUP,
+                      DBCC_GROUP, SERVER_PRINCIPAL_IMPERSONATION_GROUP]
+
+  # Custom filestream (dataset: sssd, dynamic)
+  # Reads /var/log/sssd/*.log — SSSD debug_level=5 output
+  # ILM policy: ilmlogs-sssd → logs-sssd-*
+  - pattern: logs-sssd-*
+    source: SSSD debug logs
+    fleet_policy: CADRE-Linux
+    targets: [linux01]
+
+  # Custom filestream (dataset: podman, dynamic)
+  # Reads /var/log/podman-events.log — podman events JSON stream
+  # ILM policy: ilmlogs-podman → logs-podman-*
+  - pattern: logs-podman-*
+    source: Podman events
+    fleet_policy: CADRE-Linux
+    targets: [linux01]
+    relevant_actions: [create, start, init, exec, attach, kill, die, mount, pull, import, load]
+
+  # Fleet integration: sysmon_linux (dataset: sysmon_linux.log)
+  # ILM policy: ilmlogs-sysmon-linux → logs-sysmon_linux.log-*
+  - pattern: logs-sysmon_linux.log-*
+    source: Sysmon for Linux (linux01)
+    fleet_policy: CADRE-Linux
+    targets: [linux01]
+    note: Not confirmed deployed — sysmon Linux package install may be deferred
+
+  # Fleet integration: osquery_manager (dataset: osquery_manager.result)
+  # ILM policy: ilmlogs-osquery → logs-osquery_manager.result-*
+  # Seed rules: cadre-l04
+  - pattern: logs-osquery_manager.result-*
+    source: Osquery scheduled pack
+    fleet_policy: CADRE-Linux
+    targets: [linux01]
+    note: Not currently deployed (osqueryd enrollment blocked by stock Elastic policy)
+
+  # Root-level integration: system.auth with rsyslog
+  # Seed rules: cadre-l15
+  - pattern: logs-system.auth-*
+    source: System auth log (rsyslog)
+    fleet_policy: CADRE-Linux
+    targets: [linux01]
+
+  # Component template (line 281-282): logs-auditd.*-*, logs-system.*-*
+  - pattern: logs-auditd.*-*
+    source: auditd broad match (component template)
+    fleet_policy: CADRE-Linux
+    targets: [linux01]
+
+  - pattern: logs-system.*-*
+    source: system broad match (component template)
+    fleet_policy: CADRE-Linux
+    targets: [linux01]
+
+  # ═══════════ CADRE-Monitor policy — monitor VM only ═══════════
+  # Fleet integration: zeek (datasets: zeek.connection, zeek.dns, zeek.http, zeek.ssl, zeek.kerberos)
+  # ILM policy: ilmlogs-zeek → logs-zeek.*-*
+  - pattern: logs-zeek.*-*
+    source: Zeek protocol logs (all protocols)
+    fleet_policy: CADRE-Monitor
+    targets: [monitor]
+    datasets:
+      - dataset: zeek.connection
+        log_file: conn.log
+      - dataset: zeek.dns
+        log_file: dns.log
+      - dataset: zeek.http
+        log_file: http.log
+      - dataset: zeek.ssl
+        log_file: ssl.log
+      - dataset: zeek.kerberos
+        log_file: kerberos.log
+
+  # Fleet integration: suricata (dataset: suricata.eve)
+  # ILM policy: ilmlogs-suricata → logs-suricata-*
+  - pattern: logs-suricata-*
+    source: Suricata alerts (ET Open)
+    fleet_policy: CADRE-Monitor
+    targets: [monitor]
+
+  # ═══════════ Cloud (Plan 11 — not yet deployed) ═══════════
+  # Component template (lines 287-289): broad patterns for future cloud ingestion
+  - pattern: logs-entra.*-*
+    source: Entra ID sign-in + audit (Plan 11)
+    fleet_policy: cloud-ingester
+    targets: [elk]
+    note: Not yet deployed — Plan 11
+
+  - pattern: logs-azure.*-*
+    source: Azure Activity + RBAC (Plan 11)
+    fleet_policy: cloud-ingester
+    targets: [elk]
+    note: Not yet deployed — Plan 11
+
+  - pattern: logs-m365.*-*
+    source: M365 Unified Audit Log (Plan 11)
+    fleet_policy: cloud-ingester
+    targets: [elk]
+    note: Not yet deployed — Plan 11
+
+  # ═══════════ Detection engine (cross-policy) ═══════════
+  # ILM policy: ilmlogs-alerts-security → .alerts-security.*
+  - pattern: .alerts-security.*
+    source: Elastic Security detection alerts
+    fleet_policy: cross-policy
+    targets: [all]
+
+# ────────────────────────────────────────────────────────────
+# Velociraptor pre-built hunts
+# ────────────────────────────────────────────────────────────
+velociraptor_hunts:
+  - name: cadre-process-tree
+    artifacts: [Windows.System.Pslist, Windows.System.TaskScheduler, Windows.System.Services]
+    after: Any process-based attack
+  - name: cadre-credential-access
+    artifacts: [Windows.Forensics.Amcache, Windows.Forensics.Prefetch, Windows.Registry.NTUser]
+    after: Credential dumping
+  - name: cadre-network-state
+    artifacts: [Windows.Network.NetstatEnriched, Windows.Network.DNSCache, Windows.Network.ARPCache]
+    after: Lateral movement
+  - name: cadre-fs-timeline
+    artifacts: [Windows.NTFS.MFT, Windows.Forensics.Usn]
+    after: Persistence / file drops
+  - name: cadre-registry-snapshot
+    artifacts: [Windows.Registry.Sam, Windows.Registry.Security, Windows.Registry.System]
+    after: Privilege escalation
+  - name: cadre-event-logs
+    artifacts: [Windows.EventLogs.EvtxHunter]
+    after: Any attack — Hayabusa input
+  - name: cadre-adcs-snapshot
+    artifacts: [CADRE.Windows.AdcsTemplates]
+    after: ADCS attacks
+  - name: cadre-sccm-snapshot
+    artifacts: [CADRE.Windows.SccmPolicy]
+    after: SCCM attacks
+  - name: cadre-linux-triage
+    artifacts: [Linux.Sys.AuditLogs, Linux.Sys.BashHistory, Linux.Sys.LastUserLogin,
+               Linux.Network.NetstatEnriched, CADRE.Linux.KeytabFingerprints,
+               CADRE.Linux.PodmanInventory, CADRE.Linux.SSSDCache]
+    after: Linux attacks
+  - name: cadre-full-breach
+    artifacts: [Union of all above]
+    after: Comprehensive collection
+
+# ────────────────────────────────────────────────────────────
+# Zeek log files (on monitor VM at /opt/zeek/logs/current/)
+# ────────────────────────────────────────────────────────────
+zeek_logs:
+  - name: conn.log
+    elastic_pattern: logs-zeek.conn-*
+    protocols: [TCP, UDP, ICMP]
+  - name: dns.log
+    elastic_pattern: logs-zeek.dns-*
+    protocols: [DNS]
+  - name: http.log
+    elastic_pattern: logs-zeek.http-*
+    protocols: [HTTP]
+  - name: kerberos.log
+    elastic_pattern: logs-zeek.kerberos-*
+    protocols: [Kerberos]
+  - name: smb_cmd.log
+    elastic_pattern: logs-zeek.smb_cmd-*
+    protocols: [SMB]
+  - name: smb_files.log
+    elastic_pattern: logs-zeek.smb_files-*
+    protocols: [SMB]
+  - name: smb_mapping.log
+    elastic_pattern: logs-zeek.smb_mapping-*
+    protocols: [SMB]
+  - name: ssl.log
+    elastic_pattern: logs-zeek.ssl-*
+    protocols: [TLS]
+  - name: dcerpc.log
+    elastic_pattern: logs-zeek.dcerpc-*
+    protocols: [DCE/RPC]
+  - name: ntlm.log
+    elastic_pattern: logs-zeek.ntlm-*
+    protocols: [NTLM]
+  - name: notice.log
+    elastic_pattern: logs-zeek.notice-*
+    protocols: [Zeek alerts]
+
+# ────────────────────────────────────────────────────────────
+# Seed Detection Rules (deployed by 12-elk-fleet.yml)
+# ────────────────────────────────────────────────────────────
+detection_rules:
+  # Windows rules
+  - rule_id: cadre-002-asrep-roast
+    name: AS-REP Roasting
+    index: [logs-system.security-*]
+    query: event.code:4768 AND winlog.event_data.PreAuthType:0
+    mitre: T1558.004
+  - rule_id: cadre-003-dcsync
+    name: DCSync Detected
+    index: [logs-system.security-*]
+    query: event.code:4662 AND winlog.event_data.AccessMask:*1400* AND winlog.event_data.Properties:*1131f6aa-*
+    mitre: T1003.006
+  - rule_id: cadre-004-suspicious-proc
+    name: Suspicious Sysmon Process
+    index: [logs-windows.sysmon_operational-*]
+    query: event.code:1 AND winlog.event_data.CommandLine:(*mimikatz* OR *Rubeus* ...)
+    mitre: T1059
+  - rule_id: cadre-005-adcs-tamper
+    name: ADCS Template Modification
+    index: [logs-system.security-*]
+    query: event.code:(4899 OR 4900 OR 4902) AND ObjectName:*Certificate*Templates*
+    mitre: T1649
+  - rule_id: cadre-006-ntlm-relay
+    name: NTLM Relay — Multi-Host Logon
+    index: [logs-system.security-*]
+    query: event.code:4624 AND LogonType:3 (threshold)
+    mitre: T1557.001
+  - rule_id: cadre-008-gmsa-extract
+    name: gMSA Password Extraction
+    index: [logs-system.security-*]
+    query: event.code:4662 AND ObjectType:msDS-ManagedPassword
+    mitre: T1552.005
+  # Linux rules
+  - rule_id: cadre-l01-keytab-read
+    name: Keytab File Read
+    index: [logs-auditd.log-*]
+    query: auditd.key:(keytab_access OR mssql_keytab)
+    mitre: T1558.003
+  - rule_id: cadre-l02-realm-change
+    name: Realm Join/Leave
+    index: [logs-auditd.log-*]
+    query: auditd.key:realmd_exec
+    mitre: T1484
+  - rule_id: cadre-l03-sssd-cache
+    name: SSSD Cache Read
+    index: [logs-auditd.log-*]
+    query: auditd.key:(sssd_db OR sssd_secrets)
+    mitre: T1003.008
+  - rule_id: cadre-l04-suid-binary
+    name: New SUID Binary (osquery)
+    index: [logs-osquery_manager.result-*]
+    query: osquery.name:suid_bin
+    mitre: T1548.001
+  - rule_id: cadre-l05-kernel-module
+    name: Kernel Module Load
+    index: [logs-auditd.log-*]
+    query: auditd.key:kernel_module
+    mitre: T1547.006
+  - rule_id: cadre-l06-preload-hijack
+    name: ld.so.preload Write
+    index: [logs-auditd.log-*]
+    query: auditd.key:preload_hijack
+    mitre: T1574.006
+  - rule_id: cadre-l07-container-escape
+    name: Container Escape
+    index: [logs-auditd.log-*]
+    query: auditd.key:container_escape
+    mitre: T1611
+  - rule_id: cadre-l08-cron-systemd
+    name: New Cron or Systemd Unit
+    index: [logs-auditd.log-*]
+    query: auditd.key:(cron_dir OR cron_daily OR cron_hourly OR systemd_units)
+    mitre: [T1053.003, T1543.002]
+  - rule_id: cadre-l09-mssql-brute
+    name: MSSQL Failed Login Burst
+    index: [logs-mssql.audit.linux-*]
+    query: mssql.audit.event_type:FAILED_LOGIN_GROUP (threshold)
+    mitre: T1110
+  # cadre-l10 removed — xp_cmdshell impossible on SQL Server Linux (xpstar.dll absent). L-numbering gap reserved.
+  - rule_id: cadre-l11-nfs-krb5
+    name: NFS Mount with Kerberos
+    index: [logs-auditd.log-*]
+    query: auditd.key:nfs_mount
+    mitre: T1021.002
+  - rule_id: cadre-l12-authorized-keys
+    name: Authorized Keys Modified
+    index: [logs-auditd.log-*]
+    query: auditd.key:home_access AND auditd.file.name:authorized_keys
+    mitre: T1098.004
+  - rule_id: cadre-l13-pam-change
+    name: PAM Configuration Change
+    index: [logs-auditd.log-*]
+    query: auditd.key:pam_config
+    mitre: T1556.003
+  - rule_id: cadre-l14-temp-exec
+    name: Process from Temp Directory
+    index: [logs-auditd.log-*]
+    query: auditd.key:proc_exec AND auditd.exe:(/tmp/* OR /dev/shm/* OR /var/tmp/*)
+    mitre: T1059
+  - rule_id: cadre-l15-sudo-domain
+    name: Domain User sudo Execution
+    index: [logs-system.auth-*]
+    query: event.action:sudo AND user.id:*1* AND user.id:*0* AND NOT user.name:vagrant
+    mitre: T1078.002
+
+# ────────────────────────────────────────────────────────────
+# Campaign structure (from CAMPAIGNS.md)
+# ────────────────────────────────────────────────────────────
+campaigns:
+  A: From the Network — Kali zero-creds → 3 domains (8 phases, 25 WT#)
+  B: Shadow in Root — cadre.local ACLs + persistence (5 phases, 13 WT#)
+  C: From the Edge — range.local SCCM + delegation (4 phases, 13 WT#)
+  D: Linux Pivot — linux01 post-exploit (4 phases, 5 WT#)
+
+# ────────────────────────────────────────────────────────────
+# VM short names and IPs
+# ────────────────────────────────────────────────────────────
+vms:
+  dc01: { ip: 192.168.77.10, os: "Server 2025", role: "cadre.local DC + ADCS CA + Cloud Sync" }
+  dc02: { ip: 192.168.77.11, os: "Server 2025", role: "child.cadre.local DC" }
+  dc03: { ip: 192.168.77.12, os: "Server 2025", role: "range.local DC (AES-only)" }
+  mbr01: { ip: 192.168.77.22, os: "Server 2025", role: "Member + MSSQL + IIS" }
+  mbr02: { ip: 192.168.77.23, os: "Server 2025", role: "SQL + WSUS + VSC + SCCM" }
+  linux01: { ip: 192.168.77.40, os: "Ubuntu 24.04", role: "AD-joined Linux + MSSQL + NFS + Podman" }
+  provisioning: { ip: 192.168.77.60, os: "Ubuntu 24.04", role: "Ansible runner" }
+  elk: { ip: 192.168.77.50, os: "Ubuntu 24.04", role: "Elastic Stack 9.x + Fleet" }
+  monitor: { ip: 192.168.77.55, os: "Ubuntu 24.04", role: "Zeek + Suricata + Arkime" }
+  vr: { ip: 192.168.77.51, os: "Ubuntu 24.04", role: "Velociraptor server" }

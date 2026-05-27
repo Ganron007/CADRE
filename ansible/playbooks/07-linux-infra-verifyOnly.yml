@@ -1,0 +1,84 @@
+---
+# TYPE: VERIFY-ONLY (rc=0=pass, rc=1=fail — checks Linux infra is deployed)
+# Layer 7a: Linux Deploy — verify-only mirror of 07-linux-deploy.yml
+# Checks: realm join, packages, config files, services
+
+- name: "Verify linux01 infrastructure deployment"
+  hosts: linux01
+  gather_facts: true
+  become: true
+  tasks:
+    - name: "[LINUX] Check realm — domain-joined to cadre.local"
+      ansible.builtin.shell: |
+        if realm list | grep -q "cadre.local"; then
+          echo "PASS: Domain-joined to cadre.local"
+          exit 0
+        fi
+        echo "FAIL: Not domain-joined to cadre.local"
+        exit 1
+
+    - name: "[LINUX] Check /etc/krb5.conf exists"
+      ansible.builtin.shell: |
+        test -f /etc/krb5.conf && echo "PASS: krb5.conf exists" && exit 0 || echo "FAIL: krb5.conf not found" && exit 1
+
+    - name: "[LINUX] Check AD integration packages installed"
+      ansible.builtin.shell: |
+        PKGS="realmd sssd sssd-tools libnss-sss libpam-sss adcli krb5-user oddjob oddjob-mkhomedir packagekit"
+        MISSING=""
+        for pkg in $PKGS; do
+          dpkg -l "$pkg" 2>/dev/null | grep -q "^ii" || MISSING="$MISSING $pkg"
+        done
+        if [ -z "$MISSING" ]; then
+          echo "PASS: All AD integration packages installed"
+          exit 0
+        fi
+        echo "FAIL: Missing packages:$MISSING"
+        exit 1
+
+    - name: "[LINUX] Check podman installed"
+      ansible.builtin.shell: |
+        which podman >/dev/null 2>&1 && echo "PASS: podman found" && exit 0 || echo "FAIL: podman not found" && exit 1
+
+    - name: "[LINUX] Check podman-docker installed"
+      ansible.builtin.shell: |
+        dpkg -l podman-docker 2>/dev/null | grep -q "^ii" && echo "PASS: podman-docker installed" && exit 0 || echo "FAIL: podman-docker not installed" && exit 1
+
+    - name: "[LINUX] Check NFS kernel server installed"
+      ansible.builtin.shell: |
+        which exportfs >/dev/null 2>&1 && echo "PASS: nfs-kernel-server found" && exit 0 || echo "FAIL: exportfs not found" && exit 1
+
+    - name: "[LINUX] Check rpcbind installed"
+      ansible.builtin.shell: |
+        which rpcinfo >/dev/null 2>&1 && echo "PASS: rpcbind found" && exit 0 || echo "FAIL: rpcinfo not found" && exit 1
+
+    - name: "[LINUX] Check auditd installed"
+      ansible.builtin.shell: |
+        which auditctl >/dev/null 2>&1 && echo "PASS: auditd found" && exit 0 || echo "FAIL: auditctl not found" && exit 1
+
+    - name: "[LINUX] Check audispd-plugins + acct installed"
+      ansible.builtin.shell: |
+        MISSING=""
+        dpkg -l audispd-plugins 2>/dev/null | grep -q "^ii" || MISSING="$MISSING audispd-plugins"
+        dpkg -l acct 2>/dev/null | grep -q "^ii" || MISSING="$MISSING acct"
+        if [ -z "$MISSING" ]; then
+          echo "PASS: audispd-plugins + acct installed"
+          exit 0
+        fi
+        echo "FAIL: Missing packages:$MISSING"
+        exit 1
+
+    - name: "[LINUX] Check python3-pymssql importable"
+      ansible.builtin.shell: |
+        python3 -c "import pymssql" 2>/dev/null && echo "PASS: python3-pymssql importable" && exit 0 || echo "FAIL: python3-pymssql not importable" && exit 1
+
+    - name: "[LINUX] Check /etc/rsyslog.d/30-sysmon.conf exists"
+      ansible.builtin.shell: |
+        test -f /etc/rsyslog.d/30-sysmon.conf && echo "PASS: 30-sysmon.conf exists" && exit 0 || echo "FAIL: 30-sysmon.conf not found" && exit 1
+
+    - name: "[LINUX] Check /etc/logrotate.d/sysmon exists"
+      ansible.builtin.shell: |
+        test -f /etc/logrotate.d/sysmon && echo "PASS: logrotate sysmon exists" && exit 0 || echo "FAIL: logrotate sysmon not found" && exit 1
+
+    - name: "[LINUX] Check rsyslog service is running"
+      ansible.builtin.shell: |
+        systemctl is-active rsyslog >/dev/null 2>&1 && echo "PASS: rsyslog is active" && exit 0 || echo "FAIL: rsyslog is not active" && exit 1

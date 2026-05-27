@@ -1,0 +1,11 @@
+name: CADRE.Hunts.NetworkState
+description: |
+  Network state snapshot — netstat, DNS cache, connections.
+  Part of the CADRE pre-built hunt library.
+sources:
+  - name: Netstat
+    queries:
+      - SELECT * FROM Artifact.Windows.Network.Netstat()
+  - name: DNS
+    queries:
+      - SELECT * FROM Artifact.Windows.Network.DNS()

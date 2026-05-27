@@ -1,0 +1,351 @@
+---
+# TYPE: VERIFY-ONLY (rc=0=pass, rc=1=fail — checks registry vulns, services, features)
+# Layer 4: Vulnerabilities — Verify-only mode (read, never write)
+
+- name: "Verify registry vulnerabilities on all DCs"
+  hosts: root_dc:child_dc:external_dc
+  gather_facts: false
+  tasks:
+    - name: "[VULN][WT#21] Verify NTLM outbound allowed"
+      ansible.windows.win_shell: |
+        try {
+        $ErrorActionPreference = "Stop"
+          $val = (Get-ItemProperty -Path "HKLM:\SYSTEM\CurrentControlSet\Control\Lsa\MSV1_0" -Name "RestrictSendingNTLMTraffic" -ErrorAction Stop).RestrictSendingNTLMTraffic
+          if ($val -eq 0) { Write-Output "PASS: NTLM outbound allowed (RestrictSendingNTLMTraffic=0)"; exit 0 }
+          Write-Output "FAIL: expected RestrictSendingNTLMTraffic=0 got $val"; exit 1
+        } catch { Write-Output "FAIL: $_"; exit 1 }
+      register: r
+      changed_when: false
+      failed_when: r.rc == 1
+
+    - name: "[VULN][WT#21] Verify NTLM incoming allowed"
+      ansible.windows.win_shell: |
+        try {
+        $ErrorActionPreference = "Stop"
+          $val = (Get-ItemProperty -Path "HKLM:\SYSTEM\CurrentControlSet\Services\Netlogon\Parameters" -Name "RestrictNTLMInDomain" -ErrorAction Stop).RestrictNTLMInDomain
+          if ($val -eq 0) { Write-Output "PASS: NTLM incoming allowed (RestrictNTLMInDomain=0)"; exit 0 }
+          Write-Output "FAIL: expected RestrictNTLMInDomain=0 got $val"; exit 1
+        } catch { Write-Output "FAIL: $_"; exit 1 }
+      register: r
+      changed_when: false
+      failed_when: r.rc == 1
+
+    - name: "[VULN][WT#17] Verify Print Spooler enabled (auto)"
+      ansible.windows.win_shell: |
+        try {
+        $ErrorActionPreference = "Stop"
+          $svc = Get-Service -Name "Spooler" -ErrorAction Stop
+          if ($svc.StartType -eq "Automatic" -and $svc.Status -eq "Running") { Write-Output "PASS: Spooler is Automatic/Running"; exit 0 }
+          Write-Output "FAIL: expected Spooler Automatic/Running got $($svc.StartType)/$($svc.Status)"; exit 1
+        } catch { Write-Output "FAIL: $_"; exit 1 }
+      register: r
+      changed_when: false
+      failed_when: r.rc == 1
+
+    - name: "[VULN][WT#18] Verify WebClient enabled (auto)"
+      ansible.windows.win_shell: |
+        try {
+        $ErrorActionPreference = "Stop"
+          $svc = Get-Service -Name "WebClient" -ErrorAction Stop
+          if ($svc.StartType -eq "Automatic" -and $svc.Status -eq "Running") { Write-Output "PASS: WebClient is Automatic/Running"; exit 0 }
+          Write-Output "FAIL: expected WebClient Automatic/Running got $($svc.StartType)/$($svc.Status)"; exit 1
+        } catch { Write-Output "FAIL: $_"; exit 1 }
+      register: r
+      changed_when: false
+      failed_when: r.rc == 1
+
+    - name: "[VULN][WT#20] Verify FssAgent (ShadowCoerce) enabled (auto)"
+      ansible.windows.win_shell: |
+        try {
+        $ErrorActionPreference = "Stop"
+          $svc = Get-Service -Name "FssAgent" -ErrorAction Stop
+          if ($svc.StartType -eq "Automatic" -and $svc.Status -eq "Running") { Write-Output "PASS: FssAgent is Automatic/Running"; exit 0 }
+          Write-Output "FAIL: expected FssAgent Automatic/Running got $($svc.StartType)/$($svc.Status)"; exit 1
+        } catch { Write-Output "FAIL: $_"; exit 1 }
+      register: r
+      changed_when: false
+      failed_when: r.rc == 1
+
+    - name: "[VULN][WT#18] Verify WebClient enabled (auto)"
+      ansible.windows.win_shell: |
+        try {
+        $ErrorActionPreference = "Stop"
+          $svc = Get-Service -Name "WebClient" -ErrorAction Stop
+          if ($svc.StartType -eq "Automatic" -and $svc.Status -eq "Running") { Write-Output "PASS: WebClient is Automatic/Running"; exit 0 }
+          Write-Output "FAIL: expected WebClient Automatic/Running got $($svc.StartType)/$($svc.Status)"; exit 1
+        } catch { Write-Output "FAIL: $_"; exit 1 }
+      register: r
+      changed_when: false
+      failed_when: r.rc == 1
+
+    - name: "[VULN][WT#18] Verify WebDAV-Redirector feature installed"
+      ansible.windows.win_shell: |
+        try {
+        $ErrorActionPreference = "Stop"
+          $f = Get-WindowsFeature -Name "WebDAV-Redirector"
+          if ($f.Installed) { Write-Output "PASS: WebDAV-Redirector feature installed"; exit 0 }
+          Write-Output "FAIL: WebDAV-Redirector feature not installed"; exit 1
+        } catch { Write-Output "FAIL: $_"; exit 1 }
+      register: r
+      changed_when: false
+      failed_when: r.rc == 1
+
+    - name: "[VULN][WT#19] Verify DFS Namespace feature installed (DFSCoerce)"
+      ansible.windows.win_shell: |
+        try {
+        $ErrorActionPreference = "Stop"
+          $f = Get-WindowsFeature -Name "FS-DFS-Namespace"
+          if ($f.Installed) { Write-Output "PASS: FS-DFS-Namespace feature installed"; exit 0 }
+          Write-Output "FAIL: FS-DFS-Namespace feature not installed"; exit 1
+        } catch { Write-Output "FAIL: $_"; exit 1 }
+      register: r
+      changed_when: false
+      failed_when: r.rc == 1
+
+    - name: "[VULN][WT#20] Verify FSRVP feature installed (ShadowCoerce)"
+      ansible.windows.win_shell: |
+        try {
+        $ErrorActionPreference = "Stop"
+          $f = Get-WindowsFeature -Name "FS-VSS-Agent"
+          if ($f.Installed) { Write-Output "PASS: FS-VSS-Agent feature installed"; exit 0 }
+          Write-Output "FAIL: FS-VSS-Agent feature not installed"; exit 1
+        } catch { Write-Output "FAIL: $_"; exit 1 }
+      register: r
+      changed_when: false
+      failed_when: r.rc == 1
+
+    - name: "[VULN][WT#20] Verify FssAgent (ShadowCoerce) enabled (auto)"
+      ansible.windows.win_shell: |
+        try {
+        $ErrorActionPreference = "Stop"
+          $svc = Get-Service -Name "FssAgent" -ErrorAction Stop
+          if ($svc.StartType -eq "Automatic" -and $svc.Status -eq "Running") { Write-Output "PASS: FssAgent is Automatic/Running"; exit 0 }
+          Write-Output "FAIL: expected FssAgent Automatic/Running got $($svc.StartType)/$($svc.Status)"; exit 1
+        } catch { Write-Output "FAIL: $_"; exit 1 }
+      register: r
+      changed_when: false
+      failed_when: r.rc == 1
+
+    - name: "[VULN] Verify EFS service is available for PetitPotam"
+      ansible.windows.win_shell: |
+        $ErrorActionPreference = "Stop"
+        try {
+          $svc = Get-Service -Name "EFS" -ErrorAction Stop
+          if ($svc.StartType -ne "Disabled") {
+              Write-Output "PASS: EFS exists and is ready (StartType: $($svc.StartType))"; exit 0
+          }
+          Write-Output "FAIL: EFS is explicitly Disabled and blocked"; exit 1
+        } catch {
+          Write-Output "FAIL: EFS service not found — $_"; exit 1
+        }
+      register: r
+      changed_when: false
+      failed_when: r.rc == 1
+
+    - name: "[VULN][WT#21] Verify LDAP signing NOT required (relay target)"
+      ansible.windows.win_shell: |
+        try {
+        $ErrorActionPreference = "Stop"
+          $val = (Get-ItemProperty -Path "HKLM:\SYSTEM\CurrentControlSet\Services\NTDS\Parameters" -Name "LDAPServerIntegrity" -ErrorAction Stop).LDAPServerIntegrity
+          if ($val -eq 1) { Write-Output "PASS: LDAP signing =1 (not required)"; exit 0 }
+          Write-Output "FAIL: expected LDAPServerIntegrity=1 got $val"; exit 1
+        } catch { Write-Output "FAIL: $_"; exit 1 }
+      register: r
+      changed_when: false
+      failed_when: r.rc == 1
+
+    - name: "[VULN][WT#59] Verify ESC10 — StrongCertificateBindingEnforcement=0 on Kdc"
+      ansible.windows.win_shell: |
+        try {
+        $ErrorActionPreference = "Stop"
+          $val = (Get-ItemProperty -Path "HKLM:\SYSTEM\CurrentControlSet\Services\Kdc" -Name "StrongCertificateBindingEnforcement" -ErrorAction Stop).StrongCertificateBindingEnforcement
+          if ($val -eq 0) { Write-Output "PASS: StrongCertificateBindingEnforcement=0"; exit 0 }
+          Write-Output "FAIL: expected StrongCertificateBindingEnforcement=0 got $val"; exit 1
+        } catch { Write-Output "FAIL: $_"; exit 1 }
+      register: r
+      changed_when: false
+      failed_when: r.rc == 1
+
+    - name: "[VULN][WT#59] Verify ESC10 — CertificateMappingMethods=31 on Schannel"
+      ansible.windows.win_shell: |
+        try {
+        $ErrorActionPreference = "Stop"
+          $val = (Get-ItemProperty -Path "HKLM:\SYSTEM\CurrentControlSet\Control\SecurityProviders\Schannel" -Name "CertificateMappingMethods" -ErrorAction Stop).CertificateMappingMethods
+          if ($val -eq 31) { Write-Output "PASS: CertificateMappingMethods=31"; exit 0 }
+          Write-Output "FAIL: expected CertificateMappingMethods=31 got $val"; exit 1
+        } catch { Write-Output "FAIL: $_"; exit 1 }
+      register: r
+      changed_when: false
+      failed_when: r.rc == 1
+
+- name: "Verify registry vulnerabilities on all Windows VMs"
+  hosts: windows_servers
+  gather_facts: false
+  tasks:
+    - name: "[VULN] Verify WDigest credential caching enabled"
+      ansible.windows.win_shell: |
+        try {
+        $ErrorActionPreference = "Stop"
+          $val = (Get-ItemProperty -Path "HKLM:\SYSTEM\CurrentControlSet\Control\SecurityProviders\WDigest" -Name "UseLogonCredential" -ErrorAction Stop).UseLogonCredential
+          if ($val -eq 1) { Write-Output "PASS: WDigest UseLogonCredential=1"; exit 0 }
+          Write-Output "FAIL: expected UseLogonCredential=1 got $val"; exit 1
+        } catch { Write-Output "FAIL: $_"; exit 1 }
+      register: r
+      changed_when: false
+      failed_when: r.rc == 1
+
+    - name: "[VULN] Verify Credential Guard (LsaCfgFlags) disabled"
+      ansible.windows.win_shell: |
+        try {
+        $ErrorActionPreference = "Stop"
+          $val = (Get-ItemProperty -Path "HKLM:\SYSTEM\CurrentControlSet\Control\Lsa" -Name "LsaCfgFlags" -ErrorAction Stop).LsaCfgFlags
+          if ($val -eq 0) { Write-Output "PASS: Credential Guard disabled (LsaCfgFlags=0)"; exit 0 }
+          Write-Output "FAIL: expected LsaCfgFlags=0 got $val"; exit 1
+        } catch { Write-Output "FAIL: $_"; exit 1 }
+      register: r
+      changed_when: false
+      failed_when: r.rc == 1
+
+    - name: "[VULN] Verify Credential Guard VBS (EnableVBS) disabled"
+      ansible.windows.win_shell: |
+        try {
+        $ErrorActionPreference = "Stop"
+          $val = (Get-ItemProperty -Path "HKLM:\SYSTEM\CurrentControlSet\Control\DeviceGuard" -Name "EnableVirtualizationBasedSecurity" -ErrorAction Stop).EnableVirtualizationBasedSecurity
+          if ($val -eq 0) { Write-Output "PASS: VBS disabled (EnableVirtualizationBasedSecurity=0)"; exit 0 }
+          Write-Output "FAIL: expected EnableVirtualizationBasedSecurity=0 got $val"; exit 1
+        } catch { Write-Output "FAIL: $_"; exit 1 }
+      register: r
+      changed_when: false
+      failed_when: r.rc == 1
+
+    - name: "[VULN] Verify LSA Protection (RunAsPPL) removed"
+      ansible.windows.win_shell: |
+        try {
+        $ErrorActionPreference = "Stop"
+          $val = Get-ItemProperty -Path "HKLM:\SYSTEM\CurrentControlSet\Control\Lsa" -Name "RunAsPPL" -ErrorAction Stop
+          Write-Output "FAIL: RunAsPPL exists (value $($val.RunAsPPL))"; exit 1
+        } catch {
+          Write-Output "PASS: RunAsPPL does not exist"; exit 0
+        }
+      register: r
+      changed_when: false
+      failed_when: r.rc == 1
+
+    - name: "[VULN][WT#34] Verify Restricted Admin Mode (RDP) enabled"
+      ansible.windows.win_shell: |
+        try {
+        $ErrorActionPreference = "Stop"
+          $val = (Get-ItemProperty -Path "HKLM:\System\CurrentControlSet\Control\Lsa" -Name "DisableRestrictedAdmin" -ErrorAction Stop).DisableRestrictedAdmin
+          if ($val -eq 0) { Write-Output "PASS: Restricted Admin Mode enabled (DisableRestrictedAdmin=0)"; exit 0 }
+          Write-Output "FAIL: expected DisableRestrictedAdmin=0 got $val"; exit 1
+        } catch { Write-Output "FAIL: $_"; exit 1 }
+      register: r
+      changed_when: false
+      failed_when: r.rc == 1
+
+    - name: "[VULN] Verify Windows Defender real-time monitoring disabled"
+      ansible.windows.win_shell: |
+        $ErrorActionPreference = "Stop"
+        
+        # Method 1: Check the registry directly (since the service is likely dead)
+        $regPath = "HKLM:\SOFTWARE\Microsoft\Windows Defender\Real-Time Protection"
+        $reg = Get-ItemProperty -Path $regPath -ErrorAction SilentlyContinue
+        if ($reg -and $reg.DisableRealtimeMonitoring -eq 1 -and $reg.DisableScriptScanning -eq 1) {
+            Write-Output "PASS: Defender monitoring disabled (Registry confirmed)"; exit 0
+        }
+        
+        # Method 2: Try the cmdlet and catch the "service dead" exception
+        try {
+          $mp = Get-MpPreference
+          if ($mp.DisableRealtimeMonitoring -eq $true -and $mp.DisableScriptScanning -eq $true) { 
+              Write-Output "PASS: Defender monitoring disabled (Cmdlet confirmed)"; exit 0 
+          }
+        } catch {
+          if ($_ -match "0x800106ba") {
+              Write-Output "PASS: Defender service is completely dead (0x800106ba)"; exit 0
+          }
+        }
+        
+        Write-Output "FAIL: Defender monitoring not fully disabled"
+        exit 1
+      register: r
+      changed_when: false
+      failed_when: r.rc == 1
+
+- name: "Verify SMB signing disabled on mbr02"
+  hosts: mbr02
+  gather_facts: false
+  tasks:
+    - name: "[VULN][WT#22] Verify SMB signing disabled on mbr02 (relay target)"
+      ansible.windows.win_shell: |
+        try {
+        $ErrorActionPreference = "Stop"
+          $path = "HKLM:\SYSTEM\CurrentControlSet\Services\LanmanServer\Parameters"
+          $req = (Get-ItemProperty -Path $path -Name "RequireSecuritySignature" -ErrorAction SilentlyContinue).RequireSecuritySignature
+          $en = (Get-ItemProperty -Path $path -Name "EnableSecuritySignature" -ErrorAction SilentlyContinue).EnableSecuritySignature
+          if ($req -eq 0 -and $en -eq 0) { Write-Output "PASS: SMB signing disabled (Req=0, En=0)"; exit 0 }
+          Write-Output "FAIL: expected Req=0/En=0 got Req=$req/En=$en"; exit 1
+        } catch { Write-Output "FAIL: $_"; exit 1 }
+      register: r
+      changed_when: false
+      failed_when: r.rc == 1
+
+- name: "Verify null session enumeration on dc02"
+  hosts: dc02
+  gather_facts: false
+  tasks:
+    - name: "[VULN][WT#28] Verify null session enumeration enabled (dc02)"
+      ansible.windows.win_shell: |
+        try {
+        $ErrorActionPreference = "Stop"
+          $val = (Get-ItemProperty -Path "HKLM:\SYSTEM\CurrentControlSet\Control\Lsa" -Name "RestrictAnonymous" -ErrorAction Stop).RestrictAnonymous
+          if ($val -eq 0) { Write-Output "PASS: Null session enumeration enabled (RestrictAnonymous=0)"; exit 0 }
+          Write-Output "FAIL: expected RestrictAnonymous=0 got $val"; exit 1
+        } catch { Write-Output "FAIL: $_"; exit 1 }
+      register: r
+      changed_when: false
+      failed_when: r.rc == 1
+
+- name: "DNS fix — adapter DNS + gateway verify"
+  hosts: windows_servers
+  gather_facts: false
+  tasks:
+    - name: "Detect adapters — domain (vmnet2) vs NAT"
+      ansible.windows.win_shell: |
+        $ErrorActionPreference = "Stop"
+        $interfaces = Get-NetAdapter | Where-Object { $_.Status -eq "Up" }
+        $domainIP = "{{ ansible_host }}"
+        foreach ($if in $interfaces) {
+          $ip = Get-NetIPAddress -InterfaceIndex $if.ifIndex -AddressFamily IPv4 -ErrorAction SilentlyContinue
+          if ($ip.IPAddress -eq $domainIP) { Write-Output "domain=$($if.Name)" }
+          else { Write-Output "nat=$($if.Name)" }
+        }
+      register: win_adapter_detect
+      changed_when: false
+
+    - name: "[PREP] Verify domain adapter DNS points to domain DC"
+      ansible.windows.win_shell: |
+        try {
+        $ErrorActionPreference = "Stop"
+          $domain = "{{ (win_adapter_detect.stdout_lines | select('match','^domain=') | first | split('=') | last) }}"
+          $dns = (Get-DnsClientServerAddress -InterfaceAlias $domain -AddressFamily IPv4).ServerAddresses
+          $expected = "{{ '192.168.77.11' if 'mbr01' in inventory_hostname else '192.168.77.12' if 'mbr02' in inventory_hostname else '192.168.77.10' }}"
+          if ($dns -contains $expected) { Write-Output "PASS: DNS set to $expected on $domain"; exit 0 }
+          Write-Output "FAIL: expected DNS $expected on $domain, got $($dns -join ',')"; exit 1
+        } catch { Write-Output "FAIL: $_"; exit 1 }
+      register: r
+      changed_when: false
+      failed_when: r.rc == 1
+
+    - name: "[PREP] Verify no dead default gateway on domain adapter"
+      ansible.windows.win_shell: |
+        try {
+        $ErrorActionPreference = "Stop"
+          $domain = "{{ (win_adapter_detect.stdout_lines | select('match','^domain=') | first | split('=') | last) }}"
+          $route = Get-NetRoute -InterfaceAlias $domain -DestinationPrefix "0.0.0.0/0" -ErrorAction SilentlyContinue
+          if (-not $route) { Write-Output "PASS: No dead gateway on $domain"; exit 0 }
+          Write-Output "FAIL: Dead gateway still present on $domain (NextHop=$($route.NextHop))"; exit 1
+        } catch { Write-Output "FAIL: $_"; exit 1 }
+      register: r
+      changed_when: false
+      failed_when: r.rc == 1

@@ -1,0 +1,57 @@
+---
+attack_id: T002
+walkthrough: attack-matrix/01-walkthroughs/WT002-kerberoasting-aes.md
+mitre_technique: T1558.003
+campaign: C
+domain: range.local
+target_vm: dc03
+starting_credential: analyst_osint / 0S1NT_An@lyst!
+tools: [impacket, hashcat]
+difficulty: Easy
+certifications: [CRTE]
+post_exploit_chain: "AES256 TGS hash (hashcat 19700) → crack → svc_sccm plaintext → SCCM infrastructure access (Full Administrator on mbr02)"
+
+telemetry:
+  elastic:
+    - index: logs-system.security-*
+      event_code: 4769
+      field_filters:
+        ServiceName: HTTP/mbr02.range.local
+        TicketEncryptionType: "0x12"
+      threshold: 1
+      note: AES256 TGS request for SCCM service account via Kerberoast
+      detection_rule: null
+
+  zeek:
+    - log: kerberos.log
+      field_filters:
+        request_type: TGS
+        cipher: aes256-cts-hmac-sha1-96
+      note: Zeek captures the Kerberos TGS exchange with AES256 cipher
+
+  suricata:
+    - note: AES Kerberoast blends with legitimate Kerberos traffic — no Suricata signature
+
+  arkime:
+    - protocol: kerberos
+      note: PCAP of Kerberos TGS exchange captured on monitor promiscuous NIC
+
+  velociraptor:
+    - hunt: cadre-credential-access
+      artifact: Windows.Registry.NTUser
+      note: Post-attack forensic collection
+
+detection_rules:
+  - rule_id: null
+    name: null
+    expected_trigger: false
+    note: AES Kerberoast blends with legitimate Kerberos traffic — no dedicated detection rule exists
+
+time_estimate: 30s
+
+alternative_paths:
+  - technique: Cross-forest Kerberoast
+    wt_ref: WT033
+    note: Request from cadre.local DA through forest trust against range.local
+  - technique: Single-SPN Kerberoast
+    note: Request one SPN at a time with -request-user svc_mssql for stealth

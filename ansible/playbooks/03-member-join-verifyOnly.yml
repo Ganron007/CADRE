@@ -1,0 +1,38 @@
+---
+# TYPE: VERIFY-ONLY (rc=0=pass, rc=1=fail — checks domain membership)
+# Layer 3: Member Domain Join Verification — mbr01→child.cadre.local, mbr02→range.local
+# Runs after 03-member-join.yml.
+
+- name: "Verify mbr01 is joined to child.cadre.local"
+  hosts: mbr01
+  gather_facts: false
+  tasks:
+    - name: "[VERIFY] Check mbr01 domain membership"
+      ansible.windows.win_shell: |
+        $ErrorActionPreference = "Stop"
+        try {
+          $domain = "child.cadre.local"
+          $current = (Get-WmiObject Win32_ComputerSystem).Domain
+          if ($current -eq $domain) { Write-Output "PASS: Domain is $domain"; exit 0 }
+          Write-Output "FAIL: Expected $domain, got $current"; exit 1
+        } catch { Write-Output "FAILED: $_"; exit 1 }
+      register: r
+      changed_when: false
+      failed_when: r.rc == 1
+
+- name: "Verify mbr02 is joined to range.local"
+  hosts: mbr02
+  gather_facts: false
+  tasks:
+    - name: "[VERIFY] Check mbr02 domain membership"
+      ansible.windows.win_shell: |
+        $ErrorActionPreference = "Stop"
+        try {
+          $domain = "range.local"
+          $current = (Get-WmiObject Win32_ComputerSystem).Domain
+          if ($current -eq $domain) { Write-Output "PASS: Domain is $domain"; exit 0 }
+          Write-Output "FAIL: Expected $domain, got $current"; exit 1
+        } catch { Write-Output "FAILED: $_"; exit 1 }
+      register: r
+      changed_when: false
+      failed_when: r.rc == 1

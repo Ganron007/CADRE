@@ -1,0 +1,209 @@
+---
+# TYPE: VERIFY-ONLY (rc=0=pass, rc=1=fail — manual install required)
+# Layer 9: SQL + WSUS Verification — SQL manual install required, WSUS auto-deployed
+# All tasks are verify-only (rc=0: pass, rc=1: fail).
+# Run after manually installing:
+#   - SQL Server (any variant: SQLEXPRESS/SQLDeveloper on Windows, SQL on Linux)
+# SQL (all hosts incl. Linux): see sql-integration-guide.md for manual install steps.
+#   Keytab must be generated on dc01 and pushed to linux01 manually.
+# WSUS is deployed by 04-windows-features.yml — verified here.
+#
+# Usage:
+#   ansible-playbook -i inventories/hosts playbooks/09-sql-wsus-verify.yml
+
+# =============================================================================
+# SQL Verification — mbr01 (child.cadre.local)
+# =============================================================================
+- name: "SQL Server verification — mbr01"
+  hosts: mbr01
+  gather_facts: false
+  tasks:
+    - name: "[SQL][WT#41] xp_cmdshell enabled (verify)"
+      ansible.windows.win_shell: |
+        $ErrorActionPreference = "Stop"
+        try {
+          $r = Invoke-Sqlcmd -ServerInstance "localhost\SQLEXPRESS" -Query "SELECT value_in_use FROM sys.configurations WHERE name = 'xp_cmdshell'" -ErrorAction SilentlyContinue
+          if ($r.value_in_use -eq 1) { Write-Output "PASS: xp_cmdshell enabled"; exit 0 }
+          Write-Output "FAIL: xp_cmdshell disabled (value=$($r.value_in_use))"; exit 1
+        } catch { Write-Output "FAIL: xp_cmdshell check error: $_"; exit 1 }
+      register: r
+      changed_when: false
+      failed_when: r.rc == 1
+
+    - name: "[SQL][WT#41] Linked server MBR02 exists (verify)"
+      ansible.windows.win_shell: |
+        $ErrorActionPreference = "Stop"
+        try {
+          $r = Invoke-Sqlcmd -ServerInstance "localhost\SQLEXPRESS" -Query "SELECT name FROM sys.servers WHERE name = 'MBR02'" -ErrorAction SilentlyContinue
+          if ($r.name -eq "MBR02") { Write-Output "PASS: Linked server MBR02 exists"; exit 0 }
+          Write-Output "FAIL: Linked server MBR02 not found"; exit 1
+        } catch { Write-Output "FAIL: MBR02 check error: $_"; exit 1 }
+      register: r
+      changed_when: false
+      failed_when: r.rc == 1
+
+    - name: "[SQL][WT#45] Linked server LINUX01 exists (verify)"
+      ansible.windows.win_shell: |
+        $ErrorActionPreference = "Stop"
+        try {
+          $r = Invoke-Sqlcmd -ServerInstance "localhost\SQLEXPRESS" -Query "SELECT name FROM sys.servers WHERE name = 'LINUX01'" -ErrorAction SilentlyContinue
+          if ($r.name -eq "LINUX01") { Write-Output "PASS: Linked server LINUX01 exists"; exit 0 }
+          Write-Output "FAIL: Linked server LINUX01 not found"; exit 1
+        } catch { Write-Output "FAIL: LINUX01 check error: $_"; exit 1 }
+      register: r
+      changed_when: false
+      failed_when: r.rc == 1
+
+    - name: "[SQL][WT#41][WT#45] RPC OUT on MBR02 + LINUX01 (verify)"
+      ansible.windows.win_shell: |
+        $ErrorActionPreference = "Stop"
+        try {
+          $r = Invoke-Sqlcmd -ServerInstance "localhost\SQLEXPRESS" -Query "SELECT name, is_rpc_out_enabled FROM sys.servers WHERE name IN ('MBR02','LINUX01')" -ErrorAction SilentlyContinue
+          $bad = @($r | Where-Object { $_.is_rpc_out_enabled -ne 1 })
+          if ($bad.Count -eq 0) { Write-Output "PASS: RPC OUT enabled on all linked servers"; exit 0 }
+          Write-Output "FAIL: RPC OUT disabled on: $($bad.Name -join ', ')"; exit 1
+        } catch { Write-Output "FAIL: RPC OUT check error: $_"; exit 1 }
+      register: r
+      changed_when: false
+      failed_when: r.rc == 1
+
+    - name: "[SQL][WT#44] IMPERSONATE on sa to analyst_t1 (verify)"
+      ansible.windows.win_shell: |
+        $ErrorActionPreference = "Stop"
+        try {
+          $r = Invoke-Sqlcmd -ServerInstance "localhost\SQLEXPRESS" -Query "SELECT grantee_principal_id FROM sys.server_permissions WHERE permission_name = 'IMPERSONATE' AND class = 101 AND grantor_principal_id = 1" -ErrorAction SilentlyContinue
+          if ($r.grantee_principal_id -ge 0) { Write-Output "PASS: IMPERSONATE on sa granted"; exit 0 }
+          Write-Output "FAIL: IMPERSONATE on sa not found"; exit 1
+        } catch { Write-Output "FAIL: IMPERSONATE check error: $_"; exit 1 }
+      register: r
+      changed_when: false
+      failed_when: r.rc == 1
+
+# =============================================================================
+# SQL + WSUS Verification — mbr02 (range.local)
+# =============================================================================
+- name: "SQL Server + WSUS verification — mbr02"
+  hosts: mbr02
+  gather_facts: false
+  tasks:
+    - name: "[SQL][WT#43] CLR enabled (verify)"
+      ansible.windows.win_shell: |
+        $ErrorActionPreference = "Stop"
+        try {
+          $result = sqlcmd -S "localhost" -E -C -W -h -1 -Q "SET NOCOUNT ON; SELECT value_in_use FROM sys.configurations WHERE name = 'clr enabled'" 2>&1
+          $clean = ($result -join "").Trim()
+          if ($clean -eq "1") { Write-Output "PASS: CLR enabled"; exit 0 }
+          Write-Output "FAIL: CLR disabled or error (output: $clean)"; exit 1
+        } catch { Write-Output "FAIL: CLR check error: $_"; exit 1 }
+      register: r
+      changed_when: false
+      failed_when: r.rc == 1
+
+    - name: "[SQL][WT#43] TRUSTWORTHY ON (verify)"
+      ansible.windows.win_shell: |
+        $ErrorActionPreference = "Stop"
+        try {
+          $result = sqlcmd -S "localhost" -E -C -W -h -1 -Q "SET NOCOUNT ON; SELECT is_trustworthy_on FROM sys.databases WHERE name = 'master'" 2>&1
+          $clean = ($result -join "").Trim()
+          if ($clean -eq "1") { Write-Output "PASS: TRUSTWORTHY ON"; exit 0 }
+          Write-Output "FAIL: TRUSTWORTHY OFF (output: $clean)"; exit 1
+        } catch { Write-Output "FAIL: TRUSTWORTHY check error: $_"; exit 1 }
+      register: r
+      changed_when: false
+      failed_when: r.rc == 1
+
+    - name: "[SQL][WT#43] CLR strict security disabled (verify)"
+      ansible.windows.win_shell: |
+        $ErrorActionPreference = "Stop"
+        try {
+          $result = sqlcmd -S "localhost" -E -C -W -h -1 -Q "SET NOCOUNT ON; SELECT value_in_use FROM sys.configurations WHERE name = 'clr strict security'" 2>&1
+          $clean = ($result -join "").Trim()
+          if ($clean -eq "0") { Write-Output "PASS: CLR strict security disabled"; exit 0 }
+          Write-Output "FAIL: CLR strict security enabled (value: $clean)"; exit 1
+        } catch { Write-Output "FAIL: CLR strict security check error: $_"; exit 1 }
+      register: r
+      changed_when: false
+      failed_when: r.rc == 1
+
+    - name: "[SQL][WT#41] Linked server MBR01 exists (verify)"
+      ansible.windows.win_shell: |
+        $ErrorActionPreference = "Stop"
+        try {
+          $result = sqlcmd -S "localhost" -E -C -W -h -1 -Q "SET NOCOUNT ON; SELECT name FROM sys.servers WHERE name = 'MBR01'" 2>&1
+          $clean = ($result -join "").Trim()
+          if ($clean -eq "MBR01") { Write-Output "PASS: Linked server MBR01 exists"; exit 0 }
+          Write-Output "FAIL: Linked server MBR01 not found (output: $clean)"; exit 1
+        } catch { Write-Output "FAIL: MBR01 check error: $_"; exit 1 }
+      register: r
+      changed_when: false
+      failed_when: r.rc == 1
+
+    - name: "[SQL][WT#41] RPC OUT on MBR01 (verify)"
+      ansible.windows.win_shell: |
+        $ErrorActionPreference = "Stop"
+        try {
+          $result = sqlcmd -S "localhost" -E -C -W -h -1 -Q "SET NOCOUNT ON; SELECT is_rpc_out_enabled FROM sys.servers WHERE name = 'MBR01'" 2>&1
+          $clean = ($result -join "").Trim()
+          if ($clean -eq "1") { Write-Output "PASS: RPC OUT enabled on MBR01"; exit 0 }
+          Write-Output "FAIL: RPC OUT disabled on MBR01 (value: $clean)"; exit 1
+        } catch { Write-Output "FAIL: RPC OUT check error: $_"; exit 1 }
+      register: r
+      changed_when: false
+      failed_when: r.rc == 1
+
+    - name: "[WSUS] WSUS installed + configured (verify)"
+      ansible.windows.win_shell: |
+        $ErrorActionPreference = "Stop"
+        try {
+          $contentDir = Get-ItemPropertyValue -Path "HKLM:\SOFTWARE\Microsoft\Update Services\Server\Setup" -Name "ContentDir" -ErrorAction SilentlyContinue
+          if ($contentDir) { Write-Output "PASS: WSUS configured (ContentDir: $contentDir)"; exit 0 }
+          $svc = Get-Service WsusService -ErrorAction SilentlyContinue
+          if (-not $svc) { Write-Output "FAIL: WSUS not installed"; exit 1 }
+          Write-Output "FAIL: WSUS service running but registry path not found"; exit 1
+        } catch { Write-Output "FAIL: WSUS check error: $_"; exit 1 }
+      register: r
+      changed_when: false
+      failed_when: r.rc == 1
+
+# =============================================================================
+# SQL Verification — linux01 (cadre.local) — Manual install required
+# See sql-integration-guide.md for manual SQL install steps.
+# =============================================================================
+- name: "SQL Server verification — linux01"
+  hosts: linux01
+  gather_facts: true
+  become: true
+  tasks:
+    - name: "[SQL][WT#47] SQL audit directory exists (verify)"
+      ansible.builtin.stat:
+        path: /var/opt/mssql/audit
+      register: r_audit_dir
+      changed_when: false
+      failed_when: not r_audit_dir.stat.exists
+
+    - name: "[SQL][WT#47] SQL keytab exists (verify)"
+      ansible.builtin.shell: test -f /var/opt/mssql/secrets/mssql.keytab
+      register: r_keytab
+      changed_when: false
+      failed_when: r_keytab.rc != 0
+
+    - name: "[SQL][WT#45] SQL service running (verify)"
+      ansible.builtin.shell: systemctl is-active mssql-server
+      register: r_sql
+      changed_when: false
+      failed_when: r_sql.rc != 0
+
+    - name: "[SQL][WT#45] SQL audit specification exists (verify)"
+      ansible.builtin.shell: |
+        python3 -c "
+        import pymssql
+        conn = pymssql.connect(server='127.0.0.1', user='sa', password='s@_P@ssw0rd!L@b!')
+        cur = conn.cursor()
+        cur.execute(\"SELECT name FROM sys.server_audit_specifications WHERE name = 'CADRE_AuditSpec'\")
+        r = cur.fetchone()
+        conn.close()
+        print('PASS' if r else 'FAIL')
+        "
+      register: r_mssql_audit
+      changed_when: false
+      failed_when: "'FAIL' in r_mssql_audit.stdout"

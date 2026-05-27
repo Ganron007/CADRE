@@ -1,0 +1,489 @@
+---
+# TYPE: VERIFY-ONLY (rc=0=pass, rc=1=fail — checks OUs, users, groups, GPOs exist)
+# Layer 2: AD Objects — Verify existence of OUs, users, groups, gMSA, dMSA, memberships, GPOs
+# All tasks use win_shell with exit code pattern:
+#   0 = exists and verified (pass)
+#   1 = not found or error (fail)
+# Read-only — never modifies AD.
+
+# =============================================================================
+# cadre.local (dc01)
+# =============================================================================
+- name: "dc01 — Verify OUs"
+  hosts: dc01
+  gather_facts: false
+  tasks:
+    - name: "[PREP] Verify 6 OUs in cadre.local"
+      ansible.windows.win_shell: |
+        $ErrorActionPreference = "Stop"
+        try {
+          $ouName = "{{ item.name }}"
+          $ouPath = "dc=cadre,dc=local"
+          $existing = Get-ADOrganizationalUnit -Filter "Name -eq '$ouName'" -SearchBase $ouPath -ErrorAction SilentlyContinue
+          if ($existing) { Write-Output "PASS: OU $ouName exists"; exit 0 }
+          Write-Output "FAIL: OU $ouName not found"; exit 1
+        } catch { Write-Output "FAIL: OU $ouName — $_"; exit 1 }
+      loop:
+        - { name: Cloud, desc: "Cloud-team identities" }
+        - { name: Agentic, desc: "AI/LangGraph/MCP team" }
+        - { name: DFIR, desc: "Forensic analysts" }
+        - { name: RedCell, desc: "Adversary simulation team" }
+        - { name: Engineering, desc: "Lab/infrastructure engineers" }
+        - { name: Command, desc: "Leadership / domain admins" }
+      register: r
+      changed_when: false
+      failed_when: r.rc == 1
+
+    - name: "[PREP] Verify 10 groups in cadre.local"
+      ansible.windows.win_shell: |
+        $ErrorActionPreference = "Stop"
+        try {
+          $gName = "{{ item.name }}"
+          $existing = Get-ADGroup -Identity $gName -ErrorAction SilentlyContinue
+          if ($existing) { Write-Output "PASS: Group $gName exists"; exit 0 }
+          Write-Output "FAIL: Group $gName not found"; exit 1
+        } catch { Write-Output "FAIL: Group $gName — $_"; exit 1 }
+      loop:
+        - { name: Cloud-Cadre, ou: Cloud, scope: Global }
+        - { name: Agentic-Cadre, ou: Agentic, scope: Global }
+        - { name: DFIR-Cadre, ou: DFIR, scope: Global }
+        - { name: Red-Cadre, ou: RedCell, scope: Global }
+        - { name: Engineering-Cadre, ou: Engineering, scope: Global }
+        - { name: Command-Cadre, ou: Command, scope: Global }
+        - { name: Threat-Hunt-Cadre, ou: DFIR, scope: Global }
+        - { name: Purple-Cell, ou: RedCell, scope: Global }
+        - { name: Trusted-Cadre, ou: Command, scope: DomainLocal }
+        - { name: ESC13-Vulnerable-Target, ou: Command, scope: Universal }
+      register: r
+      changed_when: false
+      failed_when: r.rc == 1
+
+    - name: "[PREP] Verify 12 users in cadre.local"
+      ansible.windows.win_shell: |
+        $ErrorActionPreference = "Stop"
+        try {
+          $uName = "{{ item.uname }}"
+          $existing = Get-ADUser -Identity $uName -ErrorAction SilentlyContinue
+          if ($existing) { Write-Output "PASS: User $uName exists"; exit 0 }
+          Write-Output "FAIL: User $uName not found"; exit 1
+        } catch { Write-Output "FAIL: User $uName — $_"; exit 1 }
+      loop:
+        - { uname: chief_command, pw: "C0mm@nd_Ch1ef!", ou: Command }
+        - { uname: lead_engineering, pw: "Eng_L3ad!", ou: Engineering }
+        - { uname: eng_agentic, pw: "Ag3nt1c_Eng!", ou: Agentic }
+        - { uname: eng_cloud, pw: "Cl0ud_Eng!", ou: Cloud }
+        - { uname: analyst_cloud, pw: "Cl0ud_An@lyst!", ou: Cloud }
+        - { uname: hunter_dfir, pw: "DF1R_Hunt3r!", ou: DFIR }
+        - { uname: analyst_dfir, pw: "An@lyst_DF1R!", ou: DFIR }
+        - { uname: ops_redcell, pw: "R3dC3ll_0ps!", ou: RedCell }
+        - { uname: lead_redcell, pw: "L3ad_R3dC3ll!", ou: RedCell }
+        - { uname: analyst_purple, pw: "Purpl3_An@lyst!", ou: RedCell }
+        - { uname: svc_ldap, pw: "s3rv1c3_Ld@p!", ou: Engineering }
+        - { uname: mssql-linux01, pw: "MS5QL_K3yt@b_P@ss!", ou: Cloud }
+      register: r
+      changed_when: false
+      failed_when: r.rc == 1
+
+    - name: "[PREP][WT#24] Verify KDS root key exists"
+      ansible.windows.win_shell: |
+        $ErrorActionPreference = "Stop"
+        try {
+          $SearchBase = "CN=Group Key Distribution Service,CN=Services,CN=Configuration,DC=cadre,DC=local"
+          $KdsKeyExists = Get-ADObject -Filter { Name -eq "Master Root Keys" } -SearchBase $SearchBase -ErrorAction SilentlyContinue
+          if ($KdsKeyExists) { Write-Output "PASS: KDS root key exists"; exit 0 }
+          Write-Output "FAIL: KDS root key not found"; exit 1
+        } catch { Write-Output "FAIL: KDS root key — $_"; exit 1 }
+      register: r
+      changed_when: false
+      failed_when: r.rc == 1
+
+    - name: "[PREP][WT#24] Verify gMSA gmsaTools exists"
+      ansible.windows.win_shell: |
+        $ErrorActionPreference = "Stop"
+        try {
+          $gmsa = Get-ADServiceAccount -Identity "gmsaTools" -ErrorAction SilentlyContinue
+          if ($gmsa) { Write-Output "PASS: gMSA gmsaTools exists"; exit 0 }
+          Write-Output "FAIL: gMSA gmsaTools not found"; exit 1
+        } catch { Write-Output "FAIL: gMSA gmsaTools — $_"; exit 1 }
+      register: r
+      changed_when: false
+      failed_when: r.rc == 1
+
+    - name: "[PREP][WT#24] Verify gMSA gmsaTools (with KDS check)"
+      ansible.windows.win_shell: |
+        $ErrorActionPreference = "Stop"
+        try {
+          $kds = Get-KdsRootKey -ErrorAction SilentlyContinue
+          if (-not $kds) { Write-Output "SKIP: No KDS root key — gMSA cannot exist"; exit 0 }
+          $gmsa = Get-ADServiceAccount -Identity "gmsaTools" -ErrorAction SilentlyContinue
+          if ($gmsa) { Write-Output "PASS: gMSA gmsaTools exists"; exit 0 }
+          Write-Output "FAIL: gMSA gmsaTools not found (KDS exists)"; exit 1
+        } catch { Write-Output "FAIL: gMSA gmsaTools — $_"; exit 1 }
+      register: r
+      changed_when: false
+      failed_when: r.rc == 1
+
+    - name: "[PREP][WT#24] Verify gMSA gmsaTools (legacy KDS check)"
+      ansible.windows.win_shell: |
+        $ErrorActionPreference = "Stop"
+        try {
+          $kds = Get-KdsRootKey -ErrorAction SilentlyContinue
+          if (-not $kds) { Write-Output "SKIP: No KDS root key — gMSA cannot exist"; exit 0 }
+          $gmsa = Get-ADServiceAccount -Identity "gmsaTools" -ErrorAction SilentlyContinue
+          if ($gmsa) { Write-Output "PASS: gMSA gmsaTools exists"; exit 0 }
+          Write-Output "FAIL: gMSA gmsaTools not found"; exit 1
+        } catch { Write-Output "FAIL: gMSA gmsaTools — $_"; exit 1 }
+      register: r
+      changed_when: false
+      failed_when: r.rc == 1
+
+    - name: "[E2E][008] Verify gMSA gmsaTools SACL for msDS-ManagedPassword audit"
+      ansible.windows.win_shell: |
+        $ErrorActionPreference = "Stop"
+        try {
+          $path = "AD:CN=gmsaTools,CN=Managed Service Accounts,DC=cadre,DC=local"
+          $acl = Get-Acl -Path $path -Audit
+          $found = $false
+          foreach ($rule in $acl.GetAuditRules($true, $false, [System.Security.Principal.SecurityIdentifier])) {
+            if ($rule.IdentityReference -match "Everyone" -and
+                $rule.ActiveDirectoryRights -eq "ReadProperty" -and
+                $rule.AuditFlags -eq "Success") {
+              $found = $true
+              break
+            }
+          }
+          if ($found) { Write-Output "PASS: gMSA SACL found (Everyone + ReadProperty + Success)"; exit 0 }
+          Write-Output "FAIL: gMSA SACL not found"; exit 1
+        } catch { Write-Output "FAIL: gMSA SACL check — $_"; exit 1 }
+      register: r
+      changed_when: false
+      failed_when: r.rc == 1
+      when: domain_role == "cadre-dc01"
+
+    - name: "[PREP] Verify cadre.local users in groups"
+      ansible.windows.win_shell: |
+        $ErrorActionPreference = "Stop"
+        try {
+          $group = "{{ item.group }}"
+          $members = '{{ item.users | join(",") }}'.Split(',', [System.StringSplitOptions]::RemoveEmptyEntries)
+          $existing = Get-ADGroupMember -Identity $group | Select-Object -ExpandProperty SamAccountName
+          $missing = $members | Where-Object { $_ -notin $existing }
+          if ($missing.Count -eq 0) { Write-Output "PASS: All members in $group"; exit 0 }
+          Write-Output "FAIL: $group missing members: $($missing -join ', ')"; exit 1
+        } catch { Write-Output "FAIL: Group membership $group — $_"; exit 1 }
+      loop:
+        - { group: "Cloud-Cadre", users: ["eng_cloud", "analyst_cloud"] }
+        - { group: "Agentic-Cadre", users: ["eng_agentic"] }
+        - { group: "DFIR-Cadre", users: ["hunter_dfir", "analyst_dfir"] }
+        - { group: "Red-Cadre", users: ["ops_redcell", "lead_redcell"] }
+        - { group: "Engineering-Cadre", users: ["lead_engineering"] }
+        - { group: "Command-Cadre", users: ["chief_command"] }
+        - { group: "Threat-Hunt-Cadre", users: ["hunter_dfir"] }
+        - { group: "Purple-Cell", users: ["analyst_purple"] }
+      register: r
+      changed_when: false
+      failed_when: r.rc == 1
+
+    - name: "[PREP][WT#23] Verify Vulnerable-GPO exists"
+      ansible.windows.win_shell: |
+        $ErrorActionPreference = "Stop"
+        try {
+          $gpo = Get-GPO -Name "Vulnerable-GPO" -ErrorAction SilentlyContinue
+          if ($gpo) { Write-Output "PASS: Vulnerable-GPO exists"; exit 0 }
+          Write-Output "FAIL: Vulnerable-GPO not found"; exit 1
+        } catch { Write-Output "FAIL: Vulnerable-GPO — $_"; exit 1 }
+      register: r
+      changed_when: false
+      failed_when: r.rc == 1
+
+    - name: "[PREP][WT#23] Verify Vulnerable-GPO linked to OU=Command"
+      ansible.windows.win_shell: |
+        $ErrorActionPreference = "Stop"
+        try {
+          $gpo = Get-GPO -Name "Vulnerable-GPO" -ErrorAction SilentlyContinue
+          if (-not $gpo) { Write-Output "FAIL: Vulnerable-GPO not found"; exit 1 }
+          $inheritance = Get-GPInheritance -Target "OU=Command,DC=cadre,DC=local"
+          $isLinked = $inheritance.GpoLinks | Where-Object { $_.GpoId -eq $gpo.Id }
+          if ($isLinked) {
+              Write-Output "PASS: Vulnerable-GPO linked to OU=Command"; exit 0
+          }
+          Write-Output "FAIL: Vulnerable-GPO not linked to OU=Command"; exit 1
+        } catch {
+          Write-Output "FAIL: Vulnerable-GPO link - $_"; exit 1
+        }
+      register: r
+      changed_when: false
+      failed_when: r.rc == 1
+
+    - name: "[PREP][WT#23] Verify WMI-Filtered-GPO linked to OU=Agentic"
+      ansible.windows.win_shell: |
+        $ErrorActionPreference = "Stop"
+        try {
+          $gpo = Get-GPO -Name "WMI-Filtered-GPO" -ErrorAction SilentlyContinue
+          if (-not $gpo) { Write-Output "FAIL: WMI-Filtered-GPO not found"; exit 1 }
+          $inheritance = Get-GPInheritance -Target "OU=Agentic,DC=cadre,DC=local"
+          $isLinked = $inheritance.GpoLinks | Where-Object { $_.GpoId -eq $gpo.Id }
+          if ($isLinked) {
+              Write-Output "PASS: WMI-Filtered-GPO linked to OU=Agentic"; exit 0
+          }
+          Write-Output "FAIL: WMI-Filtered-GPO not linked to OU=Agentic"; exit 1
+        } catch {
+          Write-Output "FAIL: WMI-Filtered-GPO link - $_"; exit 1
+        }
+      register: r
+      changed_when: false
+      failed_when: r.rc == 1
+
+    - name: "[PREP][WT#23] Verify WMI-Filtered-GPO exists"
+      ansible.windows.win_shell: |
+        $ErrorActionPreference = "Stop"
+        try {
+          $gpo = Get-GPO -Name "WMI-Filtered-GPO" -ErrorAction SilentlyContinue
+          if ($gpo) { Write-Output "PASS: WMI-Filtered-GPO exists"; exit 0 }
+          Write-Output "FAIL: WMI-Filtered-GPO not found"; exit 1
+        } catch { Write-Output "FAIL: WMI-Filtered-GPO — $_"; exit 1 }
+      register: r
+      changed_when: false
+      failed_when: r.rc == 1
+
+    - name: "[PREP][WT#23] Verify WMI-Filtered-GPO linked to OU=Agentic"
+      ansible.windows.win_shell: |
+        $ErrorActionPreference = "Stop"
+        try {
+          $gpo = Get-GPO -Name "WMI-Filtered-GPO" -ErrorAction SilentlyContinue
+          if (-not $gpo) { Write-Output "FAIL: WMI-Filtered-GPO not found"; exit 1 }
+          $inheritance = Get-GPInheritance -Target "OU=Agentic,DC=cadre,DC=local"
+          $isLinked = $inheritance.GpoLinks | Where-Object { $_.GpoId -eq $gpo.Id }
+          if ($isLinked) {
+              Write-Output "PASS: WMI-Filtered-GPO linked to OU=Agentic"; exit 0
+          }
+          Write-Output "FAIL: WMI-Filtered-GPO not linked to OU=Agentic"; exit 1
+        } catch {
+          Write-Output "FAIL: WMI-Filtered-GPO link - $_"; exit 1
+        }
+      register: r
+      changed_when: false
+      failed_when: r.rc == 1
+
+    - name: "[PREP] Verify chief_command in Domain Admins + Enterprise Admins"
+      ansible.windows.win_shell: |
+        $ErrorActionPreference = "Stop"
+        try {
+          $da = Get-ADGroupMember "Domain Admins" | Where-Object { $_.SamAccountName -eq "chief_command" }
+          $ea = Get-ADGroupMember "Enterprise Admins" | Where-Object { $_.SamAccountName -eq "chief_command" }
+          if ($da -and $ea) { Write-Output "PASS: chief_command in DA+EA"; exit 0 }
+          $missing = @()
+          if (-not $da) { $missing += "Domain Admins" }
+          if (-not $ea) { $missing += "Enterprise Admins" }
+          Write-Output "FAIL: chief_command missing from $($missing -join ', ')"; exit 1
+        } catch { Write-Output "FAIL: chief_command DA+EA — $_"; exit 1 }
+      register: r
+      changed_when: false
+      failed_when: r.rc == 1
+
+    - name: "[GPP] Verify Groups.xml with cpassword in SYSVOL"
+      ansible.windows.win_shell: |
+        $ErrorActionPreference = "Stop"
+        try {
+          $gpo = Get-GPO -Name "Vulnerable-GPO" -ErrorAction SilentlyContinue
+          if (-not $gpo) { Write-Output "SKIP: Vulnerable-GPO not found"; exit 0 }
+          $guid = $gpo.Id.ToString()
+          $path = "\\cadre.local\SYSVOL\cadre.local\Policies\{$guid}\Machine\Preferences\Groups\Groups.xml"
+          if (Test-Path $path) { Write-Output "PASS: Groups.xml exists"; exit 0 }
+          Write-Output "FAIL: Groups.xml not found at $path"; exit 1
+        } catch { Write-Output "FAIL: GPP verify error: $_"; exit 1 }
+      register: r
+      changed_when: false
+      failed_when: r.rc == 1
+
+# =============================================================================
+# child.cadre.local (dc02)
+# =============================================================================
+- name: "dc02 — Verify OUs, groups, users"
+  hosts: dc02
+  gather_facts: false
+  tasks:
+    - name: "[PREP] Verify 2 OUs in child.cadre.local"
+      ansible.windows.win_shell: |
+        $ErrorActionPreference = "Stop"
+        try {
+          $ouName = "{{ item.name }}"
+          $existing = Get-ADOrganizationalUnit -Filter "Name -eq '$ouName'" -SearchBase "dc=child,dc=cadre,dc=local" -ErrorAction SilentlyContinue
+          if ($existing) { Write-Output "PASS: OU $ouName exists"; exit 0 }
+          Write-Output "FAIL: OU $ouName not found"; exit 1
+        } catch { Write-Output "FAIL: OU $ouName — $_"; exit 1 }
+      loop:
+        - { name: Operations, desc: "SOC operations" }
+        - { name: Detection, desc: "Detection engineering" }
+      register: r
+      changed_when: false
+      failed_when: r.rc == 1
+
+    - name: "[PREP] Verify 5 groups in child.cadre.local"
+      ansible.windows.win_shell: |
+        $ErrorActionPreference = "Stop"
+        try {
+          $gName = "{{ item.name }}"
+          $existing = Get-ADGroup -Identity $gName -ErrorAction SilentlyContinue
+          if ($existing) { Write-Output "PASS: Group $gName exists"; exit 0 }
+          Write-Output "FAIL: Group $gName not found"; exit 1
+        } catch { Write-Output "FAIL: Group $gName — $_"; exit 1 }
+      loop:
+        - { name: Operations-Cadre, ou: Operations }
+        - { name: Detection-Cadre, ou: Detection }
+        - { name: SOC-Tier1, ou: Detection }
+        - { name: SOC-Tier2, ou: Detection }
+        - { name: SOC-Tier3, ou: Detection }
+      register: r
+      changed_when: false
+      failed_when: r.rc == 1
+
+    - name: "[PREP] Verify 8 users in child.cadre.local"
+      ansible.windows.win_shell: |
+        $ErrorActionPreference = "Stop"
+        try {
+          $uName = "{{ item.uname }}"
+          $existing = Get-ADUser -Identity $uName -ErrorAction SilentlyContinue
+          if ($existing) { Write-Output "PASS: User $uName exists"; exit 0 }
+          Write-Output "FAIL: User $uName not found"; exit 1
+        } catch { Write-Output "FAIL: User $uName — $_"; exit 1 }
+      loop:
+        - { uname: dir_operations, pw: "D1r_0p3r@t10ns!", ou: Operations }
+        - { uname: lead_detection, pw: "L3ad_D3t3ct10n!", ou: Detection }
+        - { uname: analyst_t1, pw: "T13r_An@lyst!", ou: Detection }
+        - { uname: analyst_t2, pw: "T23r_An@lyst!", ou: Detection }
+        - { uname: analyst_t3, pw: "T33r_An@lyst!", ou: Detection }
+        - { uname: mgr_incident, pw: "Mgr_1nc1d3nt!", ou: Operations }
+        - { uname: intern_blue, pw: "1nt3rn_Blu3!", ou: Detection }
+        - { uname: svc_mssql, pw: "s3rv1c3_MSSQL!", ou: Operations }
+      register: r
+      changed_when: false
+      failed_when: r.rc == 1
+
+    - name: "[PREP] Verify child.cadre.local users in groups"
+      ansible.windows.win_shell: |
+        $ErrorActionPreference = "Stop"
+        try {
+          $group = "{{ item.group }}"
+          $members = '{{ item.users | join(",") }}'.Split(',', [System.StringSplitOptions]::RemoveEmptyEntries)
+          $existing = Get-ADGroupMember -Identity $group | Select-Object -ExpandProperty SamAccountName
+          $missing = $members | Where-Object { $_ -notin $existing }
+          if ($missing.Count -eq 0) { Write-Output "PASS: All members in $group"; exit 0 }
+          Write-Output "FAIL: $group missing members: $($missing -join ', ')"; exit 1
+        } catch { Write-Output "FAIL: Group membership $group — $_"; exit 1 }
+      loop:
+        - { group: "Operations-Cadre", users: ["dir_operations", "mgr_incident"] }
+        - { group: "Detection-Cadre", users: ["lead_detection"] }
+        - { group: "SOC-Tier1", users: ["analyst_t1", "intern_blue"] }
+        - { group: "SOC-Tier2", users: ["analyst_t2"] }
+        - { group: "SOC-Tier3", users: ["analyst_t3"] }
+      register: r
+      changed_when: false
+      failed_when: r.rc == 1
+
+# =============================================================================
+# range.local (dc03)
+# =============================================================================
+- name: "dc03 — Verify OUs, groups, users, svc_naa→DA, dMSA"
+  hosts: dc03
+  gather_facts: false
+  tasks:
+    - name: "[PREP] Verify 2 OUs in range.local"
+      ansible.windows.win_shell: |
+        $ErrorActionPreference = "Stop"
+        try {
+          $ouName = "{{ item.name }}"
+          $existing = Get-ADOrganizationalUnit -Filter "Name -eq '$ouName'" -SearchBase "dc=range,dc=local" -ErrorAction SilentlyContinue
+          if ($existing) { Write-Output "PASS: OU $ouName exists"; exit 0 }
+          Write-Output "FAIL: OU $ouName not found"; exit 1
+        } catch { Write-Output "FAIL: OU $ouName — $_"; exit 1 }
+      loop:
+        - { name: Intelligence, desc: "Threat intelligence" }
+        - { name: Adversary, desc: "Adversary simulation" }
+      register: r
+      changed_when: false
+      failed_when: r.rc == 1
+
+    - name: "[PREP] Verify 3 groups in range.local"
+      ansible.windows.win_shell: |
+        $ErrorActionPreference = "Stop"
+        try {
+          $gName = "{{ item.name }}"
+          $existing = Get-ADGroup -Identity $gName -ErrorAction SilentlyContinue
+          if ($existing) { Write-Output "PASS: Group $gName exists"; exit 0 }
+          Write-Output "FAIL: Group $gName not found"; exit 1
+        } catch { Write-Output "FAIL: Group $gName — $_"; exit 1 }
+      loop:
+        - { name: Intelligence-Cadre, ou: Intelligence }
+        - { name: Adversary-Cadre, ou: Adversary }
+        - { name: Tools-Eng, ou: Intelligence }
+      register: r
+      changed_when: false
+      failed_when: r.rc == 1
+
+    - name: "[PREP] Verify 10 users in range.local"
+      ansible.windows.win_shell: |
+        $ErrorActionPreference = "Stop"
+        try {
+          $uName = "{{ item.uname }}"
+          $existing = Get-ADUser -Identity $uName -ErrorAction SilentlyContinue
+          if ($existing) { Write-Output "PASS: User $uName exists"; exit 0 }
+          Write-Output "FAIL: User $uName not found"; exit 1
+        } catch { Write-Output "FAIL: User $uName — $_"; exit 1 }
+      loop:
+        - { uname: dir_intelligence, pw: "D1r_1nt3l!", ou: Intelligence }
+        - { uname: analyst_osint, pw: "0S1NT_An@lyst!", ou: Intelligence }
+        - { uname: analyst_malware, pw: "M@lw@r3_An@lyst!", ou: Intelligence }
+        - { uname: analyst_forensic, pw: "F0r3ns1c_An@lyst!", ou: Intelligence }
+        - { uname: adversary_lead, pw: "Adv3rsary_L3ad!", ou: Adversary }
+        - { uname: intern_intel, pw: "1nt3rn_Int3l!", ou: Intelligence }
+        - { uname: eng_tools, pw: "T00ls_3ng!", ou: Intelligence }
+        - { uname: svc_mssql, pw: "s3rv1c3_MSSQL!", ou: Intelligence }
+        - { uname: svc_sccm, pw: "s3rv1c3_SCCM!", ou: Adversary }
+        - { uname: svc_naa, pw: "N@A_s3rv1c3!", ou: Adversary }
+      register: r
+      changed_when: false
+      failed_when: r.rc == 1
+
+    - name: "[PREP] Verify range.local users in groups"
+      ansible.windows.win_shell: |
+        $ErrorActionPreference = "Stop"
+        try {
+          $group = "{{ item.group }}"
+          $members = '{{ item.users | join(",") }}'.Split(',', [System.StringSplitOptions]::RemoveEmptyEntries)
+          $existing = Get-ADGroupMember -Identity $group | Select-Object -ExpandProperty SamAccountName
+          $missing = $members | Where-Object { $_ -notin $existing }
+          if ($missing.Count -eq 0) { Write-Output "PASS: All members in $group"; exit 0 }
+          Write-Output "FAIL: $group missing members: $($missing -join ', ')"; exit 1
+        } catch { Write-Output "FAIL: Group membership $group — $_"; exit 1 }
+      loop:
+        - { group: "Intelligence-Cadre", users: ["dir_intelligence", "analyst_osint", "analyst_malware", "analyst_forensic", "intern_intel"] }
+        - { group: "Adversary-Cadre", users: ["adversary_lead"] }
+        - { group: "Tools-Eng", users: ["eng_tools"] }
+      register: r
+      changed_when: false
+      failed_when: r.rc == 1
+
+    - name: "[PREP][WT#34] Verify svc_naa in Domain Admins (range.local)"
+      ansible.windows.win_shell: |
+        $ErrorActionPreference = "Stop"
+        try {
+          $member = Get-ADGroupMember -Identity "Domain Admins" | Where-Object { $_.SamAccountName -eq "svc_naa" }
+          if ($member) { Write-Output "PASS: svc_naa in Domain Admins"; exit 0 }
+          Write-Output "FAIL: svc_naa not in Domain Admins"; exit 1
+        } catch { Write-Output "FAIL: svc_naa → Domain Admins — $_"; exit 1 }
+      register: r
+      changed_when: false
+      failed_when: r.rc == 1
+
+    - name: "[PREP][WT#26] Verify dMSA dmsaPrivService exists"
+      ansible.windows.win_shell: |
+        $ErrorActionPreference = "Stop"
+        try {
+          $dmsa = Get-ADServiceAccount -Identity "dmsaPrivService" -ErrorAction SilentlyContinue
+          if ($dmsa) { Write-Output "PASS: dMSA dmsaPrivService exists"; exit 0 }
+          Write-Output "FAIL: dMSA dmsaPrivService not found"; exit 1
+        } catch { Write-Output "FAIL: dMSA dmsaPrivService — $_"; exit 1 }
+      register: r
+      changed_when: false
+      failed_when: r.rc == 1

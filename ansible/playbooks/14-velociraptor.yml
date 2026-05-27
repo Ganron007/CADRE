@@ -1,0 +1,324 @@
+---
+# TYPE: DEPLOY (rc=0=skip, rc=2=applied+verified, rc=1=fail)
+# ============================================================
+# velociraptor extension — Server + Client enrollment + Hunts
+# + MCP endpoint for Plan 7 agentic pipeline
+# ============================================================
+
+- name: "Play 1 — Install Velociraptor server on vr VM"
+  hosts: vr
+  gather_facts: true
+  become: yes
+  vars:
+    vr_release_tag: "0.76"
+    vr_binary_version: "0.76.1"
+    vr_host: "192.168.77.51"
+    vr_gui_port: 8889
+    vr_api_port: 8001
+    vr_frontend_port: 8000
+    vr_admin_password: "VelociraptorDefault!"
+  tasks:
+    - name: Install system dependencies
+      ansible.builtin.apt:
+        name:
+          - ca-certificates
+          - curl
+          - python3
+          - python3-pip
+          - wget
+        state: present
+        update_cache: true
+
+    - name: Create Velociraptor directories
+      ansible.builtin.file:
+        path: "{{ item }}"
+        state: directory
+        mode: "0755"
+      loop:
+        - /etc/velociraptor
+        - /var/lib/velociraptor
+        - /var/lib/velociraptor/files
+        - /var/log/velociraptor
+
+    - name: Download Velociraptor binary
+      ansible.builtin.get_url:
+        url: "https://github.com/Velocidex/velociraptor/releases/download/v{{ vr_release_tag }}/velociraptor-v{{ vr_binary_version }}-linux-amd64"
+        dest: /usr/local/bin/velociraptor
+        mode: "0755"
+
+    - name: Generate Velociraptor server config
+      ansible.builtin.shell: |
+        /usr/local/bin/velociraptor config generate 2>/dev/null > /tmp/vr-full-config.yaml
+        python3 << 'PYEOF'
+        import yaml
+        with open("/tmp/vr-full-config.yaml") as f:
+            cfg = yaml.safe_load(f)
+        cfg["Frontend"]["hostname"] = "{{ vr_host }}"
+        cfg["Frontend"]["bind_address"] = "0.0.0.0"
+        cfg["GUI"]["bind_address"] = "0.0.0.0"
+        cfg["GUI"]["public_url"] = "https://{{ vr_host }}:{{ vr_gui_port }}/app/index.html"
+        cfg["API"]["bind_address"] = "0.0.0.0"
+        cfg["API"]["bind_port"] = {{ vr_api_port }}
+        cfg["Client"]["server_urls"] = ["https://{{ vr_host }}:{{ vr_frontend_port }}/"]
+        with open("/etc/velociraptor/server.config.yaml", "w") as f:
+            yaml.dump(cfg, f, default_flow_style=False)
+        PYEOF
+        chmod 600 /etc/velociraptor/server.config.yaml
+      args:
+        creates: /etc/velociraptor/server.config.yaml
+
+    - name: Add admin user to Velociraptor
+      ansible.builtin.shell: |
+        /usr/local/bin/velociraptor --config /etc/velociraptor/server.config.yaml \
+          user add --role administrator admin "{{ vr_admin_password }}"
+      register: vr_user
+      failed_when: false
+      changed_when: "'already exists' not in vr_user.stdout"
+
+    - name: Create Velociraptor systemd service
+      ansible.builtin.copy:
+        dest: /etc/systemd/system/velociraptor.service
+        content: |
+          [Unit]
+          Description=Velociraptor Server — Digital Forensics and Incident Response
+          After=network.target
+          [Service]
+          Type=simple
+          User=root
+          ExecStart=/usr/local/bin/velociraptor --config /etc/velociraptor/server.config.yaml frontend
+          Restart=always
+          LimitNOFILE=65536
+          [Install]
+          WantedBy=multi-user.target
+        mode: "0644"
+
+    - name: Start Velociraptor server
+      ansible.builtin.systemd:
+        name: velociraptor
+        state: started
+        enabled: true
+        daemon_reload: true
+
+    - name: Wait for Velociraptor GUI
+      ansible.builtin.wait_for:
+        port: "{{ vr_gui_port }}"
+        delay: 10
+        timeout: 60
+
+    - name: Generate Velociraptor client config
+      ansible.builtin.shell: |
+        /usr/local/bin/velociraptor --config /etc/velociraptor/server.config.yaml \
+          config client > /etc/velociraptor/client.config.yaml
+      args:
+        creates: /etc/velociraptor/client.config.yaml
+
+    - name: Make client config world-readable (Ansible fetch runs as vagrant)
+      ansible.builtin.file:
+        path: /etc/velociraptor/client.config.yaml
+        mode: "0644"
+
+    - name: Download Windows Velociraptor MSI
+      ansible.builtin.get_url:
+        url: "https://github.com/Velocidex/velociraptor/releases/download/v{{ vr_release_tag }}/velociraptor-v{{ vr_binary_version }}-windows-amd64.msi"
+        dest: /tmp/velociraptor.msi
+        mode: "0644"
+
+    - name: Repack MSI with client config
+      ansible.builtin.shell: |
+        /usr/local/bin/velociraptor --config /etc/velociraptor/server.config.yaml \
+          config repack --msi /tmp/velociraptor.msi \
+          /etc/velociraptor/client.config.yaml \
+          /var/lib/velociraptor/files/velociraptor-client-cadre.msi
+      args:
+        creates: /var/lib/velociraptor/files/velociraptor-client-cadre.msi
+
+    - name: Make MSI world-readable (Ansible fetch runs as vagrant)
+      ansible.builtin.file:
+        path: /var/lib/velociraptor/files/velociraptor-client-cadre.msi
+        mode: "0644"
+
+    - name: Copy custom artifacts to vr VM
+      ansible.builtin.copy:
+        src: ../files/vr-artifacts/
+        dest: /opt/cadre-artifacts/
+        mode: "0644"
+
+    - name: Import custom artifacts into Velociraptor
+      ansible.builtin.shell: |
+        for f in /opt/cadre-artifacts/*.yaml; do
+          [ -f "$f" ] || continue
+          /usr/local/bin/velociraptor --config /etc/velociraptor/server.config.yaml \
+            artifact add "$f"
+        done
+        touch /var/lib/velociraptor/.artifacts_imported
+
+    - name: Copy pre-built hunt artifacts to vr VM
+      ansible.builtin.copy:
+        src: ../files/vr-hunts/
+        dest: /opt/cadre-hunts/
+        mode: "0644"
+
+    - name: Import pre-built hunt artifacts into Velociraptor
+      ansible.builtin.shell: |
+        for f in /opt/cadre-hunts/*.yaml; do
+          [ -f "$f" ] || continue
+          /usr/local/bin/velociraptor --config /etc/velociraptor/server.config.yaml \
+            artifact add "$f"
+        done
+        touch /var/lib/velociraptor/.hunts_imported
+
+    - name: Open firewall ports
+      ansible.builtin.ufw:
+        rule: allow
+        port: "{{ item }}"
+        proto: tcp
+      loop:
+        - "{{ vr_frontend_port }}"
+        - "{{ vr_gui_port }}"
+        - "{{ vr_api_port }}"
+        - 8002
+
+    - name: Enroll vr server as its own client
+      ansible.builtin.shell: |
+        /usr/local/bin/velociraptor --config /etc/velociraptor/server.config.yaml config client > /etc/velociraptor/client.config.yaml
+        chmod 600 /etc/velociraptor/client.config.yaml
+      args:
+        creates: /etc/velociraptor/client.config.yaml
+
+    - name: Create vr client systemd service
+      ansible.builtin.copy:
+        dest: /etc/systemd/system/velociraptor-client.service
+        content: |
+          [Unit]
+          Description=Velociraptor Client
+          After=network.target
+          [Service]
+          Type=simple
+          ExecStart=/usr/local/bin/velociraptor --config /etc/velociraptor/client.config.yaml client
+          Restart=always
+          [Install]
+          WantedBy=multi-user.target
+        mode: "0644"
+
+    - name: Start vr client
+      ansible.builtin.systemd:
+        name: velociraptor-client
+        state: started
+        enabled: true
+        daemon_reload: true
+      ignore_errors: true
+
+- name: "Play 2 — Enroll Velociraptor client on Windows VMs"
+  hosts: windows_servers
+  gather_facts: true
+  tasks:
+    - name: Remove stale Velociraptor MSI product registration if any
+      ansible.windows.win_shell: |
+        $guid = (Get-WmiObject Win32_Product | Where-Object { $_.Name -like "*Velociraptor*" }).IdentifyingNumber
+        if ($guid) { msiexec /x $guid /quiet }
+      register: vr_stale
+      changed_when: false
+      failed_when: false
+
+    - name: Remove stale Velociraptor service if any
+      ansible.windows.win_shell: |
+        sc.exe delete Velociraptor 2>$null
+        sc.exe delete 'Velociraptor Service' 2>$null
+      changed_when: false
+      failed_when: false
+
+    - name: Create Tools directory
+      ansible.windows.win_file:
+        path: C:\Tools
+        state: directory
+
+    - name: Pull repacked MSI from vr server to controller
+      ansible.builtin.fetch:
+        src: /var/lib/velociraptor/files/velociraptor-client-cadre.msi
+        dest: /tmp/vr-client-cadre.msi
+        flat: true
+      delegate_to: vr
+
+    - name: Push repacked MSI to Windows VM
+      ansible.windows.win_copy:
+        src: /tmp/vr-client-cadre.msi
+        dest: "C:\\Tools\\velociraptor-client.msi"
+
+    - name: Install Velociraptor client on Windows
+      ansible.windows.win_shell: msiexec /i "C:\Tools\velociraptor-client.msi" /quiet
+      register: vr_install
+      changed_when: false
+      failed_when: false
+
+    - name: Ensure Velociraptor service is running
+      ansible.windows.win_shell: |
+        $binPath = '"C:\Program Files\Velociraptor\velociraptor.exe" --config "C:\Program Files\Velociraptor\client.config.yaml" service run'
+        if (-not (Get-Service -Name "Velociraptor" -ErrorAction SilentlyContinue)) {
+            New-Service -Name "Velociraptor" -BinaryPathName $binPath -StartupType Automatic
+        }
+        Start-Service -Name "Velociraptor" -ErrorAction SilentlyContinue
+        Get-Service -Name "Velociraptor" | Select-Object Name,Status,StartType
+
+- name: "Play 3 — Enroll Velociraptor client on linux01"
+  hosts: linux_members
+  gather_facts: true
+  become: yes
+  vars:
+    vr_host: 192.168.77.51
+    vr_frontend_port: 8000
+    vr_release_tag: "0.76"
+    vr_binary_version: "0.76.1"
+  tasks:
+    - name: Check if Velociraptor client binary exists
+      ansible.builtin.stat:
+        path: /usr/local/bin/velociraptor-client
+      register: vr_bin
+
+    - name: Download Velociraptor Linux client binary
+      ansible.builtin.get_url:
+        url: "https://github.com/Velocidex/velociraptor/releases/download/v{{ vr_release_tag }}/velociraptor-v{{ vr_binary_version }}-linux-amd64"
+        dest: /usr/local/bin/velociraptor-client
+        mode: "0755"
+      when: not vr_bin.stat.exists
+
+    - name: Fetch client config from vr server
+      ansible.builtin.fetch:
+        src: /etc/velociraptor/client.config.yaml
+        dest: /tmp/vr-client-config.yaml
+        flat: true
+      delegate_to: vr
+
+    - name: Create Velociraptor config directory on linux01
+      ansible.builtin.file:
+        path: /etc/velociraptor
+        state: directory
+        mode: "0755"
+
+    - name: Push client config to linux01
+      ansible.builtin.copy:
+        src: /tmp/vr-client-config.yaml
+        dest: /etc/velociraptor/client.config.yaml
+        mode: "0600"
+
+    - name: Create Velociraptor client systemd service
+      ansible.builtin.copy:
+        dest: /etc/systemd/system/velociraptor-client.service
+        content: |
+          [Unit]
+          Description=Velociraptor Client
+          After=network.target
+          [Service]
+          Type=simple
+          ExecStart=/usr/local/bin/velociraptor-client --config /etc/velociraptor/client.config.yaml client
+          Restart=always
+          [Install]
+          WantedBy=multi-user.target
+        mode: "0644"
+
+    - name: Start Velociraptor client on linux01
+      ansible.builtin.systemd:
+        name: velociraptor-client
+        state: started
+        enabled: true
+        daemon_reload: true
+

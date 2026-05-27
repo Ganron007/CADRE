@@ -1,0 +1,27 @@
+name: CADRE.Hunts.FullBreach
+description: |
+  Comprehensive breach investigation — union of all CADRE hunt artifacts.
+  Collects every forensic artifact available in the lab in one collection.
+  Part of the CADRE pre-built hunt library.
+sources:
+  - name: ProcessTree
+    queries:
+      - SELECT * FROM Artifact.CADRE.Hunts.ProcessTree()
+  - name: CredentialAccess
+    queries:
+      - SELECT * FROM Artifact.CADRE.Hunts.CredentialAccess()
+  - name: NetworkState
+    queries:
+      - SELECT * FROM Artifact.CADRE.Hunts.NetworkState()
+  - name: FilesystemTimeline
+    queries:
+      - SELECT * FROM Artifact.CADRE.Hunts.FilesystemTimeline()
+  - name: RegistrySnapshot
+    queries:
+      - SELECT * FROM Artifact.CADRE.Hunts.RegistrySnapshot()
+  - name: EventLogs
+    queries:
+      - SELECT * FROM Artifact.CADRE.Hunts.EventLogs()
+  - name: LinuxTriage
+    queries:
+      - SELECT * FROM Artifact.CADRE.Hunts.LinuxTriage()

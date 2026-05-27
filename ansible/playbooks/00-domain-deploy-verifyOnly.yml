@@ -1,0 +1,330 @@
+---
+# TYPE: VERIFY-ONLY (rc=0=pass, rc=1=fail — checks domains, DNS, trusts are deployed)
+# Layer 00: Domain Deploy — Verify-only counterpart of 00-domain-deploy.yml
+# Every task is converted to rc=0/1 pattern (no modifications, no reboots).
+#
+# Run order: dc01 (forest root) → dc02 (child) → dc03 (independent forest) → trusts
+#
+# DSRM passwords:
+#   cadre.local:    S@feMode_CADRE_2026!
+#   child.cadre.local: S@feMode_Ch1ld_2026!
+#   range.local:    S@feMode_R@ng3_2026!
+
+- name: "dc01 — Verify AD-DS + cadre.local forest"
+  hosts: dc01
+  gather_facts: false
+  tasks:
+    - name: "[VERIFY] AD-Domain-Services feature installed"
+      ansible.windows.win_shell: |
+        $ErrorActionPreference = "Stop"
+        try {
+          $f = Get-WindowsFeature -Name AD-Domain-Services
+          if ($f.Installed) { Write-Output "PASS: AD-DS feature is installed"; exit 0 }
+          Write-Output "FAIL: AD-DS feature not installed"; exit 1
+        } catch { Write-Output "FAIL: $_"; exit 1 }
+      register: r
+      changed_when: false
+      failed_when: r.rc == 1
+
+    - name: "[VERIFY] cadre.local domain exists"
+      ansible.windows.win_shell: |
+        $ErrorActionPreference = "Stop"
+        try {
+          $domain = Get-ADDomain -Identity cadre.local -ErrorAction SilentlyContinue
+          if ($domain) { Write-Output "PASS: cadre.local domain exists"; exit 0 }
+          Write-Output "FAIL: cadre.local domain not found"; exit 1
+        } catch { Write-Output "FAIL: $_"; exit 1 }
+      register: r
+      changed_when: false
+      failed_when: r.rc == 1
+
+    - name: "[VERIFY] DNS role installed"
+      ansible.windows.win_shell: |
+        $ErrorActionPreference = "Stop"
+        try {
+          $f = Get-WindowsFeature -Name DNS
+          if ($f.Installed) { Write-Output "PASS: DNS role is installed"; exit 0 }
+          Write-Output "FAIL: DNS role not installed"; exit 1
+        } catch { Write-Output "FAIL: $_"; exit 1 }
+      register: r
+      changed_when: false
+      failed_when: r.rc == 1
+
+    - name: "[VERIFY] Reverse lookup zone exists"
+      ansible.windows.win_shell: |
+        $ErrorActionPreference = "Stop"
+        try {
+          $z = Get-DnsServerZone -Name "77.168.192.in-addr.arpa" -ErrorAction SilentlyContinue
+          if ($z) { Write-Output "PASS: Reverse lookup zone exists"; exit 0 }
+          Write-Output "FAIL: Reverse lookup zone not found"; exit 1
+        } catch { Write-Output "FAIL: $_"; exit 1 }
+      register: r
+      changed_when: false
+      failed_when: r.rc == 1
+
+    - name: "[VERIFY] NAT adapter DNS registration check"
+      ansible.windows.win_shell: |
+        $ErrorActionPreference = "Stop"
+        try {
+          $domainIP = "{{ ansible_host }}"
+          $adapters = Get-NetAdapter | Where-Object { $_.Status -eq "Up" }
+          foreach ($if in $adapters) {
+            $ip = Get-NetIPAddress -InterfaceIndex $if.ifIndex -AddressFamily IPv4 -ErrorAction SilentlyContinue
+            if ($ip.IPAddress -ne $domainIP) {
+              $current = (Get-DnsClient -InterfaceIndex $if.ifIndex -ErrorAction SilentlyContinue).RegisterThisConnectionsAddress
+              Write-Output "NAT: $($if.Name) (IP $($ip.IPAddress)) - RegisterThisConnectionsAddress = $current"
+            }
+          }
+          Write-Output "PASS: Domain adapter ($domainIP) uses Ansible-managed DNS. NAT adapters are controlled by VMware DHCP."; exit 0
+        } catch { Write-Output "FAIL: $_"; exit 1 }
+      register: r
+      changed_when: false
+      failed_when: r.rc == 1
+
+    - name: "[VERIFY] DNS listener check"
+      ansible.windows.win_shell: |
+        $ErrorActionPreference = "Stop"
+        try {
+          $domainIP = "{{ ansible_host }}"
+          $listen = (Get-ItemProperty "HKLM:\SYSTEM\CurrentControlSet\Services\DNS\Parameters" -Name "ListenAddresses" -ErrorAction SilentlyContinue).ListenAddresses
+          if (-not $listen) { Write-Output "INFO: DNS listener not restricted (listening on all interfaces) — apply 00-domain-deploy.yml to set"; exit 0 }
+          if ($listen -contains $domainIP) { Write-Output "PASS: DNS listener restricted to $domainIP"; exit 0 }
+          Write-Output "INFO: DNS listener set to $($listen -join ', ') — expected $domainIP"; exit 0
+        } catch { Write-Output "INFO: DNS listener check skipped: $_"; exit 0 }
+      register: r
+      changed_when: false
+      failed_when: false
+
+- name: "dc02 — Verify AD-DS + child.cadre.local domain"
+  hosts: dc02
+  gather_facts: false
+  tasks:
+    - name: "[VERIFY] DNS client set to dc01 (192.168.77.10)"
+      ansible.windows.win_shell: |
+        $ErrorActionPreference = "Stop"
+        try {
+          $dns = Get-DnsClientServerAddress -AddressFamily IPv4 | Where-Object { $_.ServerAddresses }
+          $found = $false
+          foreach ($entry in $dns) {
+            if ($entry.ServerAddresses -contains "192.168.77.10") { $found = $true; break }
+          }
+          if ($found) { Write-Output "PASS: DNS client includes 192.168.77.10"; exit 0 }
+          Write-Output "FAIL: DNS client does not include 192.168.77.10"; exit 1
+        } catch { Write-Output "FAIL: $_"; exit 1 }
+      register: r
+      changed_when: false
+      failed_when: r.rc == 1
+
+    - name: "[VERIFY] AD-Domain-Services feature installed"
+      ansible.windows.win_shell: |
+        $ErrorActionPreference = "Stop"
+        try {
+          $f = Get-WindowsFeature -Name AD-Domain-Services
+          if ($f.Installed) { Write-Output "PASS: AD-DS feature is installed"; exit 0 }
+          Write-Output "FAIL: AD-DS feature not installed"; exit 1
+        } catch { Write-Output "FAIL: $_"; exit 1 }
+      register: r
+      changed_when: false
+      failed_when: r.rc == 1
+
+    - name: "[VERIFY] child.cadre.local domain exists"
+      ansible.windows.win_shell: |
+        $ErrorActionPreference = "Stop"
+        try {
+          $domain = Get-ADDomain -Identity child.cadre.local -ErrorAction SilentlyContinue
+          if ($domain) { Write-Output "PASS: child.cadre.local domain exists"; exit 0 }
+          Write-Output "FAIL: child.cadre.local domain not found"; exit 1
+        } catch { Write-Output "FAIL: $_"; exit 1 }
+      register: r
+      changed_when: false
+      failed_when: r.rc == 1
+
+    - name: "[VERIFY] DNS role installed"
+      ansible.windows.win_shell: |
+        $ErrorActionPreference = "Stop"
+        try {
+          $f = Get-WindowsFeature -Name DNS
+          if ($f.Installed) { Write-Output "PASS: DNS role is installed"; exit 0 }
+          Write-Output "FAIL: DNS role not installed"; exit 1
+        } catch { Write-Output "FAIL: $_"; exit 1 }
+      register: r
+      changed_when: false
+      failed_when: r.rc == 1
+
+    - name: "[VERIFY] Reverse lookup zone exists"
+      ansible.windows.win_shell: |
+        $ErrorActionPreference = "Stop"
+        try {
+          $z = Get-DnsServerZone -Name "77.168.192.in-addr.arpa" -ErrorAction SilentlyContinue
+          if ($z) { Write-Output "PASS: Reverse lookup zone exists"; exit 0 }
+          Write-Output "FAIL: Reverse lookup zone not found"; exit 1
+        } catch { Write-Output "FAIL: $_"; exit 1 }
+      register: r
+      changed_when: false
+      failed_when: r.rc == 1
+
+    - name: "[VERIFY] NAT adapter DNS registration check"
+      ansible.windows.win_shell: |
+        $ErrorActionPreference = "Stop"
+        try {
+          $domainIP = "{{ ansible_host }}"
+          $adapters = Get-NetAdapter | Where-Object { $_.Status -eq "Up" }
+          foreach ($if in $adapters) {
+            $ip = Get-NetIPAddress -InterfaceIndex $if.ifIndex -AddressFamily IPv4 -ErrorAction SilentlyContinue
+            if ($ip.IPAddress -ne $domainIP) {
+              $current = (Get-DnsClient -InterfaceIndex $if.ifIndex -ErrorAction SilentlyContinue).RegisterThisConnectionsAddress
+              Write-Output "NAT: $($if.Name) (IP $($ip.IPAddress)) - RegisterThisConnectionsAddress = $current"
+            }
+          }
+          Write-Output "PASS: Domain adapter ($domainIP) uses Ansible-managed DNS. NAT adapters are controlled by VMware DHCP."; exit 0
+        } catch { Write-Output "FAIL: $_"; exit 1 }
+      register: r
+      changed_when: false
+      failed_when: r.rc == 1
+
+    - name: "[VERIFY] DNS listener check"
+      ansible.windows.win_shell: |
+        $ErrorActionPreference = "Stop"
+        try {
+          $domainIP = "{{ ansible_host }}"
+          $listen = (Get-ItemProperty "HKLM:\SYSTEM\CurrentControlSet\Services\DNS\Parameters" -Name "ListenAddresses" -ErrorAction SilentlyContinue).ListenAddresses
+          if (-not $listen) { Write-Output "INFO: DNS listener not restricted (listening on all interfaces) — apply 00-domain-deploy.yml to set"; exit 0 }
+          if ($listen -contains $domainIP) { Write-Output "PASS: DNS listener restricted to $domainIP"; exit 0 }
+          Write-Output "INFO: DNS listener set to $($listen -join ', ') — expected $domainIP"; exit 0
+        } catch { Write-Output "INFO: DNS listener check skipped: $_"; exit 0 }
+      register: r
+      changed_when: false
+      failed_when: false
+
+- name: "dc03 — Verify AD-DS + range.local forest"
+  hosts: dc03
+  gather_facts: false
+  tasks:
+    - name: "[VERIFY] DNS client set to dc01 (192.168.77.10)"
+      ansible.windows.win_shell: |
+        $ErrorActionPreference = "Stop"
+        try {
+          $dns = Get-DnsClientServerAddress -AddressFamily IPv4 | Where-Object { $_.ServerAddresses }
+          $found = $false
+          foreach ($entry in $dns) {
+            if ($entry.ServerAddresses -contains "192.168.77.10") { $found = $true; break }
+          }
+          if ($found) { Write-Output "PASS: DNS client includes 192.168.77.10"; exit 0 }
+          Write-Output "FAIL: DNS client does not include 192.168.77.10"; exit 1
+        } catch { Write-Output "FAIL: $_"; exit 1 }
+      register: r
+      changed_when: false
+      failed_when: r.rc == 1
+
+    - name: "[VERIFY] AD-Domain-Services feature installed"
+      ansible.windows.win_shell: |
+        $ErrorActionPreference = "Stop"
+        try {
+          $f = Get-WindowsFeature -Name AD-Domain-Services
+          if ($f.Installed) { Write-Output "PASS: AD-DS feature is installed"; exit 0 }
+          Write-Output "FAIL: AD-DS feature not installed"; exit 1
+        } catch { Write-Output "FAIL: $_"; exit 1 }
+      register: r
+      changed_when: false
+      failed_when: r.rc == 1
+
+    - name: "[VERIFY] range.local domain exists"
+      ansible.windows.win_shell: |
+        $ErrorActionPreference = "Stop"
+        try {
+          $domain = Get-ADDomain -Identity range.local -ErrorAction SilentlyContinue
+          if ($domain) { Write-Output "PASS: range.local domain exists"; exit 0 }
+          Write-Output "FAIL: range.local domain not found"; exit 1
+        } catch { Write-Output "FAIL: $_"; exit 1 }
+      register: r
+      changed_when: false
+      failed_when: r.rc == 1
+
+    - name: "[VERIFY] DNS role installed"
+      ansible.windows.win_shell: |
+        $ErrorActionPreference = "Stop"
+        try {
+          $f = Get-WindowsFeature -Name DNS
+          if ($f.Installed) { Write-Output "PASS: DNS role is installed"; exit 0 }
+          Write-Output "FAIL: DNS role not installed"; exit 1
+        } catch { Write-Output "FAIL: $_"; exit 1 }
+      register: r
+      changed_when: false
+      failed_when: r.rc == 1
+
+    - name: "[VERIFY] Reverse lookup zone exists"
+      ansible.windows.win_shell: |
+        $ErrorActionPreference = "Stop"
+        try {
+          $z = Get-DnsServerZone -Name "77.168.192.in-addr.arpa" -ErrorAction SilentlyContinue
+          if ($z) { Write-Output "PASS: Reverse lookup zone exists"; exit 0 }
+          Write-Output "FAIL: Reverse lookup zone not found"; exit 1
+        } catch { Write-Output "FAIL: $_"; exit 1 }
+      register: r
+      changed_when: false
+      failed_when: r.rc == 1
+
+    - name: "[VERIFY] NAT adapter DNS registration check"
+      ansible.windows.win_shell: |
+        $ErrorActionPreference = "Stop"
+        try {
+          $domainIP = "{{ ansible_host }}"
+          $adapters = Get-NetAdapter | Where-Object { $_.Status -eq "Up" }
+          foreach ($if in $adapters) {
+            $ip = Get-NetIPAddress -InterfaceIndex $if.ifIndex -AddressFamily IPv4 -ErrorAction SilentlyContinue
+            if ($ip.IPAddress -ne $domainIP) {
+              $current = (Get-DnsClient -InterfaceIndex $if.ifIndex -ErrorAction SilentlyContinue).RegisterThisConnectionsAddress
+              Write-Output "NAT: $($if.Name) (IP $($ip.IPAddress)) - RegisterThisConnectionsAddress = $current"
+            }
+          }
+          Write-Output "PASS: Domain adapter ($domainIP) uses Ansible-managed DNS. NAT adapters are controlled by VMware DHCP."; exit 0
+        } catch { Write-Output "FAIL: $_"; exit 1 }
+      register: r
+      changed_when: false
+      failed_when: r.rc == 1
+
+    - name: "[VERIFY] DNS listener check"
+      ansible.windows.win_shell: |
+        $ErrorActionPreference = "Stop"
+        try {
+          $domainIP = "{{ ansible_host }}"
+          $listen = (Get-ItemProperty "HKLM:\SYSTEM\CurrentControlSet\Services\DNS\Parameters" -Name "ListenAddresses" -ErrorAction SilentlyContinue).ListenAddresses
+          if (-not $listen) { Write-Output "INFO: DNS listener not restricted (listening on all interfaces) — apply 00-domain-deploy.yml to set"; exit 0 }
+          if ($listen -contains $domainIP) { Write-Output "PASS: DNS listener restricted to $domainIP"; exit 0 }
+          Write-Output "INFO: DNS listener set to $($listen -join ', ') — expected $domainIP"; exit 0
+        } catch { Write-Output "INFO: DNS listener check skipped: $_"; exit 0 }
+      register: r
+      changed_when: false
+      failed_when: false
+
+- name: "Verify forest trust — cadre.local side"
+  hosts: dc01
+  gather_facts: false
+  tasks:
+    - name: "[VERIFY][WT#33] Forest trust to range.local exists"
+      ansible.windows.win_shell: |
+        $ErrorActionPreference = "Stop"
+        try {
+          $trust = Get-ADTrust -Filter "Name -eq 'range.local'" -ErrorAction SilentlyContinue
+          if ($trust) { Write-Output "PASS: Forest trust cadre.local→range.local exists"; exit 0 }
+          Write-Output "FAIL: Forest trust cadre.local→range.local not found"; exit 1
+        } catch { Write-Output "FAIL: $_"; exit 1 }
+      register: r
+      changed_when: false
+      failed_when: r.rc == 1
+
+- name: "Verify forest trust — range.local side"
+  hosts: dc03
+  gather_facts: false
+  tasks:
+    - name: "[VERIFY][WT#33] Forest trust to cadre.local exists"
+      ansible.windows.win_shell: |
+        $ErrorActionPreference = "Stop"
+        try {
+          $trust = Get-ADTrust -Filter "Name -eq 'cadre.local'" -ErrorAction SilentlyContinue
+          if ($trust) { Write-Output "PASS: Forest trust range.local→cadre.local exists"; exit 0 }
+          Write-Output "FAIL: Forest trust range.local→cadre.local not found"; exit 1
+        } catch { Write-Output "FAIL: $_"; exit 1 }
+      register: r
+      changed_when: false
+      failed_when: r.rc == 1

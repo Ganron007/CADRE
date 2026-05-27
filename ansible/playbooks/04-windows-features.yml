@@ -1,0 +1,73 @@
+---
+# TYPE: DEPLOY (rc=0=skip, rc=2=applied+verified, rc=1=fail)
+# Layer 4a: Windows Features — IIS (mbr01), WSUS (mbr02)
+# Runs after member domain joins (03-member-join.yml).
+# IIS targets require domain membership for CertPotato attack path.
+# WSUS uses WID database (no SQL Server dependency).
+# Idempotent — already-installed features skip.
+
+- name: "Install IIS on mbr01 (CertPotato target)"
+  hosts: mbr01
+  gather_facts: false
+  tasks:
+    - name: "[VULN][WT#29] Install IIS Web Server + ASP.NET"
+      ansible.windows.win_feature:
+        name:
+          - Web-Server
+          - Web-Asp-Net45
+          - Web-Net-Ext45
+        include_management_tools: true
+        state: present
+
+- name: "Install WSUS on mbr02 (update abuse target)"
+  hosts: mbr02
+  gather_facts: false
+  tasks:
+    - name: "[VULN][WT#30] Install WSUS features (Services + WID + RSAT)"
+      ansible.windows.win_feature:
+        name:
+          - UpdateServices-Services
+          - UpdateServices-WidDB
+          - UpdateServices-RSAT
+        include_management_tools: true
+        state: present
+      register: wsus_install
+
+    - name: "[VULN][WT#30] Reboot if WSUS requires it"
+      ansible.windows.win_reboot:
+        reboot_timeout: 900
+      when: wsus_install.reboot_required
+
+    - name: "[VULN][WT#30] Run wsusutil postinstall"
+      ansible.windows.win_shell: |
+        $ErrorActionPreference = "Stop"
+        try {
+          $wsusutil = "C:\Program Files\Update Services\Tools\wsusutil.exe"
+          if (-not (Test-Path $wsusutil)) { Write-Output "SKIP: wsusutil not found"; exit 0 }
+          $contentDir = Get-ItemPropertyValue -Path "HKLM:\SOFTWARE\Microsoft\Update Services\Server\Setup" -Name "ContentDir" -ErrorAction SilentlyContinue
+          if ($contentDir) { Write-Output "OK: WSUS already post-installed (ContentDir: $contentDir)"; exit 0 }
+          New-Item -ItemType Directory -Path C:\WSUS -Force | Out-Null
+          & $wsusutil postinstall CONTENT_DIR=C:\WSUS
+          $v = Get-ItemPropertyValue -Path "HKLM:\SOFTWARE\Microsoft\Update Services\Server\Setup" -Name "ContentDir" -ErrorAction SilentlyContinue
+          if (-not $v) { throw "WSUS postinstall did not create registry key" }
+          Write-Output "APPLIED: WSUS postinstall complete and verified"; exit 2
+        } catch { Write-Output "FAILED: $_"; exit 1 }
+      register: r
+      changed_when: r.rc == 2
+      failed_when: r.rc == 1
+
+    - name: "[VULN][WT#30] Configure WSUS sync from Microsoft Update"
+      ansible.windows.win_shell: |
+        $ErrorActionPreference = "Stop"
+        try {
+          $wsus = Get-WsusServer -ErrorAction SilentlyContinue
+          if (-not $wsus) { Write-Output "SKIP: WSUS server object not available"; exit 0 }
+          $config = $wsus.GetConfiguration()
+          if ($config.SyncFromMicrosoftUpdate -eq $true) { Write-Output "OK: Already syncing from MU"; exit 0 }
+          $config.SyncFromMicrosoftUpdate = $true
+          $config.Save()
+          Write-Output "APPLIED: WSUS configured to sync from Microsoft Update"; exit 2
+        } catch { Write-Output "FAILED: $_"; exit 1 }
+      register: r
+      changed_when: r.rc == 2
+      failed_when: r.rc == 1

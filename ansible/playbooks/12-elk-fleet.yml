@@ -1,0 +1,1747 @@
+---
+# TYPE: DEPLOY (rc=0=skip, rc=2=applied+verified, rc=1=fail)
+# ============================================================
+# elk-fleet extension — Elastic 9.x + Kibana + Fleet Server
+# + Fleet policies (CADRE-All, CADRE-Linux, CADRE-Monitor)
+# + Elastic Defend (detect mode) + Windows/System/Osquery/Z/S integrations
+# + Threat Intel (Abuse.ch) + 23 seed detection rules
+# + Elastic Agent enrollment on all 6 target VMs
+# ============================================================
+
+- name: "Play 1 — Install ES + Kibana + Fleet Server on elk VM"
+  hosts: elk
+  gather_facts: true
+  become: yes
+  vars:
+    elk_major: "9"
+    elastic_password: "elastic_CADRE_2026!"
+    es_port: 9200
+    kibana_port: 5601
+    fleet_port: 8220
+    elastic_agent_version: "9.0.0"
+    kibana_service_token: ""
+
+  tasks:
+    - name: Read persisted elastic password if available
+      ansible.builtin.slurp:
+        src: /home/vagrant/es-generated-pw.txt
+      register: es_pw_file
+      ignore_errors: true
+
+    - name: Override elastic_password from file
+      ansible.builtin.set_fact:
+        elastic_password: "{{ (es_pw_file.content | b64decode).strip() }}"
+      when: es_pw_file is succeeded
+
+    - name: Install system dependencies
+      ansible.builtin.apt:
+        name:
+          - apt-transport-https
+          - ca-certificates
+          - curl
+          - gnupg
+          - python3-pip
+          - unzip
+          - wget
+          - jq
+        state: present
+        update_cache: true
+
+    - name: Add Elastic GPG key
+      ansible.builtin.apt_key:
+        url: https://artifacts.elastic.co/GPG-KEY-elasticsearch
+        state: present
+
+    - name: Add Elastic APT repository
+      ansible.builtin.apt_repository:
+        repo: "deb https://artifacts.elastic.co/packages/{{ elk_major }}.x/apt stable main"
+        state: present
+        update_cache: true
+
+    - name: Install Elasticsearch + Kibana
+      ansible.builtin.apt:
+        name:
+          - elasticsearch
+          - kibana
+        state: present
+
+    - name: Get installed Elasticsearch version for same-version elastic-agent
+      ansible.builtin.shell: |
+        dpkg-query -W -f='${Version}' elasticsearch | cut -d- -f1
+      register: es_ver_raw
+      changed_when: false
+
+    - name: Set elastic-agent version fact
+      ansible.builtin.set_fact:
+        elastic_agent_dl_ver: "{{ es_ver_raw.stdout | default('9.4.1') }}"
+
+    - name: Remove apt-installed elastic-agent (blocks Fleet Server enrollment)
+      ansible.builtin.systemd:
+        name: elastic-agent
+        state: stopped
+        enabled: false
+      ignore_errors: true
+
+    - name: Purge elastic-agent apt package
+      ansible.builtin.apt:
+        name: elastic-agent
+        state: absent
+        purge: true
+
+    - name: Clean up old elastic-agent data directories
+      ansible.builtin.file:
+        path: "{{ item }}"
+        state: absent
+      loop:
+        - /etc/elastic-agent
+        - /var/lib/elastic-agent
+        - /var/log/elastic-agent
+
+    - name: Download elastic-agent tarball for Fleet Server
+      ansible.builtin.get_url:
+        url: "https://artifacts.elastic.co/downloads/beats/elastic-agent/elastic-agent-{{ elastic_agent_dl_ver }}-linux-x86_64.tar.gz"
+        dest: "/tmp/elastic-agent-{{ elastic_agent_dl_ver }}-linux-x86_64.tar.gz"
+        mode: "0644"
+      register: agent_dl
+
+    - name: Extract elastic-agent tarball
+      ansible.builtin.unarchive:
+        src: "/tmp/elastic-agent-{{ elastic_agent_dl_ver }}-linux-x86_64.tar.gz"
+        dest: /opt
+        remote_src: true
+        creates: "/opt/elastic-agent-{{ elastic_agent_dl_ver }}-linux-x86_64"
+
+    - name: Configure Elasticsearch
+      ansible.builtin.copy:
+        content: |
+          cluster.name: cadre-elk
+          node.name: elk
+          path.data: /var/lib/elasticsearch
+          path.logs: /var/log/elasticsearch
+          network.host: 0.0.0.0
+          http.port: {{ es_port }}
+          discovery.type: single-node
+          xpack.security.enabled: true
+          xpack.security.http.ssl.enabled: false
+          xpack.security.transport.ssl.enabled: false
+          xpack.security.authc.api_key.enabled: true
+        dest: /etc/elasticsearch/elasticsearch.yml
+        mode: "0644"
+
+    - name: Start Elasticsearch
+      ansible.builtin.systemd:
+        name: elasticsearch
+        state: started
+        enabled: true
+        daemon_reload: true
+
+    - name: Wait for Elasticsearch port
+      ansible.builtin.wait_for:
+        port: "{{ es_port }}"
+        delay: 20
+        timeout: 180
+
+    - name: Reset elastic password and capture it
+      ansible.builtin.shell: |
+        /usr/share/elasticsearch/bin/elasticsearch-reset-password -u elastic -b -s
+      register: es_pw_reset
+      ignore_errors: true
+
+    - name: Store the elastic password for subsequent API calls
+      ansible.builtin.set_fact:
+        elastic_password: "{{ es_pw_reset.stdout_lines[0] }}"
+      when: es_pw_reset is succeeded and es_pw_reset.stdout_lines | length > 0
+
+    - name: Persist elastic password to file for cross-run access
+      ansible.builtin.copy:
+        content: "{{ elastic_password }}"
+        dest: /home/vagrant/es-generated-pw.txt
+        mode: "0644"
+      when: es_pw_reset is succeeded and es_pw_reset.stdout_lines | length > 0
+
+    - name: Create GeoIP database directory
+      ansible.builtin.file:
+        path: /etc/elasticsearch/ingest-geoip
+        state: directory
+        mode: "0755"
+
+    - name: Download GeoLite2-City database for GeoIP enrichment
+      ansible.builtin.get_url:
+        url: https://github.com/P3TERX/GeoLite.mmdb/releases/download/2026.05.16/GeoLite2-City.mmdb
+        dest: /etc/elasticsearch/ingest-geoip/GeoLite2-City.mmdb
+        mode: "0644"
+
+    - name: Generate Kibana service account token
+      ansible.builtin.uri:
+        url: "http://127.0.0.1:{{ es_port }}/_security/service/elastic/kibana/credential/token"
+        method: POST
+        user: elastic
+        password: "{{ elastic_password }}"
+        force_basic_auth: true
+        status_code: [200, 409]
+      register: kibana_token_resp
+
+    - name: Store Kibana service token as fact
+      ansible.builtin.set_fact:
+        kibana_service_token: "{{ kibana_token_resp.json.token.value | default('') }}"
+      when: kibana_token_resp.status == 200
+
+    - name: Configure Kibana
+      ansible.builtin.copy:
+        content: |
+          server.port: {{ kibana_port }}
+          server.host: "0.0.0.0"
+          server.publicBaseUrl: "http://192.168.77.50:{{ kibana_port }}"
+          elasticsearch.hosts: ["http://192.168.77.50:{{ es_port }}"]
+          elasticsearch.serviceAccountToken: "{{ kibana_service_token }}"
+          xpack.encryptedSavedObjects.encryptionKey: "cadre-elk-encryption-key-2026-cadre"
+          xpack.fleet.agents.elasticsearch.hosts: ["http://192.168.77.50:{{ es_port }}"]
+          xpack.fleet.agents.fleet_server.hosts: ["https://192.168.77.50:{{ fleet_port }}"]
+          xpack.fleet.packages:
+            - name: system
+              version: latest
+            - name: windows
+              version: latest
+            - name: endpoint
+              version: latest
+            - name: zeek
+              version: latest
+            - name: suricata
+              version: latest
+        dest: /etc/kibana/kibana.yml
+        mode: "0644"
+
+    - name: Start Kibana
+      ansible.builtin.systemd:
+        name: kibana
+        state: started
+        enabled: true
+
+    - name: Wait for Kibana
+      ansible.builtin.wait_for:
+        port: "{{ kibana_port }}"
+        delay: 15
+        timeout: 180
+
+    - name: Wait for Kibana to be ready (API responds)
+      ansible.builtin.uri:
+        url: "http://127.0.0.1:{{ kibana_port }}/api/status"
+        method: GET
+        status_code: [200, 503]
+      register: kibana_status
+      retries: 30
+      delay: 10
+      until: kibana_status.status == 200
+
+    - name: Create GeoIP ingest pipeline for source.ip + destination.ip
+      ansible.builtin.uri:
+        url: "http://127.0.0.1:{{ es_port }}/_ingest/pipeline/cadre-geoip"
+        method: PUT
+        body_format: json
+        body:
+          description: "GeoIP enrichment from GeoLite2-City"
+          processors:
+            - geoip:
+                field: source.ip
+                target_field: source.geo
+                database_file: GeoLite2-City.mmdb
+                ignore_missing: true
+            - geoip:
+                field: destination.ip
+                target_field: destination.geo
+                database_file: GeoLite2-City.mmdb
+                ignore_missing: true
+            - geoip:
+                field: client.ip
+                target_field: client.geo
+                database_file: GeoLite2-City.mmdb
+                ignore_missing: true
+            - geoip:
+                field: server.ip
+                target_field: server.geo
+                database_file: GeoLite2-City.mmdb
+                ignore_missing: true
+        user: elastic
+        password: "{{ elastic_password }}"
+        force_basic_auth: true
+        headers:
+          Content-Type: "application/json"
+        status_code: [200, 409]
+      register: geoip_pipeline
+      ignore_errors: true
+
+    - name: Apply GeoIP pipeline to ECK index templates
+      ansible.builtin.uri:
+        url: "http://127.0.0.1:{{ es_port }}/_index_template/logs-windows.geoip"
+        method: PUT
+        body_format: json
+        body:
+          index_patterns:
+            - "logs-windows.*-*"
+            - "logs-auditd.*-*"
+            - "logs-system.*-*"
+            - "logs-zeek.*-*"
+            - "logs-osquery.*-*"
+            - "logs-mssql.*-*"
+            - "logs-podman.*-*"
+            - "logs-entra.*-*"
+            - "logs-azure.*-*"
+            - "logs-m365.*-*"
+          template:
+            settings:
+              index.default_pipeline: cadre-geoip
+          priority: 50
+          _meta:
+            description: "CADRE GeoIP enrichment template — applies cadre-geoip pipeline to all indices"
+        user: elastic
+        password: "{{ elastic_password }}"
+        force_basic_auth: true
+        headers:
+          Content-Type: "application/json"
+        status_code: [200, 409]
+      ignore_errors: true
+
+    - name: Create ES ILM policies for index lifecycle management
+      ansible.builtin.uri:
+        url: "http://127.0.0.1:{{ es_port }}/_ilm/policy/{{ item.name }}"
+        method: PUT
+        body_format: json
+        body: "{{ item.body }}"
+        user: elastic
+        password: "{{ elastic_password }}"
+        force_basic_auth: true
+        headers:
+          Content-Type: "application/json"
+        status_code: [200, 409]
+      loop:
+        - name: cadre-3d-retain
+          body:
+            policy:
+              phases:
+                hot:
+                  min_age: "0d"
+                  actions:
+                    rollover:
+                      max_age: "1d"
+                      max_size: "10gb"
+                delete:
+                  min_age: "7d"
+                  actions:
+                    delete: {}
+
+    - name: Apply ILM policies to @custom component templates (Fleet-managed indices)
+      ansible.builtin.uri:
+        url: "http://127.0.0.1:{{ es_port }}/_component_template/{{ item.name }}"
+        method: PUT
+        body_format: json
+        body:
+          template:
+            settings:
+              index.lifecycle.name: "{{ item.ilms }}"
+        user: elastic
+        password: "{{ elastic_password }}"
+        force_basic_auth: true
+        headers:
+          Content-Type: "application/json"
+        status_code: [200, 409]
+      loop:
+        - { name: "logs@custom",                ilms: "cadre-3d-retain" }
+        - { name: "metrics@custom",             ilms: "cadre-3d-retain" }
+        - { name: "logs-windows.forwarded@custom", ilms: "cadre-3d-retain" }
+        - { name: "logs-windows.sysmon_operational@custom", ilms: "cadre-3d-retain" }
+        - { name: "logs-windows.powershell@custom", ilms: "cadre-3d-retain" }
+        - { name: "logs-windows.powershell_operational@custom", ilms: "cadre-3d-retain" }
+        - { name: "logs-system.security@custom", ilms: "cadre-3d-retain" }
+        - { name: "logs-system.application@custom", ilms: "cadre-3d-retain" }
+        - { name: "logs-system.syslog@custom",  ilms: "cadre-3d-retain" }
+        - { name: "logs-system.auth@custom",    ilms: "cadre-3d-retain" }
+        - { name: "auditd@custom",              ilms: "cadre-3d-retain" }
+        - { name: "logs-auditd.log@custom",     ilms: "cadre-3d-retain" }
+        - { name: "microsoft_sqlserver@custom", ilms: "cadre-3d-retain" }
+        - { name: "logs-mssql.log@custom",      ilms: "cadre-3d-retain" }
+        - { name: "system@custom",              ilms: "cadre-3d-retain" }
+        - { name: "logs-osquery_manager.result@custom", ilms: "cadre-3d-retain" }
+      ignore_errors: true
+
+    - name: Apply ILM to non-Fleet index templates
+      ansible.builtin.uri:
+        url: "http://127.0.0.1:{{ es_port }}/_index_template/{{ item.name }}"
+        method: PUT
+        body_format: json
+        body:
+          index_patterns: "{{ item.patterns }}"
+          priority: 50
+          template:
+            settings:
+              index.lifecycle.name: "{{ item.ilms }}"
+        user: elastic
+        password: "{{ elastic_password }}"
+        force_basic_auth: true
+        headers:
+          Content-Type: "application/json"
+        status_code: [200, 409]
+      loop:
+        - { name: "ilmlogs-zeek",             patterns: ["logs-zeek.*-*"],            ilms: "cadre-3d-retain" }
+        - { name: "ilmlogs-suricata",         patterns: ["logs-suricata-*"],          ilms: "cadre-3d-retain" }
+        - { name: "ilmlogs-endpoint-alerts",  patterns: ["logs-endpoint.alerts-*"],   ilms: "cadre-3d-retain" }
+        - { name: "ilmlogs-alerts-security",  patterns: [".alerts-security.*"],       ilms: "cadre-3d-retain" }
+        - { name: "ilmlogs-sysmon-linux",     patterns: ["logs-sysmon_linux.log-*"],     ilms: "cadre-3d-retain" }
+        - { name: "ilmlogs-podman",           patterns: ["logs-podman-*"],            ilms: "cadre-3d-retain" }
+        - { name: "ilmlogs-sssd",             patterns: ["logs-sssd-*"],              ilms: "cadre-3d-retain" }
+        - { name: "ilmlogs-mssql-audit",     patterns: ["logs-mssql.audit-*"],       ilms: "cadre-3d-retain" }
+        - { name: "ilmlogs-osquery",         patterns: ["logs-osquery_manager.result-*"], ilms: "cadre-3d-retain" }
+      ignore_errors: true
+
+    - name: Check if Fleet Server is already enrolled
+      ansible.builtin.stat:
+        path: /etc/elastic-agent/fleet-server.yml
+      register: fleet_server_stat
+
+    - name: Create Fleet data directories
+      ansible.builtin.file:
+        path: "{{ item }}"
+        state: directory
+        mode: "0755"
+      loop:
+        - /etc/elastic-agent
+        - /var/lib/elastic-agent
+        - /var/log/elastic-agent
+
+    - name: Initialize Fleet in Kibana
+      ansible.builtin.uri:
+        url: "http://127.0.0.1:{{ kibana_port }}/api/fleet/setup"
+        method: POST
+        user: elastic
+        password: "{{ elastic_password }}"
+        force_basic_auth: true
+        headers:
+          kbn-xsrf: "true"
+        status_code: [200, 409]
+      register: fleet_setup_resp
+      when: not fleet_server_stat.stat.exists
+
+    - name: Create Fleet Server policy
+      ansible.builtin.uri:
+        url: "http://127.0.0.1:{{ kibana_port }}/api/fleet/agent_policies"
+        method: POST
+        user: elastic
+        password: "{{ elastic_password }}"
+        force_basic_auth: true
+        headers:
+          kbn-xsrf: "true"
+        body_format: json
+        body:
+          name: fleet-server-policy
+          namespace: default
+          description: "Default Fleet Server policy"
+          is_default_fleet_server: true
+          has_fleet_server: true
+          monitoring_enabled: ["logs", "metrics"]
+        status_code: [200, 409]
+      register: fs_policy_resp
+      when: not fleet_server_stat.stat.exists
+
+    - name: Generate Fleet Server service token
+      ansible.builtin.uri:
+        url: "http://127.0.0.1:{{ es_port }}/_security/service/elastic/fleet-server/credential/token"
+        method: POST
+        user: elastic
+        password: "{{ elastic_password }}"
+        force_basic_auth: true
+        status_code: [200, 409]
+      register: fleet_token_resp
+      when: not fleet_server_stat.stat.exists
+
+    - name: Extract Fleet Server service token
+      ansible.builtin.set_fact:
+        fleet_server_token: "{{ fleet_token_resp.json.token.value | default('') }}"
+      when: not fleet_server_stat.stat.exists
+
+    - name: Enroll Fleet Server on this host
+      ansible.builtin.shell: |
+        /opt/elastic-agent-{{ elastic_agent_dl_ver }}-linux-x86_64/elastic-agent install \
+          --fleet-server-es=http://127.0.0.1:{{ es_port }} \
+          --fleet-server-service-token={{ fleet_server_token }} \
+          --fleet-server-port={{ fleet_port }} \
+          --fleet-server-policy=fleet-server-policy \
+          --non-interactive \
+          --force
+      args:
+        creates: /etc/elastic-agent/fleet-server.yml
+      when: not fleet_server_stat.stat.exists
+      register: fleet_enroll
+      failed_when: false
+      ignore_errors: true
+
+    - name: Wait for Fleet Server to start listening
+      ansible.builtin.wait_for:
+        host: "192.168.77.50"
+        port: "{{ fleet_port }}"
+        delay: 15
+        timeout: 180
+
+    - name: Wait for Fleet API to be ready in Kibana
+      ansible.builtin.uri:
+        url: "http://127.0.0.1:{{ kibana_port }}/api/fleet/agent_policies"
+        method: GET
+        user: elastic
+        password: "{{ elastic_password }}"
+        force_basic_auth: true
+        headers:
+          kbn-xsrf: "true"
+        status_code: [200, 503]
+      register: fleet_api
+      retries: 30
+      delay: 10
+      until: fleet_api.status == 200
+
+- name: "Play 2 — Fleet policies + integrations + detection rules"
+  hosts: elk
+  gather_facts: false
+  vars:
+    kibana_port: 5601
+  tasks:
+    - name: Read persisted elastic password
+      ansible.builtin.slurp:
+        src: /home/vagrant/es-generated-pw.txt
+      register: es_pw_file2
+      ignore_errors: true
+
+    - name: Override elastic_password from file
+      ansible.builtin.set_fact:
+        elastic_password: "{{ (es_pw_file2.content | b64decode).strip() }}"
+      when: es_pw_file2 is succeeded
+
+    - name: Create CADRE-All Fleet policy
+      ansible.builtin.uri:
+        url: "http://127.0.0.1:{{ kibana_port }}/api/fleet/agent_policies"
+        method: POST
+        user: elastic
+        password: "{{ elastic_password }}"
+        force_basic_auth: true
+        headers:
+          kbn-xsrf: "true"
+        body_format: json
+        body:
+          name: CADRE-All
+          namespace: default
+          description: "Windows VMs + linux01 — host telemetry + Elastic Defend + Sysmon + auditd"
+          monitoring_enabled: ["logs", "metrics"]
+        status_code: [200, 409]
+      register: p1
+
+    - name: Create CADRE-Monitor Fleet policy
+      ansible.builtin.uri:
+        url: "http://127.0.0.1:{{ kibana_port }}/api/fleet/agent_policies"
+        method: POST
+        user: elastic
+        password: "{{ elastic_password }}"
+        force_basic_auth: true
+        headers:
+          kbn-xsrf: "true"
+        body_format: json
+        body:
+          name: CADRE-Monitor
+          namespace: default
+          description: "Monitor VM — Zeek + Suricata + System"
+          monitoring_enabled: ["logs", "metrics"]
+        status_code: [200, 409]
+      register: p2
+
+    - name: Create CADRE-Linux Fleet policy
+      ansible.builtin.uri:
+        url: "http://127.0.0.1:{{ kibana_port }}/api/fleet/agent_policies"
+        method: POST
+        user: elastic
+        password: "{{ elastic_password }}"
+        force_basic_auth: true
+        headers:
+          kbn-xsrf: "true"
+        body_format: json
+        body:
+          name: CADRE-Linux
+          namespace: default
+          description: "Linux VMs — osquery + auditd + MSSQL + Sysmon + System"
+          monitoring_enabled: ["logs", "metrics"]
+        status_code: [200, 409]
+      register: p3
+
+    - name: Fetch all Fleet policies to resolve IDs
+      ansible.builtin.uri:
+        url: "http://127.0.0.1:{{ kibana_port }}/api/fleet/agent_policies"
+        method: GET
+        user: elastic
+        password: "{{ elastic_password }}"
+        force_basic_auth: true
+        headers:
+          kbn-xsrf: "true"
+        status_code: 200
+      register: policies
+
+    - name: Set policy IDs
+      ansible.builtin.set_fact:
+        cadre_all: "{{ (policies.json['items'] | selectattr('name', 'equalto', 'CADRE-All') | first) }}"
+        cadre_mon: "{{ (policies.json['items'] | selectattr('name', 'equalto', 'CADRE-Monitor') | first) }}"
+        cadre_linux: "{{ (policies.json['items'] | selectattr('name', 'equalto', 'CADRE-Linux') | first) }}"
+
+    - name: Add System integration to CADRE-All (security logs + metrics)
+      ansible.builtin.uri:
+        url: "http://127.0.0.1:{{ kibana_port }}/api/fleet/package_policies"
+        method: POST
+        user: elastic
+        password: "{{ elastic_password }}"
+        force_basic_auth: true
+        headers:
+          kbn-xsrf: "true"
+          Content-Type: "application/json"
+        body_format: json
+        body:
+          name: system-cadre-all
+          policy_id: "{{ cadre_all.id }}"
+          package:
+            name: system
+            version: 2.18.0
+          inputs:
+            - type: system/metrics
+              enabled: true
+              streams:
+                - id: sys-cpu
+                  data_stream:
+                    type: metrics
+                    dataset: system.cpu
+                  enabled: true
+                  vars:
+                    period:
+                      value: "10s"
+                    cpu.metrics:
+                      value: ["percentages"]
+                - id: sys-memory
+                  data_stream:
+                    type: metrics
+                    dataset: system.memory
+                  enabled: true
+                  vars:
+                    period:
+                      value: "10s"
+                - id: sys-network
+                  data_stream:
+                    type: metrics
+                    dataset: system.network
+                  enabled: true
+                  vars:
+                    period:
+                      value: "10s"
+            - type: winlog
+              enabled: true
+              streams:
+                - id: sys-sec
+                  data_stream:
+                    type: logs
+                    dataset: system.security
+                  enabled: true
+                  vars:
+                    preserve_original_event:
+                      value: false
+        status_code: [200, 409]
+      ignore_errors: true
+
+    - name: Add Windows integration to CADRE-All (sysmon + powershell)
+      ansible.builtin.uri:
+        url: "http://127.0.0.1:{{ kibana_port }}/api/fleet/package_policies"
+        method: POST
+        user: elastic
+        password: "{{ elastic_password }}"
+        force_basic_auth: true
+        headers:
+          kbn-xsrf: "true"
+          Content-Type: "application/json"
+        body_format: json
+        body:
+          name: windows-cadre-all
+          policy_id: "{{ cadre_all.id }}"
+          package:
+            name: windows
+            version: 3.8.3
+          inputs:
+            - type: winlog
+              enabled: true
+              streams:
+                - id: win-sec
+                  data_stream:
+                    type: logs
+                    dataset: windows.forwarded
+                  enabled: true
+                  vars:
+                    preserve_original_event:
+                      value: false
+                - id: win-sysmon
+                  data_stream:
+                    type: logs
+                    dataset: windows.sysmon_operational
+                  enabled: true
+                  vars:
+                    preserve_original_event:
+                      value: false
+                - id: win-powershell
+                  data_stream:
+                    type: logs
+                    dataset: windows.powershell
+                  enabled: true
+                  vars:
+                    preserve_original_event:
+                      value: false
+                    event_id:
+                      value: "400, 403, 600, 800"
+                - id: win-powershell-op
+                  data_stream:
+                    type: logs
+                    dataset: windows.powershell_operational
+                  enabled: true
+                  vars:
+                    preserve_original_event:
+                      value: false
+                    event_id:
+                      value: "4103, 4104, 4105, 4106"
+        status_code: [200, 409]
+      ignore_errors: true
+
+    - name: Add Elastic Defend to CADRE-All (DETECT mode)
+      ansible.builtin.uri:
+        url: "http://127.0.0.1:{{ kibana_port }}/api/fleet/package_policies"
+        method: POST
+        user: elastic
+        password: "{{ elastic_password }}"
+        force_basic_auth: true
+        headers:
+          kbn-xsrf: "true"
+        body_format: json
+        body:
+          name: elastic-defend-1
+          policy_id: "{{ cadre_all.id }}"
+          package: { name: endpoint, version: latest }
+          namespace: default
+          inputs:
+            - type: endpoint
+              enabled: true
+              streams: []
+              vars:
+                policy:
+                  value:
+                    windows:
+                      malware: { mode: detect }
+                      ransomware: { mode: detect }
+                      memory_protection: { mode: detect }
+                      behavior_protection: { mode: detect }
+                    linux:
+                      malware: { mode: detect }
+                      behavior_protection: { mode: detect }
+                    mac:
+                      malware: { mode: detect }
+                      behavior_protection: { mode: detect }
+        status_code: [200, 409]
+      ignore_errors: true
+
+    - name: Add System integration to CADRE-Linux (metrics only)
+      ansible.builtin.uri:
+        url: "http://127.0.0.1:{{ kibana_port }}/api/fleet/package_policies"
+        method: POST
+        user: elastic
+        password: "{{ elastic_password }}"
+        force_basic_auth: true
+        headers:
+          kbn-xsrf: "true"
+          Content-Type: "application/json"
+        body_format: json
+        body:
+          name: system-linux-1
+          policy_id: "{{ cadre_linux.id }}"
+          package:
+            name: system
+            version: 2.18.0
+          inputs:
+            - type: system/metrics
+              enabled: true
+              streams:
+                - id: lnx-cpu
+                  data_stream:
+                    type: metrics
+                    dataset: system.cpu
+                  enabled: true
+                  vars:
+                    period:
+                      value: "10s"
+                    cpu.metrics:
+                      value: ["percentages"]
+                - id: lnx-memory
+                  data_stream:
+                    type: metrics
+                    dataset: system.memory
+                  enabled: true
+                  vars:
+                    period:
+                      value: "10s"
+                - id: lnx-network
+                  data_stream:
+                    type: metrics
+                    dataset: system.network
+                  enabled: true
+                  vars:
+                    period:
+                      value: "10s"
+        status_code: [200, 409]
+      ignore_errors: true
+
+    - name: Add System integration to CADRE-Monitor
+      ansible.builtin.uri:
+        url: "http://127.0.0.1:{{ kibana_port }}/api/fleet/package_policies"
+        method: POST
+        user: elastic
+        password: "{{ elastic_password }}"
+        force_basic_auth: true
+        headers:
+          kbn-xsrf: "true"
+          Content-Type: "application/json"
+        body_format: json
+        body:
+          name: system-mon-1
+          policy_id: "{{ cadre_mon.id }}"
+          package:
+            name: system
+            version: 2.18.0
+          inputs:
+            - type: system/metrics
+              enabled: true
+              streams:
+                - id: mon-cpu
+                  data_stream:
+                    type: metrics
+                    dataset: system.cpu
+                  enabled: true
+                  vars:
+                    period:
+                      value: "10s"
+                    cpu.metrics:
+                      value: ["percentages"]
+                - id: mon-memory
+                  data_stream:
+                    type: metrics
+                    dataset: system.memory
+                  enabled: true
+                  vars:
+                    period:
+                      value: "10s"
+                - id: mon-network
+                  data_stream:
+                    type: metrics
+                    dataset: system.network
+                  enabled: true
+                  vars:
+                    period:
+                      value: "10s"
+        status_code: [200, 409]
+      ignore_errors: true
+
+    - name: Add Zeek integration to CADRE-Monitor
+      ansible.builtin.uri:
+        url: "http://127.0.0.1:{{ kibana_port }}/api/fleet/package_policies"
+        method: POST
+        user: elastic
+        password: "{{ elastic_password }}"
+        force_basic_auth: true
+        headers:
+          kbn-xsrf: "true"
+          Content-Type: "application/json"
+        body_format: json
+        body:
+          name: zeek-cadre-mon
+          policy_id: "{{ cadre_mon.id }}"
+          package:
+            name: zeek
+            version: 5.0.1
+          inputs:
+            - type: logfile
+              enabled: true
+              vars:
+                base_paths:
+                  value: ["/opt/zeek/logs/current"]
+              streams:
+                - id: zk-conn
+                  data_stream:
+                    type: logs
+                    dataset: zeek.connection
+                  enabled: true
+                  vars:
+                    filenames:
+                      value: ["conn.log"]
+                    tags:
+                      value: ["zeek"]
+                    preserve_original_event:
+                      value: false
+                - id: zk-dns
+                  data_stream:
+                    type: logs
+                    dataset: zeek.dns
+                  enabled: true
+                  vars:
+                    filenames:
+                      value: ["dns.log"]
+                    tags:
+                      value: ["zeek"]
+                    preserve_original_event:
+                      value: false
+                - id: zk-http
+                  data_stream:
+                    type: logs
+                    dataset: zeek.http
+                  enabled: true
+                  vars:
+                    filenames:
+                      value: ["http.log"]
+                    tags:
+                      value: ["zeek"]
+                    preserve_original_event:
+                      value: false
+                - id: zk-ssl
+                  data_stream:
+                    type: logs
+                    dataset: zeek.ssl
+                  enabled: true
+                  vars:
+                    filenames:
+                      value: ["ssl.log"]
+                    tags:
+                      value: ["zeek"]
+                    preserve_original_event:
+                      value: false
+                - id: zk-kerb
+                  data_stream:
+                    type: logs
+                    dataset: zeek.kerberos
+                  enabled: true
+                  vars:
+                    filenames:
+                      value: ["kerberos.log"]
+                    tags:
+                      value: ["zeek"]
+                    preserve_original_event:
+                      value: false
+        status_code: [200, 409]
+      ignore_errors: true
+
+    - name: Add Suricata integration to CADRE-Monitor
+      ansible.builtin.uri:
+        url: "http://127.0.0.1:{{ kibana_port }}/api/fleet/package_policies"
+        method: POST
+        user: elastic
+        password: "{{ elastic_password }}"
+        force_basic_auth: true
+        headers:
+          kbn-xsrf: "true"
+          Content-Type: "application/json"
+        body_format: json
+        body:
+          name: suricata-cadre-mon
+          policy_id: "{{ cadre_mon.id }}"
+          package:
+            name: suricata
+            version: 2.27.0
+          inputs:
+            - type: logfile
+              enabled: true
+              streams:
+                - id: sc-eve
+                  data_stream:
+                    type: logs
+                    dataset: suricata.eve
+                  enabled: true
+                  vars:
+                    paths:
+                      value: ["/var/log/suricata/eve.json"]
+                    tags:
+                      value: ["suricata"]
+                    preserve_original_event:
+                      value: false
+        status_code: [200, 409]
+      ignore_errors: true
+
+    - name: Get CADRE-All enrollment API key
+      ansible.builtin.uri:
+        url: "http://127.0.0.1:{{ kibana_port }}/api/fleet/enrollment_api_keys"
+        method: GET
+        user: elastic
+        password: "{{ elastic_password }}"
+        force_basic_auth: true
+        headers:
+          kbn-xsrf: "true"
+        status_code: 200
+      register: enroll_keys
+
+    - name: Save CADRE-All enrollment token
+      ansible.builtin.set_fact:
+        cadre_all_token: "{{ (enroll_keys.json['items'] | selectattr('policy_id', 'equalto', cadre_all.id) | first).api_key }}"
+
+    - name: Save CADRE-Linux enrollment token
+      ansible.builtin.set_fact:
+        cadre_linux_token: "{{ (enroll_keys.json['items'] | selectattr('policy_id', 'equalto', cadre_linux.id) | first).api_key }}"
+
+    - name: Register winlogbeat/detection rules index template
+      ansible.builtin.uri:
+        url: "http://127.0.0.1:{{ kibana_port }}/api/detection_engine/index"
+        method: POST
+        user: elastic
+        password: "{{ elastic_password }}"
+        force_basic_auth: true
+        headers:
+          kbn-xsrf: "true"
+        status_code: [200, 409]
+      ignore_errors: true
+
+    - name: Install Fleet-maintained packages in Kibana
+      ansible.builtin.uri:
+        url: "http://127.0.0.1:{{ kibana_port }}/api/fleet/epm/packages/{{ item }}"
+        method: POST
+        user: elastic
+        password: "{{ elastic_password }}"
+        force_basic_auth: true
+        headers:
+          kbn-xsrf: "true"
+        status_code: [200, 409]
+      loop:
+        - windows
+        - system
+        - endpoint
+        - zeek
+        - suricata
+        - ti_abusech
+        - auditd
+        - microsoft_sqlserver
+        - sysmon_linux
+        - osquery_manager
+      ignore_errors: true
+
+    - name: Add auditd integration to CADRE-Linux
+      ansible.builtin.uri:
+        url: "http://127.0.0.1:{{ kibana_port }}/api/fleet/package_policies"
+        method: POST
+        user: elastic
+        password: "{{ elastic_password }}"
+        force_basic_auth: true
+        headers:
+          kbn-xsrf: "true"
+        body_format: json
+        body:
+          name: auditd-linux-1
+          policy_id: "{{ cadre_linux.id }}"
+          package:
+            name: auditd
+            version: 3.22.2
+          inputs:
+            - type: logfile
+              enabled: true
+              streams:
+                - enabled: true
+                  data_stream:
+                    type: logs
+                    dataset: auditd.log
+                  vars:
+                    paths:
+                      value: ["/var/log/audit/audit.log*"]
+                      type: text
+                    tags:
+                      value: ["auditd-log"]
+                      type: text
+                    preserve_original_event:
+                      value: false
+                      type: bool
+        status_code: [200, 409]
+      ignore_errors: true
+
+    - name: Add Microsoft SQL Server integration to CADRE-Linux (errorlog only)
+      ansible.builtin.uri:
+        url: "http://127.0.0.1:{{ kibana_port }}/api/fleet/package_policies"
+        method: POST
+        user: elastic
+        password: "{{ elastic_password }}"
+        force_basic_auth: true
+        headers:
+          kbn-xsrf: "true"
+        body_format: json
+        body:
+          name: mssql-linux-1
+          policy_id: "{{ cadre_linux.id }}"
+          package:
+            name: microsoft_sqlserver
+            version: 2.17.0
+          inputs:
+            - type: logfile
+              policy_template: audit_logs
+              enabled: true
+              streams:
+                - enabled: true
+                  data_stream:
+                    type: logs
+                    dataset: microsoft_sqlserver.log
+                  vars:
+                    paths:
+                      value: ["/var/opt/mssql/log/error*"]
+                      type: text
+                    tags:
+                      value: ["mssql-logs"]
+                      type: text
+                    preserve_original_event:
+                      value: false
+                      type: bool
+        status_code: [200, 409]
+      ignore_errors: true
+
+    - name: Add MSSQL audit files custom log to CADRE-Linux (filestream)
+      ansible.builtin.uri:
+        url: "http://127.0.0.1:{{ kibana_port }}/api/fleet/package_policies"
+        method: POST
+        user: elastic
+        password: "{{ elastic_password }}"
+        force_basic_auth: true
+        headers:
+          kbn-xsrf: "true"
+        body_format: json
+        body:
+          name: mssql-audit-linux-1
+          policy_id: "{{ cadre_linux.id }}"
+          package:
+            name: filestream
+            title: Custom Logs (Filestream)
+            version: 2.5.0
+          namespace: ""
+          inputs:
+            - type: filestream
+              policy_template: filestream
+              enabled: true
+              streams:
+                - enabled: true
+                  data_stream:
+                    type: logs
+                    dataset: filestream.filestream
+                    elasticsearch:
+                      dynamic_dataset: true
+                      dynamic_namespace: true
+                  vars:
+                    paths:
+                      type: text
+                      value: ["/var/opt/mssql/audit/*.sqlaudit"]
+                    data_stream.dataset:
+                      type: text
+                      value: mssql_audit
+        status_code: [200, 409]
+      ignore_errors: true
+
+    - name: Add Sysmon for Linux integration to CADRE-Linux
+      ansible.builtin.uri:
+        url: "http://127.0.0.1:{{ kibana_port }}/api/fleet/package_policies"
+        method: POST
+        user: elastic
+        password: "{{ elastic_password }}"
+        force_basic_auth: true
+        headers:
+          kbn-xsrf: "true"
+        body_format: json
+        body:
+          name: sysmon-linux-1
+          policy_id: "{{ cadre_linux.id }}"
+          package:
+            name: sysmon_linux
+            version: 1.9.0
+          inputs:
+            - type: filestream
+              policy_template: sysmon_linux
+              enabled: true
+              streams:
+                - enabled: true
+                  data_stream:
+                    type: logs
+                    dataset: sysmon_linux.log
+                  vars:
+                    paths:
+                      value: ["/var/log/sysmon.log"]
+                      type: text
+                    tags:
+                      value: []
+                      type: text
+                    ignore_older:
+                      value: 72h
+                      type: text
+        status_code: [200, 409]
+      ignore_errors: true
+
+    - name: Add SSSD custom logs to CADRE-Linux (filestream)
+      ansible.builtin.uri:
+        url: "http://127.0.0.1:{{ kibana_port }}/api/fleet/package_policies"
+        method: POST
+        user: elastic
+        password: "{{ elastic_password }}"
+        force_basic_auth: true
+        headers:
+          kbn-xsrf: "true"
+        body_format: json
+        body:
+          name: sssd-linux-1
+          policy_id: "{{ cadre_linux.id }}"
+          package:
+            name: filestream
+            title: Custom Logs (Filestream)
+            version: 2.5.0
+          namespace: ""
+          inputs:
+            - type: filestream
+              policy_template: filestream
+              enabled: true
+              streams:
+                - enabled: true
+                  data_stream:
+                    type: logs
+                    dataset: filestream.filestream
+                    elasticsearch:
+                      dynamic_dataset: true
+                      dynamic_namespace: true
+                  vars:
+                    paths:
+                      type: text
+                      value: ["/var/log/sssd/*.log"]
+                    data_stream.dataset:
+                      type: text
+                      value: sssd
+        status_code: [200, 409]
+      ignore_errors: true
+
+    - name: Add Podman custom logs to CADRE-Linux (filestream)
+      ansible.builtin.uri:
+        url: "http://127.0.0.1:{{ kibana_port }}/api/fleet/package_policies"
+        method: POST
+        user: elastic
+        password: "{{ elastic_password }}"
+        force_basic_auth: true
+        headers:
+          kbn-xsrf: "true"
+        body_format: json
+        body:
+          name: podman-linux-1
+          policy_id: "{{ cadre_linux.id }}"
+          package:
+            name: filestream
+            title: Custom Logs (Filestream)
+            version: 2.5.0
+          namespace: ""
+          inputs:
+            - type: filestream
+              policy_template: filestream
+              enabled: true
+              streams:
+                - enabled: true
+                  data_stream:
+                    type: logs
+                    dataset: filestream.filestream
+                    elasticsearch:
+                      dynamic_dataset: true
+                      dynamic_namespace: true
+                  vars:
+                    paths:
+                      type: text
+                      value: ["/var/log/podman-events.log"]
+                    data_stream.dataset:
+                      type: text
+                      value: podman
+        status_code: [200, 409]
+      ignore_errors: true
+
+    - name: Add Osquery Manager to CADRE-Linux (2 packs — SUID + recent-login)
+      ansible.builtin.uri:
+        url: "http://127.0.0.1:{{ kibana_port }}/api/fleet/package_policies"
+        method: POST
+        user: elastic
+        password: "{{ elastic_password }}"
+        force_basic_auth: true
+        headers:
+          kbn-xsrf: "true"
+          Content-Type: "application/json"
+        body_format: json
+        body:
+          name: osquery-linux-1
+          policy_id: "{{ cadre_linux.id }}"
+          package:
+            name: osquery_manager
+            version: 1.28.1
+          inputs:
+            - type: osquery
+              enabled: true
+              streams:
+                - enabled: true
+                  data_stream:
+                    type: logs
+                    dataset: osquery_manager.action.responses
+                  vars:
+                    query:
+                      type: text
+                - enabled: true
+                  data_stream:
+                    type: logs
+                    dataset: osquery_manager.result
+                  vars:
+                    query:
+                      type: text
+              config:
+                osquery:
+                  value:
+                    packs:
+                      default--cadre-linux-pack-suid:
+                        shard: 100
+                        queries:
+                          suid_bin:
+                            interval: 300
+                            query: "SELECT path, username, groupname, permissions FROM suid_bins;"
+                            platform: linux
+                          proc_inmemory:
+                            interval: 300
+                            query: "SELECT pid, name, path, cmdline, uid, parent FROM processes WHERE on_disk = 0;"
+                            platform: linux
+                          listening_ports_external:
+                            interval: 300
+                            query: "SELECT pid, port, protocol, family, address, p.name FROM listening_ports lp JOIN processes p USING (pid) WHERE address NOT IN ('127.0.0.1','::1','0.0.0.0','::');"
+                            platform: linux
+                          kernel_modules:
+                            interval: 300
+                            query: "SELECT name, size, used_by, status, address FROM kernel_modules;"
+                            platform: linux
+                          login_users:
+                            interval: 300
+                            query: "SELECT uid, gid, username, description, directory, shell FROM users WHERE shell NOT IN ('/usr/sbin/nologin','/bin/false','/usr/bin/false','/sbin/nologin');"
+                            platform: linux
+                          authorized_keys:
+                            interval: 300
+                            query: "SELECT a.uid, u.username, a.key_file, a.algorithm, a.comment FROM users u JOIN authorized_keys a ON u.uid = a.uid;"
+                            platform: linux
+                      default--cadre-linux-pack-recent-login:
+                        shard: 100
+                        queries:
+                          deb_packages:
+                            interval: 1800
+                            query: "SELECT name, version, source, size, arch, revision FROM deb_packages;"
+                            platform: linux
+                          recent_logins:
+                            interval: 1800
+                            query: "SELECT username, tty, host, time, type FROM last WHERE time > (strftime('%s','now') - 1800);"
+                            platform: linux
+        status_code: [200, 409]
+      ignore_errors: true
+
+    - name: Create seed detection rules
+      ansible.builtin.uri:
+        url: "http://127.0.0.1:{{ kibana_port }}/api/detection_engine/rules"
+        method: POST
+        user: elastic
+        password: "{{ elastic_password }}"
+        force_basic_auth: true
+        headers:
+          kbn-xsrf: "true"
+        body_format: json
+        body: "{{ item }}"
+        status_code: [200, 409]
+      loop:
+        # NOTE: cadre-001 (RC4 Kerberoast) removed — RC4 is non-viable on Server 2025
+        # (KDC returns KDC_ERR_ETYPE_NOSUPP). The real Kerberoast network signature is
+        # caught by cadre-007-zeek-kerberoast (WT#002/033). Slot reserved for a future
+        # initial-access detection.
+        - rule_id: cadre-002-asrep-roast
+          name: "AS-REP Roasting"
+          description: "Detects AS-REP Roasting — Kerberos AS-REQ without pre-authentication"
+          type: query
+          language: kuery
+          index: ["logs-system.security-*"]
+          query: "event.code:4768 AND winlog.event_data.PreAuthType:0"
+          risk_score: 73
+          severity: high
+          tags: ["CADRE", "credential_access", "T1558.004"]
+          enabled: true
+          interval: 5m
+          from: now-360s
+        - rule_id: cadre-003-dcsync
+          name: "DCSync Detected"
+          description: "Detects DCSync — DS-Replication-Get-Changes extended right"
+          type: query
+          language: kuery
+          index: ["logs-system.security-*"]
+          query: "event.code:4662 AND winlog.event_data.AccessMask:*0x100* AND winlog.event_data.Properties:*1131f6aa-9c07-11d1-f79f-00c04fc2dcd2*"
+          risk_score: 99
+          severity: critical
+          tags: ["CADRE", "credential_access", "T1003.006"]
+          enabled: true
+          interval: 5m
+          from: now-360s
+        - rule_id: cadre-004-suspicious-proc
+          name: "Suspicious Sysmon Process"
+          description: "Attack tools via Sysmon EID 1 — Mimikatz/Rubeus/Certify patterns"
+          type: query
+          language: kuery
+          index: ["logs-windows.sysmon_operational-*"]
+          query: "event.code:1 AND process.command_line:(*mimikatz* OR *Rubeus* OR *Certify* OR *SharpKatz* OR *SafetyKatz* OR *Procdump64* OR *secretsdump* OR *Invoke-Mimikatz*)"
+          risk_score: 99
+          severity: critical
+          tags: ["CADRE", "execution", "T1059"]
+          enabled: true
+          interval: 5m
+          from: now-360s
+        - rule_id: cadre-005-adcs-tamper
+          name: "ADCS Template Modification"
+          description: "Certutil CA configuration change — ESC attack precursor (Sysmon EID 1)"
+          type: query
+          language: kuery
+          index: ["logs-windows.sysmon_operational-*"]
+          query: "event.code:1 AND process.command_line:(*certutil* AND *setreg* AND *CA*)"
+          risk_score: 73
+          severity: high
+          tags: ["CADRE", "privilege_escalation", "T1649"]
+          enabled: true
+          interval: 5m
+          from: now-360s
+        - rule_id: cadre-006-ntlm-relay
+          name: "NTLM Relay — Multi-Host Logon"
+          description: "Rapid NTLM logons from same source across multiple hosts"
+          type: threshold
+          language: kuery
+          index: ["logs-system.security-*"]
+          query: "event.code:4624 AND winlog.event_data.LogonType:3 AND winlog.event_data.AuthenticationPackageName:NTLM"
+          threshold:
+            field: ["source.ip"]
+            value: 3
+            cardinality:
+              - field: "winlog.computer_name"
+                value: 2
+          risk_score: 73
+          severity: high
+          tags: ["CADRE", "lateral_movement", "T1557.001"]
+          enabled: true
+          interval: 5m
+          from: now-360s
+        - rule_id: cadre-007-zeek-kerberoast
+          name: "Kerberoast Attempt (Zeek)"
+          description: "Network signature of a Kerberoasting attempt (WT#002/033) — a TGS-REQ whose encryption downgrade the Server 2025 KDC rejects (KDC_ERR_ETYPE_NOSUPP), observed on the Zeek sensor"
+          type: query
+          language: kuery
+          index: ["logs-zeek.kerberos-*"]
+          query: "zeek.kerberos.request_type:TGS AND zeek.kerberos.error.msg:KDC_ERR_ETYPE_NOSUPP"
+          risk_score: 73
+          severity: high
+          tags: ["CADRE", "credential_access", "T1558.003", "zeek"]
+          enabled: true
+          interval: 5m
+          from: now-360s
+        - rule_id: cadre-008-gmsa-extract
+          name: "gMSA Password Extraction"
+          description: "Detects gMSA password extraction — ReadProperty on msDS-ManagedPassword"
+          type: query
+          language: kuery
+          index: ["logs-system.security-*"]
+          query: "event.code:4662 AND winlog.event_data.ObjectServer:DS AND winlog.event_data.Properties:*e48d0154*"
+          risk_score: 99
+          severity: critical
+          tags: ["CADRE", "credential_access", "T1552.005"]
+          enabled: true
+          interval: 5m
+          from: now-360s
+        # --- Linux detection rules (L01-L15) ---
+        - rule_id: cadre-l01-keytab-read
+          name: "L01 — Keytab File Read"
+          description: "Read of /etc/krb5.keytab or mssql.keytab by non-system process"
+          type: query
+          language: kuery
+          index: ["logs-auditd.log-*"]
+          query: "auditd.log.key:(keytab_access OR mssql_keytab)"
+          risk_score: 73
+          severity: high
+          tags: ["CADRE", "linux", "credential_access", "T1558.003"]
+          enabled: true
+          interval: 5m
+          from: now-360s
+        - rule_id: cadre-l02-realm-change
+          name: "L02 — Realm Join/Leave"
+          description: "Execution of realm leave or realm join"
+          type: query
+          language: kuery
+          index: ["logs-auditd.log-*"]
+          query: "auditd.log.key:realmd_exec"
+          risk_score: 73
+          severity: high
+          tags: ["CADRE", "linux", "defense_evasion", "T1484"]
+          enabled: true
+          interval: 5m
+          from: now-360s
+        - rule_id: cadre-l03-sssd-cache
+          name: "L03 — SSSD Cache Read"
+          description: "Read of SSSD credential cache database — potential credential theft"
+          type: query
+          language: kuery
+          index: ["logs-auditd.log-*"]
+          query: "auditd.log.key:(sssd_db OR sssd_secrets)"
+          risk_score: 99
+          severity: critical
+          tags: ["CADRE", "linux", "credential_access", "T1003.008"]
+          enabled: true
+          interval: 5m
+          from: now-360s
+        - rule_id: cadre-l04-suid-binary
+          name: "L04 — New SUID Binary (osquery)"
+          description: "New SUID binary detected via osquery — GTFOBins persistence"
+          type: query
+          language: kuery
+          index: ["logs-osquery_manager.result-*"]
+          query: "event.module:osquery_manager AND osquery.path:/tmp/suid_bash"
+          risk_score: 73
+          severity: high
+          tags: ["CADRE", "linux", "privilege_escalation", "T1548.001"]
+          enabled: true
+          interval: 5m
+          from: now-360s
+        - rule_id: cadre-l05-kernel-module
+          name: "L05 — Kernel Module Load"
+          description: "Kernel module loaded via init_module or finit_module — potential rootkit"
+          type: query
+          language: kuery
+          index: ["logs-auditd.log-*"]
+          query: "auditd.log.key:kernel_module"
+          risk_score: 99
+          severity: critical
+          tags: ["CADRE", "linux", "persistence", "T1547.006"]
+          enabled: true
+          interval: 5m
+          from: now-360s
+        - rule_id: cadre-l06-preload-hijack
+          name: "L06 — ld.so.preload Write"
+          description: "Write to /etc/ld.so.preload — shared object hijacking"
+          type: query
+          language: kuery
+          index: ["logs-auditd.log-*"]
+          query: "auditd.log.key:preload_hijack"
+          risk_score: 99
+          severity: critical
+          tags: ["CADRE", "linux", "persistence", "T1574.006"]
+          enabled: true
+          interval: 5m
+          from: now-360s
+        - rule_id: cadre-l07-container-escape
+          name: "L07 — Container Escape"
+          description: "Container escape syscall from podman child namespace"
+          type: query
+          language: kuery
+          index: ["logs-auditd.log-*"]
+          query: "auditd.log.key:container_escape AND NOT auditd.log.AUID:-1"
+          risk_score: 99
+          severity: critical
+          tags: ["CADRE", "linux", "privilege_escalation", "T1611"]
+          enabled: true
+          interval: 5m
+          from: now-360s
+        - rule_id: cadre-l08-cron-systemd
+          name: "L08 — New Cron or Systemd Unit"
+          description: "Cron job or systemd unit created — scheduled task persistence"
+          type: query
+          language: kuery
+          index: ["logs-auditd.log-*"]
+          query: "auditd.log.key:(cron_dir OR cron_daily OR cron_hourly OR systemd_units)"
+          risk_score: 73
+          severity: high
+          tags: ["CADRE", "linux", "persistence", "T1053.003", "T1543.002"]
+          enabled: true
+          interval: 5m
+          from: now-360s
+        - rule_id: cadre-l09-mssql-brute
+          name: "L09 — MSSQL Failed Login Burst"
+          description: "MSSQL failed login attempts detected via errorlog (audit binary format unsupported on Linux)"
+          type: query
+          language: kuery
+          index: ["logs-microsoft_sqlserver.log-*"]
+          query: "message:\"Login failed\" AND host.hostname:linux01"
+          risk_score: 73
+          severity: high
+          tags: ["CADRE", "linux", "credential_access", "T1110"]
+          enabled: true
+          interval: 5m
+          from: now-360s
+        # NOTE: cadre-l10 (MSSQL xp_cmdshell) removed — xp_cmdshell is impossible on
+        # SQL Server Linux (xpstar.dll absent), so neither the attack nor a meaningful
+        # "blocked attempt" detection is valid. L-numbering keeps the gap; slot reserved
+        # for a future real Linux technique (e.g. SUID/copy-based privilege escalation).
+        - rule_id: cadre-l11-nfs-krb5
+          name: "L11 — NFS Mount with Kerberos"
+          description: "Mount syscall with sec=krb5p from non-root user"
+          type: query
+          language: kuery
+          index: ["logs-auditd.log-*"]
+          query: "auditd.log.key:nfs_mount AND NOT auditd.log.AUID:0"
+          risk_score: 73
+          severity: high
+          tags: ["CADRE", "linux", "lateral_movement", "T1021.002"]
+          enabled: true
+          interval: 5m
+          from: now-360s
+        - rule_id: cadre-l12-authorized-keys
+          name: "L12 — Authorized Keys Modified"
+          description: "SSH authorized_keys file written outside provisioning window"
+          type: query
+          language: kuery
+          index: ["logs-auditd.log-*"]
+          query: "auditd.log.name:*authorized_keys*"
+          risk_score: 99
+          severity: critical
+          tags: ["CADRE", "linux", "persistence", "T1098.004"]
+          enabled: true
+          interval: 5m
+          from: now-360s
+        - rule_id: cadre-l13-pam-change
+          name: "L13 — PAM Configuration Change"
+          description: "Write to /etc/pam.d/ outside package manager process — backdoor PAM module"
+          type: query
+          language: kuery
+          index: ["logs-auditd.log-*"]
+          query: "auditd.log.key:pam_config"
+          risk_score: 99
+          severity: critical
+          tags: ["CADRE", "linux", "persistence", "T1556.003"]
+          enabled: true
+          interval: 5m
+          from: now-360s
+        - rule_id: cadre-l14-temp-exec
+          name: "L14 — Process from Temp Directory"
+          description: "Process execution from /tmp, /dev/shm, or /var/tmp — suspicious execution"
+          type: query
+          language: kuery
+          index: ["logs-auditd.log-*"]
+          query: "auditd.log.key:proc_exec AND process.executable:(/tmp/* OR /dev/shm/* OR /var/tmp/*)"
+          risk_score: 73
+          severity: high
+          tags: ["CADRE", "linux", "execution", "T1059"]
+          enabled: true
+          interval: 5m
+          from: now-360s
+        - rule_id: cadre-l15-sudo-domain
+          name: "L15 — Domain User sudo Execution"
+          description: "Non-root sudo execution detected via auditd USER_CMD — potential privilege escalation"
+          type: query
+          language: kuery
+          index: ["logs-auditd.log-*"]
+          query: "auditd.log.record_type:USER_CMD AND NOT user.audit.id:0"
+          risk_score: 73
+          severity: high
+          tags: ["CADRE", "linux", "privilege_escalation", "T1078.002"]
+          enabled: true
+          interval: 5m
+          from: now-360s
+      ignore_errors: true
+
+    - name: Save enrollment tokens to shared fact
+      ansible.builtin.set_fact:
+        cadre_all_enroll_token: "{{ cadre_all_token }}"
+        cadre_linux_enroll_token: "{{ cadre_linux_token }}"
+
+
+
+- name: "Play 3 — Enroll Elastic Agent on Windows VMs"
+  hosts: windows_servers
+  gather_facts: true
+  vars:
+    fleet_server: 192.168.77.50
+    fleet_port: 8220
+  tasks:
+    - name: Check if Elastic Agent service exists
+      ansible.windows.win_service:
+        name: "Elastic Agent"
+      register: agent_svc
+      ignore_errors: true
+      failed_when: false
+
+    - name: Create Tools directory
+      ansible.windows.win_file:
+        path: C:\Tools
+        state: directory
+      when: agent_svc is defined and (agent_svc is failed or agent_svc.status is undefined)
+
+    - name: Download Elastic Agent for Windows
+      ansible.windows.win_get_url:
+        url: "https://artifacts.elastic.co/downloads/beats/elastic-agent/elastic-agent-{{ elastic_agent_version }}-windows-x86_64.zip"
+        dest: "C:\\Tools\\elastic-agent.zip"
+      when: agent_svc is defined and (agent_svc is failed or agent_svc.status is undefined or agent_svc.status != "running")
+
+    - name: Extract Elastic Agent
+      community.windows.win_unzip:
+        src: "C:\\Tools\\elastic-agent.zip"
+        dest: "C:\\Tools\\"
+        creates: "C:\\Tools\\elastic-agent-{{ elastic_agent_version }}-windows-x86_64"
+      when: agent_svc is defined and (agent_svc is failed or agent_svc.status is undefined or agent_svc.status != "running")
+
+    - name: Enroll and install Elastic Agent (Windows)
+      ansible.windows.win_shell: |
+        $svc = Get-Service "Elastic Agent" -ErrorAction SilentlyContinue
+        if ($svc -and $svc.Status -eq "Running") { exit 0 }
+        $env:PATH += ";C:\Tools\elastic-agent-{{ elastic_agent_version }}-windows-x86_64"
+        & "C:\Tools\elastic-agent-{{ elastic_agent_version }}-windows-x86_64\elastic-agent.exe" install `
+          --url="https://{{ fleet_server }}:{{ fleet_port }}" `
+          --enrollment-token="{{ hostvars['elk']['cadre_all_enroll_token'] }}" `
+          --insecure `
+          --non-interactive `
+          --force 2>&1
+      register: win_install
+      when: agent_svc is defined and (agent_svc is failed or agent_svc.status is undefined or agent_svc.status != "running")
+      failed_when: false
+      changed_when: false
+
+    - name: Ensure Elastic Agent runs as auto + started
+      ansible.windows.win_service:
+        name: "Elastic Agent"
+        state: started
+        start_mode: auto
+
+- name: "Play 4 — Enroll Elastic Agent on linux01"
+  hosts: linux_members
+  gather_facts: true
+  vars:
+    fleet_server: 192.168.77.50
+    fleet_port: 8220
+  tasks:
+    - name: Check Elastic Agent config exists
+      ansible.builtin.stat:
+        path: /etc/elastic-agent/elastic-agent.yml
+      register: agent_cfg
+
+    - name: Download Elastic Agent for Linux
+      ansible.builtin.get_url:
+        url: "https://artifacts.elastic.co/downloads/beats/elastic-agent/elastic-agent-{{ elastic_agent_version }}-linux-x86_64.tar.gz"
+        dest: /tmp/elastic-agent.tar.gz
+        mode: "0644"
+      when: not agent_cfg.stat.exists
+
+    - name: Extract Elastic Agent
+      ansible.builtin.unarchive:
+        src: /tmp/elastic-agent.tar.gz
+        dest: /tmp/
+        remote_src: true
+        creates: /tmp/elastic-agent-{{ elastic_agent_version }}-linux-x86_64
+      when: not agent_cfg.stat.exists
+
+    - name: Enroll and install Elastic Agent (Linux)
+      ansible.builtin.shell: |
+        cd /tmp/elastic-agent-{{ elastic_agent_version }}-linux-x86_64
+        ./elastic-agent install \
+          --url=https://{{ fleet_server }}:{{ fleet_port }} \
+          --enrollment-token={{ hostvars['elk']['cadre_linux_enroll_token'] }} \
+          --insecure \
+          --non-interactive \
+          --force
+      args:
+        creates: /etc/elastic-agent/elastic-agent.yml
+      when: not agent_cfg.stat.exists
+      register: linux_install
+      failed_when: false
+
+    - name: Ensure elastic-agent service is running
+      ansible.builtin.systemd:
+        name: elastic-agent
+        state: started
+        enabled: true
+        daemon_reload: true

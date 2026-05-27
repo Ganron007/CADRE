@@ -1,0 +1,242 @@
+---
+# TYPE: DEPLOY (rc=0=skip, rc=2=applied+verified, rc=1=fail)
+# Layer 4: Vulnerabilities — Deploy registry, services, features
+# Uses native Ansible modules (win_regedit, win_service, win_feature)
+# which are inherently idempotent — they read state before changing.
+# Only dead gateway removal uses win_shell rc=2.
+
+- name: "Deploy registry vulnerabilities on all DCs"
+  hosts: root_dc:child_dc:external_dc
+  gather_facts: false
+  tasks:
+    - name: "[VULN][WT#21] NTLM outbound allowed"
+      ansible.windows.win_regedit:
+        path: HKLM:\SYSTEM\CurrentControlSet\Control\Lsa\MSV1_0
+        name: RestrictSendingNTLMTraffic
+        data: 0
+        type: dword
+
+    - name: "[VULN][WT#21] NTLM incoming allowed"
+      ansible.windows.win_regedit:
+        path: HKLM:\SYSTEM\CurrentControlSet\Services\Netlogon\Parameters
+        name: RestrictNTLMInDomain
+        data: 0
+        type: dword
+
+    - name: "[VULN][WT#17] Print Spooler enabled (auto)"
+      ansible.windows.win_service:
+        name: Spooler
+        start_mode: auto
+        state: started
+
+    - name: "[VULN][WT#18] WebClient enabled (auto)"
+      ansible.windows.win_service:
+        name: WebClient
+        start_mode: auto
+        state: started
+
+    - name: "[VULN][WT#20] FssAgent (ShadowCoerce) enabled (auto)"
+      ansible.windows.win_service:
+        name: FssAgent
+        start_mode: auto
+        state: started
+
+    - name: "[VULN][WT#18] WebClient enabled (auto)"
+      ansible.windows.win_service:
+        name: WebClient
+        start_mode: auto
+        state: started
+
+    - name: "[VULN][WT#18] WebDAV-Redirector feature installed"
+      ansible.windows.win_feature:
+        name: WebDAV-Redirector
+        state: present
+
+    - name: "[VULN][WT#19] DFS Namespace feature installed (DFSCoerce)"
+      ansible.windows.win_feature:
+        name: FS-DFS-Namespace
+        state: present
+
+    - name: "[VULN][WT#20] FSRVP feature installed (ShadowCoerce)"
+      ansible.windows.win_feature:
+        name: FS-VSS-Agent
+        state: present
+
+    - name: "[VULN][WT#20] FssAgent (ShadowCoerce) enabled (auto)"
+      ansible.windows.win_service:
+        name: FssAgent
+        start_mode: auto
+        state: started
+
+    - name: "EFS service enabled (auto start) — PetitPotam target"
+      ansible.windows.win_service:
+        name: EFS
+        start_mode: auto
+        state: started
+
+    - name: "[VULN][WT#21] LDAP signing NOT required (relay target)"
+      ansible.windows.win_regedit:
+        path: HKLM:\SYSTEM\CurrentControlSet\Services\NTDS\Parameters
+        name: LDAPServerIntegrity
+        data: 1
+        type: dword
+
+    - name: "[VULN][WT#59] ESC10 — StrongCertificateBindingEnforcement=0 on Kdc"
+      ansible.windows.win_regedit:
+        path: HKLM:\SYSTEM\CurrentControlSet\Services\Kdc
+        name: StrongCertificateBindingEnforcement
+        data: 0
+        type: dword
+
+    - name: "[VULN][WT#59] ESC10 — CertificateMappingMethods=31 on Schannel"
+      ansible.windows.win_regedit:
+        path: HKLM:\SYSTEM\CurrentControlSet\Control\SecurityProviders\Schannel
+        name: CertificateMappingMethods
+        data: 31
+        type: dword
+
+- name: "Deploy registry vulnerabilities on all Windows VMs"
+  hosts: windows_servers
+  gather_facts: false
+  tasks:
+    - name: "[VULN] WDigest credential caching enabled"
+      ansible.windows.win_regedit:
+        path: HKLM:\SYSTEM\CurrentControlSet\Control\SecurityProviders\WDigest
+        name: UseLogonCredential
+        data: 1
+        type: dword
+
+    - name: "[VULN] Credential Guard (LsaCfgFlags) disabled"
+      ansible.windows.win_regedit:
+        path: HKLM:\SYSTEM\CurrentControlSet\Control\Lsa
+        name: LsaCfgFlags
+        data: 0
+        type: dword
+      register: r_cg
+      failed_when: false
+      changed_when: r_cg is changed
+
+    - name: "[VULN] Credential Guard VBS (EnableVBS) disabled"
+      ansible.windows.win_regedit:
+        path: HKLM:\SYSTEM\CurrentControlSet\Control\DeviceGuard
+        name: EnableVirtualizationBasedSecurity
+        data: 0
+        type: dword
+      register: r_vbs
+      failed_when: false
+
+    - name: "[VULN] LSA Protection (RunAsPPL) removed"
+      ansible.windows.win_regedit:
+        path: HKLM:\SYSTEM\CurrentControlSet\Control\Lsa
+        name: RunAsPPL
+        state: absent
+
+    - name: "[VULN][WT#34] Restricted Admin Mode (RDP) enabled"
+      ansible.windows.win_regedit:
+        path: HKLM:\System\CurrentControlSet\Control\Lsa
+        name: DisableRestrictedAdmin
+        data: 0
+        type: dword
+
+    - name: "[VULN] Windows Defender real-time monitoring disabled"
+      ansible.windows.win_shell: |
+        $ErrorActionPreference = "Stop"
+        try {
+          # Check if already disabled via Policy registry key (survives reboot)
+          $polPath = "HKLM:\SOFTWARE\Policies\Microsoft\Windows Defender"
+          $pol = Get-ItemProperty -Path $polPath -Name "DisableAntiSpyware" -ErrorAction SilentlyContinue
+          if ($pol.DisableAntiSpyware -eq 1) { Write-Output "OK: Defender already disabled via Policy"; exit 0 }
+          # Check via MpPreference
+          $mp = Get-MpPreference -ErrorAction SilentlyContinue
+          if ($mp.DisableRealtimeMonitoring -eq $true -and $mp.DisableIntrusionPreventionSystem -eq $true -and $mp.DisableScriptScanning -eq $true) {
+            Write-Output "OK: Defender already disabled"; exit 0
+          }
+          # Apply — Policy key + MpPreference
+          New-Item -Path $polPath -Force | Out-Null
+          New-ItemProperty -Path $polPath -Name "DisableAntiSpyware" -Value 1 -PropertyType DWORD -Force
+          Set-MpPreference -DisableRealtimeMonitoring $true -DisableIntrusionPreventionSystem $true -DisableScriptScanning $true -ErrorAction SilentlyContinue
+          $vPol = Get-ItemProperty -Path $polPath -Name "DisableAntiSpyware" -ErrorAction Stop
+          if ($vPol.DisableAntiSpyware -ne 1) { throw "Policy registry not applied" }
+          Write-Output "APPLIED: Defender disabled (policy + preferences). Reboot required."; exit 2
+        } catch { Write-Output "FAILED: Defender — $_"; exit 1 }
+      register: r
+      changed_when: r.rc == 2
+      failed_when: r.rc == 1
+
+    - name: "[VULN] Reboot after Defender disable"
+      ansible.windows.win_reboot:
+        reboot_timeout: 600
+      when: r.rc == 2
+
+- name: "Deploy SMB signing disabled on mbr02"
+  hosts: mbr02
+  gather_facts: false
+  tasks:
+    - name: "[VULN][WT#22] SMB signing disabled on mbr02 (relay target)"
+      ansible.windows.win_shell: |
+        $ErrorActionPreference = "Stop"
+        try {
+          $path = "HKLM:\SYSTEM\CurrentControlSet\Services\LanmanServer\Parameters"
+          $req = (Get-ItemProperty -Path $path -Name "RequireSecuritySignature" -ErrorAction SilentlyContinue).RequireSecuritySignature
+          $en = (Get-ItemProperty -Path $path -Name "EnableSecuritySignature" -ErrorAction SilentlyContinue).EnableSecuritySignature
+          if ($req -eq 0 -and $en -eq 0) { Write-Output "OK: SMB signing already disabled"; exit 0 }
+          Set-ItemProperty -Path $path -Name "RequireSecuritySignature" -Value 0 -Type DWord -Force
+          Set-ItemProperty -Path $path -Name "EnableSecuritySignature" -Value 0 -Type DWord -Force
+          $vReq = (Get-ItemProperty -Path $path -Name "RequireSecuritySignature" -ErrorAction Stop).RequireSecuritySignature
+          $vEn = (Get-ItemProperty -Path $path -Name "EnableSecuritySignature" -ErrorAction Stop).EnableSecuritySignature
+          if ($vReq -ne 0 -or $vEn -ne 0) { throw "Verify failed" }
+          Write-Output "APPLIED: SMB signing disabled and verified"; exit 2
+        } catch { Write-Output "FAILED: SMB signing — $_"; exit 1 }
+      register: r
+      changed_when: r.rc == 2
+      failed_when: r.rc == 1
+
+- name: "Deploy null session enumeration on dc02"
+  hosts: dc02
+  gather_facts: false
+  tasks:
+    - name: "[VULN][WT#28] Null session enumeration enabled (dc02)"
+      ansible.windows.win_regedit:
+        path: HKLM:\SYSTEM\CurrentControlSet\Control\Lsa
+        name: RestrictAnonymous
+        data: 0
+        type: dword
+
+- name: "DNS fix — adapter DNS + gateway cleanup"
+  hosts: windows_servers
+  gather_facts: false
+  tasks:
+    - name: "Detect adapters — domain (vmnet2) vs NAT"
+      ansible.windows.win_shell: |
+        $ErrorActionPreference = "Stop"
+        $interfaces = Get-NetAdapter | Where-Object { $_.Status -eq "Up" }
+        $domainIP = "{{ ansible_host }}"
+        foreach ($if in $interfaces) {
+          $ip = Get-NetIPAddress -InterfaceIndex $if.ifIndex -AddressFamily IPv4 -ErrorAction SilentlyContinue
+          if ($ip.IPAddress -eq $domainIP) { Write-Output "domain=$($if.Name)" }
+          else { Write-Output "nat=$($if.Name)" }
+        }
+      register: win_adapter_detect
+      changed_when: false
+
+    - name: "[PREP] Set domain adapter DNS to domain DC"
+      ansible.windows.win_dns_client:
+        adapter_names: "{{ (win_adapter_detect.stdout_lines | select('match','^domain=') | first | split('=') | last) }}"
+        ipv4_addresses:
+          - "{{ '192.168.77.11' if 'mbr01' in inventory_hostname else '192.168.77.12' if 'mbr02' in inventory_hostname else '192.168.77.10' }}"
+
+    - name: "[PREP] Remove dead default gateway from domain adapter"
+      ansible.windows.win_shell: |
+        $ErrorActionPreference = "Stop"
+        $domain = "{{ (win_adapter_detect.stdout_lines | select('match','^domain=') | first | split('=') | last) }}"
+        try {
+          $route = Get-NetRoute -InterfaceAlias $domain -DestinationPrefix "0.0.0.0/0" -ErrorAction SilentlyContinue
+          if (-not $route) { Write-Output "OK: No dead gateway found"; exit 0 }
+          Remove-NetRoute -InterfaceAlias $domain -DestinationPrefix "0.0.0.0/0" -Confirm:$false
+          $verify = Get-NetRoute -InterfaceAlias $domain -DestinationPrefix "0.0.0.0/0" -ErrorAction SilentlyContinue
+          if ($verify) { throw "Route still present" }
+          Write-Output "APPLIED: Dead gateway removed"; exit 2
+        } catch { Write-Output "FAILED: Gateway removal — $_"; exit 1 }
+      register: r
+      changed_when: r.rc == 2
+      failed_when: r.rc == 1

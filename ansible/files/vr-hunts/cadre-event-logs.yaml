@@ -1,0 +1,17 @@
+name: CADRE.Hunts.EventLogs
+description: |
+  Export all Windows Event Logs (.evtx) for offline Hayabusa analysis.
+  Part of the CADRE pre-built hunt library.
+sources:
+  - name: Security
+    queries:
+      - SELECT * FROM Artifact.Windows.EventLogs.Security()
+  - name: System
+    queries:
+      - SELECT * FROM Artifact.Windows.EventLogs.System()
+  - name: Powershell
+    queries:
+      - SELECT * FROM Artifact.Windows.EventLogs.Powershell()
+  - name: Sysmon
+    queries:
+      - SELECT * FROM Artifact.Windows.EventLogs.Sysmon()

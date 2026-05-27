@@ -1,0 +1,41 @@
+---
+# TYPE: VERIFY-ONLY (rc=0=pass, rc=1=fail — checks Cloud Sync agent)
+# Layer 13: Cloud Sync — verify Entra Cloud Sync provisioning agent
+
+- name: "Verify Entra Cloud Sync agent on dc01"
+  hosts: dc01
+  gather_facts: false
+  tasks:
+    - name: "[CLOUD] Verify Cloud Sync directory exists"
+      ansible.windows.win_shell: |
+        try {
+        $ErrorActionPreference = "Stop"
+          if (Test-Path "C:\ProgramData\Microsoft\Azure\CloudSync") { Write-Output "PASS: dir exists"; exit 0 }
+          Write-Output "FAIL: dir not found"; exit 1
+        } catch { Write-Output "FAIL: $_"; exit 1 }
+      changed_when: false
+      failed_when: r.rc == 1
+      register: r
+
+    - name: "[CLOUD] Verify Cloud Sync provisioning agent installer"
+      ansible.windows.win_shell: |
+        try {
+        $ErrorActionPreference = "Stop"
+          if (Test-Path "C:\Windows\Temp\AADConnectProvisioningAgentSetup.exe") { Write-Output "PASS: installer exists"; exit 0 }
+          Write-Output "FAIL: installer not found"; exit 1
+        } catch { Write-Output "FAIL: $_"; exit 1 }
+      changed_when: false
+      failed_when: r.rc == 1
+      register: r
+
+    - name: "[CLOUD] Verify Cloud Sync agent installed"
+      ansible.windows.win_shell: |
+        try {
+        $ErrorActionPreference = "Stop"
+          $svc = Get-Service -Name "AADConnectProvisioningAgent" -ErrorAction SilentlyContinue
+          if ($svc) { Write-Output "PASS: Cloud Sync agent installed"; exit 0 }
+          Write-Output "FAIL: Cloud Sync agent not installed"; exit 1
+        } catch { Write-Output "FAIL: $_"; exit 1 }
+      changed_when: false
+      failed_when: r.rc == 1
+      register: r

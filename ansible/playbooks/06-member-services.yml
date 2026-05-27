@@ -1,0 +1,194 @@
+---
+# TYPE: DEPLOY (rc=0=skip, rc=2=applied+verified, rc=1=fail)
+# Layer 6: Member Services — Deploy shares + bait, IIS app pool, VSC verify
+# SQL/WSUS verify extracted to 09-sql-wsus-verify.yml. SCCM verify at 10-sccm-verify.yml.
+# Shares/bait use deploy pattern (native modules).
+
+- name: "Deploy IIS CertPotato app pool on mbr01"
+  hosts: mbr01
+  gather_facts: false
+  tasks:
+    - name: "[VULN][WT#29] IIS app pool CADRE-CertPotato as NetworkService"
+      ansible.windows.win_shell: |
+        $ErrorActionPreference = "Stop"
+        try {
+          Import-Module WebAdministration
+          $pool = Get-Item "IIS:\AppPools\CADRE-CertPotato" -ErrorAction SilentlyContinue
+          if ($pool) {
+            $identity = (Get-ItemProperty "IIS:\AppPools\CADRE-CertPotato" -Name processModel).identityType
+            if ($identity -eq 2) { Write-Output "OK: App pool exists as NetworkService"; exit 0 }
+            Set-ItemProperty "IIS:\AppPools\CADRE-CertPotato" -Name processModel.identityType -Value 2
+            Write-Output "APPLIED: App pool identity set to NetworkService"; exit 2
+          }
+          New-WebAppPool -Name "CADRE-CertPotato"
+          Set-ItemProperty "IIS:\AppPools\CADRE-CertPotato" -Name processModel.identityType -Value 2
+          $v = Get-ItemProperty "IIS:\AppPools\CADRE-CertPotato" -Name processModel
+          if ($v.identityType -ne 2) { throw "Verify failed" }
+          Write-Output "APPLIED: CADRE-CertPotato app pool created as NetworkService"; exit 2
+        } catch { Write-Output "FAILED: $_"; exit 1 }
+      register: r
+      changed_when: r.rc == 2
+      failed_when: r.rc not in [0, 2]
+
+- name: "Deploy SMB shares on mbr01"
+  hosts: mbr01
+  gather_facts: false
+  tasks:
+    - name: 'Create C:\Shares\public directory'
+      ansible.windows.win_file:
+        path: C:\Shares\public
+        state: directory
+
+    - name: 'Create C:\Shares\restricted directory'
+      ansible.windows.win_file:
+        path: C:\Shares\restricted
+        state: directory
+
+    - name: "[SHARE] public (Everyone: Full)"
+      ansible.windows.win_share:
+        name: public
+        path: C:\Shares\public
+        list: yes
+        full: Everyone
+
+    - name: "[SHARE] restricted (Domain Users: Read, Eng-Cadre: Change)"
+      ansible.windows.win_share:
+        name: restricted
+        path: C:\Shares\restricted
+        list: yes
+        read: CADRE\Domain Users
+        change: CADRE\Engineering-Cadre
+
+    - name: "[SHARE] NTFS FullControl for analyst_cloud on restricted"
+      ansible.windows.win_shell: |
+        $ErrorActionPreference = "Stop"
+        try {
+          $path = "C:\Shares\restricted"
+          $user = "CADRE\analyst_cloud"
+          $acl = Get-Acl -Path $path
+          $existing = $acl.Access | Where-Object { $_.IdentityReference.Value -eq $user -and $_.FileSystemRights -eq "FullControl" }
+          if ($existing) { Write-Output "OK: NTFS ACE exists"; exit 0 }
+          $rule = New-Object System.Security.AccessControl.FileSystemAccessRule($user, "FullControl", "ContainerInherit,ObjectInherit", "None", "Allow")
+          $acl.AddAccessRule($rule)
+          Set-Acl -Path $path -AclObject $acl
+          $vAcl = Get-Acl -Path $path
+          $v = $vAcl.Access | Where-Object { $_.IdentityReference.Value -eq $user -and $_.FileSystemRights -eq "FullControl" }
+          if (-not $v) { throw "Verify failed" }
+          Write-Output "APPLIED: NTFS FullControl for analyst_cloud on restricted"; exit 2
+        } catch { Write-Output "FAILED: $_"; exit 1 }
+      register: r
+      changed_when: r.rc == 2
+      failed_when: r.rc not in [0, 2]
+
+    - name: "[SHARE] Bait: cadre-handbook.txt (public)"
+      ansible.windows.win_copy:
+        dest: C:\Shares\public\cadre-handbook.txt
+        content: |
+          CADRE LAB — Internal Handbook
+          ==============================
+          Domain: cadre.local
+          DC: dc01.cadre.local (192.168.77.10)
+          Child domain: child.cadre.local (dc02 - 192.168.77.11)
+          External domain: range.local (dc03 - 192.168.77.12)
+
+          SCCM Site: mbr02.range.local — Site Code: CAD
+          WSUS: mbr02.range.local (HTTP port 8530)
+          KeePass database: C:\Shares\vault\passwords.kdbx
+          Cloud tenant: cadre-lab.onmicrosoft.com
+          Entra Cloud Sync: dc01.cadre.local (agent running)
+
+          AD FS: planned — pending deployment
+        force: no
+
+    - name: "[SHARE] Bait: incident-log.txt (public)"
+      ansible.windows.win_copy:
+        dest: C:\Shares\public\incident-log.txt
+        content: |
+          Incident Report — 2026-05-18
+          ==============================
+          07:42:31 — Suspicious logon detected: analyst_t1@child.cadre.local from 192.168.77.60
+          08:15:22 — Failed Kerberos authentication for svc_ldap (KRB5KDC_ERR_PREAUTH_FAILED)
+          09:30:01 — PIM activation by lead_engineering — elevated to Domain Admin
+          10:45:12 — Certificate enrollment request CADRE-ESC1 submitted by eng_cloud
+          11:20:33 — Potential DCSync attempt from eng_agentic (blocked by monitoring)
+        force: no
+
+- name: "Deploy SMB shares on mbr02"
+  hosts: mbr02
+  gather_facts: false
+  tasks:
+    - name: 'Create C:\Shares\vault directory'
+      ansible.windows.win_file:
+        path: C:\Shares\vault
+        state: directory
+
+    - name: 'Create vault share (RANGE\Domain Users: Read)'
+      ansible.windows.win_share:
+        name: vault
+        path: C:\Shares\vault
+        list: yes
+        read: RANGE\Domain Users
+
+    - name: "[SHARE] Bait: naa-rotation-notice.txt (vault)"
+      ansible.windows.win_copy:
+        dest: C:\Shares\vault\naa-rotation-notice.txt
+        content: |
+          NAA Credential Rotation Notice
+          ===============================
+          Network Access Account (NAA) for SCCM:
+          Username: RANGE\svc_naa
+          Password: N@A_s3rv1c3!
+          Note: svc_naa is a member of Domain Admins (range.local).
+          Next rotation: 2026-06-18
+        force: no
+
+    - name: "[SHARE] Bait: sccm-recovery-key.txt (vault)"
+      ansible.windows.win_copy:
+        dest: C:\Shares\vault\sccm-recovery-key.txt
+        content: |
+          SCCM Site Recovery Information
+          ===============================
+          Site Code: CAD
+          Site Server: mbr02.range.local
+          SQL Server: mbr02.range.local\SQLEXPRESS
+          SA Password: s@_P@ssw0rd!L@b!
+          SCCM Service Account: RANGE\svc_sccm
+          Client Push Account: RANGE\svc_naa
+        force: no
+
+    - name: "[SCCM][WT#37-40] Add RANGE\svc_sccm as SCCM Full Administrator"
+      ansible.windows.win_shell: |
+        $ErrorActionPreference = "Stop"
+        try {
+          $svc = Get-Service SMS_EXECUTIVE -ErrorAction SilentlyContinue
+          if (-not $svc) { Write-Output "SKIP: SCCM not installed"; exit 0 }
+          $sid = ([System.Security.Principal.NTAccount]"RANGE\svc_sccm").Translate([System.Security.Principal.SecurityIdentifier]).Value
+          $existing = Get-WmiObject -Namespace "root\SMS\site_CAD" -Class SMS_Admin -ErrorAction SilentlyContinue | Where-Object { $_.AdminSid -eq $sid }
+          if ($existing) { Write-Output "SKIP: svc_sccm already SCCM admin"; exit 0 }
+          $class = [WMIClass]"root\sms\site_CAD:SMS_Admin"
+          $admin = $class.CreateInstance()
+          $admin.AdminSid = $sid
+          $admin.AdminType = 1; $admin.CategoryType = 1; $admin.CollectionID = "SMS00001"
+          $admin.Put() | Out-Null
+          Write-Output "APPLIED: svc_sccm added as SCCM Full Administrator"; exit 2
+        } catch { Write-Output "FAIL: $_"; exit 1 }
+      register: r
+      changed_when: r.rc == 2
+      failed_when: r.rc == 1
+
+- name: "VSC template verification — dc01"
+  hosts: dc01
+  gather_facts: false
+  tasks:
+    - name: "[ADCS] VSC template CADRE-VSC published (verify)"
+      ansible.windows.win_shell: |
+        $ErrorActionPreference = "Stop"
+        try {
+          $configNC = (Get-ADRootDSE).configurationNamingContext
+          $tpl = Get-ADObject -Filter { Name -eq "CADRE-VSC" } -SearchBase "CN=Certificate Templates,CN=Public Key Services,CN=Services,$configNC" -ErrorAction SilentlyContinue
+          if ($tpl) { Write-Output "PASS: CADRE-VSC template exists"; exit 0 }
+          Write-Output "FAIL: CADRE-VSC template not found"; exit 1
+        } catch { Write-Output "FAIL: VSC check error: $_"; exit 1 }
+      register: r
+      changed_when: false
+      failed_when: r.rc not in [0, 2]

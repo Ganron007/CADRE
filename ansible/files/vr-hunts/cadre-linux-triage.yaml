@@ -1,0 +1,35 @@
+name: CADRE.Hunts.LinuxTriage
+description: |
+  Linux forensic triage — processes, network, SUID binaries, audit logs, bash history, containers, SSSD.
+  Part of the CADRE pre-built hunt library.
+sources:
+  - name: Pslist
+    queries:
+      - SELECT * FROM pslist()
+  - name: Netstat
+    queries:
+      - SELECT * FROM netstat()
+  - name: SUIDBinaries
+    queries:
+      - SELECT * FROM Artifact.Linux.Sys.SUID()
+  - name: AuditLogs
+    queries:
+      - SELECT * FROM Artifact.Linux.Sys.AuditLogs()
+  - name: BashHistory
+    queries:
+      - SELECT * FROM Artifact.Linux.Sys.BashHistory()
+  - name: LastUserLogin
+    queries:
+      - SELECT * FROM Artifact.Linux.Sys.LastUserLogin()
+  - name: RootkitKeywords
+    queries:
+      - SELECT * FROM Artifact.Linux.Detection.IncludeRootkitKeywords()
+  - name: PodmanInventory
+    queries:
+      - SELECT * FROM Artifact.Linux.Containers.PodmanInventory()
+  - name: SSSDCache
+    queries:
+      - SELECT * FROM Artifact.Linux.Authentication.SSSDCache()
+  - name: KeytabFingerprints
+    queries:
+      - SELECT * FROM Artifact.CADRE.Linux.KeytabFingerprints()

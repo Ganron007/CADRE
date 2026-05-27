@@ -1,0 +1,36 @@
+name: CADRE.Linux.KeytabFingerprints
+description: |
+  Collect keytab file fingerprints from krb5.keytab and mssql.keytab.
+  Runs klist -ke on each keytab found to enumerate service principals and encryption types.
+parameters:
+  - name: keytabPaths
+    description: Glob paths to search for keytab files
+    default: /etc/krb5.keytab /var/opt/mssql/secrets/mssql.keytab
+sources:
+  - precondition: |
+      SELECT OS FROM info()
+      WHERE OS = 'linux'
+    queries:
+      - name: keytab_inventory
+        query: |
+          LET keytabs = glob(globs=split(string=keytabPaths, sep=" "))
+          SELECT FullPath,
+                 timestamp(epoch=Sys.Strftime!["Mtime"]) as Modified,
+                 Size
+          FROM keytabs
+      - name: keytab_principals
+        query: |
+          LET klist_results = SELECT * FROM foreach(
+            row={
+              SELECT FullPath FROM glob(globs=split(string=keytabPaths, sep=" "))
+            },
+            query={
+              SELECT FullPath, Stdout as KeytabOutput
+              FROM exec(argv=["klist", "-ke", "-t", FullPath])
+            })
+          SELECT FullPath,
+             parse_string_with_regex(
+               string=KeytabOutput,
+               regex=["(?P<Principal>[^ ]+@[^ ]+) \\((?P<KVNO>\\d+)\\)"]
+             ) as Principals
+          FROM klist_results

@@ -1,0 +1,688 @@
+{
+  "domains": [
+    {
+      "name": "cadre.local",
+      "type": "forest_root",
+      "netbios": "CADRE",
+      "functional_level": "WinThreshold",
+      "dc": "dc01",
+      "ip": "192.168.77.10",
+      "admin_password": "D0m@1n_Adm1n!",
+      "dsrm_password": "DSRM_C@dre!",
+      "ous": [
+        "OU=Agentic,DC=cadre,DC=local",
+        "OU=Cloud,DC=cadre,DC=local",
+        "OU=Command,DC=cadre,DC=local",
+        "OU=DFIR,DC=cadre,DC=local",
+        "OU=Engineering,DC=cadre,DC=local",
+        "OU=RedCell,DC=cadre,DC=local"
+      ],
+      "users": [
+        {
+          "name": "chief_command",
+          "password": "C0mm@nd_Ch1ef!",
+          "ou": "OU=Command,DC=cadre,DC=local",
+          "groups": [
+            "Domain Admins",
+            "Enterprise Admins"
+          ]
+        },
+        {
+          "name": "lead_engineering",
+          "password": "Eng_L3ad!",
+          "ou": "OU=Engineering,DC=cadre,DC=local",
+          "groups": [
+            "Domain Users"
+          ]
+        },
+        {
+          "name": "eng_agentic",
+          "password": "Ag3nt1c_Eng!",
+          "ou": "OU=Agentic,DC=cadre,DC=local",
+          "groups": [
+            "Domain Users"
+          ]
+        },
+        {
+          "name": "eng_cloud",
+          "password": "Cl0ud_Eng!",
+          "ou": "OU=Cloud,DC=cadre,DC=local",
+          "groups": [
+            "Domain Users"
+          ]
+        },
+        {
+          "name": "analyst_cloud",
+          "password": "Cl0ud_An@lyst!",
+          "ou": "OU=Cloud,DC=cadre,DC=local",
+          "groups": [
+            "Domain Users"
+          ]
+        },
+        {
+          "name": "hunter_dfir",
+          "password": "DF1R_Hunt3r!",
+          "ou": "OU=DFIR,DC=cadre,DC=local",
+          "groups": [
+            "Domain Users"
+          ]
+        },
+        {
+          "name": "analyst_dfir",
+          "password": "An@lyst_DF1R!",
+          "ou": "OU=DFIR,DC=cadre,DC=local",
+          "groups": [
+            "Domain Users"
+          ]
+        },
+        {
+          "name": "ops_redcell",
+          "password": "R3dC3ll_0ps!",
+          "ou": "OU=RedCell,DC=cadre,DC=local",
+          "groups": [
+            "Domain Users"
+          ]
+        },
+        {
+          "name": "lead_redcell",
+          "password": "L3ad_R3dC3ll!",
+          "ou": "OU=RedCell,DC=cadre,DC=local",
+          "groups": [
+            "Domain Users"
+          ]
+        },
+        {
+          "name": "analyst_purple",
+          "password": "Purpl3_An@lyst!",
+          "ou": "OU=RedCell,DC=cadre,DC=local",
+          "groups": [
+            "Domain Users"
+          ]
+        },
+        {
+          "name": "svc_ldap",
+          "password": "s3rv1c3_Ld@p!",
+          "ou": "OU=Engineering,DC=cadre,DC=local",
+          "groups": [
+            "Domain Users"
+          ]
+        },
+        {
+          "name": "mssql-linux01",
+          "password": "MS5QL_K3yt@b_P@ss!",
+          "ou": "OU=Cloud,DC=cadre,DC=local",
+          "groups": [
+            "Domain Users"
+          ]
+        }
+      ],
+      "groups": [
+        {
+          "name": "Cloud-Cadre",
+          "ou": "OU=Cloud,DC=cadre,DC=local",
+          "members": [
+            "eng_cloud",
+            "analyst_cloud"
+          ]
+        },
+        {
+          "name": "Agentic-Cadre",
+          "ou": "OU=Agentic,DC=cadre,DC=local",
+          "members": [
+            "eng_agentic"
+          ]
+        },
+        {
+          "name": "DFIR-Cadre",
+          "ou": "OU=DFIR,DC=cadre,DC=local",
+          "members": [
+            "hunter_dfir",
+            "analyst_dfir"
+          ]
+        },
+        {
+          "name": "Red-Cadre",
+          "ou": "OU=RedCell,DC=cadre,DC=local",
+          "members": [
+            "ops_redcell",
+            "lead_redcell"
+          ]
+        },
+        {
+          "name": "Engineering-Cadre",
+          "ou": "OU=Engineering,DC=cadre,DC=local",
+          "members": [
+            "lead_engineering"
+          ]
+        },
+        {
+          "name": "Command-Cadre",
+          "ou": "OU=Command,DC=cadre,DC=local",
+          "members": [
+            "chief_command"
+          ]
+        },
+        {
+          "name": "Threat-Hunt-Cadre",
+          "ou": "OU=DFIR,DC=cadre,DC=local",
+          "members": [
+            "hunter_dfir"
+          ]
+        },
+        {
+          "name": "Purple-Cell",
+          "ou": "OU=RedCell,DC=cadre,DC=local",
+          "members": [
+            "analyst_purple"
+          ]
+        },
+        {
+          "name": "Trusted-Cadre",
+          "ou": "OU=Command,DC=cadre,DC=local"
+        },
+        {
+          "name": "ESC13-Vulnerable-Target",
+          "ou": "OU=Command,DC=cadre,DC=local"
+        }
+      ]
+    },
+    {
+      "name": "child.cadre.local",
+      "type": "child",
+      "netbios": "CHILD",
+      "functional_level": "WinThreshold",
+      "dc": "dc02",
+      "ip": "192.168.77.11",
+      "admin_password": "Ch1ld_D0m@1n!",
+      "dsrm_password": "DSRM_Ch1ld!",
+      "ous": [
+        "OU=Detection,DC=child,DC=cadre,DC=local",
+        "OU=Operations,DC=child,DC=cadre,DC=local"
+      ],
+      "users": [
+        {
+          "name": "dir_operations",
+          "password": "D1r_0p3r@t10ns!",
+          "ou": "OU=Operations,DC=child,DC=cadre,DC=local",
+          "groups": [
+            "Domain Users"
+          ]
+        },
+        {
+          "name": "lead_detection",
+          "password": "L3ad_D3t3ct10n!",
+          "ou": "OU=Detection,DC=child,DC=cadre,DC=local",
+          "groups": [
+            "Domain Users"
+          ]
+        },
+        {
+          "name": "analyst_t1",
+          "password": "T13r_An@lyst!",
+          "ou": "OU=Detection,DC=child,DC=cadre,DC=local",
+          "groups": [
+            "Domain Users"
+          ]
+        },
+        {
+          "name": "analyst_t2",
+          "password": "T23r_An@lyst!",
+          "ou": "OU=Detection,DC=child,DC=cadre,DC=local",
+          "groups": [
+            "Domain Users"
+          ]
+        },
+        {
+          "name": "analyst_t3",
+          "password": "T33r_An@lyst!",
+          "ou": "OU=Detection,DC=child,DC=cadre,DC=local",
+          "groups": [
+            "Domain Users"
+          ]
+        },
+        {
+          "name": "mgr_incident",
+          "password": "Mgr_1nc1d3nt!",
+          "ou": "OU=Operations,DC=child,DC=cadre,DC=local",
+          "groups": [
+            "Domain Users"
+          ]
+        },
+        {
+          "name": "intern_blue",
+          "password": "1nt3rn_Blu3!",
+          "ou": "OU=Detection,DC=child,DC=cadre,DC=local",
+          "groups": [
+            "Domain Users"
+          ]
+        },
+        {
+          "name": "svc_mssql",
+          "password": "s3rv1c3_MSSQL!",
+          "ou": "OU=Operations,DC=child,DC=cadre,DC=local",
+          "groups": [
+            "Domain Users"
+          ]
+        }
+      ],
+      "groups": [
+        {
+          "name": "Operations-Cadre",
+          "ou": "OU=Operations,DC=child,DC=cadre,DC=local",
+          "members": [
+            "dir_operations",
+            "mgr_incident"
+          ]
+        },
+        {
+          "name": "Detection-Cadre",
+          "ou": "OU=Detection,DC=child,DC=cadre,DC=local",
+          "members": [
+            "lead_detection"
+          ]
+        },
+        {
+          "name": "SOC-Tier1",
+          "ou": "OU=Detection,DC=child,DC=cadre,DC=local",
+          "members": [
+            "analyst_t1",
+            "intern_blue"
+          ]
+        },
+        {
+          "name": "SOC-Tier2",
+          "ou": "OU=Detection,DC=child,DC=cadre,DC=local",
+          "members": [
+            "analyst_t2"
+          ]
+        },
+        {
+          "name": "SOC-Tier3",
+          "ou": "OU=Detection,DC=child,DC=cadre,DC=local",
+          "members": [
+            "analyst_t3"
+          ]
+        }
+      ],
+      "parent_domain": "cadre.local"
+    },
+    {
+      "name": "range.local",
+      "type": "external_forest",
+      "netbios": "RANGE",
+      "functional_level": "WinThreshold",
+      "dc": "dc03",
+      "ip": "192.168.77.12",
+      "admin_password": "R@ng3_F0r3st!",
+      "dsrm_password": "DSRM_R@ng3!",
+      "ous": [
+        "OU=Adversary,DC=range,DC=local",
+        "OU=Intelligence,DC=range,DC=local"
+      ],
+      "users": [
+        {
+          "name": "dir_intelligence",
+          "password": "D1r_1nt3l!",
+          "ou": "OU=Intelligence,DC=range,DC=local",
+          "groups": [
+            "Domain Users"
+          ]
+        },
+        {
+          "name": "analyst_osint",
+          "password": "0S1NT_An@lyst!",
+          "ou": "OU=Intelligence,DC=range,DC=local",
+          "groups": [
+            "Domain Users"
+          ]
+        },
+        {
+          "name": "analyst_malware",
+          "password": "M@lw@r3_An@lyst!",
+          "ou": "OU=Intelligence,DC=range,DC=local",
+          "groups": [
+            "Domain Users"
+          ]
+        },
+        {
+          "name": "analyst_forensic",
+          "password": "F0r3ns1c_An@lyst!",
+          "ou": "OU=Intelligence,DC=range,DC=local",
+          "groups": [
+            "Domain Users"
+          ]
+        },
+        {
+          "name": "adversary_lead",
+          "password": "Adv3rsary_L3ad!",
+          "ou": "OU=Adversary,DC=range,DC=local",
+          "groups": [
+            "Domain Users"
+          ]
+        },
+        {
+          "name": "intern_intel",
+          "password": "1nt3rn_Int3l!",
+          "ou": "OU=Intelligence,DC=range,DC=local",
+          "groups": [
+            "Domain Users"
+          ]
+        },
+        {
+          "name": "eng_tools",
+          "password": "T00ls_3ng!",
+          "ou": "OU=Intelligence,DC=range,DC=local",
+          "groups": [
+            "Domain Users"
+          ]
+        },
+        {
+          "name": "svc_mssql",
+          "password": "s3rv1c3_MSSQL!",
+          "ou": "OU=Intelligence,DC=range,DC=local",
+          "groups": [
+            "Domain Users"
+          ]
+        },
+        {
+          "name": "svc_sccm",
+          "password": "s3rv1c3_SCCM!",
+          "ou": "OU=Adversary,DC=range,DC=local",
+          "groups": [
+            "Domain Users"
+          ]
+        },
+        {
+          "name": "svc_naa",
+          "password": "N@A_s3rv1c3!",
+          "ou": "OU=Adversary,DC=range,DC=local",
+          "groups": [
+            "Domain Admins"
+          ]
+        }
+      ],
+      "groups": [
+        {
+          "name": "Intelligence-Cadre",
+          "ou": "OU=Intelligence,DC=range,DC=local",
+          "members": [
+            "dir_intelligence",
+            "analyst_osint",
+            "analyst_malware",
+            "analyst_forensic",
+            "intern_intel"
+          ]
+        },
+        {
+          "name": "Adversary-Cadre",
+          "ou": "OU=Adversary,DC=range,DC=local",
+          "members": [
+            "adversary_lead"
+          ]
+        },
+        {
+          "name": "Tools-Eng",
+          "ou": "OU=Intelligence,DC=range,DC=local",
+          "members": [
+            "eng_tools"
+          ]
+        }
+      ],
+      "dmsa": {
+        "name": "dmsaPrivService",
+        "description": "dMSA for BadSuccessor target"
+      }
+    }
+  ],
+  "hosts": [
+    {
+      "hostname": "dc01",
+      "ip": "192.168.77.10",
+      "os": "windows",
+      "role": "dc"
+    },
+    {
+      "hostname": "dc02",
+      "ip": "192.168.77.11",
+      "os": "windows",
+      "role": "dc"
+    },
+    {
+      "hostname": "dc03",
+      "ip": "192.168.77.12",
+      "os": "windows",
+      "role": "dc"
+    },
+    {
+      "hostname": "mbr01",
+      "ip": "192.168.77.22",
+      "os": "windows",
+      "role": "member"
+    },
+    {
+      "hostname": "mbr02",
+      "ip": "192.168.77.23",
+      "os": "windows",
+      "role": "member"
+    },
+    {
+      "hostname": "linux01",
+      "ip": "192.168.77.40",
+      "os": "linux",
+      "role": "member"
+    },
+    {
+      "hostname": "elk",
+      "ip": "192.168.77.50",
+      "os": "linux",
+      "role": "telemetry"
+    },
+    {
+      "hostname": "vr",
+      "ip": "192.168.77.51",
+      "os": "linux",
+      "role": "telemetry"
+    },
+    {
+      "hostname": "monitor",
+      "ip": "192.168.77.55",
+      "os": "linux",
+      "role": "telemetry"
+    },
+    {
+      "hostname": "provisioning",
+      "ip": "192.168.77.60",
+      "os": "linux",
+      "role": "provisioner"
+    }
+  ],
+  "network": {
+    "subnet": "192.168.77.0/24",
+    "vmnet": "vmnet2",
+    "gateway": "192.168.77.1"
+  },
+  "vulns": {
+    "dc01": {
+      "adcs_ca": true,
+      "esc_templates": [
+        "ESC1",
+        "ESC2",
+        "ESC3-Agent",
+        "ESC3-Target",
+        "ESC4",
+        "ESC7",
+        "ESC9",
+        "ESC13",
+        "ESC14"
+      ],
+      "rc4_enabled": true,
+      "cloud_sync_agent": true
+    },
+    "dc02": {
+      "child_domain": true
+    },
+    "dc03": {
+      "aes_only": true,
+      "dmsa_enabled": true,
+      "external_forest": true
+    },
+    "mbr01": {
+      "mssql": true,
+      "mssql_instance": "SQLEXPRESS",
+      "iis": true,
+      "unconstrained_delegation": true,
+      "shares": [
+        "public",
+        "restricted"
+      ]
+    },
+    "mbr02": {
+      "sccm": true,
+      "wsus": true,
+      "virtual_smart_card_ca": true
+    },
+    "linux01": {
+      "sssd": true,
+      "mssql_linux": true,
+      "nfs_krb5": true,
+      "podman_privileged": true
+    }
+  },
+  "adcs": {
+    "ca_hostname": "dc01",
+    "ca_name": "cadre-CA",
+    "ca_common_name": "CADRE Certification Authority",
+    "templates": {
+      "ESC1": {
+        "name": "ESC1-WebServer",
+        "enrollee_supplies_subject": true,
+        "client_auth": true
+      },
+      "ESC2": {
+        "name": "ESC2-SubCA",
+        "enrollee_supplies_subject": true,
+        "subca": true
+      },
+      "ESC3-Agent": {
+        "name": "ESC3-Agent",
+        "agent": true
+      },
+      "ESC3-Target": {
+        "name": "ESC3-Target",
+        "target": true
+      },
+      "ESC4": {
+        "name": "ESC4-Modified",
+        "modified": true
+      },
+      "ESC7": {
+        "name": "ESC7-CA-Manager",
+        "ca_manager": true
+      },
+      "ESC9": {
+        "name": "ESC9-NoSecurityExt",
+        "no_security_ext": true
+      },
+      "ESC13": {
+        "name": "ESC13-OldCert",
+        "old_cert": true
+      },
+      "ESC14": {
+        "name": "ESC14-EnrolleeSuppliesSubject",
+        "enrollee_supplies_subject": true
+      }
+    }
+  },
+  "trusts": [
+    {
+      "source": "cadre.local",
+      "target": "child.cadre.local",
+      "type": "parent-child",
+      "direction": "ParentChild",
+      "sid_filtering": false
+    },
+    {
+      "source": "cadre.local",
+      "target": "range.local",
+      "type": "forest",
+      "direction": "Bidirectional",
+      "sid_filtering": false
+    }
+  ],
+  "dns_forwarders": [
+    {
+      "dc": "dc01",
+      "domain": "range.local",
+      "forward_to": "192.168.77.12"
+    },
+    {
+      "dc": "dc01",
+      "domain": "child.cadre.local",
+      "forward_to": "192.168.77.11"
+    },
+    {
+      "dc": "dc03",
+      "domain": "cadre.local",
+      "forward_to": "192.168.77.10"
+    }
+  ],
+  "gmsa": {
+    "name": "gmsaTools",
+    "description": "gMSA for tooling services",
+    "principals": [
+      "CADRE\\eng_cloud"
+    ]
+  },
+  "shares": [
+    {
+      "server": "mbr01",
+      "name": "public",
+      "path": "C:\\Shares\\Public",
+      "description": "Public share for all users"
+    },
+    {
+      "server": "mbr01",
+      "name": "restricted",
+      "path": "C:\\Shares\\Restricted",
+      "description": "Restricted share for analysts"
+    },
+    {
+      "server": "mbr02",
+      "name": "vault",
+      "path": "C:\\Shares\\Vault",
+      "description": "Vault share for command staff"
+    }
+  ],
+  "bait_files": [
+    {
+      "share": "public",
+      "name": "cadre-handbook.txt",
+      "content": "Recon intel - fake operations manual"
+    },
+    {
+      "share": "public",
+      "name": "incident-log.txt",
+      "content": "Recon intel - fake incident log"
+    },
+    {
+      "share": "vault",
+      "name": "naa-rotation-notice.txt",
+      "content": "Recon intel - fake NAA password rotation notice"
+    },
+    {
+      "share": "vault",
+      "name": "sccm-recovery-key.txt",
+      "content": "Recon intel - fake SCCM recovery key"
+    }
+  ],
+  "gpos": [
+    {
+      "name": "Vulnerable-GPO",
+      "target": "OU=Command,DC=cadre,DC=local",
+      "settings": {
+        "WDigest": true,
+        "LmCompatibilityLevel": 1
+      }
+    }
+  ]
+}

@@ -1,0 +1,190 @@
+---
+# TYPE: VERIFY-ONLY (rc=0=pass, rc=1=fail — checks IIS pool, shares, bait files)
+# Layer 6: Member Services — Verify shares + bait, IIS app pool, VSC template
+
+- name: "Verify IIS CertPotato app pool on mbr01"
+  hosts: mbr01
+  gather_facts: false
+  tasks:
+    - name: "[VULN][WT#29] Verify IIS app pool CADRE-CertPotato as NetworkService"
+      ansible.windows.win_shell: |
+        $ErrorActionPreference = "Stop"
+        try {
+          Import-Module WebAdministration
+          $pool = Get-Item "IIS:\AppPools\CADRE-CertPotato" -ErrorAction SilentlyContinue
+          if ($pool) {
+            $identity = (Get-ItemProperty "IIS:\AppPools\CADRE-CertPotato" -Name processModel).identityType
+            if ($identity -eq 2 -or $identity -eq "NetworkService") { Write-Output "PASS: App pool exists as NetworkService"; exit 0 }
+            Write-Output "FAIL: App pool exists but identity is $identity"; exit 1
+          }
+          Write-Output "FAIL: CADRE-CertPotato app pool not found"; exit 1
+        } catch { Write-Output "FAIL: $_"; exit 1 }
+      register: r
+      changed_when: false
+      failed_when: r.rc == 1
+
+- name: "Verify SMB shares on mbr01"
+  hosts: mbr01
+  gather_facts: false
+  tasks:
+    - name: 'Verify C:\Shares\public directory'
+      ansible.windows.win_shell: |
+        $ErrorActionPreference = "Stop"
+        try {
+          if (Test-Path "C:\Shares\public") { Write-Output "PASS: Directory exists"; exit 0 }
+          Write-Output "FAIL: Directory not found"; exit 1
+        } catch { Write-Output "FAIL: $_"; exit 1 }
+      register: r
+      changed_when: false
+      failed_when: r.rc == 1
+
+    - name: 'Verify C:\Shares\restricted directory'
+      ansible.windows.win_shell: |
+        $ErrorActionPreference = "Stop"
+        try {
+          if (Test-Path "C:\Shares\restricted") { Write-Output "PASS: Directory exists"; exit 0 }
+          Write-Output "FAIL: Directory not found"; exit 1
+        } catch { Write-Output "FAIL: $_"; exit 1 }
+      register: r
+      changed_when: false
+      failed_when: r.rc == 1
+
+    - name: "[SHARE] Verify public share"
+      ansible.windows.win_shell: |
+        $ErrorActionPreference = "Stop"
+        try {
+          $share = Get-SmbShare -Name "public" -ErrorAction SilentlyContinue
+          if ($share) { Write-Output "PASS: Share exists"; exit 0 }
+          Write-Output "FAIL: Share not found"; exit 1
+        } catch { Write-Output "FAIL: $_"; exit 1 }
+      register: r
+      changed_when: false
+      failed_when: r.rc == 1
+
+    - name: "[SHARE] Verify restricted share"
+      ansible.windows.win_shell: |
+        $ErrorActionPreference = "Stop"
+        try {
+          $share = Get-SmbShare -Name "restricted" -ErrorAction SilentlyContinue
+          if ($share) { Write-Output "PASS: Share exists"; exit 0 }
+          Write-Output "FAIL: Share not found"; exit 1
+        } catch { Write-Output "FAIL: $_"; exit 1 }
+      register: r
+      changed_when: false
+      failed_when: r.rc == 1
+
+    - name: "[SHARE] Verify NTFS FullControl for analyst_cloud on restricted"
+      ansible.windows.win_shell: |
+        $ErrorActionPreference = "Stop"
+        try {
+          $acl = Get-Acl -Path "C:\Shares\restricted"
+          $existing = $acl.Access | Where-Object { $_.IdentityReference.Value -eq "CADRE\analyst_cloud" -and $_.FileSystemRights -eq "FullControl" }
+          if ($existing) { Write-Output "PASS: NTFS ACE exists"; exit 0 }
+          Write-Output "FAIL: NTFS ACE not found"; exit 1
+        } catch { Write-Output "FAIL: $_"; exit 1 }
+      register: r
+      changed_when: false
+      failed_when: r.rc == 1
+
+    - name: "[SHARE] Verify bait: cadre-handbook.txt (public)"
+      ansible.windows.win_shell: |
+        $ErrorActionPreference = "Stop"
+        try {
+          if (Test-Path "C:\Shares\public\cadre-handbook.txt") { Write-Output "PASS: Bait file exists"; exit 0 }
+          Write-Output "FAIL: Bait file not found"; exit 1
+        } catch { Write-Output "FAIL: $_"; exit 1 }
+      register: r
+      changed_when: false
+      failed_when: r.rc == 1
+
+    - name: "[SHARE] Verify bait: incident-log.txt (public)"
+      ansible.windows.win_shell: |
+        $ErrorActionPreference = "Stop"
+        try {
+          if (Test-Path "C:\Shares\public\incident-log.txt") { Write-Output "PASS: Bait file exists"; exit 0 }
+          Write-Output "FAIL: Bait file not found"; exit 1
+        } catch { Write-Output "FAIL: $_"; exit 1 }
+      register: r
+      changed_when: false
+      failed_when: r.rc == 1
+
+- name: "Verify SMB shares on mbr02"
+  hosts: mbr02
+  gather_facts: false
+  tasks:
+    - name: 'Verify C:\Shares\vault directory'
+      ansible.windows.win_shell: |
+        $ErrorActionPreference = "Stop"
+        try {
+          if (Test-Path "C:\Shares\vault") { Write-Output "PASS: Directory exists"; exit 0 }
+          Write-Output "FAIL: Directory not found"; exit 1
+        } catch { Write-Output "FAIL: $_"; exit 1 }
+      register: r
+      changed_when: false
+      failed_when: r.rc == 1
+
+    - name: 'Verify vault share'
+      ansible.windows.win_shell: |
+        $ErrorActionPreference = "Stop"
+        try {
+          $share = Get-SmbShare -Name "vault" -ErrorAction SilentlyContinue
+          if ($share) { Write-Output "PASS: Share exists"; exit 0 }
+          Write-Output "FAIL: Share not found"; exit 1
+        } catch { Write-Output "FAIL: $_"; exit 1 }
+      register: r
+      changed_when: false
+      failed_when: r.rc == 1
+
+    - name: "[SHARE] Verify bait: naa-rotation-notice.txt (vault)"
+      ansible.windows.win_shell: |
+        $ErrorActionPreference = "Stop"
+        try {
+          if (Test-Path "C:\Shares\vault\naa-rotation-notice.txt") { Write-Output "PASS: Bait file exists"; exit 0 }
+          Write-Output "FAIL: Bait file not found"; exit 1
+        } catch { Write-Output "FAIL: $_"; exit 1 }
+      register: r
+      changed_when: false
+      failed_when: r.rc == 1
+
+    - name: "[SHARE] Verify bait: sccm-recovery-key.txt (vault)"
+      ansible.windows.win_shell: |
+        $ErrorActionPreference = "Stop"
+        try {
+          if (Test-Path "C:\Shares\vault\sccm-recovery-key.txt") { Write-Output "PASS: Bait file exists"; exit 0 }
+          Write-Output "FAIL: Bait file not found"; exit 1
+        } catch { Write-Output "FAIL: $_"; exit 1 }
+      register: r
+      changed_when: false
+      failed_when: r.rc == 1
+
+    - name: "[SCCM][WT#37-40] Verify svc_sccm is SCCM Full Administrator"
+      ansible.windows.win_shell: |
+        $ErrorActionPreference = "Stop"
+        try {
+          $svc = Get-Service SMS_EXECUTIVE -ErrorAction SilentlyContinue
+          if (-not $svc) { Write-Output "SKIP: SCCM not installed"; exit 0 }
+          $sid = ([System.Security.Principal.NTAccount]"RANGE\svc_sccm").Translate([System.Security.Principal.SecurityIdentifier]).Value
+          $admin = Get-WmiObject -Namespace "root\SMS\site_CAD" -Class SMS_Admin -ErrorAction SilentlyContinue | Where-Object { $_.AdminSid -eq $sid }
+          if ($admin) { Write-Output "PASS: svc_sccm is SCCM Full Administrator"; exit 0 }
+          Write-Output "FAIL: svc_sccm is not an SCCM admin. Run 06-member-services.yml deploy."; exit 1
+        } catch { Write-Output "FAIL: svc_sccm admin check error: $_"; exit 1 }
+      register: r
+      changed_when: false
+      failed_when: r.rc == 1
+
+- name: "VSC template verification — dc01"
+  hosts: dc01
+  gather_facts: false
+  tasks:
+    - name: "[ADCS] VSC template CADRE-VSC published (verify)"
+      ansible.windows.win_shell: |
+        $ErrorActionPreference = "Stop"
+        try {
+          $configNC = (Get-ADRootDSE).configurationNamingContext
+          $tpl = Get-ADObject -Filter { Name -eq "CADRE-VSC" } -SearchBase "CN=Certificate Templates,CN=Public Key Services,CN=Services,$configNC" -ErrorAction SilentlyContinue
+          if ($tpl) { Write-Output "PASS: CADRE-VSC template exists"; exit 0 }
+          Write-Output "FAIL: CADRE-VSC template not found"; exit 1
+        } catch { Write-Output "FAIL: VSC check error: $_"; exit 1 }
+      register: r
+      changed_when: false
+      failed_when: r.rc == 1

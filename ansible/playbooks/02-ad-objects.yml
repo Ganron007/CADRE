@@ -1,0 +1,558 @@
+---
+# TYPE: DEPLOY (rc=0=skip, rc=2=applied+verified, rc=1=fail)
+# Layer 2: AD Objects — Deploy OUs, users, groups, gMSA, dMSA, memberships
+# All tasks use win_shell with exit code pattern:
+#   0 = already exists (ok, skip)
+#   1 = error (fail)
+#   2 = applied and verified (changed)
+# Idempotent — safe to run multiple times.
+
+# =============================================================================
+# cadre.local (dc01)
+# =============================================================================
+- name: "dc01 — Deploy OUs"
+  hosts: dc01
+  gather_facts: false
+  tasks:
+    - name: "[PREP] Create 6 OUs in cadre.local"
+      ansible.windows.win_shell: |
+        $ErrorActionPreference = "Stop"
+        try {
+          $ouName = "{{ item.name }}"
+          $ouPath = "dc=cadre,dc=local"
+          $existing = Get-ADOrganizationalUnit -Filter "Name -eq '$ouName'" -SearchBase $ouPath -ErrorAction SilentlyContinue
+          if ($existing) { Write-Output "OK: OU $ouName exists"; exit 0 }
+          New-ADOrganizationalUnit -Name $ouName -Path $ouPath -Description "{{ item.desc }}" -ProtectedFromAccidentalDeletion $false
+          $verify = Get-ADOrganizationalUnit -Filter "Name -eq '$ouName'" -SearchBase $ouPath -ErrorAction Stop
+          if (-not $verify) { throw "Verify failed" }
+          Write-Output "APPLIED: OU $ouName created and verified"; exit 2
+        } catch { Write-Output "FAILED: OU $ouName — $_"; exit 1 }
+      loop:
+        - { name: Cloud, desc: "Cloud-team identities" }
+        - { name: Agentic, desc: "AI/LangGraph/MCP team" }
+        - { name: DFIR, desc: "Forensic analysts" }
+        - { name: RedCell, desc: "Adversary simulation team" }
+        - { name: Engineering, desc: "Lab/infrastructure engineers" }
+        - { name: Command, desc: "Leadership / domain admins" }
+      register: r
+      changed_when: r.rc == 2
+      failed_when: r.rc == 1
+
+    - name: "[PREP] Create 10 groups in cadre.local"
+      ansible.windows.win_shell: |
+        $ErrorActionPreference = "Stop"
+        try {
+          $gName = "{{ item.name }}"
+          $existing = Get-ADGroup -Identity $gName -ErrorAction SilentlyContinue
+          if ($existing) { Write-Output "OK: Group $gName exists"; exit 0 }
+          New-ADGroup -Name $gName -Path "ou={{ item.ou }},dc=cadre,dc=local" -GroupScope {{ item.scope }} -GroupCategory Security
+          $verify = Get-ADGroup -Identity $gName -ErrorAction Stop
+          if (-not $verify) { throw "Verify failed" }
+          Write-Output "APPLIED: Group $gName created and verified"; exit 2
+        } catch { Write-Output "FAILED: Group $gName — $_"; exit 1 }
+      loop:
+        - { name: Cloud-Cadre, ou: Cloud, scope: Global }
+        - { name: Agentic-Cadre, ou: Agentic, scope: Global }
+        - { name: DFIR-Cadre, ou: DFIR, scope: Global }
+        - { name: Red-Cadre, ou: RedCell, scope: Global }
+        - { name: Engineering-Cadre, ou: Engineering, scope: Global }
+        - { name: Command-Cadre, ou: Command, scope: Global }
+        - { name: Threat-Hunt-Cadre, ou: DFIR, scope: Global }
+        - { name: Purple-Cell, ou: RedCell, scope: Global }
+        - { name: Trusted-Cadre, ou: Command, scope: DomainLocal }
+        - { name: ESC13-Vulnerable-Target, ou: Command, scope: Universal }
+      register: r
+      changed_when: r.rc == 2
+      failed_when: r.rc == 1
+
+    - name: "[PREP] Create 12 users in cadre.local"
+      ansible.windows.win_shell: |
+        $ErrorActionPreference = "Stop"
+        try {
+          $uName = "{{ item.uname }}"
+          $existing = Get-ADUser -Identity $uName -ErrorAction SilentlyContinue
+          if ($existing) { Write-Output "OK: User $uName exists"; exit 0 }
+          $secPwd = ConvertTo-SecureString "{{ item.pw }}" -AsPlainText -Force
+          New-ADUser -Name $uName -SamAccountName $uName -UserPrincipalName "$uName@cadre.local" `
+            -GivenName "$uName" -Surname "" -Path "ou={{ item.ou }},dc=cadre,dc=local" `
+            -AccountPassword $secPwd -Enabled $true -PasswordNeverExpires $true
+          $verify = Get-ADUser -Identity $uName -ErrorAction Stop
+          if (-not $verify) { throw "Verify failed" }
+          Write-Output "APPLIED: User $uName created and verified"; exit 2
+        } catch { Write-Output "FAILED: User $uName — $_"; exit 1 }
+      loop:
+        - { uname: chief_command, pw: "C0mm@nd_Ch1ef!", ou: Command }
+        - { uname: lead_engineering, pw: "Eng_L3ad!", ou: Engineering }
+        - { uname: eng_agentic, pw: "Ag3nt1c_Eng!", ou: Agentic }
+        - { uname: eng_cloud, pw: "Cl0ud_Eng!", ou: Cloud }
+        - { uname: analyst_cloud, pw: "Cl0ud_An@lyst!", ou: Cloud }
+        - { uname: hunter_dfir, pw: "DF1R_Hunt3r!", ou: DFIR }
+        - { uname: analyst_dfir, pw: "An@lyst_DF1R!", ou: DFIR }
+        - { uname: ops_redcell, pw: "R3dC3ll_0ps!", ou: RedCell }
+        - { uname: lead_redcell, pw: "L3ad_R3dC3ll!", ou: RedCell }
+        - { uname: analyst_purple, pw: "Purpl3_An@lyst!", ou: RedCell }
+        - { uname: svc_ldap, pw: "s3rv1c3_Ld@p!", ou: Engineering }
+        - { uname: mssql-linux01, pw: "MS5QL_K3yt@b_P@ss!", ou: Cloud }
+      register: r
+      changed_when: r.rc == 2
+      failed_when: r.rc == 1
+
+    - name: "[PREP][WT#24] Create KDS root key for gMSA"
+      ansible.windows.win_shell: |
+        $ErrorActionPreference = "Stop"
+        try {
+          $kds = Get-KdsRootKey -ErrorAction SilentlyContinue
+          if ($kds) { Write-Output "OK: KDS root key exists"; exit 0 }
+          Start-Service KdsSvc -ErrorAction SilentlyContinue
+          Add-KdsRootKey -EffectiveTime ((Get-Date).AddHours(-10)) -ErrorAction Stop
+          $verify = Get-KdsRootKey -ErrorAction Stop
+          if (-not $verify) { throw "Verify failed" }
+          Write-Output "APPLIED: KDS root key created"; exit 2
+        } catch { Write-Output "WARN: Cannot create KDS key via cmdlet on this platform ($($_.Exception.Message)). Checking if gMSA exists instead..."; exit 0 }
+      register: r
+      changed_when: r.rc == 2
+      failed_when: false
+
+    - name: "[PREP][WT#24] Create gMSA gmsaTools"
+      ansible.windows.win_shell: |
+        $ErrorActionPreference = "Stop"
+        try {
+          $gmsa = Get-ADServiceAccount -Identity "gmsaTools" -ErrorAction SilentlyContinue
+          if ($gmsa) { Write-Output "OK: gMSA gmsaTools exists"; exit 0 }
+          Write-Output "WARN: gMSA gmsaTools not found — create manually via: New-ADServiceAccount -Name gmsaTools -DNSHostName dc01.cadre.local -PrincipalsAllowedToRetrieveManagedPassword (Get-ADUser eng_cloud) -KerberosEncryptionType AES128,AES256"; exit 0
+        } catch { Write-Output "WARN: gMSA check failed — $_"; exit 0 }
+      register: r
+      changed_when: false
+      failed_when: false
+
+    - name: "[PREP][WT#24] Create gMSA gmsaTools"
+      ansible.windows.win_shell: |
+        $ErrorActionPreference = "Stop"
+        try {
+          $kds = Get-KdsRootKey -ErrorAction SilentlyContinue
+          if (-not $kds) { Write-Output "SKIP: No KDS root key found — gMSA cannot be created"; exit 0 }
+          $gmsa = Get-ADServiceAccount -Identity "gmsaTools" -ErrorAction SilentlyContinue
+          if ($gmsa) { Write-Output "OK: gMSA gmsaTools exists"; exit 0 }
+          New-ADServiceAccount -Name "gmsaTools" -DNSHostName "dc01.cadre.local" `
+            -PrincipalsAllowedToRetrieveManagedPassword "CADRE\eng_cloud" `
+            -KerberosEncryptionType AES128,AES256
+          $verify = Get-ADServiceAccount -Identity "gmsaTools" -ErrorAction Stop
+          if (-not $verify) { throw "Verify failed" }
+          Write-Output "APPLIED: gMSA gmsaTools created (AES128/256) and verified"; exit 2
+        } catch { Write-Output "FAILED: gMSA gmsaTools — $_"; exit 1 }
+      register: r
+      changed_when: r.rc == 2
+      failed_when: r.rc == 1
+
+    - name: "[PREP][WT#24] Create gMSA gmsaTools"
+      ansible.windows.win_shell: |
+        $ErrorActionPreference = "Stop"
+        try {
+          $kds = Get-KdsRootKey -ErrorAction SilentlyContinue
+          if (-not $kds) { Write-Output "SKIP: No KDS root key — gMSA cannot be created on Server 2025 (ACE#10 will skip gracefully)"; exit 0 }
+          $gmsa = Get-ADServiceAccount -Identity "gmsaTools" -ErrorAction SilentlyContinue
+          if ($gmsa) { Write-Output "OK: gMSA gmsaTools exists"; exit 0 }
+          New-ADServiceAccount -Name "gmsaTools" -DNSHostName "dc01.cadre.local" -PrincipalsAllowedToRetrieveManagedPassword "CADRE\eng_cloud"
+          $verify = Get-ADServiceAccount -Identity "gmsaTools" -ErrorAction Stop
+          if (-not $verify) { throw "Verify failed" }
+          Write-Output "APPLIED: gMSA gmsaTools created and verified"; exit 2
+        } catch { Write-Output "FAILED: gMSA gmsaTools — $_"; exit 1 }
+      register: r
+      changed_when: r.rc == 2
+      failed_when: r.rc == 1
+
+    - name: "[E2E][008] Add SACL to gMSA gmsaTools for msDS-ManagedPassword audit"
+      ansible.windows.win_shell: |
+        $ErrorActionPreference = "Stop"
+        try {
+          Import-Module ActiveDirectory
+          $path = "AD:CN=gmsaTools,CN=Managed Service Accounts,DC=cadre,DC=local"
+          $acl = Get-Acl -Path $path -Audit
+          $identity = [System.Security.Principal.NTAccount]"Everyone"
+          $adRight = [System.DirectoryServices.ActiveDirectoryRights]"ReadProperty"
+          $type = [System.Security.AccessControl.AuditFlags]"Success"
+          $rule = New-Object System.DirectoryServices.ActiveDirectoryAuditRule($identity, $adRight, $type, [System.Guid]::Empty, [System.DirectoryServices.ActiveDirectorySecurityInheritance]"All")
+          $acl.AddAuditRule($rule)
+          Set-Acl -Path $path -AclObject $acl
+          Write-Output "APPLIED: SACL added to gMSA gmsaTools"; exit 2
+        } catch { Write-Output "FAILED: SACL — $_"; exit 1 }
+      register: r
+      changed_when: r.rc == 2
+      failed_when: r.rc == 1
+      when: domain_role == "cadre-dc01"
+
+    - name: "[PREP] Add cadre.local users to groups"
+      ansible.windows.win_shell: |
+        $ErrorActionPreference = "Stop"
+        try {
+          $group = "{{ item.group }}"
+          $members = '{{ item.users | join(",") }}'.Split(',', [System.StringSplitOptions]::RemoveEmptyEntries)
+          $existing = Get-ADGroupMember -Identity $group | Select-Object -ExpandProperty SamAccountName
+          $added = $false
+          foreach ($m in $members) {
+            if ($m -notin $existing) { Add-ADGroupMember -Identity $group -Members $m; $added = $true }
+          }
+          if (-not $added) { Write-Output "OK: All members already in $group"; exit 0 }
+          $verify = Get-ADGroupMember -Identity $group | Select-Object -ExpandProperty SamAccountName
+          $missing = $members | Where-Object { $_ -notin $verify }
+          if ($missing) { throw "Missing: $missing" }
+          Write-Output "APPLIED: Members added to $group and verified"; exit 2
+        } catch { Write-Output "FAILED: Group membership $group — $_"; exit 1 }
+      loop:
+        - { group: "Cloud-Cadre", users: ["eng_cloud", "analyst_cloud"] }
+        - { group: "Agentic-Cadre", users: ["eng_agentic"] }
+        - { group: "DFIR-Cadre", users: ["hunter_dfir", "analyst_dfir"] }
+        - { group: "Red-Cadre", users: ["ops_redcell", "lead_redcell"] }
+        - { group: "Engineering-Cadre", users: ["lead_engineering"] }
+        - { group: "Command-Cadre", users: ["chief_command"] }
+        - { group: "Threat-Hunt-Cadre", users: ["hunter_dfir"] }
+        - { group: "Purple-Cell", users: ["analyst_purple"] }
+      register: r
+      changed_when: r.rc == 2
+      failed_when: r.rc == 1
+
+    - name: "[PREP][WT#23] Create Vulnerable-GPO"
+      ansible.windows.win_shell: |
+        $ErrorActionPreference = "Stop"
+        try {
+          $gpo = Get-GPO -Name "Vulnerable-GPO" -ErrorAction SilentlyContinue
+          if ($gpo) { Write-Output "OK: Vulnerable-GPO exists"; exit 0 }
+          $junk = New-GPO -Name "Vulnerable-GPO"
+          $verify = Get-GPO -Name "Vulnerable-GPO" -ErrorAction Stop
+          if (-not $verify) { throw "Verify failed" }
+          Write-Output "APPLIED: Vulnerable-GPO created"; exit 2
+        } catch { Write-Output "FAILED: Vulnerable-GPO — $_"; exit 1 }
+      register: r
+      changed_when: r.rc == 2
+      failed_when: r.rc == 1
+
+    - name: "[PREP][WT#23] Link Vulnerable-GPO → OU=Command"
+      ansible.windows.win_shell: |
+        $ErrorActionPreference = "Stop"
+        try {
+          $gpo = Get-GPO -Name "Vulnerable-GPO" -ErrorAction SilentlyContinue
+          if (-not $gpo) { Write-Output "SKIP: Vulnerable-GPO not found"; exit 0 }
+          $inheritance = Get-GPInheritance -Target "OU=Command,DC=cadre,DC=local"
+          $links = $inheritance.GpoLinks | Where-Object { $_.GpoId -eq $gpo.Id }
+          if ($links) { Write-Output "OK: Already linked to OU=Command"; exit 0 }
+          $junk = New-GPLink -Name "Vulnerable-GPO" -Target "OU=Command,DC=cadre,DC=local" -LinkEnabled Yes
+          $vInheritance = Get-GPInheritance -Target "OU=Command,DC=cadre,DC=local"
+          $verify = $vInheritance.GpoLinks | Where-Object { $_.GpoId -eq $gpo.Id }
+          if (-not $verify) { throw "Verify failed" }
+          Write-Output "APPLIED: Vulnerable-GPO linked to OU=Command"; exit 2
+        } catch { Write-Output "FAILED: Vulnerable-GPO link — $_"; exit 1 }
+      register: r
+      changed_when: r.rc == 2
+      failed_when: r.rc == 1
+
+    - name: "[PREP][WT#23] Create WMI-Filtered-GPO"
+      ansible.windows.win_shell: |
+        $ErrorActionPreference = "Stop"
+        try {
+          $gpo = Get-GPO -Name "WMI-Filtered-GPO" -ErrorAction SilentlyContinue
+          if ($gpo) { Write-Output "OK: WMI-Filtered-GPO exists"; exit 0 }
+          $junk = New-GPO -Name "WMI-Filtered-GPO"
+          $verify = Get-GPO -Name "WMI-Filtered-GPO" -ErrorAction Stop
+          if (-not $verify) { throw "Verify failed" }
+          Write-Output "APPLIED: WMI-Filtered-GPO created"; exit 2
+        } catch { Write-Output "FAILED: WMI-Filtered-GPO — $_"; exit 1 }
+      register: r
+      changed_when: r.rc == 2
+      failed_when: r.rc == 1
+
+    - name: "[PREP][WT#23] Link WMI-Filtered-GPO → OU=Agentic"
+      ansible.windows.win_shell: |
+        $ErrorActionPreference = "Stop"
+        try {
+          $gpo = Get-GPO -Name "WMI-Filtered-GPO" -ErrorAction SilentlyContinue
+          if (-not $gpo) { Write-Output "SKIP: WMI-Filtered-GPO not found"; exit 0 }
+          $inheritance = Get-GPInheritance -Target "OU=Agentic,DC=cadre,DC=local"
+          $links = $inheritance.GpoLinks | Where-Object { $_.GpoId -eq $gpo.Id }
+          if ($links) { Write-Output "OK: Already linked to OU=Agentic"; exit 0 }
+          $junk = New-GPLink -Name "WMI-Filtered-GPO" -Target "OU=Agentic,DC=cadre,DC=local" -LinkEnabled Yes
+          $vInheritance = Get-GPInheritance -Target "OU=Agentic,DC=cadre,DC=local"
+          $verify = $vInheritance.GpoLinks | Where-Object { $_.GpoId -eq $gpo.Id }
+          if (-not $verify) { throw "Verify failed" }
+          Write-Output "APPLIED: WMI-Filtered-GPO linked to OU=Agentic"; exit 2
+        } catch { Write-Output "FAILED: WMI-Filtered-GPO link — $_"; exit 1 }
+      register: r
+      changed_when: r.rc == 2
+      failed_when: r.rc == 1
+
+    - name: "[PREP] Add chief_command to Domain Admins + Enterprise Admins"
+      ansible.windows.win_shell: |
+        $ErrorActionPreference = "Stop"
+        try {
+          $da = Get-ADGroupMember "Domain Admins" | Where-Object { $_.SamAccountName -eq "chief_command" }
+          $ea = Get-ADGroupMember "Enterprise Admins" | Where-Object { $_.SamAccountName -eq "chief_command" }
+          if ($da -and $ea) { Write-Output "OK: chief_command already in DA+EA"; exit 0 }
+          if (-not $da) { Add-ADGroupMember "Domain Admins" -Members chief_command }
+          if (-not $ea) { Add-ADGroupMember "Enterprise Admins" -Members chief_command }
+          $vDa = Get-ADGroupMember "Domain Admins" | Where-Object { $_.SamAccountName -eq "chief_command" }
+          $vEa = Get-ADGroupMember "Enterprise Admins" | Where-Object { $_.SamAccountName -eq "chief_command" }
+          if (-not $vDa -or -not $vEa) { throw "Verify failed" }
+          Write-Output "APPLIED: chief_command added to DA+EA and verified"; exit 2
+        } catch { Write-Output "FAILED: chief_command DA+EA — $_"; exit 1 }
+      register: r
+      changed_when: r.rc == 2
+      failed_when: r.rc == 1
+
+    - name: "[GPP] Create Groups.xml with cpassword in SYSVOL"
+      ansible.windows.win_shell: |
+        $ErrorActionPreference = "Stop"
+        try {
+          $gpo = Get-GPO -Name "Vulnerable-GPO" -ErrorAction Stop
+          $guid = $gpo.Id.ToString()
+          $cpassword = "T6Zc9T0qO/pEh+eOXTnxky0jSJvWvPcvAKWwGSpFOqY"
+          $path = "\\cadre.local\SYSVOL\cadre.local\Policies\{$guid}\Machine\Preferences\Groups\Groups.xml"
+          if (Test-Path $path) { Write-Output "SKIP: Groups.xml already exists"; exit 0 }
+          $xml = @"
+<?xml version="1.0" encoding="utf-8"?>
+<Groups clsid="{3125E937-EB16-4b4c-9934-544FC6D24D26}">
+  <Group clsid="{6D4A79E4-529C-4481-ABD0-F5BD7EA93BA7}" name="CADRE-Backup" image="2" changed="2026-05-23 12:00:00" uid="{A5E8D2F1-3B4C-5D6E-7F8A-9B0C1D2E3F4A}">
+    <Properties action="U" newName="" fullName="CADRE Backup Service" description="Service account for automated backups" cpassword="$cpassword" changeLogon="0" noChange="1" neverExpires="1" acctDisabled="0" userName="CADRE\svc_backup"/>
+  </Group>
+</Groups>
+"@
+          New-Item -Path (Split-Path $path -Parent) -ItemType Directory -Force | Out-Null
+          Set-Content -Path $path -Value $xml -Force
+          if (-not (Test-Path $path)) { throw "File not found after write" }
+          Write-Output "APPLIED: Groups.xml created with cpassword"; exit 2
+        } catch { Write-Output "FAILED: GPP cpassword — $_"; exit 1 }
+      register: r
+      changed_when: r.rc == 2
+      failed_when: r.rc == 1
+
+# =============================================================================
+# child.cadre.local (dc02)
+# =============================================================================
+- name: "dc02 — Deploy OUs, groups, users"
+  hosts: dc02
+  gather_facts: false
+  tasks:
+    - name: "[PREP] Create 2 OUs in child.cadre.local"
+      ansible.windows.win_shell: |
+        $ErrorActionPreference = "Stop"
+        try {
+          $ouName = "{{ item.name }}"
+          $existing = Get-ADOrganizationalUnit -Filter "Name -eq '$ouName'" -SearchBase "dc=child,dc=cadre,dc=local" -ErrorAction SilentlyContinue
+          if ($existing) { Write-Output "OK: OU $ouName exists"; exit 0 }
+          New-ADOrganizationalUnit -Name $ouName -Path "dc=child,dc=cadre,dc=local" -Description "{{ item.desc }}" -ProtectedFromAccidentalDeletion $false
+          $verify = Get-ADOrganizationalUnit -Filter "Name -eq '$ouName'" -SearchBase "dc=child,dc=cadre,dc=local" -ErrorAction Stop
+          if (-not $verify) { throw "Verify failed" }
+          Write-Output "APPLIED: OU $ouName created and verified"; exit 2
+        } catch { Write-Output "FAILED: OU $ouName — $_"; exit 1 }
+      loop:
+        - { name: Operations, desc: "SOC operations" }
+        - { name: Detection, desc: "Detection engineering" }
+      register: r
+      changed_when: r.rc == 2
+      failed_when: r.rc == 1
+
+    - name: "[PREP] Create 5 groups in child.cadre.local"
+      ansible.windows.win_shell: |
+        $ErrorActionPreference = "Stop"
+        try {
+          $gName = "{{ item.name }}"
+          $existing = Get-ADGroup -Identity $gName -ErrorAction SilentlyContinue
+          if ($existing) { Write-Output "OK: Group $gName exists"; exit 0 }
+          New-ADGroup -Name $gName -Path "ou={{ item.ou }},dc=child,dc=cadre,dc=local" -GroupScope Global -GroupCategory Security
+          $verify = Get-ADGroup -Identity $gName -ErrorAction Stop
+          if (-not $verify) { throw "Verify failed" }
+          Write-Output "APPLIED: Group $gName created and verified"; exit 2
+        } catch { Write-Output "FAILED: Group $gName — $_"; exit 1 }
+      loop:
+        - { name: Operations-Cadre, ou: Operations }
+        - { name: Detection-Cadre, ou: Detection }
+        - { name: SOC-Tier1, ou: Detection }
+        - { name: SOC-Tier2, ou: Detection }
+        - { name: SOC-Tier3, ou: Detection }
+      register: r
+      changed_when: r.rc == 2
+      failed_when: r.rc == 1
+
+    - name: "[PREP] Create 8 users in child.cadre.local"
+      ansible.windows.win_shell: |
+        $ErrorActionPreference = "Stop"
+        try {
+          $uName = "{{ item.uname }}"
+          $existing = Get-ADUser -Identity $uName -ErrorAction SilentlyContinue
+          if ($existing) { Write-Output "OK: User $uName exists"; exit 0 }
+          $secPwd = ConvertTo-SecureString "{{ item.pw }}" -AsPlainText -Force
+          New-ADUser -Name $uName -SamAccountName $uName -UserPrincipalName "$uName@child.cadre.local" `
+            -Path "ou={{ item.ou }},dc=child,dc=cadre,dc=local" `
+            -AccountPassword $secPwd -Enabled $true -PasswordNeverExpires $true
+          $verify = Get-ADUser -Identity $uName -ErrorAction Stop
+          if (-not $verify) { throw "Verify failed" }
+          Write-Output "APPLIED: User $uName created and verified"; exit 2
+        } catch { Write-Output "FAILED: User $uName — $_"; exit 1 }
+      loop:
+        - { uname: dir_operations, pw: "D1r_0p3r@t10ns!", ou: Operations }
+        - { uname: lead_detection, pw: "L3ad_D3t3ct10n!", ou: Detection }
+        - { uname: analyst_t1, pw: "T13r_An@lyst!", ou: Detection }
+        - { uname: analyst_t2, pw: "T23r_An@lyst!", ou: Detection }
+        - { uname: analyst_t3, pw: "T33r_An@lyst!", ou: Detection }
+        - { uname: mgr_incident, pw: "Mgr_1nc1d3nt!", ou: Operations }
+        - { uname: intern_blue, pw: "1nt3rn_Blu3!", ou: Detection }
+        - { uname: svc_mssql, pw: "s3rv1c3_MSSQL!", ou: Operations }
+      register: r
+      changed_when: r.rc == 2
+      failed_when: r.rc == 1
+
+    - name: "[PREP] Add child.cadre.local users to groups"
+      ansible.windows.win_shell: |
+        $ErrorActionPreference = "Stop"
+        try {
+          $group = "{{ item.group }}"
+          $members = '{{ item.users | join(",") }}'.Split(',', [System.StringSplitOptions]::RemoveEmptyEntries)
+          $existing = Get-ADGroupMember -Identity $group | Select-Object -ExpandProperty SamAccountName
+          $added = $false
+          foreach ($m in $members) {
+            if ($m -notin $existing) { Add-ADGroupMember -Identity $group -Members $m; $added = $true }
+          }
+          if (-not $added) { Write-Output "OK: All members already in $group"; exit 0 }
+          $verify = Get-ADGroupMember -Identity $group | Select-Object -ExpandProperty SamAccountName
+          $missing = $members | Where-Object { $_ -notin $verify }
+          if ($missing) { throw "Missing: $missing" }
+          Write-Output "APPLIED: Members added to $group and verified"; exit 2
+        } catch { Write-Output "FAILED: Group membership $group — $_"; exit 1 }
+      loop:
+        - { group: "Operations-Cadre", users: ["dir_operations", "mgr_incident"] }
+        - { group: "Detection-Cadre", users: ["lead_detection"] }
+        - { group: "SOC-Tier1", users: ["analyst_t1", "intern_blue"] }
+        - { group: "SOC-Tier2", users: ["analyst_t2"] }
+        - { group: "SOC-Tier3", users: ["analyst_t3"] }
+      register: r
+      changed_when: r.rc == 2
+      failed_when: r.rc == 1
+
+# =============================================================================
+# range.local (dc03)
+# =============================================================================
+- name: "dc03 — Deploy OUs, groups, users, svc_naa→DA, dMSA"
+  hosts: dc03
+  gather_facts: false
+  tasks:
+    - name: "[PREP] Create 2 OUs in range.local"
+      ansible.windows.win_shell: |
+        $ErrorActionPreference = "Stop"
+        try {
+          $ouName = "{{ item.name }}"
+          $existing = Get-ADOrganizationalUnit -Filter "Name -eq '$ouName'" -SearchBase "dc=range,dc=local" -ErrorAction SilentlyContinue
+          if ($existing) { Write-Output "OK: OU $ouName exists"; exit 0 }
+          New-ADOrganizationalUnit -Name $ouName -Path "dc=range,dc=local" -Description "{{ item.desc }}" -ProtectedFromAccidentalDeletion $false
+          $verify = Get-ADOrganizationalUnit -Filter "Name -eq '$ouName'" -SearchBase "dc=range,dc=local" -ErrorAction Stop
+          if (-not $verify) { throw "Verify failed" }
+          Write-Output "APPLIED: OU $ouName created and verified"; exit 2
+        } catch { Write-Output "FAILED: OU $ouName — $_"; exit 1 }
+      loop:
+        - { name: Intelligence, desc: "Threat intelligence" }
+        - { name: Adversary, desc: "Adversary simulation" }
+      register: r
+      changed_when: r.rc == 2
+      failed_when: r.rc == 1
+
+    - name: "[PREP] Create 3 groups in range.local"
+      ansible.windows.win_shell: |
+        $ErrorActionPreference = "Stop"
+        try {
+          $gName = "{{ item.name }}"
+          $existing = Get-ADGroup -Identity $gName -ErrorAction SilentlyContinue
+          if ($existing) { Write-Output "OK: Group $gName exists"; exit 0 }
+          New-ADGroup -Name $gName -Path "ou={{ item.ou }},dc=range,dc=local" -GroupScope Global -GroupCategory Security
+          $verify = Get-ADGroup -Identity $gName -ErrorAction Stop
+          if (-not $verify) { throw "Verify failed" }
+          Write-Output "APPLIED: Group $gName created and verified"; exit 2
+        } catch { Write-Output "FAILED: Group $gName — $_"; exit 1 }
+      loop:
+        - { name: Intelligence-Cadre, ou: Intelligence }
+        - { name: Adversary-Cadre, ou: Adversary }
+        - { name: Tools-Eng, ou: Intelligence }
+      register: r
+      changed_when: r.rc == 2
+      failed_when: r.rc == 1
+
+    - name: "[PREP] Create 10 users in range.local"
+      ansible.windows.win_shell: |
+        $ErrorActionPreference = "Stop"
+        try {
+          $uName = "{{ item.uname }}"
+          $existing = Get-ADUser -Identity $uName -ErrorAction SilentlyContinue
+          if ($existing) { Write-Output "OK: User $uName exists"; exit 0 }
+          $secPwd = ConvertTo-SecureString "{{ item.pw }}" -AsPlainText -Force
+          New-ADUser -Name $uName -SamAccountName $uName -UserPrincipalName "$uName@range.local" `
+            -Path "ou={{ item.ou }},dc=range,dc=local" `
+            -AccountPassword $secPwd -Enabled $true -PasswordNeverExpires $true
+          $verify = Get-ADUser -Identity $uName -ErrorAction Stop
+          if (-not $verify) { throw "Verify failed" }
+          Write-Output "APPLIED: User $uName created and verified"; exit 2
+        } catch { Write-Output "FAILED: User $uName — $_"; exit 1 }
+      loop:
+        - { uname: dir_intelligence, pw: "D1r_1nt3l!", ou: Intelligence }
+        - { uname: analyst_osint, pw: "0S1NT_An@lyst!", ou: Intelligence }
+        - { uname: analyst_malware, pw: "M@lw@r3_An@lyst!", ou: Intelligence }
+        - { uname: analyst_forensic, pw: "F0r3ns1c_An@lyst!", ou: Intelligence }
+        - { uname: adversary_lead, pw: "Adv3rsary_L3ad!", ou: Adversary }
+        - { uname: intern_intel, pw: "1nt3rn_Int3l!", ou: Intelligence }
+        - { uname: eng_tools, pw: "T00ls_3ng!", ou: Intelligence }
+        - { uname: svc_mssql, pw: "s3rv1c3_MSSQL!", ou: Intelligence }
+        - { uname: svc_sccm, pw: "s3rv1c3_SCCM!", ou: Adversary }
+        - { uname: svc_naa, pw: "N@A_s3rv1c3!", ou: Adversary }
+      register: r
+      changed_when: r.rc == 2
+      failed_when: r.rc == 1
+
+    - name: "[PREP] Add range.local users to groups"
+      ansible.windows.win_shell: |
+        $ErrorActionPreference = "Stop"
+        try {
+          $group = "{{ item.group }}"
+          $members = '{{ item.users | join(",") }}'.Split(',', [System.StringSplitOptions]::RemoveEmptyEntries)
+          $existing = Get-ADGroupMember -Identity $group | Select-Object -ExpandProperty SamAccountName
+          $added = $false
+          foreach ($m in $members) {
+            if ($m -notin $existing) { Add-ADGroupMember -Identity $group -Members $m; $added = $true }
+          }
+          if (-not $added) { Write-Output "OK: All members already in $group"; exit 0 }
+          $verify = Get-ADGroupMember -Identity $group | Select-Object -ExpandProperty SamAccountName
+          $missing = $members | Where-Object { $_ -notin $verify }
+          if ($missing) { throw "Missing: $missing" }
+          Write-Output "APPLIED: Members added to $group and verified"; exit 2
+        } catch { Write-Output "FAILED: Group membership $group — $_"; exit 1 }
+      loop:
+        - { group: "Intelligence-Cadre", users: ["dir_intelligence", "analyst_osint", "analyst_malware", "analyst_forensic", "intern_intel"] }
+        - { group: "Adversary-Cadre", users: ["adversary_lead"] }
+        - { group: "Tools-Eng", users: ["eng_tools"] }
+      register: r
+      changed_when: r.rc == 2
+      failed_when: r.rc == 1
+
+    - name: "[PREP][WT#34] Add svc_naa to Domain Admins (range.local)"
+      ansible.windows.win_shell: |
+        $ErrorActionPreference = "Stop"
+        try {
+          $member = Get-ADGroupMember -Identity "Domain Admins" | Where-Object { $_.SamAccountName -eq "svc_naa" }
+          if ($member) { Write-Output "OK: svc_naa already in Domain Admins"; exit 0 }
+          Add-ADGroupMember -Identity "Domain Admins" -Members "svc_naa"
+          $verify = Get-ADGroupMember -Identity "Domain Admins" | Where-Object { $_.SamAccountName -eq "svc_naa" }
+          if (-not $verify) { throw "Verify failed" }
+          Write-Output "APPLIED: svc_naa added to Domain Admins and verified"; exit 2
+        } catch { Write-Output "FAILED: svc_naa → Domain Admins — $_"; exit 1 }
+      register: r
+      changed_when: r.rc == 2
+      failed_when: r.rc == 1
+
+    - name: "[PREP][WT#26] Create dMSA dmsaPrivService (BadSuccessor)"
+      ansible.windows.win_shell: |
+        $ErrorActionPreference = "Stop"
+        try {
+          $dmsa = Get-ADServiceAccount -Identity "dmsaPrivService" -ErrorAction SilentlyContinue
+          if ($dmsa) { Write-Output "OK: dMSA dmsaPrivService exists"; exit 0 }
+          New-ADServiceAccount -Name "dmsaPrivService" -DNSHostName "dc03.range.local" -ManagedPasswordIntervalInDays 30 -PrincipalsAllowedToRetrieveManagedPassword "RANGE\Adversary-Cadre"
+          $verify = Get-ADServiceAccount -Identity "dmsaPrivService" -ErrorAction Stop
+          if (-not $verify) { throw "Verify failed" }
+          Write-Output "APPLIED: dMSA dmsaPrivService created and verified"; exit 2
+        } catch { Write-Output "FAILED: dMSA dmsaPrivService — $_"; exit 1 }
+      register: r
+      changed_when: r.rc == 2
+      failed_when: r.rc == 1

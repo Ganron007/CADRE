@@ -1,0 +1,6 @@
+---
+domain_action: forest
+domain_name: cadre.local
+domain_netbios: CADRE
+safe_mode_password: "S@feMode_CADRE_2026!"
+domain_type: forest_root
