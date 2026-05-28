@@ -188,15 +188,30 @@ MISP → Elastic via Fleet Threat Intel integration. Indices: `logs-ti_misp.*`.
 
 ## C2Stack (Optional)
 
-**Sibling project integration.** Not a CADRE VM — connects to the external `C2Stack` project (Mythic/Sliver/Havoc in a lean 4-VM configuration).
+**Sibling project integration.** Not a CADRE VM — connects to the external
+`C2Stack` project (Mythic/Sliver/Havoc in a 2-VM configuration with network
+segmentation).
 
-Provides:
+**Architecture:**
+- **kali-c2** (4 GB) — Mythic + Sliver + Havoc + Kali tools on vmnet3 (isolated)
+- **redirector** (1 GB) — Apache reverse proxy on vmnet2, header-based routing to vmnet3
+
+Victims on vmnet2 see only the redirector (192.168.77.71). The C2 server on
+vmnet3 (192.168.88.0/24) is invisible — no route exists from the lab network.
+
+**Provides:**
 - Real C2 implant traffic flowing through CADRE's telemetry stack
-- Realistic adversary emulation (beyond one-shot attack scripts)
-- Beacon callbacks visible in Zeek/Suricata/Arkime
+- Realistic adversary emulation with network segmentation (C2 on isolated subnet)
+- Beacon callbacks visible in Zeek/Suricata/Arkime on monitor VM
+- Redirector OPSEC practice (header validation, decoy pages)
 - EDR detection of C2 frameworks in Elastic Defend alerts
 
-When C2Stack is connected, Plan 10 walkthroughs deliver C2 implants via SCCM client push (the most realistic 2026 IR vector).
+**Setup:** `git clone` the C2Stack repo → `cd Local && vagrant up`. Takes
+~10 minutes. Both VMs join vmnet2 automatically. CADRE targets are reachable
+from the Kali admin interface at 192.168.77.70.
+
+When C2Stack is connected, Plan 10 walkthroughs deliver C2 implants via SCCM
+client push (the most realistic 2026 IR vector).
 
 ---
 

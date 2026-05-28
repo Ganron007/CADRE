@@ -4,6 +4,27 @@ All notable changes to CADRE are documented here. Format: [Keep a Changelog](htt
 
 ## [Unreleased]
 
+### Changed (2026-05-27 — Session: Plan 0.7/0.8 Stripped, Plan 0.9 Added, Naming Normalized)
+
+- **Plan 0.7 scoped to public-safe content** — Zeek built-in detection scripts, Suricata AD rules, RITA installation, ShowMeThePackets tools (GPL-3.0, dhoelzer/ShowMeThePackets). Course-specific PCAP/log imports kept local and out of repo.
+- **Plan 0.9 — Malware RE Lab** added as Post-Foundation Upgrade: REMnux OVA + Flare VM (no Vagrant), Ghidra MCP AI-assisted RE, quick-scan pipeline, sample DB (theZoo/Flare-On/MalwareBazaar). Spec at `plan00-upgrades/plan0.9-malware-re-lab.md`. Full detail at `C:\STUDY\Github\CADRE-Courses\MalwareRev\README.md`. Deferred to Plan 7 (MCP integration) for execution.
+- **File naming normalized** — `plan07-` → `plan0.7-`, `plan08-` → `plan0.8-`, `plan09-` → `plan0.9-` for consistency. All references updated across CHANGELOG, roadmap, AGENTS.md.
+- **`00-plan.md` prerequisites updated** — old "6 E2E attack scripts" prerequisite replaced with Phase 0 per-attack verification workflow.
+- **`01-state.md` updated** — date, stale E2E reference replaced with Phase 0 reference.
+- **`roadmap.md` updated** — Plan 0.9 added to phase table + decisions log; PCAP note removed.
+- **`AGENTS.md` execution order** updated to `0.7 → 0.8 → 0.9 → core catalog`.
+- **C2Stack repo finalized** — Vagrantfile rewritten to 2-VM architecture (Kali C2 + Redirector, dual NICs vmnet2+vmnet3), stale redStack files removed, setup scripts written, README + deployment guide completed. Separate sibling repo (Plan 10/P3, deferred).
+
+### Added (2026-05-26 — Session Wo: Plan 1 Phase0 Restructured — 0.7 + 0.8 Lead, Core Telemetry Follows)
+- **Phase 0 README.md restructured** to new execution order: Plan 0.7 (monitor VM defense deepening) → Plan 0.8 (npm supply-chain) → core Telemetry Catalog (59 CADRE attacks).
+- **Plan 0.7 — Defense Deepening** added to Phase 0: Zeek built-in detection scripts (krb/ntlm/intel/known-hosts/known-services), Suricata AD-specific rules (Kerberoast burst, DCSync, SMB coercion, NTLM relay), ShowMeThePackets tools (GPL-3.0, dhoelzer/ShowMeThePackets), RITA C2/beacon detection. Full spec at `plan00-upgrades/plan0.7-defense-deepening.md`.
+- **Plan 0.8 — npm Supply-Chain** added to Phase 0: MHaggis/NPM-Threat-Emulation integration (9 scenarios × 2 platforms), 10 new detection rules (`npm-001..010`), mock webhook sink, Campaign E + 9 walkthroughs. Full spec at `plan00-upgrades/plan0.8-supplychain.md`.
+- **Verification table** extended: "Emerging Threats — Plan 0.8" section added with 10 npm rule rows.
+- **Prerequisites** split into 3 groups: global, Plan 0.7 (monitor VM), Plan 0.8 (supply chain).
+- **Execution order** reworked: 0.7 before any attack runs (enriched network telemetry), 0.8 second (fast setup), core catalog third (59 attacks campaign by campaign).
+- **01-state.md** updated: Phase P0 points to `phase0/` directory; old inline checklist replaced.
+- **Docs now ready for Phase 0 execution**: 0.7 monitor config → 0.8 npm scenarios → core catalog campaign by campaign → verification table filled → Sigma YAML catalog writing.
+
 ### Changed (2026-05-26 — Session Wr: Public-Doc Count Standardization + Clean Git Re-Init)
 - **Doc accuracy pass (public):** standardized walkthrough/attack/Sigma counts to **60** (was inconsistently "62") across README, DOCS, goals, forensic-workflow, attack-matrix/README; reconciled **ESC coverage to 12/15** (ESC5/12/15 out of scope) across cert-coverage, adcs-configuration-guide, goals (was variously 13/15, 14/15); fixed residual `T001`/RC4 example commands → `T002`; phase-05 deploy summary "RC4/AES" → "AES" (matches the playbook fix). `60` is a placeholder pending the vector-by-vector review.
 - **Repository re-initialized clean.** Prior `.git` was deleted (gitnexus/graphify post-commit hooks were breaking the opencode CLI). Re-`git init` + single clean commit, force-pushed to `github.com/Ganron007/CADRE` (`93ef410…a4230a1`, forced). **Critical:** the `.gitignore` had been deleted with `.git` — recreated it *first* (portable, not reliant on global ignore) so a naive `git add -A` couldn't leak `docs/internal/` + `AGENTS.md` + `CLAUDE.md` to the public repo or bloat it with `.gitnexus/`/`graphify-out/`/`.vagrant` (9 GB)/installers. Final commit: 258 files, largest 500 KB, zero leaks.
@@ -171,7 +192,7 @@ All notable changes to CADRE are documented here. Format: [Keep a Changelog](htt
 ### Changed (2026-05-24 — Session Vd: `docs/internal/` Reorganization into Per-Plan Folders)
 - **Internal docs restructured** from 35 flat files into a per-plan layout (all gitignored — no public-repo impact). Phases 1–5 executed; tracked in `docs/internal/doc-reorg-plan.md`.
 - **Phase 1 (dedup/archive)**: moved 6 stale/duplicate docs to `archive/` — `adcs-configuration-guide.md` + `sccm-integration-guide.md` (public copies at `docs/` are now canonical), `doc-inventory.md` (stale ADOPT-parity tracker), `plan0-current-updated-state.md` (superseded by plan_status), `cadre-py-interactive-shell-plan.md` (implemented), `CADRE.txt` (scratch).
-- **Phase 2 (upgrades)**: `plan00-upgrades/` — `upgrade-suggestions.md`, `plan07-defense-deepening.md`, `plan08-supplychain.md`, `newwalkthrough-ideas.md`, `_out-of-tree/evasion-lab.md`.
+- **Phase 2 (upgrades)**: `plan00-upgrades/` — `upgrade-suggestions.md`, `plan0.7-defense-deepening.md`, `plan0.8-supplychain.md`, `newwalkthrough-ideas.md`, `_out-of-tree/evasion-lab.md`.
 - **Phase 3 (reference)**: `_canonical/` (naming-scheme, ad-structure-summary, arch-flow), `reference/` (2 ansible-research docs, course-comparison, lab-why), `process/` (deploy-test-recipe).
 - **Phase 4 (foundation)**: `plan00-foundation/` with `spec/` (attack-specifications, monitoring-dfir-specifications, implementation-guide), `design/` (4 historical playbook-rewrite notes), `state/` (status, offense-summary, defense-summary), `gaps/` (cert-attack-gap, e2e-attack-scripts, known-gaps).
 - **Phase 5 (index/link repair)**: rebuilt `DOC-MAP.md` to the new tree; updated `AGENTS.md` Key Files + `core-plan.md` Companion Documents/inline links. roadmap-vs-status split formalized (roadmap = cross-plan; `plan00-foundation/state/status.md` = Plan 0 detail). Root now holds only 4 live docs: core-plan, roadmap, DOC-MAP, doc-reorg-plan.
