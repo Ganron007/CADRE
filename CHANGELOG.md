@@ -68,7 +68,26 @@ All notable changes to CADRE are documented here. Format: [Keep a Changelog](htt
 - End-to-end real-data analysis: point DFIR-Nexus at CADRE lab telemetry from Phase 1-3 attack runs
 - v0.7 backlog: 5 deferred features (OpenSearch indexer, push ingest webhook, Notion/IRIS export, rule translation, case template library)
 
-### DFIR-Nexus v0.6.0 → A.0 "Pioneer" Rename + SANS Tools Integration Plan (2026-06-22)
+### DFIR-Nexus SANS Plan vs plan1.7 Distinction Clarified (2026-06-22)
+
+Per user 2026-06-22 — "this also has some of the sans exercises but from other courses to - for main cadre. lets not overlap them with our DFIR-Nexus."
+
+Two separate SANS-touching documents in CADRE, with different purposes:
+
+| Document | Purpose | Audience | SANS Courses | Output |
+|---|---|---|---|---|
+| **`plan1.7-defense-deepening.md`** + **`plan1.7-exercises.md`** | SANS-derived **defensive exercises** for CADRE lab users. Each exercise (EX-01 to EX-48) is a hands-on lab the user runs on the CADRE lab to **learn the tools manually**. | **CADRE lab user / student** | SEC503, FOR572, SEC511, FOR508, FOR500, FOR608, FOR578, SEC530 (8 courses, **network + architecture focus**) | 48 hands-on exercises covering tcpdump, Wireshark, Zeek, SiLK, RITA, Sysmon, Autoruns, AppLocker, KAPE, Prefetch, Registry, MFT, Memory, Timeline, Velociraptor, YARA, Sigma, Scapy, DoH, MITRE ATT&CK Navigator, STIG, SpiderFoot, ASF Triage |
+| **`dfir-nexus-sans-tools-integration.md`** | SANS tools integrated as **importers/parsers/runners INTO DFIR-Nexus** (our MCP tool). Maps each tool to a specific DFIR-Nexus release module + function. | **DFIR-Nexus developers** | FOR500, FOR508, FOR608 (3 courses, **forensic focus**) | 250+ tools → 7 DFIR-Nexus modules |
+
+**No overlap in purpose, only in tool names.** Each FOR500/FOR508/FOR608 tool that has a plan1.7 exercise is cross-referenced in the SANS tools integration plan with the `plan1.7 ref` column. Rule of thumb:
+- **plan1.7** = "how to manually run this tool" (CADRE lab user)
+- **DFIR-Nexus SANS plan** = "how DFIR-Nexus programmatically runs, parses output, and integrates with the agent graph" (DFIR-Nexus developer)
+
+DFIR-Nexus does NOT cover the network/architecture courses (SEC503, FOR572, SEC511, FOR578, SEC530) — those are plan1.7's domain.
+
+The SANS tools integration plan was updated to add a "Distinction from CADRE Plan 1.7" section with cross-references to plan1.7 exercises (EX-01 to EX-48).
+
+
 
 **Release naming scheme changed** to avoid overlap with CADRE Plan 0.7/0.8/0.9/1.0:
 
