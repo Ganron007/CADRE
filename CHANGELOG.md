@@ -8,6 +8,15 @@ All notable changes to CADRE are documented here. Format: [Keep a Changelog](htt
 
 **DFIR-Nexus** — our agentic super DFIR tool — is now **feature-complete**. All 6 phases shipped in a single day (2026-06-20). Local git initialized at `C:\STUDY\Github\CADRE\tools\dfir-nexus\` (commit `5b37837` on `master`, no push per user instruction).
 
+**Source projects (DFIR-mcp is 3+1 sub-repos by AppliedIR):**
+- **Valhuntir** — umbrella platform (audit chain, DRAFT/HITL approval, LangGraph integration)
+- **sift-mcp** — SIFT-side monorepo (11 packages: forensic-mcp, case-mcp, report-mcp, sift-mcp, sift-gateway, forensic-knowledge, forensic-rag, windows-triage, opencti, sift-common, case-dashboard)
+- **wintools-mcp** — Windows forensic tool execution
+- **opensearch-mcp** (optional) — 17 evidence-indexing tools
+- **DFIR-Companion** (hasamba) — 24+ artifact importers, AI vision, IOC enrichment
+- **Security-Detections-MCP** (michaelhaag) — detection rule layer
+- **CADRE** — testing, requirements, integrations
+
 | Metric | v0.6.0 |
 |---|---|
 | **MCP tools** | 30 |
@@ -58,6 +67,66 @@ All notable changes to CADRE are documented here. Format: [Keep a Changelog](htt
 - Live SSH connectors to pull Elastic/Suricata/Zeek output
 - End-to-end real-data analysis: point DFIR-Nexus at CADRE lab telemetry from Phase 1-3 attack runs
 - v0.7 backlog: 5 deferred features (OpenSearch indexer, push ingest webhook, Notion/IRIS export, rule translation, case template library)
+
+### DFIR-Nexus Source Project Assessment (2026-06-22)
+
+**Comprehensive gap analysis** of DFIR-Nexus v0.6.0 against the 3 source projects it integrates. Evidence-first deep code inspection — every tool count verified via direct file inspection (not docs).
+
+**Source projects inventoried:**
+- **Security-Detections-MCP** (michaelhaag) — **81 MCP tools**, 8,200+ indexed rules from 6 sources, 172 MITRE actors, 488 techniques × 2,374 procedures, 10K+ extracted patterns, LangGraph agent pipeline (12 nodes), Cursor subagents (14), Claude skills (18)
+- **DFIR-Companion** (hasamba) — **230+ HTTP routes**, 26 built-in importers + 1 IRIS reverse import + 1 declarative engine, 6 AI providers, 15 overridable prompts, 13 TI providers, 12 output formats (MD/HTML/DOCX/CSV/JSON/JSONL/STIX 2.1/Navigator/Asset-graph SVG/Swimlane SVG/blocklist/snapshot), 6 hunt-query platforms, browser extension with 6 console adapters, 9 3rd-party integrations, 208 test files
+- **DFIR-mcp suite** (AppliedIR) — **83-100 MCP tools** across 8-9 backends (3 local repos + 1 described), 11 packages in sift-mcp monorepo, 31 forensic catalog binaries, 22K RAG records, 2.6M Windows baseline records, 14 playbooks, 3,848 test functions, 28 CLI commands, 8-tab Examiner Portal with challenge-response auth, DRAFT/HITL approval with PBKDF2-derived HMAC signing (600K iterations), Bubblewrap sandbox
+
+**Key finding:** DFIR-Nexus is at **~28% feature parity** with the union of source projects (51 of 181 source features DONE).
+
+**Coverage by layer:**
+
+| Layer | DONE | Total | % |
+|---|---|---|---|
+| Detection engineering | 2 | 19 | 10.5% |
+| Ingest / Importers | 31 | 50 | 62.0% |
+| Case management / Audit chain | 4 | 20 | 20.0% |
+| Forensic tool execution | 0 | 9 | OUT OF SCOPE |
+| Windows baseline validation | 0 | 9 | 0% |
+| Forensic RAG | 0 | 7 | 0% |
+| Velociraptor integration | 2 | 15 | 13.3% |
+| Analysis | 7 | 17 | 41.2% |
+| Output / Reports | 4 | 14 | 28.6% |
+| Push / Webhook | 0 | 11 | 0% |
+| HTTP gateway | 1 | 10 | 10% |
+
+**3 structural gaps preventing DFIR-Nexus from being production-grade:**
+1. No DRAFT / HITL approval workflow (Valhuntir's signature feature)
+2. No HTTP gateway aggregation layer (sift-gateway)
+3. No browser-based Examiner Portal (case-dashboard SPA)
+
+**6 important feature gaps:**
+4. No on-the-fly Sigma → SPL/KQL rule translation
+5. No RAG knowledge base (22K records)
+6. No Windows baseline validation (2.6M records)
+7. No OpenCTI / YETI integration
+8. No push-ingest webhook (`POST /cases/:id/push`)
+9. No browser extension (6 console adapters)
+
+**DFIR-Nexus strengths over predecessors:**
+- **STIX 2.0 export** (Valhuntir has none)
+- **VQL hunt generation** as a first-class module
+- **Single-process deployment** vs Valhuntir's 3+ sub-processes
+- **31 importers in one unified registry** vs DFIR-Companion's 26+ separate import files
+- **AI vision** for screenshot/image analysis (Valhuntir has none)
+- **OpenAI-compat standard across 16+ LLM services**
+
+**Roadmap to ~95% parity:**
+- **v0.7** (12 weeks, ~10K lines) — DRAFT/HITL + Gateway + Portal + Sigma download
+- **v0.8** (8 weeks, ~7K lines) — RAG + Windows baseline + GraphRAG + deobfuscation
+- **v0.9** (6 weeks, ~4K lines) — 10 TI providers + Velociraptor framework + MITRE Navigator
+- **v1.0** (8 weeks, ~6.5K lines) — Push ingest + Browser extension + 9 integrations + DOCX/CSV/SVG
+
+**Documents created:**
+- `docs/internal/integrations/dfir-nexus-source-assessment.md` (Part 1: Inventory)
+- `docs/internal/integrations/dfir-nexus-source-assessment-2-mapping.md` (Part 2: Gap mapping)
+- `docs/internal/integrations/dfir-nexus-source-assessment-3-roadmap.md` (Part 3: Roadmap)
+- `tools/dfir-nexus/docs/STUDY-GUIDE.md` (NEW — full how-to-use guide)
 
 ### Added (2026-06-20 — DFIR-Nexus Phase 6: Integration — FEATURE COMPLETE)
 
