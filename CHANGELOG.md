@@ -68,7 +68,29 @@ All notable changes to CADRE are documented here. Format: [Keep a Changelog](htt
 - End-to-end real-data analysis: point DFIR-Nexus at CADRE lab telemetry from Phase 1-3 attack runs
 - v0.7 backlog: 5 deferred features (OpenSearch indexer, push ingest webhook, Notion/IRIS export, rule translation, case template library)
 
-### DFIR-Nexus Source Project Assessment (2026-06-22)
+### DFIR-Nexus v0.6.0 → A.0 "Pioneer" Rename + SANS Tools Integration Plan (2026-06-22)
+
+**Release naming scheme changed** to avoid overlap with CADRE Plan 0.7/0.8/0.9/1.0:
+
+| New name | Was | Theme | Status |
+|---|---|---|---|
+| **A.0 "Pioneer"** | v0.6.0 | FEATURE COMPLETE baseline | ✅ current |
+| **B.0 "Pathfinder"** | v0.7 | LangGraph + DRAFT/HITL + Gateway + Portal + Plaso + Velociraptor MCP | planned |
+| **C.0 "Voyager"** | v0.8 | RAG + Windows baseline + Volatility 3 + SANS FOR508/500 tools | planned |
+| **D.0 "Stellar"** | v0.9 | TI providers + MITRE Navigator + threat actors | planned |
+| **E.0 "Constellation"** | v1.0 | Production platform | planned |
+
+**Letter prefixes (A, B, C, D, E) are unique to DFIR-Nexus — no conflict with CADRE Plans.**
+
+**SANS Tools Integration Plan** — separate document at `docs/internal/integrations/dfir-nexus-sans-tools-integration.md`. Maps 250+ unique tools from SANS FOR500 + FOR508 + FOR608 to DFIR-Nexus releases:
+
+- **FOR500** (Windows Forensics, 77 tools) — Eric Zimmerman EZ suite (18 tools), Volatility 2/3, MemProcFS, WinPMEM, AVML, Hindsight, OneDriveExplorer, MFCMAPI, RabbitHole, TSK/fls/mactime, 42 artifact types, 30+ MITRE techniques, 35+ Event IDs, 30+ persistence mechanisms
+- **FOR508** (Advanced IR + Threat Hunting, 100+ tools) — KAPE, Plaso, Velociraptor, HollowsHunter, Memory Baseliner, Hiber2Bin, Bulk Extractor, all EZ tools + advanced parsers, MFT/USN/LogFile carving
+- **FOR608** (Enterprise IR + Threat Hunting, 100+ tools) — Velociraptor (25+ artifacts, VQL templates), CyLR, Elastic Stack, KQL/sigmac, YARA, Sysmon (23 IDs), Plaso, Timesketch, AWS CloudTrail, M365 UAL, macOS/mac_apt, Docker, Aurora IR
+
+**Total: 250+ unique tools → 100+ artifact types → 100+ MITRE techniques.**
+
+**Estimated integration effort: ~30 weeks across B.0 → E.0 releases.**
 
 **Comprehensive gap analysis** of DFIR-Nexus v0.6.0 against the 3 source projects it integrates. Evidence-first deep code inspection — every tool count verified via direct file inspection (not docs).
 
