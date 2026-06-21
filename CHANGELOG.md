@@ -72,12 +72,14 @@ All notable changes to CADRE are documented here. Format: [Keep a Changelog](htt
 
 **Comprehensive gap analysis** of DFIR-Nexus v0.6.0 against the 3 source projects it integrates. Evidence-first deep code inspection — every tool count verified via direct file inspection (not docs).
 
-**Source projects inventoried:**
-- **Security-Detections-MCP** (michaelhaag) — **81 MCP tools**, 8,200+ indexed rules from 6 sources, 172 MITRE actors, 488 techniques × 2,374 procedures, 10K+ extracted patterns, LangGraph agent pipeline (12 nodes), Cursor subagents (14), Claude skills (18)
-- **DFIR-Companion** (hasamba) — **230+ HTTP routes**, 26 built-in importers + 1 IRIS reverse import + 1 declarative engine, 6 AI providers, 15 overridable prompts, 13 TI providers, 12 output formats (MD/HTML/DOCX/CSV/JSON/JSONL/STIX 2.1/Navigator/Asset-graph SVG/Swimlane SVG/blocklist/snapshot), 6 hunt-query platforms, browser extension with 6 console adapters, 9 3rd-party integrations, 208 test files
-- **DFIR-mcp suite** (AppliedIR) — **83-100 MCP tools** across 8-9 backends (3 local repos + 1 described), 11 packages in sift-mcp monorepo, 31 forensic catalog binaries, 22K RAG records, 2.6M Windows baseline records, 14 playbooks, 3,848 test functions, 28 CLI commands, 8-tab Examiner Portal with challenge-response auth, DRAFT/HITL approval with PBKDF2-derived HMAC signing (600K iterations), Bubblewrap sandbox
+**Vision clarified (per user 2026-06-22):** DFIR-Nexus is the **massive DFIR section of CADRE** — a **comprehensive, industry-leading DFIR solution** that serves **standalone + agentic + CADRE-integrated** modes. It borrows the best of 3 predecessor projects + our forensic tooling (KAPE, Plaso, Hayabusa, Timesketch, WinPMEM, AVML, Volatility 3, Velociraptor MCP). **DFIR-mcp is the original predecessor** (per user); Security-Detections-MCP was assessed; DFIR-Companion was added third. We aim for **95%+ parity** with the union of source features, not a minimal subset.
 
-**Key finding:** DFIR-Nexus is at **~28% feature parity** with the union of source projects (51 of 181 source features DONE).
+**Source projects inventoried:**
+- **DFIR-mcp suite (AppliedIR)** — **the original predecessor** (per user 2026-06-22). 83-100 MCP tools across 8-9 backends (3 local repos + 1 described), 11 packages in sift-mcp monorepo, 31 forensic catalog binaries, 22K RAG records, 2.6M Windows baseline records, 14 playbooks, 3,848 test functions, 28 CLI commands, 8-tab Examiner Portal with challenge-response auth, DRAFT/HITL approval with PBKDF2-derived HMAC signing (600K iterations), Bubblewrap sandbox, **LangGraph multi-agent pipeline** (Plan 7 spine).
+- **Security-Detections-MCP** (michaelhaag) — **assessed**. 81 MCP tools, 8,200+ indexed rules from 6 sources, 172 MITRE actors, 488 techniques × 2,374 procedures, 10K+ extracted patterns, LangGraph agent pipeline (12 nodes), Cursor subagents (14), Claude skills (18).
+- **DFIR-Companion** (hasamba) — **added third**. 230+ HTTP routes, 26 built-in importers + 1 IRIS reverse import + 1 declarative engine, 6 AI providers, 15 overridable prompts, 13 TI providers, 12 output formats (MD/HTML/DOCX/CSV/JSON/JSONL/STIX 2.1/Navigator/Asset-graph SVG/Swimlane SVG/blocklist/snapshot), 6 hunt-query platforms, browser extension with 6 console adapters, 9 3rd-party integrations, 208 test files.
+
+**Key finding:** DFIR-Nexus is at **~28% feature parity** with the union of source projects (51 of 181 source features DONE). Goal: reach ~95% by v1.0.
 
 **Coverage by layer:**
 
@@ -94,19 +96,27 @@ All notable changes to CADRE are documented here. Format: [Keep a Changelog](htt
 | Output / Reports | 4 | 14 | 28.6% |
 | Push / Webhook | 0 | 11 | 0% |
 | HTTP gateway | 1 | 10 | 10% |
+| **LangGraph agentic pipeline** | 0 | 12 | 0% (NEW) |
 
-**3 structural gaps preventing DFIR-Nexus from being production-grade:**
+**Design principle v2 (corrected per user 2026-06-22):**
+- DFIR-Nexus is **BOTH a tool AND an agentic framework** (not "tool not agent framework")
+- LangGraph multi-agent pipeline + Velociraptor MCP + multi-LLM router are all in scope (v0.7)
+- Forensic tools (KAPE, Plaso, Hayabusa, Timesketch, WinPMEM, AVML, Volatility 3) are integrated, not deferred to "specialized use only"
+- Industry practices (Sigma → SPL/KQL, MITRE Navigator, RBA, threat actor profiles) are core, not optional
+- **Borrow all that's relevant to core DFIR work** — comprehensive, not minimal
+
+**3 structural gaps preventing DFIR-Nexus from being production-grade (v0.7 priorities):**
 1. No DRAFT / HITL approval workflow (Valhuntir's signature feature)
 2. No HTTP gateway aggregation layer (sift-gateway)
 3. No browser-based Examiner Portal (case-dashboard SPA)
 
 **6 important feature gaps:**
-4. No on-the-fly Sigma → SPL/KQL rule translation
-5. No RAG knowledge base (22K records)
-6. No Windows baseline validation (2.6M records)
-7. No OpenCTI / YETI integration
-8. No push-ingest webhook (`POST /cases/:id/push`)
-9. No browser extension (6 console adapters)
+4. No LangGraph multi-agent pipeline (Plan 7 spine) — **NEW, was incorrectly skipped**
+5. No on-the-fly Sigma → SPL/KQL rule translation
+6. No RAG knowledge base (22K records)
+7. No Windows baseline validation (2.6M records)
+8. No OpenCTI / YETI integration
+9. No push-ingest webhook (`POST /cases/:id/push`)
 
 **DFIR-Nexus strengths over predecessors:**
 - **STIX 2.0 export** (Valhuntir has none)
@@ -116,16 +126,17 @@ All notable changes to CADRE are documented here. Format: [Keep a Changelog](htt
 - **AI vision** for screenshot/image analysis (Valhuntir has none)
 - **OpenAI-compat standard across 16+ LLM services**
 
-**Roadmap to ~95% parity:**
-- **v0.7** (12 weeks, ~10K lines) — DRAFT/HITL + Gateway + Portal + Sigma download
-- **v0.8** (8 weeks, ~7K lines) — RAG + Windows baseline + GraphRAG + deobfuscation
-- **v0.9** (6 weeks, ~4K lines) — 10 TI providers + Velociraptor framework + MITRE Navigator
-- **v1.0** (8 weeks, ~6.5K lines) — Push ingest + Browser extension + 9 integrations + DOCX/CSV/SVG
+**Roadmap to ~95% parity (corrected to comprehensive):**
+- **v0.7** (14 weeks, ~14K lines) — **LangGraph pipeline** + Velociraptor MCP server + DRAFT/HITL + Gateway + Portal + Plaso + Sigma download
+- **v0.8** (8 weeks, ~7K lines) — Volatility 3 + RAG + Windows baseline + GraphRAG + deobfuscation
+- **v0.9** (6 weeks, ~4K lines) — TI providers (OpenCTI/YETI/etc.) + Velociraptor framework + MITRE Navigator + threat actors
+- **v1.0** (8 weeks, ~6.5K lines) — Push ingest + 3rd-party integrations (MISP/IRIS/Timesketch/Notion/ClickUp) + DOCX/CSV/SVG outputs
 
 **Documents created:**
-- `docs/internal/integrations/dfir-nexus-source-assessment.md` (Part 1: Inventory)
+- `docs/internal/integrations/dfir-nexus-source-assessment.md` (Part 1: Inventory + Design Principle v2)
 - `docs/internal/integrations/dfir-nexus-source-assessment-2-mapping.md` (Part 2: Gap mapping)
-- `docs/internal/integrations/dfir-nexus-source-assessment-3-roadmap.md` (Part 3: Roadmap)
+- `docs/internal/integrations/dfir-nexus-source-assessment-3-roadmap.md` (Part 3: Roadmap + Skip list, v0.7 expanded to include LangGraph)
+- `docs/internal/integrations/dfir-nexus-codebase-review.md` (code-level verification of assessment)
 - `tools/dfir-nexus/docs/STUDY-GUIDE.md` (NEW — full how-to-use guide)
 
 ### Added (2026-06-20 — DFIR-Nexus Phase 6: Integration — FEATURE COMPLETE)
