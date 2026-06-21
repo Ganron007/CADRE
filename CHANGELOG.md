@@ -68,6 +68,26 @@ All notable changes to CADRE are documented here. Format: [Keep a Changelog](htt
 - End-to-end real-data analysis: point DFIR-Nexus at CADRE lab telemetry from Phase 1-3 attack runs
 - v0.7 backlog: 5 deferred features (OpenSearch indexer, push ingest webhook, Notion/IRIS export, rule translation, case template library)
 
+### DFIR-Nexus Improvement Plan Archived (2026-06-22)
+
+Per user 2026-06-22 — `dfir-nexus-improvement-plan.md` archived to avoid overlap with the active release roadmap.
+
+**What was archived:**
+- `docs/internal/integrations/dfir-nexus-improvement-plan.md` → `docs/internal/integrations/archive/dfir-nexus-improvement-plan-archived-2026-06-22.md`
+
+**Why archived:**
+- The improvement-plan.md was the original 30-feature plan captured on 2026-06-20, before the source-project assessment was completed.
+- After the assessment (2026-06-22), `dfir-nexus-source-assessment-3-roadmap.md` became the authoritative forward-looking roadmap (A.0 "Pioneer" → E.0 "Constellation").
+- Both docs covered the same features (DRAFT/HITL, Gateway, Portal, RAG, Windows baseline, etc.) — overlapping and confusing.
+
+**What replaces it:**
+- **1-pager** (`dfir-nexus.md`) — what DFIR-Nexus IS, status, design principle v3, stats
+- **Release roadmap** (`dfir-nexus-source-assessment-3-roadmap.md`) — A.0 "Pioneer" → E.0 "Constellation" with detailed implementation plans
+
+**Other docs updated** to point to roadmap instead of improvement-plan:
+- `docs/internal/registry.md` — row updated to reference roadmap
+- `AGENTS.md` — Mini-Projects table + session entry updated
+
 ### DFIR-Nexus SANS Plan vs plan1.7 Distinction Clarified (2026-06-22)
 
 Per user 2026-06-22 — "this also has some of the sans exercises but from other courses to - for main cadre. lets not overlap them with our DFIR-Nexus."
