@@ -19,10 +19,10 @@
 | <img src="https://img.shields.io/badge/C--Cloud-0078d4?style=flat-for-the-badge&logo=microsoftazure&logoColor=white" alt="Cloud"> | **Hybrid Cloud Identity** | Microsoft Entra ID (Free Tenant) • Azure Resource Manager (ARM) • Hybrid attack scenarios bridging On-Prem and Cloud |
 | <img src="https://img.shields.io/badge/A--Agentic-343a40?style=flat-for-the-badge&logo=openai&logoColor=white" alt="Agentic"> | **Autonomous Investigation** | LangGraph Multi-Agent Workflows • DFIR-Nexus Evidence Schema • Local LLMs & RAG Routing • Velociraptor MCP |
 | <img src="https://img.shields.io/badge/D--DFIR-5c0d12?style=flat-for-the-badge&logo=elastic&logoColor=white" alt="DFIR"> | **Forensics & Telemetry** | Elastic SIEM (Host Telemetry) • Velociraptor (Live Hunts) • Zeek & Suricata (Network Flows) • Plaso, Hayabusa & Timesketch |
-| <img src="https://img.shields.io/badge/R--Red_Team-ef4444?style=flat-for-the-badge&logo=target&logoColor=white" alt="Red-Team"> | **Offensive Emulation** | 60+ scripted attack surfaces spanning 8 industry certifications (CRTP/E, CAPE, ADCS, OADOC, CARTP/E) |
+| <img src="https://img.shields.io/badge/R--Red_Team-ef4444?style=flat-for-the-badge&logo=target&logoColor=white" alt="Red-Team"> | **Offensive Emulation** | 60+ scripted attack walkthroughs against live multi-domain AD + Azure, spanning on-prem, hybrid, and cloud identity |
 | <img src="https://img.shields.io/badge/E--Environment-14532d?style=flat-for-the-badge&logo=virtualbox&logoColor=white" alt="Environment"> | **Active Substrate** | Server 2025 (3 DCs, 2 members) • Ubuntu 24.04 Linux AD • 7 core VMs + 3 extensions (ELK, Net-Monitor, VR) |
 
-The first open-source lab combining red-team practice, agentic AI investigation, DFIR tooling, cloud identity (Azure/Entra), and 8 industry certifications in a single instrumented substrate. Every attack produces ground-truth telemetry. Investigate manually or via multi-agent AI pipeline. Export structured evidence. Reset. Repeat.
+The first open-source lab combining red-team practice, agentic AI investigation, DFIR tooling, cloud identity (Azure/Entra), and major AD certification-level attack coverage in a single instrumented substrate. Every attack produces ground-truth telemetry. Investigate manually or via multi-agent AI pipeline. Export structured evidence. Reset. Repeat.
 
 MIT licensed. $0 baseline cost.
 
@@ -44,7 +44,7 @@ Full guide: [docs/deployment.md](docs/deployment.md)
 
 ## Core Capabilities
 
-1. **Red-team practice** — 60 walkthroughs across 8 certifications against live multi-domain AD + Azure
+1. **Red-team practice** — 60 walkthroughs across major AD certification-level attack areas against live multi-domain AD + Azure
 2. **Telemetry knowledge via offense** — every attack produces artifacts across Sysmon, Elastic Defend, Zeek, Suricata, Arkime, Velociraptor
 3. **DFIR investigation** — Velociraptor VQL hunts, Hayabusa timelines, Plaso, KAPE, Volatility 3
 4. **Agentic AI investigation** — LangGraph multi-agent pipeline (6 agents) + DFIR-Nexus + multi-LLM router
@@ -68,21 +68,6 @@ Full topology: [docs/architecture.md](docs/architecture.md)
 
 ---
 
-## 8 Certifications Attack Coverage
-
-| Cert | Focus |
-|------|-------|
-| CRTP | AD pentesting fundamentals |
-| CRTE | AD expert (cross-forest, delegation, dMSA) |
-| CESP-ADCS | Certificate Services ESC1-15 |
-| HTB CAPE | AD + coercion + Linux cross-platform |
-| OSCP+ | Offensive Security AD portion |
-| WKL OADOC | SCCM Misconfiguration-Manager + Virtual Smart Cards |
-| CARTP | Azure Red Team Professional (Azure scenarios + Cloud Sync) |
-| CARTE | Azure Red Team Expert (Azure RM + PIM + multi-tenant + Arc) |
-
----
-
 ## Project Structure & Documentation
 
 Full doc index: [`DOCS.md`](DOCS.md) — start there to find the right page for what you're doing.
@@ -95,7 +80,6 @@ Full doc index: [`DOCS.md`](DOCS.md) — start there to find the right page for 
 | [Forensic Workflow](docs/forensic-workflow.md) | Attack → Telemetry → Investigate → Export → Reset cycle |
 | [Testing](docs/testing-recommendations.md) | 83-check verification recipe |
 | [DFIR Logging Reference](docs/dfir-logging-reference.md) | Every channel / EID / auditd key / Elastic index in one page |
-| [Cert Coverage](docs/cert-coverage.md) | Honest % coverage for all 8 certifications (post-deploy + roadmap completion) |
 | [Goals / Roadmap](docs/goals.md) | 11-plan roadmap with status |
 
 ---
