@@ -4,6 +4,131 @@ All notable changes to CADRE are documented here. Format: [Keep a Changelog](htt
 
 ## [Unreleased]
 
+### Added (2026-07-25 — Plan 1.1 Campaign Automation + CHECKLIST next action)
+
+> **Scope:** Establish **Plan 1.1** (RedStrike-driven campaign automation) as the next execution track ahead of / with Plan 1 telemetry, so attack runs can scale instead of staying hand-driven. Docs + checklist only — RedStrike M1 code not started.
+
+**What was done:**
+- Created [`docs/internal/plan1.1-campaign-automation/`](docs/internal/plan1.1-campaign-automation/) — `README.md` router + `CAMPAIGN-AUTOMATION-PLAN.md` (mirror of RedStrike plan: M1–M5, ws01 routing, HITL gates, Branches A–D/G).
+- Updated [`docs/internal/PLANS.md`](docs/internal/PLANS.md) — Plan **1.1** in naming table, folder table, and execution order (1.1 before/with Plan 1).
+- Updated root [`CHECKLIST.md`](CHECKLIST.md) — new **P11.*** section (P11.0 docs done; P11.1–P11.6 pending); top priorities lead with Plan 1.1; `I.1` redirected to P11; companion-doc + NEXT ACTION banner.
+- Updated [`docs/internal/ACTIVE.md`](docs/internal/ACTIVE.md) — next action = CHECKLIST **P11.1** (RedStrike M1).
+- Sister repo: `RedStrike/CAMPAIGN-AUTOMATION-PLAN.md` + `ROADMAP.md` link + `RedStrike/CHANGELOG.md` entry (committed/pushed separately).
+
+**Why:** Plan 1 telemetry catalog cannot move fast without repeatable attack automation. Plan 1.1 is the orchestrator; Plan 1 remains the catalog.
+
+**Next:** Implement RedStrike **M1** (writer: `RedStrike/`) — Ws01Router + CredentialLedger + Phases 1–3.
+
+### Changed (2026-07-16 — README & Logo Tagline Refactoring for CADRE-RevAI / RevEng)
+
+> **Scope:** Refactored the public README.md and modified the tagline text inside the vector logo for the `CADRE-RevAI` repository, and merged/refactored the parent `CADRE-RevEng` README.md to ensure technical honesty and layout consistency.
+
+**What was done:**
+- Refactored `CADRE-RevAI/README.md` to follow the "Pragmatic Hybrid" design: clarified the deterministic stage-based pipeline architecture ("Deterministic Skeleton, Cognitive LLM Union"), cataloged internal scripts, and separated core versus experimental features (such as Z3 symbolic deobfuscation and bottom-up call-graph function recovery).
+- Refactored and merged the parent `CADRE-RevEng/README.md` using `README2.md` as the source of truth, establishing an honest, clear layout describing active status tiers (v2 SQL-first, v3 UI hooks) and future v5 agentic planning.
+- Updated the tagline text inside `CADRE-RevAI/assets/revai-logo.svg` from "Autonomous Malware Decompilation & Deobfuscation" to "LLM-Assisted Reverse Engineering & Signature Generation" for technical accuracy.
+- Cleaned absolute `file://` local paths inside the workspace READMEs to use proper repository-relative paths for public-release compatibility.
+
+### Changed (2026-07-13 — README & Image Asset Update for Public Release)
+
+> **Scope:** Updated CADRE README.md and generated public-release ready image assets from vector sources.
+
+**What was done:**
+- Generated `cadre-architecture-dark.png` from `cadre-architecture-dark.svg` using headless Microsoft Edge.
+- Generated `cadre-logo-godfather.png` from `cadre-logo-godfather.svg` using headless Microsoft Edge.
+- Updated `README.md` to display the Godfather logo at the top, along with project status badges (License, Status, Platform) matching other sister repos.
+- Updated the architecture diagram in the README to reference the new dark mode PNG (`docs/img/cadre-architecture-dark.png`) to align with the visual identity.
+- Refactored README sections to match standard project formats (`Core Capabilities`, `Architecture & Data Flow`, `Project Structure & Documentation`, `Current Status & Roadmap`).
+
+### Added (2026-07-04 — RevEng ↔ DFIR-Nexus integration plan)
+
+> **Scope:** Joint integration plan between **CADRE-RevEng v2.0/v3** and **DFIR-Nexus v1.0.0 E.0 Constellation**. Both tools were built independently; this plan bridges them.
+
+**Plan structure:**
+- **3-layer model:** RAG search (per-corpus best-fit model, shared reranker) → LLM judge (router-agnostic, shared metadata) → output push (RevEng sample run → DFIR-Nexus case)
+- **Q1 finding:** Don't rewire DFIR-Nexus. Keep bge-base-en-v1.5 (768d) for its short structured text corpus. Use bge-m3 (1024d) for RevEng's malware jargon corpus. No re-index required.
+- **Q2 solution:** 5-step implementation plan
+  1. RevEng → DFIR-Nexus output push (~50 LOC each side, uses existing E.0.1 push/server.py)
+  2. RevEng evidence → DFIR-Nexus RAG adapter (~30 LOC, new `load_reveng_bundle()`)
+  3. RevEng hashes → DFIR-Nexus TI cache (~100 LOC, new `reveng_provider.py`)
+  4. Ollama embedder in DFIR-Nexus (bge-m3 indexing, ~50 LOC)
+  5. RevEng in DFIR-Nexus langgraph agent graph (~150 LOC)
+- **Work order:** 1 → 2 → 4 → 3 → 5
+- **Hard blocker:** **V3.18** (DFIR-Nexus sharing decision — PR upstream vs local fork vs shared module). User decision required.
+
+**Docs written (mirrors):**
+- **RevEng side:** `CADRE-RevEng/Tools/integrations/dfir-nexus/PLAN.md` (full Q1+Q2 + 5-step plan + CHECKLIST refs)
+- **DFIR-Nexus side:** `CADRE/tools/dfir-nexus/docs/integrations/REVENG-INTEGRATION.md` (mirror, RevEng-specific only)
+- **Updated:**
+  - `docs/internal/ACTIVE.md` — sister project context row + new handoff log entry
+  - `docs/internal/registry.md` — already accurate; flagged as "bridge v3 (formally planned, not deferred)"
+
+**CHECKLIST cross-references** (from `CADRE-RevEng/CHECKLIST.md`): V3.18 (sharing decision), V3.20 (GGUF source), V3.29 (Ollama wire-in), O.5 (CADRE bridge cluster), O.6 (case provisioning), O.7 (Ansible playbook).
+
+**Next:** Wait for V3.18 user decision. Once decided, start with Step 1 (push pipeline) — smallest, highest impact, no model changes.
+
+---
+
+### Added (2026-06-30 — CADRE-RevEng v2.0 COMPLETE + MTA 2025/2026 real-world sample source)
+
+> **Scope:** Finalized `CADRE-RevEng` v2.0 lab on `.41` (Linux) and `.42` (Windows). Verified T4 pipeline end-to-end on a real malware-traffic-analysis.net sample. Staged MTA 2025/2026 as the primary real-world sample corpus. Deferred v3 work (RAG, Z3, angr/CFF GhidraScript, CADRE main bridge).
+
+**T4 pipeline verified on real MTA sample:**
+- **SHA-256:** `353ddce78d58aef2083ca0ac271af93659cf0039b0b29d0d169fc015bd3610bc`
+- **Source:** MTA 2026-04-16 Lumma Stealer + SectopRAT infection
+- **Tool chain:** `intake.py` → `quick_scan_v2.py` → `deep_dive.py` → `yara_gen.py` → `publish_report.py`
+- **Result:** verdict `malicious`, family `Lumma Stealer`, score 95, agreement `llm_and_v1_agree`
+
+**MTA 2025/2026 staged on `.41`:**
+- 85 posts, 112 ZIPs downloaded, 65 extraction dirs, ~17 GB extracted
+- Routing manifest counts: 130 executables, 71 pcaps, 16 documents, 40 scripts, 376 IOC text files, 30 images, 65 archives
+- Routed to:
+  - `/opt/samples/mta-routing/corpus/` — 9.2 GB RevEng analysis corpus
+  - `/opt/samples/mta-routing/dfir/` — 2.9 GB bridge-ready DFIR topics
+
+**Tools updated:**
+- `CADRE-RevEng/Tools/v2-deploy/stage_mta_traffic.py` — rewritten with subcommands `emit-manifest`, `stage-zips`, `classify-artifacts`, `route-to-cadre`. Parses per-post pages, auto-derives password `infected_YYYYMMDD`, uses `7z` for AES extraction with long-path and bad-unicode handling.
+- `CADRE-RevEng/Tools/v2-deploy/stage_case_study.py` — `--hunt-open-sources` queries MalwareBazaar, Hybrid Analysis, Triage, OTX, VirusTotal. Confirmed free-tier API keys verify hashes but **cannot download** latest APT samples.
+
+**Vendor case-study cleanup:**
+- Active: MLTBackdoor, OceanLotus, GoFlateLoader, MustangPanda, SaassyCode + SHEET#CREEP workbook-only
+- Removed: Miasma, GopherRAT-FBISE
+
+**Constraints locked:**
+- Lab interface only: `.41` = `192.168.77.41`, `.42` = `192.168.77.42`
+- API keys in `/opt/secrets/cadre.env` (chmod 600): DeepSeek, ABUSECH, HA, TRIAGE, OTX, VT
+
+**Deferred to v3:**
+- CADRE main bridge (`publish_to_cadre.py` / `intake-from-cadre.py`)
+- RAG layer, Z3 verification, angr/CFF GhidraScript
+- Design docs: `CADRE-RevEng/Tools/v2-deploy/MTA-CADRE-SHARING.md` and `plan_v2-CADRE-integration.md`
+
+**Files updated (RevEng repo):**
+- `Tools/v2-deploy/verification-log-v2.md` — 2026-06-30 session + MTA pipeline result
+- `Tools/v2-deploy/STAGING-PLAYBOOK.md` — 2025/2026 MTA scope + local routing
+- `Tools/v2-deploy/_progress.md` — MTA noted as working alternative sample source
+- `Tools/v2-deploy/MTA-CADRE-SHARING.md` — new design doc; bridge marked v3
+
+**Cross-references:**
+- `CADRE-RevEng/Tools/v2-deploy/plan_v2.md`
+- `CADRE-RevEng/Tools/v2-deploy/plan_v2-CADRE-integration.md`
+- `docs/internal/roadmapv2.md` §Plan 0.9
+- `docs/internal/registry.md` CADRE-RevEng row
+
+---
+
+### Changed (2026-06-29 — Red-Strike in-tree relocation)
+
+- **Red-Strike:** Agentic offense tool relocated from deprecated `CADRE-Strike/` sister repo to `tools/red-strike/` (same in-tree pattern as DFIR-Nexus). Integration doc: `docs/internal/integrations/red-strike.md`. Cursor rule: `.cursor/rules/red-strike.mdc`.
+- **Registry / ACTIVE / workspace:** `CADRE-Strike` removed from sister list; `CADRE-DarkAI` added. `CADRE-ALL.code-workspace` updated.
+- **Deprecated:** `CADRE-Strike/` retained as redirect stub only; `cadre-strike.md` integration doc removed (superseded by `red-strike.md`).
+
+### Fixed (2026-06-27 — CADRE-Platform folder migration repair)
+
+- **Filesystem:** Merged accidental nested `CADRE/CADRE/` into repo root — restored `lab/`, `tools/` (regen-config, campaign scripts, dfir-nexus), `docs/internal/plan01-upgrades/`, `_canonical/`, `process/`, `references/sources`, `tests/`. Removed nested folder and old `Github\CADRE\NUL` stub (replaced with README pointer).
+- **Docs:** Updated `registry.md`, `ACTIVE.md`, `ecosystem-organization.md` (Option B executed), `DOC-MAP.md` (ACTIVE + registry entries). Path sweep across platform to `C:\STUDY\Github\CADRE-Platform\`.
+- **Workspace:** Canonical entry `CADRE-Platform\CADRE-ALL.code-workspace` + `CADRE-Platform\README.md`.
+
 ### Added (2026-06-25 — AMSI Bypass Detection Engineering [Session 16])
 
 > **Source:** [One Bool. Six Shells. AMSI's Design Problem](https://bl4ckarch.github.io/posts/One-Bool.-Six-Shells.-AMSI%27s-Design-Problem/) by bl4ckarch, 2026-06-25. Per user direction: "you can update these 2 and remove from Todo" — apply the bl4ckarch research to plan1.7 §16 + Campaign_suggestions Item #109.
@@ -148,7 +273,7 @@ All notable changes to CADRE are documented here. Format: [Keep a Changelog](htt
 
 ### Added (2026-06-25 — Roadmapv2 + 13Cubed Linux Forensics Integration + Items EX-49..59 / EX-OFF-32..37 [Session 14])
 
-> **Scope:** Per user direction (2026-06-25): *"save roadmapv2 first and then proceed to review this one as well, i want linux forensics as well into this somehow ... C:\STUDY\Github\CADRE-Courses\13Cubed ... this if anything new, goes into plan1.7 exercises and other places as necessary and update the roadmapv2 in the end. lastly update changelog and agents.md"*
+> **Scope:** Per user direction (2026-06-25): *"save roadmapv2 first and then proceed to review this one as well, i want linux forensics as well into this somehow ... C:\STUDY\Github\CADRE-Platform\CADRE-Courses\13Cubed ... this if anything new, goes into plan1.7 exercises and other places as necessary and update the roadmapv2 in the end. lastly update changelog and agents.md"*
 
 **Roadmapv2 saved (new file):**
 - **`docs/internal/roadmapv2.md`** (new, ~333 lines, 8 sections) — supersedes `roadmap.md` as the "where are we" + "what to do next" doc. Sections: (1) State of the Lab, (2) Why we're slow, (3) 2-sprint plan (9 sessions to v1.0), (4) After Sprint 2, (5) Critical decisions, (6) Out-of-scope for v1.0, (7) 13Cubed Course Library, (8) Per-plan quick reference, (9) Key file references.
@@ -158,7 +283,7 @@ All notable changes to CADRE are documented here. Format: [Keep a Changelog](htt
 
 **13Cubed Linux Forensics Integration:**
 
-**Source:** `C:\STUDY\Github\CADRE-Courses\13Cubed\` — three courses by ForensicJason:
+**Source:** `C:\STUDY\Github\CADRE-Platform\CADRE-Courses\13Cubed\` — three courses by ForensicJason:
 - **Investigating Linux Devices** (44 topics, 11 sections) — primary value for CADRE linux01
 - **Investigating Windows Endpoints** (32 topics, 10 sections) — cross-validation
 - **Investigating Windows Memory** (48 topics, 10 sections) — Plan 9 cross-reference
@@ -229,7 +354,7 @@ All notable changes to CADRE are documented here. Format: [Keep a Changelog](htt
 
 ### Added (2026-06-25 — ebooks Survey + Items #109-115 [Session 13])
 
-> **Survey scope:** All 75 .txt files in `C:\STUDY\Github\CADRE-Courses\ebooks\` surveyed via term-frequency analysis for AD attack vocabulary + DFIR/detection keywords. Per user direction (2026-06-25): "look only at the txt files for now... propose your suggestions here."
+> **Survey scope:** All 75 .txt files in `C:\STUDY\Github\CADRE-Platform\CADRE-Courses\ebooks\` surveyed via term-frequency analysis for AD attack vocabulary + DFIR/detection keywords. Per user direction (2026-06-25): "look only at the txt files for now... propose your suggestions here."
 
 **Survey findings:**
 - 11 books identified as **Tier 1+2 high-value new content** (not duplicates of existing sources)
@@ -428,7 +553,7 @@ Add-MpPreference -ExclusionExtension ".exe"
 
 ### Tracked (2026-06-24 — CADRE-Strike Agentic Offense Automation [Defer to Campaign Complete])
 
-- **Project reviewed:** `C:\STUDY\Github\CADRE-Strike\` (separate repo, MIT, ~30 files / ~10K LOC MVP 0.1). CADRE = **Contextual Active Directory Reasoning Engine**. Parallel agentic offense layer for the campaign — drives existing campaign tooling (NetExec, bloodyAD, Certipy, Coercer, Impacket) via LLM agents.
+- **Project reviewed:** `C:\STUDY\Github\CADRE-Platform\CADRE-Strike\` (separate repo, MIT, ~30 files / ~10K LOC MVP 0.1). CADRE = **Contextual Active Directory Reasoning Engine**. Parallel agentic offense layer for the campaign — drives existing campaign tooling (NetExec, bloodyAD, Certipy, Coercer, Impacket) via LLM agents.
 - **Differentiators from "command-pass-through" wrappers (HexStrike AI, etc.):**
   - **Intent-level operations** (`enumerate_domain_users`, `find_delegation`, `find_asrep_roastable`, etc.) — semantic ops an LLM agent can reason about
   - **Typed command builders** with `shell=False`
@@ -590,7 +715,7 @@ Add-MpPreference -ExclusionExtension ".exe"
 
 ### Added (2026-06-24 — Onelogon: Single-Channel NRPC Authentication Bypass [WOOT 2026])
 
-- **Paper analyzed:** "Onelogon: An Authentication Bypass for Windows Active Directory via Single-Channel Netlogon" — Alexandru-Vlad Pădurean, WOOT 2026 (Workshop on Offensive Technologies, Aug 1-3 2026). Same author as `krbrelayx`. Paper text at `C:\STUDY\Github\CADRE-Courses\woot2026-onelogon\woot2026-onelogon.txt` (923 lines).
+- **Paper analyzed:** "Onelogon: An Authentication Bypass for Windows Active Directory via Single-Channel Netlogon" — Alexandru-Vlad Pădurean, WOOT 2026 (Workshop on Offensive Technologies, Aug 1-3 2026). Same author as `krbrelayx`. Paper text at `C:\STUDY\Github\CADRE-Platform\CADRE-Courses\woot2026-onelogon\woot2026-onelogon.txt` (923 lines).
 - **Vulnerability:** MS-NRPC's single-channel variant (over SMB/445 via `\PIPE\netlogon`) was **not covered by the post-Zerologon hardening** (CVE-2020-1472 patch + SpecterOps "Renaissance of NTLM Relay Attacks" 2025 mitigations). The hardening was only added to multi-channel NRPC (DC-to-DC replication). Single-channel NRPC still accepts pre-Zerologon non-secure-RPC calls, exposing two attacks:
   - **Section 5.2 Zero-Channel:** Call `NetrServerPasswordSet2` against target DC machine account → set DC machine password to attacker-known value → DCSync → KRBTGT → full domain takeover in 1 RPC call.
   - **Section 5.1 AES-CBC8 Downgrade:** Compute hash of ANY password (machine, KRBTGT, user) offline via RFC 4753 weak DES challenge-response.
@@ -737,7 +862,7 @@ Add-MpPreference -ExclusionExtension ".exe"
 
 ### DFIR-Nexus v0.6.0 — FEATURE COMPLETE (2026-06-20)
 
-**DFIR-Nexus** — our agentic super DFIR tool — is now **feature-complete**. All 6 phases shipped in a single day (2026-06-20). Local git initialized at `C:\STUDY\Github\CADRE\tools\dfir-nexus\` (commit `5b37837` on `master`, no push per user instruction).
+**DFIR-Nexus** — our agentic super DFIR tool — is now **feature-complete**. All 6 phases shipped in a single day (2026-06-20). Local git initialized at `C:\STUDY\Github\CADRE-Platform\CADRE\tools\dfir-nexus\` (commit `5b37837` on `master`, no push per user instruction).
 
 **Predecessor features** (detection, ingest, case, RAG, triage) were ported into DFIR-Nexus during A.0–C.0. Historical assessment docs live in `docs/internal/integrations/`.
 
@@ -1032,7 +1157,7 @@ The SANS tools integration plan was updated to add a "Distinction from CADRE Pla
 
 ### Added (2026-06-20 — DFIR-Nexus Phase 1 + Phase 2 Implementation)
 
-- **`tools/dfir-nexus/`** — first two phases of DFIR-Nexus built at `C:\STUDY\Github\CADRE\tools\dfir-nexus\`:
+- **`tools/dfir-nexus/`** — first two phases of DFIR-Nexus built at `C:\STUDY\Github\CADRE-Platform\CADRE\tools\dfir-nexus\`:
   - **Phase 1 (Detection Layer + LLM Router)** — 8 MCP tools, ~63 tests:
     - LLM Router with 4 providers (OpenAI / Anthropic / Ollama / LiteLLM), all using standard OpenAI-compatible API
     - Detection Searcher + Indexer (Sigma YAML parser) + MITRE Coverage (per-technique, matrix, gap analysis)
@@ -1091,7 +1216,7 @@ The SANS tools integration plan was updated to add a "Distinction from CADRE Pla
   - `CADRE/references/project-nightcrawler/` → `docs/internal/references/sources/project-nightcrawler/`
   - `CADRE/references/uncanny/` → `docs/internal/references/sources/uncanny/`
   - All references in `AGENTS.md` and `docs/internal/registry.md` updated to new paths
-- **Path convention documented** in AGENTS.md: "External source repos live in `C:\STUDY\Github\CADRE-Integrations\` (read-only). CADRE references them by path — no duplication. Locally cloned small references live in `docs/internal/references/sources/`. Analysis docs live in `docs/internal/references/`."
+- **Path convention documented** in AGENTS.md: "External source repos live in `C:\STUDY\Github\CADRE-Platform\CADRE-Integrations\` (read-only). CADRE references them by path — no duplication. Locally cloned small references live in `docs/internal/references/sources/`. Analysis docs live in `docs/internal/references/`."
 
 ### Added (2026-06-20 — Integrations Registry + 9 1-pagers + AGENTS.md update)
 
@@ -1115,10 +1240,10 @@ The SANS tools integration plan was updated to add a "Distinction from CADRE Pla
 - Top directive expanded to include `docs/internal/registry.md` as required first read
 - New **"Mini-Projects & Integrations"** section added between Architecture and Commands
 - 12 integrations + 2 sister projects summarized in a single table with Plan mapping + status
-- Path convention documented: external sources in `C:\STUDY\Github\CADRE-Integrations\` (read-only), locally cloned small refs in `CADRE/references/`
+- Path convention documented: external sources in `C:\STUDY\Github\CADRE-Platform\CADRE-Integrations\` (read-only), locally cloned small refs in `CADRE/references/`
 
 **Path strategy (per user decision):**
-- External-only: source repos stay in `C:\STUDY\Github\CADRE-Integrations\`
+- External-only: source repos stay in `C:\STUDY\Github\CADRE-Platform\CADRE-Integrations\`
 - No duplication into `CADRE/references/`
 - CADRE references them by path through `registry.md`
 
@@ -1519,7 +1644,7 @@ The SANS tools integration plan was updated to add a "Distinction from CADRE Pla
 - **Both playbooks updated**: `12-elk-fleet.yml` adds zeek.notice filestream integration; `12-elk-fleet-verifyOnly.yml` verifies it exists.
 
 - **Plan 0.7 scoped to public-safe content** — Zeek built-in detection scripts, Suricata AD rules, RITA installation, ShowMeThePackets tools (GPL-3.0, dhoelzer/ShowMeThePackets). Course-specific PCAP/log imports kept local and out of repo.
-- **Plan 0.9 — Malware RE Lab** added as Post-Foundation Upgrade: REMnux OVA + Flare VM (no Vagrant), Ghidra MCP AI-assisted RE, quick-scan pipeline, sample DB (theZoo/Flare-On/MalwareBazaar). Spec at `plan00-upgrades/plan0.9-malware-re-lab.md`. Full detail at `C:\STUDY\Github\CADRE-Courses\MalwareRev\README.md`. Deferred to Plan 7 (MCP integration) for execution.
+- **Plan 0.9 — Malware RE Lab** added as Post-Foundation Upgrade: REMnux OVA + Flare VM (no Vagrant), Ghidra MCP AI-assisted RE, quick-scan pipeline, sample DB (theZoo/Flare-On/MalwareBazaar). Spec at `plan00-upgrades/plan0.9-malware-re-lab.md`. Full detail at `C:\STUDY\Github\CADRE-Platform\CADRE-Courses\MalwareRev\README.md`. Deferred to Plan 7 (MCP integration) for execution.
 - **File naming normalized** — `plan07-` → `plan0.7-`, `plan08-` → `plan0.8-`, `plan09-` → `plan0.9-` for consistency. All references updated across CHANGELOG, roadmap, AGENTS.md.
 - **`00-plan.md` prerequisites updated** — old "6 E2E attack scripts" prerequisite replaced with Phase 0 per-attack verification workflow.
 - **`01-state.md` updated** — date, stale E2E reference replaced with Phase 0 reference.
