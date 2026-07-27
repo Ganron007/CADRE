@@ -1,0 +1,55 @@
+# CADRE Lab — Curated ET Rules Subset
+# Hand-picked from ET Open rules for lab relevance
+# Focus: Kerberos attacks, SMB lateral movement, DNS anomalies, TLS, C2
+# SID range: 2000001-2000099 (ET Open subset)
+# Generated: 2026-05-28
+
+# === Kerberos Attack Detection ===
+
+# Kerberos AS-REP without pre-auth (AS-REP Roasting)
+alert krb5 any any -> any 88 (msg:"ET TROJAN Kerberos AS-REP Without Pre-Auth (AS-REP Roast)"; krb5_msg_type:10; sid:2000002; rev:1; classtype:credential-access;)
+
+# === SMB / Lateral Movement ===
+
+# SMBv1 usage (deprecated, attack vector)
+alert smb any any -> any any (msg:"ET POLICY SMBv1 Usage Detected"; smb.version:1; sid:2000010; rev:1; classtype:policy-violation;)
+
+# SMB admin share access (C$, ADMIN$)
+alert smb any any -> any any (msg:"ET POLICY SMB Admin Share Access"; smb.share; content:"ADMIN$"; nocase; sid:2000012; rev:1; classtype:policy-violation;)
+
+# === DNS Anomaly Detection ===
+
+# DNS tunneling via TXT records
+alert dns any any -> any 53 (msg:"ET TROJAN DNS Query to Suspicious TXT Record"; dns.rrtype:16; sid:2000020; rev:1; classtype:trojan-activity;)
+
+# DNS query to known malicious domains
+alert dns any any -> any 53 (msg:"ET TROJAN DNS Query to Known Malicious Domain"; dns.query; pcre:"/\.(tk|ml|ga|cf|gq|bit|dynu)/i"; sid:2000021; rev:1; classtype:trojan-activity;)
+
+# DNS high-entropy query (DGA indicator)
+alert dns any any -> any 53 (msg:"ET TROJAN High Entropy DNS Query (Possible DGA)"; dns.query; pcre:"/^[a-z0-9]{15,}\./i"; sid:2000022; rev:1; classtype:trojan-activity;)
+
+# === TLS Anomaly Detection ===
+
+# TLS 1.0 or earlier
+alert tls any any -> any any (msg:"ET POLICY Deprecated TLS Version (1.0 or Earlier)"; ssl_version:sslv2,sslv3,tls1.0; sid:2000031; rev:1; classtype:policy-violation;)
+
+# TLS with unusual SNI pattern
+alert tls any any -> any any (msg:"ET TROJAN TLS SNI with High Entropy Domain"; tls.sni; pcre:"/^[a-z0-9]{20,}\./i"; sid:2000032; rev:1; classtype:trojan-activity;)
+
+# === C2 / Malware Communication ===
+
+# HTTP User-Agent with suspicious patterns
+alert http any any -> any any (msg:"ET TROJAN Suspicious HTTP User-Agent"; http.user_agent; pcre:"/(curl|wget|python|perl|ruby|powershell)/i"; sid:2000041; rev:1; classtype:trojan-activity;)
+
+# === SSH Anomaly ===
+
+# SSH brute force attempt
+alert ssh any any -> any 22 (msg:"ET POLICY SSH Brute Force Attempt"; threshold: type both, count 5, seconds 60, track by_src; sid:2000060; rev:1; classtype:attempted-admin;)
+
+# === HTTP Anomaly ===
+
+# HTTP request to known exploit paths
+alert http any any -> any any (msg:"ET WEB_SERVER Possible Exploit Attempt"; http.uri; pcre:"/(cmd\.exe|powershell|wget|curl|nc|netcat)/i"; sid:2000070; rev:1; classtype:web-application-attack;)
+
+# HTTP suspicious content type
+alert http any any -> any any (msg:"ET TROJAN HTTP Suspicious Content-Type"; http.content_type; pcre:"/(application\/x-msdownload|application\/octet-stream)/i"; sid:2000072; rev:1; classtype:trojan-activity;)

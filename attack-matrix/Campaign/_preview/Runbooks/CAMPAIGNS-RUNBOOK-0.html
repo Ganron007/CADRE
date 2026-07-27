@@ -1,0 +1,392 @@
+<!DOCTYPE html><html><head><meta charset='utf-8'><title>CAMPAIGNS-RUNBOOK-0</title><style>
+body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+       max-width: 52rem; margin: 2rem auto; padding: 0 1.25rem; line-height: 1.55;
+       color: #1f2328; background: #fff; }
+pre { background: #f6f8fa; padding: 1rem; overflow-x: auto; border-radius: 6px; }
+code { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 0.9em; }
+table { border-collapse: collapse; width: 100%; margin: 1rem 0; font-size: 0.92em; }
+th, td { border: 1px solid #d0d7de; padding: 0.45rem 0.6rem; vertical-align: top; }
+th { background: #f6f8fa; }
+blockquote { border-left: 4px solid #d0d7de; margin-left: 0; padding-left: 1rem; color: #57606a; }
+a { color: #0969da; }
+h1, h2, h3 { scroll-margin-top: 1rem; }
+.banner { background: #fff8c5; border: 1px solid #d4a72c; padding: 0.75rem 1rem;
+           border-radius: 6px; margin-bottom: 1.5rem; font-size: 0.95em; }
+</style></head><body><div class='banner'><strong>Static preview</strong> — generated from <code>attack-matrix\Campaign\Runbooks\CAMPAIGNS-RUNBOOK-0.md</code>. Regenerate: <code>python tools/render-campaign-preview.py attack-matrix\Campaign\Runbooks\CAMPAIGNS-RUNBOOK-0.md</code></div><h1>CAMPAIGNS v2 — Phase 0 — Reconnaissance</h1>
+<blockquote>
+<p><strong>Campaign v2</strong> — read the theory here, run each command block live, then update <a href="../CAMPAIGNS-METADATA.md"><code>CAMPAIGNS-METADATA.md</code></a>.<br />
+<strong>Index:</strong> <a href="CAMPAIGNS-RUNBOOK-README.md"><code>CAMPAIGNS-RUNBOOK-README.md</code></a> · <strong>Full reference:</strong> <a href="../CAMPAIGNS_v2.md"><code>CAMPAIGNS_v2.md</code></a> · <strong>Topology:</strong> <a href="../CAMPAIGNS.md"><code>CAMPAIGNS.md</code></a><br />
+<strong>DFIR track:</strong> <a href="../DFIR-Nexus-Pioneer-workflow.md"><code>DFIR-Nexus-Pioneer-workflow.md</code></a></p>
+<p><strong>Sync rule:</strong> When you change this runbook during lab work, apply the same edit to <a href="../CAMPAIGNS_v2.md"><code>CAMPAIGNS_v2.md</code></a> (matching section). Re-run <code>python tools/split-campaign-runbooks.py --check</code> to verify coverage.</p>
+</blockquote>
+<p><strong>Default host:</strong> Kali / provisioning (<code>192.168.77.60</code>) unless a step says otherwise.</p>
+<hr />
+<h2>Phase 0 - Reconnaissance — From Zero Credentials</h2>
+<h3>Step 0 — Full Port/Service Scan (All VMs)</h3>
+<pre><code class="language-bash">nmap -Pn -sV -sC -p- --min-rate 5000 -T4 192.168.77.10,11,12,22,23,40,50,51,55
+</code></pre>
+<p><strong>Results (9 hosts up, 411s scan):</strong></p>
+<table>
+<thead>
+<tr>
+<th>VM</th>
+<th>IP</th>
+<th>Open Ports</th>
+<th>Key Services</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>dc01 (cadre.local)</td>
+<td>.10</td>
+<td>22,53,80,88,135,139,389,445,464,593,636,3268,3269,3389,5985,9389</td>
+<td>DC: DNS, Kerberos, LDAP, LDAPS, SMB, RDP, WinRM, ADWS. <strong>SMB signing required</strong></td>
+</tr>
+<tr>
+<td>dc02 (child.cadre.local)</td>
+<td>.11</td>
+<td>22,53,88,135,139,389,445,464,593,636,3268,3269,3389,5985,9389</td>
+<td>DC: DNS, Kerberos, LDAP, LDAPS, SMB, RDP, WinRM, ADWS. <strong>SMB signing required</strong></td>
+</tr>
+<tr>
+<td>dc03 (range.local)</td>
+<td>.12</td>
+<td>22,53,88,135,139,389,445,464,593,636,3268,3269,3389,5985,9389</td>
+<td>DC: DNS, Kerberos, LDAP, LDAPS, SMB, RDP, WinRM, ADWS. <strong>SMB signing required</strong></td>
+</tr>
+<tr>
+<td>mbr01 (child.cadre.local)</td>
+<td>.22</td>
+<td>22,80,135,443,445,1433,3389,5985</td>
+<td><strong>MSSQL 2022</strong> (1433), IIS, HTTPS, RDP, WinRM. <strong>SMB signing NOT required</strong></td>
+</tr>
+<tr>
+<td>mbr02 (range.local)</td>
+<td>.23</td>
+<td>22,80,135,139,443,445,3389,5040,5985,8530,8531</td>
+<td><strong>SCCM</strong> (8530/8531), IIS, HTTPS, RDP, WinRM. <strong>SMB signing NOT required</strong></td>
+</tr>
+<tr>
+<td>linux01 (cadre.local)</td>
+<td>.40</td>
+<td>22,111,1433,2049,8080</td>
+<td><strong>MSSQL Linux</strong> (1433), NFS, SSH, Python HTTP</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Key findings:</strong></p>
+<ul>
+<li>3 MSSQL instances: mbr01 (Windows), linux01 (Linux), mbr02 (SCCM)</li>
+<li>SCCM on mbr02: ports 8530/8531 (HTTP/HTTPS WSUS)</li>
+<li>SMB signing <strong>not required</strong> on mbr01/mbr02 — NTLM relay possible</li>
+<li>SMB signing <strong>required</strong> on all 3 DCs — NTLM relay blocked</li>
+<li>SSH on all Windows VMs (OpenSSH for Windows)</li>
+<li>WinRM (5985) on all DCs and member servers</li>
+<li>NFS on linux01 (2049)</li>
+</ul>
+<h3>Step 0.5 — Unauthenticated Reconnaissance (Limited on Server 2025)</h3>
+<blockquote>
+<p>⚠️ <strong>Flow correction (2026-06-24 session 10):</strong> NetExec commands that require credentials (<code>intern_blue:1nt3rn_Blu3!</code>) do NOT belong at this stage — we don't have those credentials yet. They are now distributed across the appropriate post-credential-gain stages (see Phase 1.3, 2.3, 3.5A). Step 0.5 is now strictly <strong>unauthenticated</strong> recon.</p>
+</blockquote>
+<p><strong>Server 2025 blocks most unauthenticated enumeration:</strong><br />
+- ❌ Null session (SAMR) — blocked<br />
+- ❌ Anonymous LDAP bind — blocked<br />
+- ⚠️ Guest SMB session — usually disabled<br />
+- ✅ Kerberos user enum (no creds needed) — see Phase 1 Step 1<br />
+- ✅ NTLM session-less checks — limited but useful for signing state</p>
+<p><strong>Unauthenticated NetExec commands that DO work:</strong></p>
+<pre><code class="language-bash"># Relay candidate list (NO AUTH — just outputs hosts that allow NTLM relay)
+nxc smb 192.168.77.0/24 --gen-relay-list /tmp/relay_list.txt
+
+# Signing state check (NO AUTH — just reports signing_required: True/False per host)
+nxc smb 192.168.77.0/24
+# Output: per-host signing state — identifies relay targets (mbr01/mbr02 have signing NOT required)
+
+# Guest session attempt (may be blocked on Server 2025 — try anyway)
+nxc smb 192.168.77.10 -u 'guest' -p '' --shares
+# Expected on Server 2025: STATUS_LOGON_FAILURE or access denied
+
+# RID cycling with guest (often blocked — try anyway)
+nxc smb 192.168.77.10 -u 'guest' -p '' --rid-brute 10000
+# Expected on Server 2025: likely 0 users enumerated
+</code></pre>
+<p><strong>What CAN run unauthenticated in Phase 0 (not NetExec):</strong><br />
+- <strong>Step 0</strong> — nmap port/service scan (already in CAMPAIGNS.md)<br />
+- <strong>Step 1</strong> — RPC anonymous enum (blocked on Server 2025 — historical)<br />
+- <strong>Step 2</strong> — DNS zone transfers, public records<br />
+- <strong>Step 3</strong> — ADWS enumeration (port 9389 — may still work unauth in some configs)<br />
+- <strong>Step 4</strong> — DNS enumeration via adidnsdump<br />
+- <strong>Step 5</strong> — SAMR enumeration (blocked on Server 2025)<br />
+- <strong>Step 6</strong> — Honeypot detection via lastLogon (LDAP query — needs creds OR anonymous)<br />
+- <strong>Step 7</strong> — ADeleg GUI recon (Windows GUI tool — runs as authenticated user)</p>
+<p><strong>Phase 1 Step 1</strong> — Kerberos user enum via <code>kerbrute</code> (no creds needed — Kerberos AS-REQ with no pre-auth)</p>
+<p><strong>See new post-credential NetExec stages:</strong><br />
+- <strong>Phase 1 Step 3</strong> — NetExec Authenticated Recon (First Credential: <code>intern_blue</code>)<br />
+- <strong>Phase 2 Step 3</strong> — NetExec Authenticated Recon (Service Account: <code>svc_mssql</code>)<br />
+- <strong>Phase 3.5 Step A</strong> — NetExec Authenticated Recon (Admin/SYSTEM)</p>
+<h3>Step 1 — Anonymous Enumeration (Server 2025 blocks this)</h3>
+<pre><code class="language-bash"># rpcclient — anonymous RPC
+rpcclient -U '' -N 192.168.77.11 -c 'enumdomusers'
+# Result: NT_STATUS_ACCESS_DENIED
+
+# enum4linux — anonymous LDAP/SMB
+enum4linux -a 192.168.77.11
+# Result: NT_STATUS_ACCESS_DENIED
+
+enum4linux -a 192.168.77.10
+# Result: NT_STATUS_ACCESS_DENIED
+</code></pre>
+<p><strong>Finding:</strong> Server 2025 blocks all anonymous enumeration by default. Both DCs (child.cadre.local and cadre.local) reject anonymous sessions. This is a hardening improvement over older Windows Server versions — GOAD (Server 2016/2019) allowed anonymous user listing.</p>
+<h3>Step 2 — Kerberos User Enumeration (no creds needed)</h3>
+<p>Even with anonymous blocked, Kerberos port 88 reveals valid users. The KDC responds differently to valid vs invalid usernames in AS-REQ packets — no authentication required.</p>
+<pre><code class="language-bash"># Create user list from known naming conventions
+cat &gt; /tmp/users.txt &lt;&lt; 'EOF'
+administrator, guest, krbtgt, vagrant,
+intern_blue, analyst_t1, analyst_t2, analyst_t3, analyst_cloud,
+svc_mssql, svc_elastic, mgr_incident, lead_detection, dir_operations,
+eng_agentic, eng_cloud, intern_intel, hunter_dfir, analyst_dfir,
+lead_engineering, ops_redcell, chief_command
+EOF
+
+# Enumerate child.cadre.local (DC02)
+nmap -Pn -p 88 --script=krb5-enum-users \
+  --script-args='krb5-enum-users.realm=child.cadre.local,userdb=/tmp/users.txt' \
+  192.168.77.11
+
+# Enumerate cadre.local (DC01)
+nmap -Pn -p 88 --script=krb5-enum-users \
+  --script-args='krb5-enum-users.realm=cadre.local,userdb=/tmp/users.txt' \
+  192.168.77.10
+</code></pre>
+<p><strong>Results — 20 valid users found across both domains:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Domain</th>
+<th>DC</th>
+<th>Users Found</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>child.cadre.local</td>
+<td>dc02 (192.168.77.11)</td>
+<td>vagrant, svc_mssql, lead_detection, administrator, analyst_t3, intern_blue, mgr_incident, analyst_t2, dir_operations, analyst_t1</td>
+</tr>
+<tr>
+<td>cadre.local</td>
+<td>dc01 (192.168.77.10)</td>
+<td>analyst_cloud, administrator, lead_engineering, vagrant, hunter_dfir, eng_cloud, chief_command, analyst_dfir, ops_redcell, eng_agentic</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Key finding:</strong> <code>analyst_cloud</code> is in the <strong>root domain</strong> (cadre.local), not the child domain. This was never discovered by BloodHound because BH was only run against child.cadre.local.</p>
+<h3>Step 3 — ADWS Enumeration (SOAP port 9389) ⏳</h3>
+<p><strong>Source:</strong> iPurple.team (2025-08-12)<br />
+<strong>MITRE:</strong> T1018 (Remote System Discovery)</p>
+<p>Active Directory Web Services (ADWS) runs on all DCs on port 9389. Provides SOAP-based enumeration as alternative to LDAP. Server 2025 blocks anonymous LDAP — but ADWS may behave differently.</p>
+<pre><code class="language-bash"># Test ADWS connectivity from Kali
+nmap -Pn -p 9389 192.168.77.10,11,12
+
+# Enumerate via ADWS (requires creds — test with intern_blue)
+# SOAPHound or adws-enum tools
+</code></pre>
+<p><strong>Test:</strong> Can ADWS enumerate users/groups when LDAP anonymous is blocked? If yes, this is a viable Phase 0 recon vector.</p>
+<p><strong>Detection:</strong> Zeek conn.log — connections to port 9389 from non-domain hosts.</p>
+<h3>Step 4 — DNS Enumeration via adidnsdump ⏳</h3>
+<p><strong>Source:</strong> dirkjanm.io (2019)<br />
+<strong>MITRE:</strong> T1590.002 (Gather Victim Network Information: DNS)<br />
+<strong>Tool:</strong> adidnsdump (<a href="https://github.com/dirkjanm/adidnsdump">https://github.com/dirkjanm/adidnsdump</a>)</p>
+<p>AD-integrated DNS allows any authenticated user to query all records by default. adidnsdump enumerates the AD DNS zone, including records the querying user has no explicit read rights to.</p>
+<pre><code class="language-bash"># From Kali with intern_blue creds
+adidnsdump -u cadre.local\\intern_blue -p '1nt3rn_Blu3!' dc01.cadre.local
+
+# Compare output with BloodHound computer list
+# Check for unpublicized records (Azure/Entra endpoints, Cloud Sync, etc.)
+</code></pre>
+<p><strong>Test:</strong> Can we discover hosts not visible in BloodHound? Cloud Sync endpoints? Internal service records?</p>
+<p><strong>Detection:</strong> Zeek dns.log — bulk DNS queries from single source to authoritative AD DNS.</p>
+<h3>Step 5 — SAMR Enumeration (LDAP-Free Account Discovery) ⏳</h3>
+<p><strong>Source:</strong> CYPFER Offensive Practice (2026-06-15)<br />
+<strong>MITRE:</strong> T1087.002 (Account Discovery: Domain Account)</p>
+<p>LDAP enumeration is heavily monitored in mature environments. SAMR (MS-SAMR protocol over port 445) returns the same account data through the same RPC pipe that backup agents, inventory tools, and management consoles use daily — traffic blends into baseline.</p>
+<p><strong>Tool:</strong> <code>sam_honeypot_enum.c</code> (CYPFER) or Impacket's <code>samrdump.py</code></p>
+<pre><code class="language-bash"># From Kali — enumerate users via SAMR (no LDAP bind)
+python3 samrdump.py cadre.local/intern_blue:'1nt3rn_Blu3!'@192.168.77.10
+
+# Returns: samAccountName + lastLogon for every user
+# Also works for machine accounts (dollar sign)
+</code></pre>
+<p><strong>What SAMR returns:</strong></p>
+<ul>
+<li><code>samAccountName</code> — username</li>
+<li><code>lastLogon</code> — last authentication timestamp (FILETIME)</li>
+<li><code>logonCount</code> — total logon count</li>
+<li><code>passwordLastSet</code> — when password was last changed</li>
+<li><code>accountExpires</code> — expiration date</li>
+</ul>
+<p><strong>Test:</strong> Does SAMR enumeration generate fewer alerts than LDAP enumeration? Compare Zeek/Suricata output for both approaches.</p>
+<p><strong>Detection:</strong> Zeek <code>dce_rpc.log</code> — SAMR RPC calls from non-management hosts. Low confidence alone — needs correlation with other indicators.</p>
+<h3>Step 6 — Honeypot Detection via lastLogon ⏳</h3>
+<p><strong>Source:</strong> CYPFER Offensive Practice (2026-06-15)<br />
+<strong>MITRE:</strong> T1087.002 (Account Discovery: Domain Account)</p>
+<p>Honeytoken accounts are built to detect interaction — attractive names (<code>svc_backup_adm</code>, <code>sql_da</code>), elevated group memberships, but <strong>never authenticated</strong>. The <code>lastLogon</code> attribute exposes them:</p>
+<ul>
+<li><code>lastLogon = 0</code> (or <code>12/31/1600</code> in tools) = never authenticated = <strong>honeypot</strong></li>
+<li>Real privileged accounts always have authentication history</li>
+<li>Machine accounts (<code>$</code>) with <code>lastLogon = 0</code> are impossible — domain join requires authentication</li>
+<li>Check across multiple DCs — <code>lastLogon</code> is not replicated</li>
+</ul>
+<p><strong>Detection technique:</strong></p>
+<pre><code class="language-bash"># Enumerate via SAMR, filter for lastLogon = 0
+python3 samrdump.py cadre.local/intern_blue:'1nt3rn_Blu3!'@192.168.77.10 | grep &quot;Last Logon: 0&quot;
+
+# Or via LDAP (noisier):
+ldapsearch -x -H ldap://dc01.cadre.local -b &quot;DC=cadre,DC=local&quot; &quot;(&amp;(lastLogon=0)(!(objectClass=computer)))&quot; sAMAccountName
+</code></pre>
+<p><strong>Behavioral correlation:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Attribute</th>
+<th>Real Account</th>
+<th>Honeypot</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>lastLogon</td>
+<td>Recent timestamp</td>
+<td>0 or 12/31/1600</td>
+</tr>
+<tr>
+<td>logonCount</td>
+<td><code>&gt; 0</code></td>
+<td>0</td>
+</tr>
+<tr>
+<td>passwordLastSet</td>
+<td>Recent</td>
+<td>Never or old default</td>
+</tr>
+<tr>
+<td>groupMembership</td>
+<td>Used in practice</td>
+<td>Attractive but unused</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Test:</strong> Deploy honeytoken accounts in CADRE (Phase 5 defense exercise). Can we detect them via lastLogon before interacting?</p>
+<p><strong>Detection (defensive):</strong> Monitor LDAP queries targeting honeytoken accounts. ANY interaction = high-confidence alert. Deploy via plan1.7 EX-22.</p>
+<hr />
+<h3>Step 7 — ADeleg GUI Recon (Alternative to BloodHound) 🆕</h3>
+<p><strong>Tool:</strong> <a href="https://github.com/trimarc/ADeleg">ADeleg</a> (Windows GUI, single <code>.exe</code>). Source material at <code>CADRE-Courses/How to Find Insecure Active Directory Permissions with ADeleg/Episode 173 (wildcard).txt</code> (21,554 bytes).</p>
+<p><strong>Why this exists:</strong> Per the ADeleg podcast Episode 173:</p>
+<p><em>"adelec is an active directory delegation management tool ... it gets you almost the same amount of information that bloodhound gets you but with like a third of the hassle — you don't have to set up bloodhound, you don't have to run the sharp pound collector in your environment and trigger all your edr alerts, you don't have to set up docker to like set up the bloodhound ui and node for neoj"</em></p>
+<p><strong>Differentiators from BloodHound (Phase 4):</strong><br />
+- ✅ <strong>No SharpHound collector</strong> — avoids EDR alerts<br />
+- ✅ <strong>No Docker / Neo4j</strong> setup<br />
+- ✅ <strong>No LDAP bind required</strong> for full enumeration<br />
+- ✅ <strong>Pure Windows GUI</strong> — drop executable, click Connect<br />
+- ✅ <strong>Direct View by Trustee</strong> — maps directly to attacker perspective<br />
+- ⚠️ <strong>Trade-off:</strong> no graph visualization, no Cypher queries, no path-finding</p>
+<p><strong>Workflow:</strong></p>
+<pre><code class="language-powershell"># 1. Copy ADeleg.exe to a domain-joined Windows VM (mbr01, mbr02, or any DC)
+Copy-Item .\ADeleg.exe \\mbr01\C$\Tools\
+
+# 2. RDP to mbr01, double-click ADeleg.exe
+# 3. Click &quot;Connect&quot; — auto-authenticates as current user
+# 4. View → Index View By → Trustees (reorganizes UI)
+# 5. Select unsafe group on left (e.g., &quot;Authenticated Users&quot;)
+# 6. Review resources on right with &quot;Allow&quot; type + flagged permissions
+# 7. For ADCS: View by → Resources → Certificate Templates → check ESC1-8 markers
+</code></pre>
+<p><strong>"Unsafe users/groups" to check first (per article):</strong><br />
+- everyone<br />
+- authenticated users<br />
+- domain users<br />
+- domain computers<br />
+- domain join account (often over-permissioned — "i commonly see over permissioned")</p>
+<p><strong>"Unsafe permissions" flagged:</strong><br />
+- GenericAll / Full Control<br />
+- WriteAllProperties / WriteProperty<br />
+- WriteDacl / WriteOwner<br />
+- ForceChangePassword / ResetPassword<br />
+- Delete / CreateChild / DeleteChild<br />
+- AllExtendedRights (ADCS abuse)<br />
+- Apply-Group-Policy (GPO abuse)</p>
+<p><strong>Maps to:</strong><br />
+- <strong>Branch A (ACL Abuse)</strong> — visualizes the 14 ACEs from <code>05-ad-attack-surface.yml</code> BEFORE exploitation. Confirms playbook deployment worked.<br />
+- <strong>Branch B (ADCS)</strong> — visual scan of ESC1-17 templates from <code>08-adcs-deploy.yml</code> BEFORE <code>certipy find</code>. Identifies:<br />
+  - ESC4 (vulnerable template ACLs — WriteOwner/WriteDacl on cert template)<br />
+  - ESC1 (enrollee supplies subject + auth EKU)<br />
+  - ESC2 (any purpose EKU)<br />
+  - ESC3 (enrollment agent EKU)<br />
+- <strong>Phase 5 (Delegation)</strong> — surfaces unconstrained + constrained + RBCD delegation paths<br />
+- <strong>Phase 4 (BloodHound)</strong> — pre-recon verification (faster, lower-noise)</p>
+<p><strong>When to use ADeleg vs BloodHound:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Use case</th>
+<th>Tool</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Quick triage, no setup, avoid EDR</td>
+<td>ADeleg</td>
+</tr>
+<tr>
+<td>Deep path-finding, complex queries</td>
+<td>BloodHound</td>
+</tr>
+<tr>
+<td>ADCS misconfig discovery</td>
+<td>Both (ADeleg first, then <code>certipy find</code>)</td>
+</tr>
+<tr>
+<td>Reports with screenshots</td>
+<td>ADeleg (clean GUI)</td>
+</tr>
+<tr>
+<td>Reports with path graphs</td>
+<td>BloodHound (only option)</td>
+</tr>
+</tbody>
+</table>
+<p><strong>CADRE-specific notes:</strong><br />
+- Run ADeleg from mbr01 (domain-joined, less critical than DCs)<br />
+- Visualizes the 14 ACEs from <code>05-ad-attack-surface.yml</code>:<br />
+  - ACE#13-14 (eng_agentic → DC: GetChanges + All) — DCSync<br />
+  - ACE#18 (intern_blue → analyst_t2: ForceChangePassword) — Phase 2 path<br />
+  - ACE#20 (dir_operations → mbr01$: GenericWrite) — RBCD path<br />
+  - ACE#23 (analyst_osint → svc_naa: GenericAll) — Phase 8 path<br />
+  - + 10 more<br />
+- Surfaces ADCS ESC1-17 templates from <code>08-adcs-deploy.yml</code>:<br />
+  - ESC1-Template (vulnerable ESC1)<br />
+  - ESC2-Template<br />
+  - ESC3-Template<br />
+  - ESC4-Template (vulnerable ACLs)<br />
+- All 3 DCs (dc01, dc02, dc03) have over-permissioned defaults that ADeleg will surface</p>
+<p><strong>Detection (when defender monitors ADeleg recon):</strong></p>
+<ul>
+<li><strong>WinSec 4662</strong> (DS Object Access) — high volume of ACL reads in short period from one source</li>
+<li><strong>WinSec 4624 Type 3</strong> — auth from ADeleg source</li>
+<li><strong>Zeek LDAP queries</strong> — bulk <code>searchRequest</code> with <code>(objectClass=\*)</code> from single source IP</li>
+<li><strong>Sysmon EID 1</strong> — <code>ADeleg.exe</code> process creation (process name visible)</li>
+<li><strong>Suricata new SID (propose 1000102):</strong> Bulk LDAP queries from single source IP, large ACL-read pattern</li>
+<li><strong>Elastic KQL</strong> (cardinality alert):</li>
+</ul>
+<pre><code class="language-kql">event.code:4662 AND winlog.event_data.SubjectUserName:*
+| where cardinality(winlog.event_data.SubjectUserName) &gt; 100
+</code></pre>
+<p><strong>Cross-references:</strong><br />
+- Phase 4 (BloodHound) — pre-BloodHound scan<br />
+- Branch A (ACL Abuse — 14 ACEs) — visual confirmation<br />
+- Branch B (ADCS ESC1-17) — visual scan of vulnerable templates<br />
+- See Campaign_suggestions.md #99 (full entry with reasoning + alternative analysis)</p>
+<hr />
+<hr />
+<h2>Navigation</h2>
+<p>Next: <a href="CAMPAIGNS-RUNBOOK-1.md"><code>CAMPAIGNS-RUNBOOK-1.md</code></a> →</p></body></html>

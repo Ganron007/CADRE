@@ -1,0 +1,16 @@
+{
+  "size": 5,
+  "sort": [{"@timestamp": "desc"}],
+  "query": {
+    "bool": {
+      "must": [
+        {"range": {"@timestamp": {"gte": "now-10m"}}},
+        {"wildcard": {"host.name": "mbr01*"}},
+        {"bool": {"should": [
+          {"term": {"destination.port": 1433}},
+          {"match": {"network.direction": "ingress"}}
+        ], "minimum_should_match": 1}}
+      ]
+    }
+  }
+}

@@ -120,6 +120,12 @@
       changed_when: r.rc == 2
       failed_when: r.rc == 1
 
+    - name: "[PREP] Ensure DNS service is running and set to automatic"
+      ansible.windows.win_service:
+        name: DNS
+        start_mode: auto
+        state: started
+
 - name: "dc02 — Install AD-DS + promote child.cadre.local domain"
   hosts: dc02
   gather_facts: false
@@ -234,6 +240,12 @@
       changed_when: r.rc == 2
       failed_when: r.rc == 1
 
+    - name: "[PREP] Ensure DNS service is running and set to automatic"
+      ansible.windows.win_service:
+        name: DNS
+        start_mode: auto
+        state: started
+
 - name: "dc03 — Install AD-DS + promote range.local forest"
   hosts: dc03
   gather_facts: false
@@ -345,6 +357,12 @@
       register: r
       changed_when: r.rc == 2
       failed_when: r.rc == 1
+
+    - name: "[PREP] Ensure DNS service is running and set to automatic"
+      ansible.windows.win_service:
+        name: DNS
+        start_mode: auto
+        state: started
 
 - name: "Create forest trust — cadre.local side"
   hosts: dc01

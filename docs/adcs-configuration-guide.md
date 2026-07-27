@@ -1,6 +1,8 @@
 # ADCS Configuration Guide — Manual Path
 
-**Status:** ADCS CA `cadre-CA` IS running on dc01 and all ESC templates are published (18/18 checks pass in `08-adcs-verify.yml`). This document is the tested and verified manual recipe used to configure it. Use it to re-deploy from scratch or to understand the full ADCS setup sequence.
+**Status:** ADCS CA `cadre-CA` IS running on dc01 and all ESC templates are published (18/18 checks pass in `08-adcs-verify.yml`). This document is the tested and verified **manual recipe** used to configure it. Ansible verify playbooks were written **after** this setup to reflect live state — they do not install ADCS or create templates.
+
+Use it to re-deploy from scratch or to understand the full ADCS setup sequence.
 
 **Target:** `dc01.cadre.local` (Domain Controller + Enterprise Root CA)
 **Goal:** Create + publish 9 vulnerable ADCS templates (CADRE-ESC1 through CADRE-ESC15) to enable ESC1-ESC15 attack surface for CESP-ADCS / HTB CAPE / CRTE coverage

@@ -1,0 +1,22 @@
+{
+  "size": 1,
+  "sort": [{ "@timestamp": "desc" }],
+  "query": {
+    "bool": {
+      "must": [
+        { "range": { "@timestamp": { "gte": "2026-07-25T04:45:03Z" } } },
+        { "term": { "suricata.eve.alert.signature_id": 1000025 } }
+      ]
+    }
+  },
+  "_source": [
+    "@timestamp",
+    "source.ip",
+    "destination.ip",
+    "destination.port",
+    "suricata.eve.alert.signature_id",
+    "suricata.eve.alert.signature",
+    "suricata.eve.dns.rrname",
+    "suricata.eve.dns.rrtype"
+  ]
+}

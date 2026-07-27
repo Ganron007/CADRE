@@ -79,6 +79,44 @@
       changed_when: false
       failed_when: r.rc == 1
 
+    - name: "[SQL] Mixed mode auth enabled (verify)"
+      ansible.windows.win_shell: |
+        $ErrorActionPreference = "Stop"
+        try {
+          $regPath = "HKLM:\SOFTWARE\Microsoft\Microsoft SQL Server\MSSQL16.SQLEXPRESS\MSSQLServer"
+          $val = (Get-ItemProperty -Path $regPath -Name "LoginMode" -ErrorAction Stop).LoginMode
+          if ($val -eq 2) { Write-Output "PASS: Mixed mode auth enabled (LoginMode=2)"; exit 0 }
+          Write-Output "FAIL: expected LoginMode=2 got $val"; exit 1
+        } catch { Write-Output "FAIL: mixed mode check error: $_"; exit 1 }
+      register: r
+      changed_when: false
+      failed_when: r.rc == 1
+
+    - name: "[SQL] SA login enabled (verify)"
+      ansible.windows.win_shell: |
+        $ErrorActionPreference = "Stop"
+        try {
+          $r = Invoke-Sqlcmd -ServerInstance "localhost\SQLEXPRESS" -Query "SELECT name, is_disabled FROM sys.server_principals WHERE name = 'sa'" -ErrorAction SilentlyContinue
+          if ($r.is_disabled -eq 0) { Write-Output "PASS: SA login enabled"; exit 0 }
+          Write-Output "FAIL: SA login disabled"; exit 1
+        } catch { Write-Output "FAIL: SA check error: $_"; exit 1 }
+      register: r
+      changed_when: false
+      failed_when: r.rc == 1
+
+    - name: "[SQL] SQL logins exist (svc_mssql, analyst_t1) (verify)"
+      ansible.windows.win_shell: |
+        $ErrorActionPreference = "Stop"
+        try {
+          $r = Invoke-Sqlcmd -ServerInstance "localhost\SQLEXPRESS" -Query "SELECT name, type_desc FROM sys.server_principals WHERE name IN ('svc_mssql', 'analyst_t1') AND type_desc = 'SQL_LOGIN'" -ErrorAction SilentlyContinue
+          $count = ($r | Measure-Object).Count
+          if ($count -ge 2) { Write-Output "PASS: SQL logins exist (svc_mssql, analyst_t1)"; exit 0 }
+          Write-Output "FAIL: expected 2 SQL logins got $count"; exit 1
+        } catch { Write-Output "FAIL: SQL login check error: $_"; exit 1 }
+      register: r
+      changed_when: false
+      failed_when: r.rc == 1
+
 # =============================================================================
 # SQL + WSUS Verification — mbr02 (range.local)
 # =============================================================================

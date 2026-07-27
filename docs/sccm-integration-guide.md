@@ -1,6 +1,8 @@
 # SCCM Integration Guide — Manual Path
 
-**Status:** SCCM site CAD IS deployed on mbr02 and verified (7/7 checks pass in `10-sccm-verify.yml`). This document is the tested and verified manual recipe used to deploy it. Use it to re-deploy from scratch or to understand the full install sequence.
+**Status:** SCCM site CAD IS deployed on mbr02 and verified (7/7 checks pass in `10-sccm-verify.yml`). This document is the tested and verified **manual recipe** used to deploy it. Ansible verify playbooks were written **after** this setup to reflect live state — they do not install SCCM.
+
+Use it to re-deploy from scratch or to understand the full install sequence.
 
 **Target:** `mbr02.range.local` (Windows Server 2025)
 **Goal:** Install SCCM Current Branch (2509) with full Misconfiguration-Manager attack surface for WKL OADOC Section 51 "Abusing SCCM in Active Directory Environments"

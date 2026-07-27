@@ -251,15 +251,16 @@
       ignore_errors: true
 
     - name: Verify ILM policy exists
-      ansible.builtin.uri:
-        url: "http://127.0.0.1:{{ es_port }}/_ilm/policy/cadre-3d-retain"
-        method: GET
-        user: elastic
-        password: "{{ elastic_password }}"
-        force_basic_auth: true
-        status_code: [200, 404]
+      ansible.builtin.shell: |
+        failed=0
+        for pol in logs@lifecycle cadre-3d-retain; do
+          code=$(curl -s -o /dev/null -w "%{http_code}" -u "elastic:{{ elastic_password }}" "http://127.0.0.1:{{ es_port }}/_ilm/policy/$pol")
+          [ "$code" = "200" ] || { echo "FAIL: ILM policy $pol missing (HTTP $code)"; failed=1; }
+        done
+        [ "$failed" -eq 0 ] && echo "PASS: all ILM policies exist" || echo "FAIL: some ILM policies missing"
+      changed_when: false
+      failed_when: false
       register: ilm_policy_check
-      failed_when: ilm_policy_check.status == 404
 
     - name: Verify ILM component templates exist
       ansible.builtin.shell: |
@@ -539,6 +540,20 @@
       failed_when: >
         pkg_suricata_mon.json['items'] | selectattr('name', 'equalto', 'suricata-cadre-mon') | list | length == 0
 
+    - name: Verify Zeek Notice integration exists in CADRE-Monitor
+      ansible.builtin.uri:
+        url: "http://127.0.0.1:{{ kibana_port }}/api/fleet/package_policies"
+        method: GET
+        user: elastic
+        password: "{{ elastic_password }}"
+        force_basic_auth: true
+        headers:
+          kbn-xsrf: "true"
+        status_code: 200
+      register: pkg_zeek_notice_mon
+      failed_when: >
+        pkg_zeek_notice_mon.json['items'] | selectattr('name', 'equalto', 'zeek-cadre-notice-1') | list | length == 0
+
     - name: Verify CADRE-All enrollment API key exists
       ansible.builtin.uri:
         url: "http://127.0.0.1:{{ kibana_port }}/api/fleet/enrollment_api_keys"
@@ -747,7 +762,8 @@
 
 
 
-- name: "Play 3 — Verify Elastic Agent enrollment on Windows VMs"
+# ws01 is on CADRE-All with other Windows VMs (no CADRE-WS01 policy). Detailed checks also in 17-ws01-deploy-verifyOnly.yml.
+- name: "Play 3 — Verify Elastic Agent enrollment on Windows VMs (CADRE-All; includes ws01)"
   hosts: windows_servers
   gather_facts: true
   vars:

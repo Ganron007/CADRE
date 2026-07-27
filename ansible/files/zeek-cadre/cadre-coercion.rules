@@ -1,0 +1,31 @@
+# CADRE Coercion Detection Rules (Spec A.2)
+# SID range: 1000050-1000059
+# Deployment: 13-net-monitor.yml (suricata-rule-files list)
+
+# MS-RPRN (spoolss) — TCP dynamic ports (direct TCP, not SMB pipe)
+# UUID: 12345678-1234-ABCD-EF00-0123456789AB
+# Confirmed opnums from pcap: 1 (RpcRemoteFindFirstPrinterChangeNotification), 65 (RpcRemoteFindFirstPrinterChangeNotificationEx)
+alert dcerpc any any -> $HOME_NET any (msg:"CADRE Coercion MS-RPRN attempt"; dcerpc.iface:12345678-1234-ABCD-EF00-0123456789AB; dcerpc.opnum:1,65; sid:1000050; rev:1;)
+
+# MS-DFSNM (netdfs) — SMB named pipe (\PIPE\netdfs)
+# UUID: 4fc742e0-4a10-11cf-8273-00aa004ae673
+# Opnum 12: NetrDfsAddStdRoot (per MS-DFSNM spec)
+alert dcerpc any any -> $HOME_NET 445 (msg:"CADRE Coercion MS-DFSNM attempt"; dcerpc.iface:4fc742e0-4a10-11cf-8273-00aa004ae673; dcerpc.opnum:12; sid:1000051; rev:1;)
+
+# MS-FSRVP (FileServerVssAgent) — SMB named pipe
+# UUID: a8e0653c-2744-4389-a61d-7373df8b2292
+# Opnum 7: IsPathSupported, Opnum 8: IsPathShadowCopied (per MS-FSRVP spec)
+alert dcerpc any any -> $HOME_NET 445 (msg:"CADRE Coercion MS-FSRVP attempt"; dcerpc.iface:a8e0653c-2744-4389-a61d-7373df8b2292; dcerpc.opnum:7,8; sid:1000052; rev:1;)
+
+# MS-EFSR (Encrypting File System Remote) — SMB named pipe (\PIPE\efsrpc)
+# UUID: c681d488-0000-0000-c000-000000000046
+# NOTE: \PIPE\efsrpc not accessible on Server 2025 — rule included for completeness
+alert dcerpc any any -> $HOME_NET 445 (msg:"CADRE Coercion MS-EFSR attempt"; dcerpc.iface:c681d488-0000-0000-c000-000000000046; sid:1000053; rev:1;)
+
+# ============================================================
+# Development test rules (commented out — uncomment for debugging)
+# ============================================================
+# alert dcerpc any any -> $HOME_NET any (msg:"TEST dcerpc to HOME_NET"; sid:1000056; rev:1;)
+# alert dcerpc any any -> any any (msg:"TEST dcerpc any dir"; sid:1000057; rev:1;)
+# alert dcerpc any any -> $HOME_NET any (msg:"TEST dcerpc opnum=3"; dcerpc.opnum:3; sid:1000058; rev:1;)
+# alert dcerpc any any -> $HOME_NET 49674 (msg:"TEST MS-RPRN opnum=65"; dcerpc.opnum:65; sid:1000059; rev:1;)

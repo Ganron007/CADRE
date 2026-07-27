@@ -1,0 +1,40 @@
+# CADRE Supply-Chain Detection Rules (Plan 0.8 / Phase C)
+# Detects network patterns from NPM-Threat-Emulation scenarios
+# Maps to: npm-001, npm-002, npm-005, npm-006, npm-007, npm-010
+# SID range: 1000030-1000049 (CADRE custom, Phase C)
+# Deploy: ansible/files/zeek-cadre/cadre-supplychain.rules
+
+# === Scenario 1: Malicious postinstall POSTs to webhook ===
+# npm-010 equivalent: HTTP POST to non-lab host (exfil indicator)
+alert http any any -> any any (msg:"CADRE SUPPLYCHAIN HTTP POST to non-lab host (possible webhook exfil)"; http.method; content:"POST"; sid:1000030; rev:1; classtype:trojan-activity;)
+
+# npm-001 network complement: HTTP POST with suspicious content-type
+alert http any any -> any any (msg:"CADRE SUPPLYCHAIN HTTP POST with webhook content-type"; http.method; content:"POST"; http.content_type; pcre:"/(json|form|xml)/i"; sid:1000031; rev:1; classtype:trojan-activity;)
+
+# === Scenario 2: TruffleHog download from GitHub ===
+# npm-002 network complement: HTTP to GitHub trufflesecurity
+alert http any any -> any any (msg:"CADRE SUPPLYCHAIN HTTP request to GitHub trufflesecurity (TruffleHog)"; http.host; content:"github.com"; http.uri; pcre:"/trufflehog|trufflesecurity/i"; sid:1000035; rev:1; classtype:trojan-activity;)
+
+# TruffleHog binary download indicator
+alert http any any -> any any (msg:"CADRE SUPPLYCHAIN TruffleHog binary download detected"; http.host; content:"github.com"; http.uri; pcre:"/trufflehog.*\.tar\.gz|trufflehog.*\.zip|trufflehog.*linux|trufflehog.*darwin/i"; sid:1000036; rev:1; classtype:trojan-activity;)
+
+# === Scenario 5: Multi-stage /tmp download+exec ===
+# npm-005 network complement: HTTP download to /tmp
+alert http any any -> any any (msg:"CADRE SUPPLYCHAIN HTTP download with /tmp path in URI"; http.uri; pcre:"/\/tmp\/|\\temp\\|stage[12]/i"; sid:1000040; rev:1; classtype:trojan-activity;)
+
+# Suspicious executable content-type from non-standard source
+alert http any any -> any any (msg:"CADRE SUPPLYCHAIN Executable download from non-standard source"; http.content_type; pcre:"/(x-executable|x-sharedlib|octet-stream)/i"; sid:1000041; rev:1; classtype:trojan-activity;)
+
+# === Scenario 6: npm publish worm ===
+# npm-006 network complement: POST to npm registry
+alert http any any -> any any (msg:"CADRE SUPPLYCHAIN HTTP POST to npm registry (possible publish)"; http.method; content:"POST"; http.host; pcre:"/registry\.npmjs\.org|registry\.yarnpkg\.com/i"; sid:1000045; rev:1; classtype:trojan-activity;)
+
+# npm publish with authentication header
+alert http any any -> any any (msg:"CADRE SUPPLYCHAIN npm publish with auth header"; http.method; content:"POST"; http.host; pcre:"/registry\.npmjs\.org/i"; http.header; content:"Authorization"; nocase; sid:1000046; rev:1; classtype:trojan-activity;)
+
+# === Scenario 7: Cloud metadata probe ===
+# npm-007: Connection attempt to cloud metadata endpoint
+alert http any any -> any any (msg:"CADRE SUPPLYCHAIN HTTP request to cloud metadata endpoint (169.254.169.254)"; http.host; content:"169.254.169.254"; sid:1000048; rev:1; classtype:attempted-user;)
+
+# Cloud metadata via DNS resolution
+alert dns any any -> any 53 (msg:"CADRE SUPPLYCHAIN DNS query for cloud metadata endpoint"; dns.query; content:"169.254.169.254"; sid:1000049; rev:1; classtype:attempted-user;)

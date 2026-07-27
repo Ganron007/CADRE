@@ -1,0 +1,11 @@
+{
+  "size": 0,
+  "query": {
+    "bool": {
+      "must": [
+        {"range": {"@timestamp": {"gte": "now-20m"}}},
+        {"term": {"suricata.eve.alert.signature_id": 1000025}}
+      ]
+    }
+  }
+}

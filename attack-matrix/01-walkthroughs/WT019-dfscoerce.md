@@ -1,4 +1,6 @@
-# WT#019 — DFSCoerce
+# ~~WT#019 — DFSCoerce~~
+
+> **❌ NON-FUNCTIONAL in detection scope.** SMB-pipe DCE-RPC (MS-DFSNM) cannot be detected by Suricata 8.0.5 `dcerpc` keywords (app_proto:"smb"). Zeek `dce_rpc_request` events do not fire for SMB-encapsulated DCE-RPC. Preserved for reference; use WT017 (PrinterBug) for confirmed detection.
 
 ## Metadata
 | Field | Value |

@@ -95,8 +95,10 @@
         data: 31
         type: dword
 
-- name: "Deploy registry vulnerabilities on all Windows VMs"
-  hosts: windows_servers
+# ws01 is the Windows beachhead (Elastic CADRE-All; no MDE). Soft Defender lives in 17-ws01-deploy.yml.
+# Keep ws01 out of this hard vuln strip (WDigest / CG / LSA / full Defender kill).
+- name: "Deploy registry vulnerabilities on Windows VMs (exclude ws01 beachhead)"
+  hosts: windows_servers:!ws01
   gather_facts: false
   tasks:
     - name: "[VULN] WDigest credential caching enabled"
@@ -138,26 +140,97 @@
         data: 0
         type: dword
 
-    - name: "[VULN] Windows Defender real-time monitoring disabled"
+    - name: "[VULN][WT#H] RDP enabled (fDenyTSConnections=0)"
+      ansible.windows.win_regedit:
+        path: HKLM:\System\CurrentControlSet\Control\Terminal Server
+        name: fDenyTSConnections
+        data: 0
+        type: dword
+
+    - name: "[VULN][WT#H] RDP firewall rule enabled"
       ansible.windows.win_shell: |
         $ErrorActionPreference = "Stop"
         try {
-          # Check if already disabled via Policy registry key (survives reboot)
+          $rule = Get-NetFirewallRule -DisplayGroup "Remote Desktop" -ErrorAction SilentlyContinue
+          if (-not $rule) { Write-Output "SKIP: RDP firewall group not found"; exit 0 }
+          $enabled = $rule | Where-Object { $_.Enabled -eq $true }
+          if ($enabled) { Write-Output "OK: RDP firewall already enabled"; exit 0 }
+          Enable-NetFirewallRule -DisplayGroup "Remote Desktop"
+          $v = Get-NetFirewallRule -DisplayGroup "Remote Desktop" | Where-Object { $_.Enabled -eq $true }
+          if (-not $v) { throw "Firewall rule not enabled" }
+          Write-Output "APPLIED: RDP firewall rule enabled"; exit 2
+        } catch { Write-Output "FAILED: $_"; exit 1 }
+      register: r
+      changed_when: r.rc == 2
+      failed_when: r.rc == 1
+
+    # Lab attack paths (SQL/LDAP/SMB) expect host firewall OFF on servers. ws01 excluded (MDE baseline).
+    - name: "[VULN] Windows Firewall profiles disabled (lab servers — not ws01)"
+      ansible.windows.win_shell: |
+        $ErrorActionPreference = "Stop"
+        try {
+          $enabled = Get-NetFirewallProfile | Where-Object { $_.Enabled -eq $true }
+          if (-not $enabled) { Write-Output "OK: All firewall profiles already disabled"; exit 0 }
+          Set-NetFirewallProfile -Profile Domain,Public,Private -Enabled False
+          $still = Get-NetFirewallProfile | Where-Object { $_.Enabled -eq $true }
+          if ($still) { throw ("Still enabled: " + ($still.Name -join ',')) }
+          Write-Output "APPLIED: Firewall profiles Domain/Public/Private disabled"; exit 2
+        } catch { Write-Output "FAILED: $_"; exit 1 }
+      register: r_fw
+      changed_when: r_fw.rc == 2
+      failed_when: r_fw.rc == 1
+
+    - name: "[VULN] Windows Defender fully disabled (Server 2025 compatible)"
+      ansible.windows.win_shell: |
+        $ErrorActionPreference = "Stop"
+        try {
+          # Check if already disabled
           $polPath = "HKLM:\SOFTWARE\Policies\Microsoft\Windows Defender"
           $pol = Get-ItemProperty -Path $polPath -Name "DisableAntiSpyware" -ErrorAction SilentlyContinue
-          if ($pol.DisableAntiSpyware -eq 1) { Write-Output "OK: Defender already disabled via Policy"; exit 0 }
-          # Check via MpPreference
-          $mp = Get-MpPreference -ErrorAction SilentlyContinue
-          if ($mp.DisableRealtimeMonitoring -eq $true -and $mp.DisableIntrusionPreventionSystem -eq $true -and $mp.DisableScriptScanning -eq $true) {
-            Write-Output "OK: Defender already disabled"; exit 0
-          }
-          # Apply — Policy key + MpPreference
+          if ($pol.DisableAntiSpyware -eq 1) { Write-Output "OK: Defender already disabled"; exit 0 }
+
+          # Step 1: Disable Tamper Protection (critical — Server 2025 rejects all changes without this)
+          $tpPath = "HKLM:\SOFTWARE\Microsoft\Windows Defender\Features"
+          Set-ItemProperty -Path $tpPath -Name "TamperProtection" -Value 0 -Type DWord -Force
+
+          # Step 2: Stop and disable the service
+          Set-Service WinDefend -StartupType Disabled -ErrorAction SilentlyContinue
+          Stop-Service WinDefend -Force -ErrorAction SilentlyContinue
+
+          # Step 3: Policy registry keys
           New-Item -Path $polPath -Force | Out-Null
-          New-ItemProperty -Path $polPath -Name "DisableAntiSpyware" -Value 1 -PropertyType DWORD -Force
-          Set-MpPreference -DisableRealtimeMonitoring $true -DisableIntrusionPreventionSystem $true -DisableScriptScanning $true -ErrorAction SilentlyContinue
+          New-ItemProperty -Path $polPath -Name "DisableAntiSpyware" -Value 1 -Type DWord -Force
+
+          $rtp = Join-Path $polPath "Real-Time Protection"
+          New-Item -Path $rtp -Force | Out-Null
+          New-ItemProperty -Path $rtp -Name "DisableRealtimeMonitoring" -Value 1 -Type DWord -Force
+          New-ItemProperty -Path $rtp -Name "DisableBehaviorMonitoring" -Value 1 -Type DWord -Force
+          New-ItemProperty -Path $rtp -Name "DisableOnAccessProtection" -Value 1 -Type DWord -Force
+          New-ItemProperty -Path $rtp -Name "DisableIOAVProtection" -Value 1 -Type DWord -Force
+
+          # Step 4: MpPreference — all protection layers
+          Set-MpPreference -DisableRealtimeMonitoring $true -ErrorAction SilentlyContinue
+          Set-MpPreference -DisableBehaviorMonitoring $true -ErrorAction SilentlyContinue
+          Set-MpPreference -DisableIntrusionPreventionSystem $true -ErrorAction SilentlyContinue
+          Set-MpPreference -DisableScriptScanning $true -ErrorAction SilentlyContinue
+          Set-MpPreference -DisableIOAVProtection $true -ErrorAction SilentlyContinue
+          Set-MpPreference -DisableBlockAtFirstSeen $true -ErrorAction SilentlyContinue
+          Set-MpPreference -DisableArchiveScanning $true -ErrorAction SilentlyContinue
+          Set-MpPreference -MAPSReporting 0 -ErrorAction SilentlyContinue
+          Set-MpPreference -SubmitSamplesConsent 0 -ErrorAction SilentlyContinue
+          Set-MpPreference -PUAProtection 0 -ErrorAction SilentlyContinue
+          Set-MpPreference -ScanScheduleDay 8 -ErrorAction SilentlyContinue
+
+          # Step 5: Spynet / cloud reporting off
+          $spynet = Join-Path $polPath "SpyNet"
+          New-Item -Path $spynet -Force | Out-Null
+          New-ItemProperty -Path $spynet -Name "SpynetReporting" -Value 0 -Type DWord -Force
+          New-ItemProperty -Path $spynet -Name "SubmitSamplesConsent" -Value 0 -Type DWord -Force
+
+          # Verify
           $vPol = Get-ItemProperty -Path $polPath -Name "DisableAntiSpyware" -ErrorAction Stop
           if ($vPol.DisableAntiSpyware -ne 1) { throw "Policy registry not applied" }
-          Write-Output "APPLIED: Defender disabled (policy + preferences). Reboot required."; exit 2
+          Write-Output "APPLIED: Defender fully disabled. Reboot required."; exit 2
         } catch { Write-Output "FAILED: Defender — $_"; exit 1 }
       register: r
       changed_when: r.rc == 2
@@ -202,8 +275,9 @@
         data: 0
         type: dword
 
-- name: "DNS fix — adapter DNS + gateway cleanup"
-  hosts: windows_servers
+# ws01 DNS/gateway is owned by 17-ws01-deploy.yml (dc02 = 192.168.77.11). Do not rewrites here.
+- name: "DNS fix — adapter DNS + gateway cleanup (exclude ws01)"
+  hosts: windows_servers:!ws01
   gather_facts: false
   tasks:
     - name: "Detect adapters — domain (vmnet2) vs NAT"

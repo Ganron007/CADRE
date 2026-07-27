@@ -1,0 +1,40 @@
+{
+  "credentials": {
+    "analyst_t1": {
+      "username": "analyst_t1",
+      "password": "T13r_An@lyst!",
+      "domain": "child.cadre.local",
+      "source": "seed",
+      "notes": "Assumed-breach identity — never use vagrant as attack identity"
+    },
+    "intern_blue": {
+      "username": "intern_blue",
+      "password": "1nt3rn_BLu3!",
+      "domain": "child.cadre.local",
+      "source": "seed",
+      "notes": "Lab known password — also earned via AS-REP in live runs"
+    },
+    "svc_mssql": {
+      "username": "svc_mssql",
+      "password": null,
+      "domain": "child.cadre.local",
+      "source": "seed",
+      "notes": "Password filled after Kerberoast crack"
+    },
+    "krbtgt": {
+      "username": "krbtgt",
+      "password": null,
+      "nt_hash": null,
+      "domain": "child.cadre.local",
+      "source": "seed",
+      "notes": "Filled after T009 DCSync"
+    },
+    "svc_naa": {
+      "username": "svc_naa",
+      "password": null,
+      "domain": "range.local",
+      "source": "seed",
+      "notes": "Branch C NAA — filled after WT034"
+    }
+  }
+}

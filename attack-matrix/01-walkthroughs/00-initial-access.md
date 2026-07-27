@@ -12,7 +12,7 @@
 | **MITRE ATT&CK** | T1046 (Network Service Discovery), T1595 (Active Scanning) |
 | **Difficulty** | Easy |
 
-This is the entry point for the whole matrix. Every other walkthrough assumes you have done this once: mapped the network, configured Kerberos, and confirmed you can authenticate. Tools are **not** deployed by CADRE — bring your own (see [`../attack-tools-required.md`](../attack-tools-required.md)).
+This is the entry point for the whole matrix. Every other walkthrough assumes you have done this once: mapped the network, configured Kerberos, and confirmed you can authenticate. Tools are **not** deployed by CADRE — bring your own (see [`../Campaign/attack-tools-required.md`](../Campaign/attack-tools-required.md)).
 
 ## Prerequisites
 

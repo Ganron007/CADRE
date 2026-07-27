@@ -1,3 +1,8 @@
+# ───────────────────────── In-tree tools (nested git) ───────────────────────
+# Same pattern as CADRE-DarkAI/tools/praxis — commit inside each tool's .git
+tools/dfir-nexus/
+tools/red-strike/
+
 # ───────────────────────── Internal / never-publish ─────────────────────────
 docs/internal/
 AGENTS.md
@@ -46,3 +51,7 @@ ansible/roles/cloud/files/AADConnectProvisioningAgentSetup.exe
 *.swo
 Thumbs.db
 .DS_Store
+
+# Local RITA/docker image tarballs (too large for git)
+ansible/files/rita-images/
+

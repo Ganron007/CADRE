@@ -1,0 +1,78 @@
+# Optional — join provisioning (.60) to child.cadre.local for Plan 1.1 linux beachhead.
+# DEFAULT OFF. Does not run in cadre.py install loop.
+#
+# Enable:
+#   export CADRE_PROVISIONING_DOMAIN_JOIN=1
+#   ansible-playbook -i inventories/hosts playbooks/18-provisioning-domain-join.yml
+#
+# Constraints (Plan 1.1):
+#   - Keep SSH config lane as local vagrant (never require domain auth for cadre.py)
+#   - Lab DNS on vmnet2 NIC only; NAT stays for apt
+#   - Do NOT install monitoring agents on provisioning
+#   - Attack identity = child\analyst_t1; config identity = vagrant
+
+- name: "provisioning — optional domain join (Plan 1.1 linux beachhead)"
+  hosts: provisioning
+  gather_facts: true
+  become: true
+  vars:
+    cadre_prov_join_enabled: "{{ lookup('env', 'CADRE_PROVISIONING_DOMAIN_JOIN') | default('0', true) }}"
+    join_domain: "child.cadre.local"
+    join_user: "administrator@CHILD.CADRE.LOCAL"
+    join_password: "Ch1ld_D0m@1n!"
+    lab_dns: "192.168.77.11"
+  tasks:
+    - name: "Skip unless CADRE_PROVISIONING_DOMAIN_JOIN=1"
+      ansible.builtin.assert:
+        that:
+          - cadre_prov_join_enabled | string == "1"
+        fail_msg: >-
+          Refusing to domain-join provisioning. Set CADRE_PROVISIONING_DOMAIN_JOIN=1
+          to enable this optional Plan 1.1 linux beachhead playbook.
+        success_msg: "CADRE_PROVISIONING_DOMAIN_JOIN=1 — proceeding with optional join"
+
+    - name: "Install realmd / sssd packages"
+      ansible.builtin.apt:
+        name:
+          - realmd
+          - sssd
+          - sssd-tools
+          - libnss-sss
+          - libpam-sss
+          - adcli
+          - packagekit
+          - krb5-user
+        state: present
+        update_cache: true
+
+    - name: "Ensure lab DNS resolvers hint (do not rewrite NAT)"
+      ansible.builtin.debug:
+        msg: >-
+          Ensure vmnet2 NIC uses {{ lab_dns }} (dc02) via existing netplan 60-dns.yaml pattern.
+          Do not point NAT DHCP DNS at the DC.
+
+    - name: "Join child.cadre.local if not already joined"
+      ansible.builtin.shell: |
+        set -euo pipefail
+        if realm list 2>/dev/null | grep -qi "{{ join_domain }}"; then
+          echo "OK: Already domain-joined to {{ join_domain }}"
+          exit 0
+        fi
+        if realm list 2>/dev/null | grep -qi "cadre.local"; then
+          echo "WARN: Joined to another realm — inspect 'realm list' before re-joining"
+          exit 1
+        fi
+        echo "{{ join_password }}" | realm join --user "{{ join_user }}" "{{ join_domain }}" -v
+        realm list | grep -qi "{{ join_domain }}" || { echo "FAIL: realm join did not stick"; exit 1; }
+        echo "APPLIED: Domain-joined to {{ join_domain }}"
+      args:
+        executable: /bin/bash
+      register: r_join
+      changed_when: "'APPLIED' in r_join.stdout"
+      failed_when: r_join.rc != 0
+
+    - name: "Remind: config lane stays vagrant"
+      ansible.builtin.debug:
+        msg: >-
+          Domain join complete. Keep SSH/Ansible as vagrant for cadre.py.
+          Attack lane: child\\analyst_t1 / Kerberos. No monitoring agents on this host.

@@ -2,6 +2,9 @@
 # CADRE environment variables — sourced by all attack scripts
 # Usage: source lib/cadre-env.sh
 
+# Impacket / local tools (pip --user on provisioning)
+export PATH="${HOME}/.local/bin:/usr/local/bin:${PATH}"
+
 # Network
 export DC01="192.168.77.10"
 export DC02="192.168.77.11"

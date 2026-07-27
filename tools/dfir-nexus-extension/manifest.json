@@ -1,0 +1,23 @@
+{
+  "manifest_version": 3,
+  "name": "DFIR-Nexus Capture",
+  "version": "1.0.0",
+  "description": "Capture console API traffic into DFIR-Nexus push ingest (E.0.2)",
+  "permissions": ["storage", "activeTab"],
+  "host_permissions": ["<all_urls>"],
+  "background": {
+    "service_worker": "serviceWorker.js"
+  },
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "DFIR-Nexus Capture"
+  },
+  "content_scripts": [
+    {
+      "matches": ["<all_urls>"],
+      "js": ["pageHook.js"],
+      "run_at": "document_start",
+      "world": "MAIN"
+    }
+  ]
+}

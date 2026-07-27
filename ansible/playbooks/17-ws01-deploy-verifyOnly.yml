@@ -1,0 +1,310 @@
+---
+# TYPE: VERIFY-ONLY
+# 17-ws01-deploy-verifyOnly.yml — Verify the deployed state of ws01
+# Targets: ws01 (192.168.77.62)
+# This playbook does NOT make changes. It fails if the expected state is missing.
+# Config lane: vagrant/vagrant WinRM (basic).
+
+# =============================================================================
+# Play 0: Verify WinRM lab listener
+# =============================================================================
+- name: "ws01 — Verify WinRM HTTP/Basic + FW 5985"
+  hosts: ws01
+  gather_facts: false
+  tasks:
+    - name: "[VERIFY] WinRM service running"
+      ansible.windows.win_shell: |
+        if ((Get-Service WinRM).Status -eq 'Running') { Write-Output 'OK' } else { throw 'WinRM not running' }
+
+    - name: "[VERIFY] Basic + AllowUnencrypted enabled"
+      ansible.windows.win_shell: |
+        $basic = (Get-Item WSMan:\localhost\Service\Auth\Basic).Value
+        $unenc = (Get-Item WSMan:\localhost\Service\AllowUnencrypted).Value
+        if ("$basic" -ne 'true' -and $basic -ne $true) { throw "Basic=$basic" }
+        if ("$unenc" -ne 'true' -and $unenc -ne $true) { throw "AllowUnencrypted=$unenc" }
+        Write-Output 'OK: Basic + AllowUnencrypted'
+
+    - name: "[VERIFY] Inbound TCP 5985 allowed (CADRE or built-in WinRM rule)"
+      ansible.windows.win_shell: |
+        $cadre = Get-NetFirewallRule -DisplayName 'CADRE-WinRM-HTTP-5985' -ErrorAction SilentlyContinue |
+          Where-Object { $_.Enabled -eq 'True' -or $_.Enabled -eq $true }
+        $builtin = Get-NetFirewallRule -DisplayGroup 'Windows Remote Management' -ErrorAction SilentlyContinue |
+          Where-Object { $_.Enabled -eq 'True' -or $_.Enabled -eq $true }
+        if (-not $cadre -and -not $builtin) { throw 'No enabled WinRM firewall rule' }
+        Write-Output 'OK: WinRM firewall rule enabled'
+
+# =============================================================================
+# Play 1: Verify hostname, IP, DNS, domain join
+# =============================================================================
+- name: "ws01 — Verify hostname, IP, DNS and domain join"
+  hosts: ws01
+  gather_facts: false
+  vars:
+    ws01_ip: "192.168.77.62"
+    ws01_prefix: 24
+    ws01_dns: "192.168.77.11"
+    ws01_dns_fallback: "192.168.77.10"
+    ws01_ou: "OU=WS01-MDE,DC=child,DC=cadre,DC=local"
+  tasks:
+    - name: "[VERIFY] Hostname is ws01"
+      ansible.windows.win_shell: |
+        if ($env:COMPUTERNAME -eq 'ws01') { Write-Output 'OK' } else { throw "Hostname is $($env:COMPUTERNAME), expected ws01" }
+
+    - name: "[VERIFY] Domain is child.cadre.local"
+      ansible.windows.win_shell: |
+        $domain = (Get-WmiObject Win32_ComputerSystem).Domain
+        if ($domain -eq 'child.cadre.local') { Write-Output "OK: $domain" } else { throw "Domain is $domain, expected child.cadre.local" }
+
+    - name: "[VERIFY] ws01 computer object is in OU=WS01-MDE"
+      ansible.windows.win_shell: |
+        $searcher = [ADSISearcher]"(&(objectClass=computer)(name=$env:COMPUTERNAME))"
+        $result = $searcher.FindOne()
+        if (-not $result) { throw 'Computer object not found in AD' }
+        $dn = $result.Properties['distinguishedname'][0]
+        if ($dn -notmatch 'OU=WS01-MDE') { throw "ws01 not in OU=WS01-MDE: $dn" }
+        Write-Output "OK: $dn"
+
+    - name: "[VERIFY] Static IP and DNS on vmnet2 adapter"
+      ansible.windows.win_shell: |
+        $ErrorActionPreference = 'Stop'
+        $if = Get-NetAdapter | Where-Object { $_.Status -eq 'Up' } | ForEach-Object {
+          $ip = Get-NetIPAddress -InterfaceIndex $_.ifIndex -AddressFamily IPv4 -ErrorAction SilentlyContinue
+          if ($ip.IPAddress -match '^192\.168\.77\.') { $_ }
+        } | Select-Object -First 1
+        if (-not $if) { throw 'No 192.168.77.x adapter found' }
+        $ip = Get-NetIPAddress -InterfaceIndex $if.ifIndex -AddressFamily IPv4
+        if ($ip.IPAddress -ne '{{ ws01_ip }}') { throw "IP is $($ip.IPAddress), expected {{ ws01_ip }}" }
+        if ($ip.PrefixLength -ne {{ ws01_prefix }}) { throw "Prefix is $($ip.PrefixLength), expected {{ ws01_prefix }}" }
+        $dns = Get-DnsClientServerAddress -InterfaceIndex $if.ifIndex -AddressFamily IPv4 | Select-Object -ExpandProperty ServerAddresses
+        if ($dns -notcontains '{{ ws01_dns }}') { throw "Primary DNS missing; got $dns" }
+        Write-Output "OK: IP={{ ws01_ip }}/{{ ws01_prefix }}, DNS=$dns"
+
+# =============================================================================
+# Play 2: Verify Sysmon
+# =============================================================================
+- name: "ws01 — Verify Sysmon"
+  hosts: ws01
+  gather_facts: false
+  tasks:
+    - name: "[VERIFY] Sysmon64 service exists, running and auto-start"
+      ansible.windows.win_shell: |
+        $svc = Get-Service 'Sysmon64' -ErrorAction Stop
+        if ($svc.Status -ne 'Running') { throw 'Sysmon64 is not Running' }
+        if ($svc.StartType -ne 'Automatic') { throw "Sysmon64 StartType is $($svc.StartType), expected Automatic" }
+        Write-Output "OK: Sysmon64 Running/Auto"
+
+    - name: "[VERIFY] Sysmon config file exists"
+      ansible.windows.win_stat:
+        path: C:\Tools\Sysmon\sysmonconfig.xml
+      register: sysmon_config
+      failed_when: not sysmon_config.stat.exists
+
+# =============================================================================
+# Play 3: Verify DFIR monitoring baseline
+# =============================================================================
+- name: "ws01 — Verify DFIR monitoring baseline"
+  hosts: ws01
+  gather_facts: false
+  tasks:
+    - name: "[VERIFY] SCENoApplyLegacyAuditPolicy=1"
+      ansible.windows.win_shell: |
+        $v = (Get-ItemProperty 'HKLM:\SYSTEM\CurrentControlSet\Control\Lsa' -Name 'SCENoApplyLegacyAuditPolicy' -ErrorAction Stop).SCENoApplyLegacyAuditPolicy
+        if ($v -eq 1) { Write-Output 'OK' } else { throw "SCENoApplyLegacyAuditPolicy=$v, expected 1" }
+
+    - name: "[VERIFY] PowerShell ScriptBlockLogging=1"
+      ansible.windows.win_shell: |
+        $v = (Get-ItemProperty 'HKLM:\SOFTWARE\Policies\Microsoft\Windows\PowerShell\ScriptBlockLogging' -Name 'EnableScriptBlockLogging' -ErrorAction Stop).EnableScriptBlockLogging
+        if ($v -eq 1) { Write-Output 'OK' } else { throw "EnableScriptBlockLogging=$v, expected 1" }
+
+    - name: "[VERIFY] 4688 command-line audit enabled"
+      ansible.windows.win_shell: |
+        $v = (Get-ItemProperty 'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\System\Audit' -Name 'ProcessCreationIncludeCmdLine_Enabled' -ErrorAction Stop).ProcessCreationIncludeCmdLine_Enabled
+        if ($v -eq 1) { Write-Output 'OK' } else { throw "ProcessCreationIncludeCmdLine_Enabled=$v, expected 1" }
+
+    - name: "[VERIFY] Core log sizes"
+      ansible.windows.win_shell: |
+        $expected = @{
+          'Security' = 1073741824
+          'System' = 536870912
+          'Application' = 536870912
+          'Microsoft-Windows-PowerShell/Operational' = 536870912
+          'Windows PowerShell' = 536870912
+          'Microsoft-Windows-Sysmon/Operational' = 1073741824
+        }
+        foreach ($k in $expected.Keys) {
+          $info = wevtutil gl "$k" 2>&1 | Select-String 'maxSize:'
+          [int]$val = ($info -split ':')[1].Trim()
+          if ($val -ne $expected[$k]) { throw "$k maxSize=$val, expected $($expected[$k])" }
+        }
+        Write-Output 'OK: Core log sizes match'
+
+    - name: "[VERIFY] Key operational channels enabled"
+      ansible.windows.win_shell: |
+        $channels = @(
+          'Microsoft-Windows-NTLM/Operational'
+          'Microsoft-Windows-DNS-Client/Operational'
+          'Microsoft-Windows-LDAP-Client/Debug'
+        )
+        foreach ($ch in $channels) {
+          $info = wevtutil gl "$ch" 2>&1 | Select-String 'enabled:'
+          if ($info -notmatch 'true') { throw "$ch is not enabled" }
+        }
+        Write-Output 'OK: Key operational channels enabled'
+
+# =============================================================================
+# Play 4: Verify RDP
+# =============================================================================
+- name: "ws01 — Verify RDP"
+  hosts: ws01
+  gather_facts: false
+  vars:
+    ws01_domain_user: "analyst_t1"
+  tasks:
+    - name: "[VERIFY] RDP fDenyTSConnections=0"
+      ansible.windows.win_shell: |
+        $v = (Get-ItemProperty 'HKLM:\System\CurrentControlSet\Control\Terminal Server' -Name 'fDenyTSConnections' -ErrorAction Stop).fDenyTSConnections
+        if ($v -eq 0) { Write-Output 'OK' } else { throw "fDenyTSConnections=$v, expected 0" }
+
+    - name: "[VERIFY] analyst_t1 is in Remote Desktop Users"
+      ansible.windows.win_shell: |
+        $group = [ADSI]"WinNT://$env:COMPUTERNAME/Remote Desktop Users,group"
+        $found = $group.Members() | Where-Object { $_.GetType().InvokeMember('Name', 'GetProperty', $null, $_, $null) -eq '{{ ws01_domain_user }}' }
+        if ($found) { Write-Output 'OK' } else { throw '{{ ws01_domain_user }} not in Remote Desktop Users' }
+
+    - name: "[VERIFY] analyst_t1 is in local Administrators (Plan 1.1 assumed-breach)"
+      ansible.windows.win_shell: |
+        $found = Get-LocalGroupMember -Group 'Administrators' -ErrorAction Stop |
+          Where-Object { $_.Name -like '*\{{ ws01_domain_user }}' -or $_.Name -eq 'CHILD\{{ ws01_domain_user }}' }
+        if ($found) { Write-Output 'OK' } else { throw '{{ ws01_domain_user }} not in Administrators' }
+
+    - name: "[VERIFY] RDP firewall rule enabled"
+      ansible.windows.win_shell: |
+        $enabled = Get-NetFirewallRule -DisplayGroup 'Remote Desktop' -ErrorAction Stop | Where-Object { $_.Enabled -eq 'True' }
+        if ($enabled) { Write-Output 'OK' } else { throw 'No enabled RDP firewall rule' }
+
+# =============================================================================
+# Play 5: Verify domain user profile
+# =============================================================================
+- name: "ws01 — Verify domain user profile"
+  hosts: ws01
+  gather_facts: false
+  vars:
+    ws01_domain_user: "analyst_t1"
+  tasks:
+    - name: "[VERIFY] Profile directories exist"
+      ansible.windows.win_shell: |
+        $paths = @('Downloads', 'Documents', 'Desktop')
+        foreach ($p in $paths) {
+          $full = "C:\Users\{{ ws01_domain_user }}\$p"
+          if (-not (Test-Path $full)) { throw "Missing: $full" }
+        }
+        Write-Output 'OK: Profile directories exist'
+
+# =============================================================================
+# Play 6: Verify DFIR telemetry + soft Defender (no MDE)
+# =============================================================================
+- name: "ws01 — Verify DFIR telemetry knobs + soft Defender"
+  hosts: ws01
+  gather_facts: false
+  tasks:
+    - name: "[VERIFY] High-performance power plan active"
+      ansible.windows.win_shell: |
+        $active = powercfg /getactivescheme
+        if ($active -match 'High performance') { Write-Output 'OK' } else { throw "Power plan: $active" }
+
+    - name: "[VERIFY] NTLM auditing enabled"
+      ansible.windows.win_shell: |
+        $p = 'HKLM:\SYSTEM\CurrentControlSet\Control\Lsa\MSV1_0'
+        $v1 = (Get-ItemProperty $p -Name 'AuditReceivingNTLMTraffic' -ErrorAction Stop).AuditReceivingNTLMTraffic
+        $v2 = (Get-ItemProperty $p -Name 'AuditNTLMInDomain' -ErrorAction Stop).AuditNTLMInDomain
+        if ($v1 -eq 2 -and $v2 -eq 2) { Write-Output 'OK' } else { throw "NTLM audit values: $v1, $v2" }
+
+    - name: "[VERIFY] Kerberos LogLevel=1"
+      ansible.windows.win_shell: |
+        $v = (Get-ItemProperty 'HKLM:\SYSTEM\CurrentControlSet\Control\Lsa\Kerberos\Parameters' -Name 'LogLevel' -ErrorAction Stop).LogLevel
+        if ($v -eq 1) { Write-Output 'OK' } else { throw "Kerberos LogLevel=$v, expected 1" }
+
+    - name: "[VERIFY] Soft Defender — RTP off, Tamper Protection off"
+      ansible.windows.win_shell: |
+        $st = Get-MpComputerStatus
+        if ($st.RealTimeProtectionEnabled -eq $true) { throw 'RealTimeProtectionEnabled is ON (expected off)' }
+        if ($st.IsTamperProtected -eq $true) { throw 'IsTamperProtected is ON (expected off — no MDE)' }
+        Write-Output 'OK: RTP off, Tamper Protection off'
+
+    - name: "[VERIFY] Defender tool path excludes present"
+      ansible.windows.win_shell: |
+        $paths = @((Get-MpPreference).ExclusionPath)
+        foreach ($need in @('C:\Tools','C:\Tools\cadre-attack')) {
+          if ($paths -notcontains $need) { throw "Missing ExclusionPath: $need (have: $($paths -join ','))" }
+        }
+        Write-Output 'OK: ExclusionPath includes C:\Tools and C:\Tools\cadre-attack'
+
+# =============================================================================
+# Play 7: Verify Elastic Agent enrollment on CADRE-All
+# =============================================================================
+- name: "elk — Verify ws01 agent on CADRE-All"
+  hosts: elk
+  gather_facts: false
+  vars:
+    kibana_port: 5601
+  tasks:
+    - name: "Read persisted elastic password"
+      ansible.builtin.slurp:
+        src: /home/vagrant/es-generated-pw.txt
+      register: es_pw_file
+      ignore_errors: true
+
+    - name: "Override elastic_password from file"
+      ansible.builtin.set_fact:
+        elastic_password: "{{ (es_pw_file.content | b64decode).strip() }}"
+      when: es_pw_file is succeeded
+
+    - name: "Fetch Fleet policies"
+      ansible.builtin.uri:
+        url: "http://127.0.0.1:{{ kibana_port }}/api/fleet/agent_policies"
+        method: GET
+        user: elastic
+        password: "{{ elastic_password }}"
+        force_basic_auth: true
+        headers:
+          kbn-xsrf: "true"
+        status_code: 200
+      register: policies
+
+    - name: "Verify CADRE-All exists and CADRE-WS01 is absent"
+      ansible.builtin.assert:
+        that:
+          - "'CADRE-All' in (policies.json['items'] | map(attribute='name') | list)"
+          - "'CADRE-WS01' not in (policies.json['items'] | map(attribute='name') | list)"
+        fail_msg: "Expected CADRE-All present and CADRE-WS01 removed from Fleet"
+
+    - name: "Fetch Fleet agents"
+      ansible.builtin.uri:
+        url: "http://127.0.0.1:{{ kibana_port }}/api/fleet/agents"
+        method: GET
+        user: elastic
+        password: "{{ elastic_password }}"
+        force_basic_auth: true
+        headers:
+          kbn-xsrf: "true"
+        status_code: 200
+      register: agents
+
+    - name: "Verify ws01 agent is Healthy and on CADRE-All"
+      ansible.builtin.assert:
+        that:
+          - "agents.json['items'] | selectattr('local_metadata.host.hostname', 'equalto', 'ws01') | list | length > 0"
+          - "(agents.json['items'] | selectattr('local_metadata.host.hostname', 'equalto', 'ws01') | first).status == 'online'"
+          - "(agents.json['items'] | selectattr('local_metadata.host.hostname', 'equalto', 'ws01') | first).policy_id == (policies.json['items'] | selectattr('name', 'equalto', 'CADRE-All') | first).id"
+        fail_msg: "ws01 agent not found, not healthy, or not on CADRE-All policy"
+
+- name: "ws01 — Verify Elastic Agent service"
+  hosts: ws01
+  gather_facts: false
+  tasks:
+    - name: "[VERIFY] Elastic Agent service running and auto-start"
+      ansible.windows.win_shell: |
+        $svc = Get-Service 'Elastic Agent' -ErrorAction Stop
+        if ($svc.Status -ne 'Running') { throw 'Elastic Agent is not Running' }
+        if ($svc.StartType -ne 'Automatic') { throw "Elastic Agent StartType is $($svc.StartType), expected Automatic" }
+        Write-Output 'OK: Elastic Agent Running/Auto'

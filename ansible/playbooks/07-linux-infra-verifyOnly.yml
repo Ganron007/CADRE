@@ -82,3 +82,28 @@
     - name: "[LINUX] Check rsyslog service is running"
       ansible.builtin.shell: |
         systemctl is-active rsyslog >/dev/null 2>&1 && echo "PASS: rsyslog is active" && exit 0 || echo "FAIL: rsyslog is not active" && exit 1
+
+    - name: "[LINUX] Check DNS resolver configured on vmnet2 NIC"
+      ansible.builtin.shell: |
+        VMNET_IFACE=$(ip -4 addr show | grep -oP '192\.168\.77\.\d+/\d+' | head -1 | xargs -I{} ip -o addr show | grep {} | awk '{print $2}')
+        if [ -z "$VMNET_IFACE" ]; then
+          echo "FAIL: Could not detect vmnet2 interface"
+          exit 1
+        fi
+        DNS_SERVER=$(resolvectl dns "$VMNET_IFACE" 2>/dev/null | grep -oP '192\.168\.77\.10')
+        if [ "$DNS_SERVER" = "192.168.77.10" ]; then
+          echo "PASS: DNS resolver on $VMNET_IFACE points to 192.168.77.10 (DC01)"
+          exit 0
+        fi
+        echo "FAIL: DNS resolver on $VMNET_IFACE does not point to 192.168.77.10"
+        exit 1
+
+    - name: "[LINUX] Check DNS can resolve cadre.local"
+      ansible.builtin.shell: |
+        RESULT=$(dig +short +timeout=3 cadre.local @192.168.77.10 2>/dev/null)
+        if echo "$RESULT" | grep -q "192.168.77.10"; then
+          echo "PASS: DNS resolves cadre.local to $RESULT"
+          exit 0
+        fi
+        echo "FAIL: DNS resolution failed or returned unexpected result: $RESULT"
+        exit 1

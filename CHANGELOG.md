@@ -4,6 +4,109 @@ All notable changes to CADRE are documented here. Format: [Keep a Changelog](htt
 
 ## [Unreleased]
 
+### Added (2026-07-26 — Plan 1.1 M5 + P11.6 complete)
+
+> **Scope:** Close Plan 1.1 — E/F thin streams + live dry-run smoke on provisioning `.60`.
+
+**RedStrike 0.5.0:**
+- Branches `E` / `F` · `STREAM_SPECS` (phase 9 / 10) · CLI `redstrike-campaign stream E|F`
+- API `POST /campaign/stream` · MCP `campaign_stream`
+- Path `external60_phase0` (no ws01 routing for E/F)
+- Tests: **88** passed
+
+**CADRE glue:**
+- `campaign-graph.yaml` **v5** — E (WT069–081 + WT093 stub) + F (F01–F10)
+- Thin wrappers: `04-automation/linux/campaign-e|f/`
+- Profiles `P-NETDEF` / `P-SUPPLY` in `lab-profiles.yaml`
+- **P11.6:** `~/RedStrike` venv + `~/CADRE` on `.60`; dry-run OK for Phases 1–3 (windows/linux) + `stream E|F`
+- Docs: `red-strike.md`, `vm-access.md`, `Red-Strike-workflow.md`, `plan1.1` README/plan, CHECKLIST P11.* all `[x]`
+
+**Next:** Plan 1 telemetry catalog. Live `--execute` remains operator-gated (HITL).
+
+### Added (2026-07-25 — Plan 1.1 M4 typed builders)
+
+> **Scope:** Typed AD/ADCS builders + graph intents (no invent-argv).
+
+**RedStrike 0.4.0:** `cadre_strike/builders/` (Certipy, Rubeus, bloodyAD, SQL, SharpSCCM, Mimikatz); `runtime/intents.py`; MCP `build_intent`; `--prefer-script`.
+
+**CADRE:** `campaign-graph.yaml` v4 with `intent:` on key spine/branch nodes; scripts kept as harness.
+
+### Added (2026-07-25 — Plan 1.1 M3 branches + product split)
+
+> **Scope:** Branch graph + LAB-PROFILES preflight; lock RedStrike as generic AD/ADCS agentic toolset.
+
+**CADRE glue:**
+- `campaign-graph.yaml` v3 — spine + A/B/C/D/G/sql-ai (UnPAC stub, SCCM 034–039).
+- `lab-seed-creds.json`, `lab-profiles.yaml` under `Campaign/automation/`.
+- `docs/internal/integrations/red-strike-product.md` — standalone vs integration split.
+
+**RedStrike 0.3.0:**
+- `--branch` filter + preflight; seeds resolve from CADRE first.
+- Removed lab passwords from `examples/` (placeholder `seed.example.json` only).
+- Synced pin. CHECKLIST **P11.3** closed; next **P11.4**.
+
+### Added (2026-07-25 — Plan 1.1 M2 spine + HITL + MCP)
+
+> **Scope:** Full spine graph, human gates, MCP/API campaign tools, workflow doc.
+
+**RedStrike 0.2.1:**
+- `runtime/hitl.py` + `session.py` — engagement state, gate approvals.
+- Orchestrator pauses execute on unapproved HITL; stubs skip cleanly.
+- CLI: `start` / `approve` / `run` / `status`.
+- API `/campaign/start|approve|run_phase|status` + MCP `campaign_*`.
+- Synced → `tools/red-strike/`.
+
+**CADRE:**
+- `campaign-graph.yaml` v2 (Phase 0–8).
+- `Red-Strike-workflow.md`.
+- CHECKLIST **P11.2** closed; next **P11.3** M3.
+
+### Added (2026-07-25 — Plan 1.1 M1 CampaignOrchestrator prove path)
+
+> **Scope:** Ship RedStrike **M1** (engine SSoT) + CADRE campaign graph; sync pin.
+
+**RedStrike (`RedStrike\` → sync `tools/red-strike/`):**
+- `cadre_strike/runtime/` — BeachheadRouter, CredentialLedger, campaign graph loader, CampaignOrchestrator.
+- CLI `redstrike-campaign run --phase 1-3 --beachhead windows|linux --engage <id>` (default dry-run).
+- Profile `cadre-campaign`; tests prove windows→ws01-exec, linux→no ws01-exec, mbr01 gated.
+- Version **0.2.0**.
+
+**CADRE glue:**
+- `attack-matrix/Campaign/automation/campaign-graph.yaml` — T003 / T002 / T041 / T043.
+- CHECKLIST **P11.1** closed; next **P11.2** (M2).
+
+### Changed (2026-07-25 — Plan 1.1 M0 live closeout + CADRE-All / no MDE)
+
+> **Scope:** Finish M0 on live ws01; align Ansible with Elastic **CADRE-All** (no MDE / no CADRE-WS01).
+
+**Live lab:**
+- ws01 restored (pre-isolation snapshot); WinRM from host/provisioning; T042 → mbr02:1433 OK.
+- `CHILD\analyst_t1` → local Administrators (+ Remote Management Users).
+- Soft Defender: RTP/TP off + `C:\Tools*` excludes; Elastic Agent + ElasticEndpoint on **CADRE-All**.
+- **No MDE** on beachhead (Sense unenrolled).
+
+**Playbooks:**
+- `17-ws01-deploy.yml` / verify — CADRE-All enroll; soft Defender; DFIR knobs (not MDE).
+- `12-elk-fleet.yml` / verify — removed CADRE-WS01 policy/integrations/tokens; Play 3 includes ws01.
+- `host_vars/ws01.yml`, `04-vulnerabilities.yml` comments; `02-ad-objects.yml` OU note (migrate later).
+
+**Tracking:** CHECKLIST P11.0a / I.7 / N0.2 closed; next **P11.1 M1** (RedStrike).
+
+### Added (2026-07-25 — Plan 1.1 M0 lab/campaign prep)
+
+> **Scope:** Execute Plan 1.1 **M0** — CADRE-side beachhead prep and campaign surface promotion before RedStrike M1 code.
+
+**What was done:**
+- `17-ws01-deploy.yml` / verify — add `CHILD\analyst_t1` to local **Administrators** (assumed-breach; attack identity stays analyst).
+- `WS01-ROUTING.md` — ws01-primary, linux alt, `stage_mbr01` exception-only; provisioning stays blind.
+- Optional `18-provisioning-domain-join.yml` (+ verify) — `CADRE_PROVISIONING_DOMAIN_JOIN=1` only; not in `cadre.py` install loop.
+- `CAMPAIGNS_v3.md` — Plan 1.1 routing block; UnPAC-the-Hash; full ESC notes; SCCM WT034–039 first-class; Branch D / SQL AI alt pointers.
+- `CAMPAIGNS.md` index → **v3 current**; METADATA UnPAC stub; `LAB-PROFILES.md` assume-breach notes.
+- `T042-REVERIFY.md` + truth-table 🔄 note (live probe pending).
+- CHECKLIST **P11.0a** [x]; ACTIVE next = **P11.1 M1**.
+
+**Next:** RedStrike M1 — BeachheadRouter + CredentialLedger + Phases 1–3.
+
 ### Added (2026-07-25 — Plan 1.1 Campaign Automation + CHECKLIST next action)
 
 > **Scope:** Establish **Plan 1.1** (RedStrike-driven campaign automation) as the next execution track ahead of / with Plan 1 telemetry, so attack runs can scale instead of staying hand-driven. Docs + checklist only — RedStrike M1 code not started.

@@ -15,7 +15,7 @@
 # matching extension VM(s) are added to this same Vagrantfile run. One Vagrantfile,
 # one `.vagrant/` state. Example: CADRE_EXTENSIONS="elk-fleet,net-monitor" vagrant up
 #
-# Total RAM budget: ~30 GB core + ~22 GB extensions (elk=12, monitor=8, vr=2)
+# Total RAM budget: ~32 GB core + ~26 GB extensions (elk=12, monitor=8, vr=4, provisioning=4)
 
 ENV["VAGRANT_DEFAULT_PROVIDER"] = "vmware_desktop"
 
@@ -42,7 +42,7 @@ VMS = [
   { name: "linux01",      ip: "192.168.77.40", ram: 4096, cpus: 2, box: UBUNTU_2404_BOX, family: "linux"   },
 
   # Ansible runner (replaces WSL2)
-  { name: "provisioning", ip: "192.168.77.60", ram: 2048, cpus: 2, box: UBUNTU_2404_BOX, family: "linux"   },
+  { name: "provisioning", ip: "192.168.77.60", ram: 4096, cpus: 2, box: UBUNTU_2404_BOX, family: "linux"   },
 ]
 
 # ----- Extension VMs (gated by CADRE_EXTENSIONS env var) -----
@@ -50,7 +50,7 @@ VMS = [
 # monitor carries a promiscuous second NIC for traffic capture (net-monitor).
 EXT_VMS = {
   "elk-fleet"    => { name: "elk",     ip: "192.168.77.50", ram: 12288, cpus: 6, box: UBUNTU_2404_BOX, family: "linux" },
-  "velociraptor" => { name: "vr",      ip: "192.168.77.51", ram: 2048,  cpus: 2, box: UBUNTU_2404_BOX, family: "linux" },
+  "velociraptor" => { name: "vr",      ip: "192.168.77.51", ram: 4096,  cpus: 2, box: UBUNTU_2404_BOX, family: "linux" },
   "net-monitor"  => { name: "monitor", ip: "192.168.77.55", ram: 8192,  cpus: 4, box: UBUNTU_2404_BOX, family: "linux", promisc: true },
 }
 
@@ -133,6 +133,39 @@ Vagrant.configure("2") do |config|
         m.vm.communicator = "ssh"
         m.ssh.username  = "vagrant"
         m.ssh.password  = "vagrant"
+
+        # ---- Linux DNS setup (vmnet2 has no DHCP; DC01 is the DNS server) ----
+        m.vm.provision "shell", privileged: true, inline: <<-SH, name: "Configure DNS for vmnet2"
+          set -e
+          # Find which NIC has the 192.168.77.x vmnet2 IP
+          VMNET_IFACE=$(ip -4 addr show | grep -oP '192\.168\.77\.\d+/\d+' | head -1 | xargs -I{} ip -o addr show | grep {} | awk '{print $2}')
+          if [ -z "$VMNET_IFACE" ]; then
+            echo "WARN: Could not detect vmnet2 interface; defaulting to eth0"
+            VMNET_IFACE="eth0"
+          fi
+          # Write netplan DNS overlay targeting the vmnet2 NIC
+          cat > /etc/netplan/60-dns.yaml << NETPLAN
+network:
+  version: 2
+  renderer: networkd
+  ethernets:
+    $VMNET_IFACE:
+      nameservers:
+        addresses:
+        - 192.168.77.10
+        search:
+        - cadre.local
+NETPLAN
+          chmod 600 /etc/netplan/60-dns.yaml
+          netplan apply 2>/dev/null || true
+          systemctl restart systemd-resolved
+          # Verify DNS works against DC01
+          if dig +short +timeout=3 cadre.local @192.168.77.10 >/dev/null 2>&1; then
+            echo "OK: DNS resolving against dc01 works"
+          else
+            echo "WARN: DNS test against dc01 failed (dc01 may not be up yet)"
+          fi
+        SH
       end
 
       # ---- provisioning VM extras: install Ansible 2.16+ + python deps ----

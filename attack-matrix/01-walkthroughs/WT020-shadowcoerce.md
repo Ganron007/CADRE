@@ -1,4 +1,6 @@
-# WT#020 — ShadowCoerce
+# ~~WT#020 — ShadowCoerce~~
+
+> **❌ NON-FUNCTIONAL on Server 2025.** MS-FSRVP (File Server VSS Agent) service is not available on Server 2025 domain controllers. Preserved for reference; use WT017 (PrinterBug) for confirmed coercion detection.
 
 ## Metadata
 | Field | Value |

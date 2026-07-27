@@ -1,5 +1,7 @@
 #!/bin/bash
 # CADRE — WT#028 Null Session Enumeration
+# ❌ INVALID — SAMR null bind blocked on Server 2025 (RestrictAnonymousSAM=1)
+# Kept for historical reference. Do not use in active campaign.
 source ../lib/cadre-env.sh
 source ../lib/common.sh
 print_banner "WT#028 — Null Session Enumeration"

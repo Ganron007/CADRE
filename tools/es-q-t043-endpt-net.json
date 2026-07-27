@@ -1,0 +1,13 @@
+{
+  "size": 0,
+  "query": {
+    "bool": {
+      "must": [
+        { "range": { "@timestamp": { "gte": "now-2h" } } },
+        { "term": { "host.name": "mbr01" } },
+        { "term": { "source.ip": "192.168.77.60" } },
+        { "term": { "destination.port": 1433 } }
+      ]
+    }
+  }
+}

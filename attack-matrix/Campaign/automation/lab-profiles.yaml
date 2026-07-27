@@ -1,0 +1,55 @@
+# CADRE lab profile → required hosts for RedStrike preflight (Plan 1.1 M3).
+# Source narrative: LAB-PROFILES.md — this file is machine-readable only.
+version: 1
+profiles:
+  P-BEACH:
+    required_hosts: [provisioning, ws01, dc02]
+    for: [spine:0.5]
+  P-CHILD:
+    required_hosts: [provisioning, dc01, dc02, mbr01]
+    for: [spine:0, spine:1, spine:2, spine:3, branch:A, branch:B, branch:sql-ai]
+  P-CREDS:
+    required_hosts: [provisioning, dc01, dc02, mbr01]
+    for: [spine:3.5]
+  P-DELEG:
+    required_hosts: [provisioning, dc01, dc02, mbr01]
+    for: [spine:4, spine:5, spine:6]
+  P-FOREST:
+    required_hosts: [provisioning, dc01, dc02, dc03, mbr01, mbr02]
+    for: [spine:7, spine:8, branch:C]
+  P-LINUX:
+    required_hosts: [provisioning, dc01, mbr01, linux01]
+    for: [branch:D]
+  P-NETDEF:
+    required_hosts: [provisioning, dc01, dc02, monitor]
+    for: [branch:E]
+  P-SUPPLY:
+    required_hosts: [provisioning, linux01, mbr01]
+    for: [branch:F]
+  P-FULL:
+    required_hosts: [provisioning, dc01, dc02, dc03, mbr01, mbr02, linux01, ws01]
+    for: [branch:G]
+
+# Default profile if operator does not pass --profile
+branch_defaults:
+  spine: P-CHILD
+  A: P-CHILD
+  B: P-CHILD
+  C: P-FOREST
+  D: P-LINUX
+  E: P-NETDEF
+  F: P-SUPPLY
+  G: P-FULL
+  sql-ai: P-CHILD
+
+# Host → expected lab IP (informational; live check optional)
+hosts:
+  provisioning: 192.168.77.60
+  ws01: 192.168.77.62
+  dc01: 192.168.77.10
+  dc02: 192.168.77.11
+  dc03: 192.168.77.12
+  mbr01: 192.168.77.22
+  mbr02: 192.168.77.23
+  linux01: 192.168.77.40
+  monitor: 192.168.77.55

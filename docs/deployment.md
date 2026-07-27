@@ -137,7 +137,7 @@ The pre-flight check in Step 1 will flag these as missing if you skip this step.
 ## Step 1 — Pre-flight check
 
 ```powershell
-cd C:\STUDY\Github\CADRE
+cd C:\STUDY\Github\CADRE-Platform\CADRE
 python cadre.py check
 ```
 
@@ -249,8 +249,8 @@ Before any vagrant work starts, cadre.py shows you a summary panel and waits for
 │  Install location     D:\VMs\CADRE                │
 │  Parent directory     D:\VMs                      │
 │  CADRE folder         CADRE/  (will be created)   │
-│  Vagrantfile source   C:\STUDY\Github\CADRE\lab\providers\vmware\Vagrantfile │
-│  Config source        C:\STUDY\Github\CADRE\lab\data\config.json │
+│  Vagrantfile source   C:\STUDY\Github\CADRE-Platform\CADRE\lab\providers\vmware\Vagrantfile │
+│  Config source        C:\STUDY\Github\CADRE-Platform\CADRE\lab\data\config.json │
 │  VMs to provision     7 (5 Windows Server 2025 + 2 Linux)   │
 │  Extension VMs        elk-fleet(.50) · net-monitor(.55) · vr(.51) — deployed on demand │
 │  Extensions           elk-fleet, net-monitor, velociraptor │

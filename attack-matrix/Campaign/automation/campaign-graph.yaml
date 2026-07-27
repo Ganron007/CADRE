@@ -1,0 +1,725 @@
+# CADRE-owned campaign graph (Plan 1.1 M5).
+# Engine is generic RedStrike; this file + seeds + lab-profiles are CADRE glue.
+# branch: spine | A | B | C | D | E | F | G | sql-ai
+# path: ws01 | linux60 | stage_mbr01 | external60_phase0
+# hitl_gate: dcsync | ticket | forest | persistence | acl_write | site_takeover
+# Streams: E = phase 9 (network defense), F = phase 10 (supply-chain) — no ws01 routing
+version: 5
+name: cadre-campaign-m5
+# M4+: prefer typed `intent` when set; `script` remains harness fallback (--prefer-script).
+nodes:
+  # ========== SPINE ==========
+  - id: T028
+    phase: 0
+    branch: spine
+    title: Null session enum (expect blocked on Server 2025)
+    path: external60_phase0
+    beachheads: [linux]
+    script: campaign-a/T028-nullsession.sh
+    requires_cred: null
+    produces_cred: null
+
+  - id: H-ASSUME
+    phase: 0.5
+    branch: spine
+    title: Assume breach as analyst_t1 on beachhead
+    path: ws01
+    beachheads: [windows, linux]
+    script: ""
+    stub: true
+    requires_cred: analyst_t1
+    produces_cred: null
+
+  - id: T003
+    phase: 1
+    branch: spine
+    title: AS-REP Roast (intern_blue)
+    path: ws01
+    beachheads: [windows, linux]
+    script: campaign-a/T003-asrep-ws01.sh
+    intent: rubeus.asreproast
+    intent_args:
+      user: intern_blue
+      domain: child.cadre.local
+      dc: dc02.child.cadre.local
+      format: hashcat
+    requires_cred: null
+    produces_cred: intern_blue
+
+  - id: T002
+    phase: 2
+    branch: spine
+    title: Kerberoast (svc_mssql)
+    path: ws01
+    beachheads: [windows, linux]
+    script: campaign-a/T002-kerb-ws01.sh
+    intent: rubeus.kerberoast
+    intent_args:
+      user: svc_mssql
+      domain: child.cadre.local
+      dc: dc02.child.cadre.local
+    requires_cred: intern_blue
+    produces_cred: svc_mssql
+
+  - id: T041
+    phase: 3
+    branch: spine
+    title: SQL auth → xp_cmdshell (analyst_t1)
+    path: ws01
+    beachheads: [windows, linux]
+    script: campaign-a/T041-xpcmd-ws01.sh
+    intent: sql.xp_cmdshell
+    cred: analyst_t1
+    intent_args:
+      target: 192.168.77.22
+      command: whoami
+      domain: child.cadre.local
+      windows_auth: true
+    requires_cred: analyst_t1
+    produces_cred: null
+
+  - id: T043
+    phase: 3
+    branch: spine
+    title: IMPERSONATE sa → GodPotato
+    path: ws01
+    beachheads: [windows, linux]
+    script: campaign-a/T043-impersonate-ws01.sh
+    requires_cred: analyst_t1
+    produces_cred: null
+
+  - id: T035-CREDS
+    phase: 3.5
+    branch: spine
+    title: Post-SYSTEM credential dump (lsassy/DonPAPI/mimikatz)
+    path: ws01
+    beachheads: [windows, linux]
+    script: ""
+    stub: true
+    requires_cred: analyst_t1
+    produces_cred: null
+
+  - id: T004-BH
+    phase: 4
+    branch: spine
+    title: BloodHound collection (analyst context)
+    path: ws01
+    beachheads: [windows, linux]
+    script: ""
+    stub: true
+    requires_cred: analyst_t1
+    produces_cred: null
+
+  - id: T017
+    phase: 5
+    branch: spine
+    title: PrinterBug / MS-RPRN coercion
+    path: ws01
+    beachheads: [windows, linux]
+    script: attacks/WT017-printerbug-spoolsample.sh
+    requires_cred: svc_mssql
+    produces_cred: null
+    hitl_gate: persistence
+
+  - id: T009
+    phase: 6
+    branch: spine
+    title: DCSync (krbtgt / DA secrets)
+    path: ws01
+    beachheads: [windows, linux]
+    script: campaign-a/T009-dcsync-ws01.sh
+    requires_cred: null
+    produces_cred: krbtgt
+    hitl_gate: dcsync
+
+  - id: T010
+    phase: 7
+    branch: spine
+    title: Golden Ticket
+    path: ws01
+    beachheads: [windows, linux]
+    script: campaign-a/T010-golden-ws01.sh
+    requires_cred: krbtgt
+    produces_cred: null
+    hitl_gate: ticket
+
+  - id: T011
+    phase: 7
+    branch: spine
+    title: Silver Ticket
+    path: ws01
+    beachheads: [windows, linux]
+    script: campaign-a/T011-silver-ws01.sh
+    requires_cred: null
+    produces_cred: null
+    hitl_gate: ticket
+
+  - id: T012
+    phase: 7
+    branch: spine
+    title: Diamond Ticket
+    path: ws01
+    beachheads: [windows, linux]
+    script: campaign-a/T012-diamond-ws01.sh
+    requires_cred: null
+    produces_cred: null
+    hitl_gate: ticket
+
+  - id: T033
+    phase: 8
+    branch: spine
+    title: Cross-forest Kerberoast
+    path: ws01
+    beachheads: [windows, linux]
+    script: campaign-a/T033-xforest-ws01.sh
+    requires_cred: null
+    produces_cred: null
+    hitl_gate: forest
+
+  - id: T042
+    phase: 8
+    branch: spine
+    title: MSSQL CLR assembly (T042 re-verify)
+    path: ws01
+    beachheads: [windows, linux]
+    script: campaign-a/T042-clr-ws01.sh
+    requires_cred: analyst_t1
+    produces_cred: null
+
+  # ========== BRANCH A — ACL abuse ==========
+  - id: T015
+    phase: 4
+    branch: A
+    title: ACL ForceChangePassword
+    path: ws01
+    beachheads: [windows, linux]
+    script: attacks/WT015-acl-forcechangepassword.sh
+    intent: bloodyad.set_password
+    cred: intern_blue
+    intent_args:
+      host: dc02.child.cadre.local
+      target: analyst_t2
+      new_password: "Ch4nged_By_RedStrike!"
+      domain: child.cadre.local
+    requires_cred: intern_blue
+    produces_cred: null
+    hitl_gate: acl_write
+
+  - id: T013
+    phase: 4
+    branch: A
+    title: ACL WriteDacl
+    path: ws01
+    beachheads: [windows, linux]
+    script: attacks/WT013-acl-writedacl.sh
+    requires_cred: null
+    produces_cred: null
+    hitl_gate: acl_write
+
+  - id: T014
+    phase: 4
+    branch: A
+    title: ACL GenericWrite
+    path: ws01
+    beachheads: [windows, linux]
+    script: attacks/WT014-acl-genericwrite.sh
+    requires_cred: null
+    produces_cred: null
+    hitl_gate: acl_write
+
+  - id: T016
+    phase: 4
+    branch: A
+    title: ACL GenericAll on OU
+    path: ws01
+    beachheads: [windows, linux]
+    script: attacks/WT016-acl-genericall-ou.sh
+    requires_cred: null
+    produces_cred: null
+    hitl_gate: acl_write
+
+  - id: T023
+    phase: 5
+    branch: A
+    title: GPO abuse
+    path: ws01
+    beachheads: [windows, linux]
+    script: attacks/WT023-gpo-abuse.sh
+    requires_cred: null
+    produces_cred: null
+    hitl_gate: acl_write
+
+  - id: T008
+    phase: 5
+    branch: A
+    title: Shadow credentials
+    path: ws01
+    beachheads: [windows, linux]
+    script: attacks/WT008-shadow-credentials.sh
+    requires_cred: null
+    produces_cred: null
+    hitl_gate: acl_write
+
+  - id: T024
+    phase: 5
+    branch: A
+    title: gMSA extraction
+    path: ws01
+    beachheads: [windows, linux]
+    script: attacks/WT024-gmsa-extraction.sh
+    requires_cred: null
+    produces_cred: null
+
+  # ========== BRANCH B — ADCS + UnPAC ==========
+  - id: T050
+    phase: 5
+    branch: B
+    title: ADCS ESC1
+    path: ws01
+    beachheads: [windows, linux]
+    script: attacks/WT050-esc1.sh
+    intent: certipy.find
+    cred: analyst_t1
+    intent_args:
+      target: dc01.cadre.local
+      dc_ip: 192.168.77.10
+      vulnerable: true
+    requires_cred: analyst_t1
+    produces_cred: null
+
+  - id: T051
+    phase: 5
+    branch: B
+    title: ADCS ESC2
+    path: ws01
+    beachheads: [windows, linux]
+    script: attacks/WT051-esc2.sh
+    requires_cred: analyst_t1
+    produces_cred: null
+
+  - id: T056
+    phase: 5
+    branch: B
+    title: ADCS ESC8 (NTLM relay)
+    path: ws01
+    beachheads: [windows, linux]
+    script: attacks/WT056-esc8.sh
+    requires_cred: analyst_t1
+    produces_cred: null
+    hitl_gate: persistence
+
+  - id: T061
+    phase: 5
+    branch: B
+    title: ADCS ESC14
+    path: ws01
+    beachheads: [windows, linux]
+    script: attacks/WT061-esc14.sh
+    requires_cred: analyst_t1
+    produces_cred: null
+
+  - id: T-UNPAC
+    phase: 5
+    branch: B
+    title: UnPAC-the-Hash (cert → NT hash via U2U)
+    path: ws01
+    beachheads: [windows, linux]
+    script: ""
+    stub: true
+    requires_cred: analyst_t1
+    produces_cred: null
+
+  # ========== BRANCH C — SCCM ==========
+  - id: T034
+    phase: 8
+    branch: C
+    title: SCCM NAA extraction
+    path: ws01
+    beachheads: [windows, linux]
+    script: attacks/WT034-sccm-naa-extraction.sh
+    intent: sharpsccm.get_naa
+    intent_args:
+      server: mbr02.range.local
+    requires_cred: null
+    produces_cred: svc_naa
+
+  - id: T035
+    phase: 8
+    branch: C
+    title: SCCM PXE boot abuse
+    path: ws01
+    beachheads: [windows, linux]
+    script: attacks/WT035-sccm-pxe-boot.sh
+    requires_cred: null
+    produces_cred: null
+
+  - id: T036
+    phase: 8
+    branch: C
+    title: SCCM client push relay
+    path: ws01
+    beachheads: [windows, linux]
+    script: attacks/WT036-sccm-client-push.sh
+    requires_cred: null
+    produces_cred: null
+
+  - id: T037
+    phase: 8
+    branch: C
+    title: SCCM CMPivot abuse
+    path: ws01
+    beachheads: [windows, linux]
+    script: attacks/WT037-sccm-cmpivot.sh
+    requires_cred: null
+    produces_cred: null
+
+  - id: T038
+    phase: 8
+    branch: C
+    title: SCCM app deploy
+    path: ws01
+    beachheads: [windows, linux]
+    script: attacks/WT038-sccm-app-deploy.sh
+    requires_cred: null
+    produces_cred: null
+
+  - id: T039
+    phase: 8
+    branch: C
+    title: SCCM site takeover
+    path: ws01
+    beachheads: [windows, linux]
+    script: attacks/WT039-sccm-site-takeover.sh
+    requires_cred: null
+    produces_cred: null
+    hitl_gate: site_takeover
+
+  # ========== BRANCH D — Linux pivot ==========
+  - id: T040
+    phase: 3
+    branch: D
+    title: MSSQL linked server hop → linux01
+    path: ws01
+    beachheads: [windows, linux]
+    script: attacks/WT040-mssql-linked-server-hop.sh
+    requires_cred: analyst_t1
+    produces_cred: null
+
+  - id: T044
+    phase: 3
+    branch: D
+    title: MSSQL Linux lateral
+    path: linux60
+    beachheads: [linux]
+    script: attacks/WT044-mssql-linux-lateral.sh
+    requires_cred: analyst_t1
+    produces_cred: null
+
+  - id: T045
+    phase: 3.5
+    branch: D
+    title: Linux SSSD ticket extraction
+    path: linux60
+    beachheads: [linux]
+    script: attacks/WT045-linux-sssd-ticket-extraction.sh
+    requires_cred: null
+    produces_cred: null
+
+  - id: T047
+    phase: 3.5
+    branch: D
+    title: NFS Kerberos mount
+    path: linux60
+    beachheads: [linux]
+    script: attacks/WT047-nfs-kerberos-mount.sh
+    requires_cred: null
+    produces_cred: null
+
+  - id: T048
+    phase: 3.5
+    branch: D
+    title: Podman container escape
+    path: linux60
+    beachheads: [linux]
+    script: attacks/WT048-podman-container-escape.sh
+    requires_cred: null
+    produces_cred: null
+
+  # ========== ALT — SQL AI abuse (mbr02) ==========
+  - id: T-SQL-AI
+    phase: 3
+    branch: sql-ai
+    title: SQL Server 2025 AI abuse (mbr02)
+    path: ws01
+    beachheads: [windows, linux]
+    script: ""
+    stub: true
+    requires_cred: analyst_t1
+    produces_cred: null
+
+  # ========== BRANCH G — standalone / MITRE gap samples ==========
+  - id: T031
+    phase: 1
+    branch: G
+    title: Password spray (standalone / gated)
+    path: external60_phase0
+    beachheads: [linux]
+    script: attacks/WT031-password-spray.sh
+    requires_cred: null
+    produces_cred: null
+    hitl_gate: persistence
+
+  - id: T007
+    phase: 5
+    branch: G
+    title: RBCD (standalone exercise)
+    path: ws01
+    beachheads: [windows, linux]
+    script: attacks/WT007-rbcd.sh
+    requires_cred: null
+    produces_cred: null
+    hitl_gate: acl_write
+
+  # ========== STREAM E — Network defense (Plan 0.7) — phase 9 ==========
+  # Thin wrappers under linux/campaign-e/ (no ws01). path=external60_phase0 preserved.
+  - id: WT069
+    phase: 9
+    branch: E
+    title: DNS DGA
+    path: external60_phase0
+    beachheads: [windows, linux]
+    script: campaign-e/wt069-dns-dga.sh
+    requires_cred: null
+    produces_cred: null
+
+  - id: WT070
+    phase: 9
+    branch: E
+    title: DNS TXT burst
+    path: external60_phase0
+    beachheads: [windows, linux]
+    script: campaign-e/wt070-dns-txt.sh
+    requires_cred: null
+    produces_cred: null
+
+  - id: WT071
+    phase: 9
+    branch: E
+    title: DNS NXDOMAIN burst
+    path: external60_phase0
+    beachheads: [windows, linux]
+    script: campaign-e/wt071-dns-nxdomain.sh
+    requires_cred: null
+    produces_cred: null
+
+  - id: WT072
+    phase: 9
+    branch: E
+    title: DNS TLD abuse
+    path: external60_phase0
+    beachheads: [windows, linux]
+    script: campaign-e/wt072-dns-tld.sh
+    requires_cred: null
+    produces_cred: null
+
+  - id: WT073
+    phase: 9
+    branch: E
+    title: DNS IP literal
+    path: external60_phase0
+    beachheads: [windows, linux]
+    script: campaign-e/wt073-dns-ip-literal.sh
+    requires_cred: null
+    produces_cred: null
+
+  - id: WT074
+    phase: 9
+    branch: E
+    title: TLS 1.0 downgrade
+    path: external60_phase0
+    beachheads: [windows, linux]
+    script: campaign-e/wt074-tls-v1.sh
+    requires_cred: null
+    produces_cred: null
+
+  - id: WT075
+    phase: 9
+    branch: E
+    title: SMB admin share
+    path: external60_phase0
+    beachheads: [windows, linux]
+    script: campaign-e/wt075-smb-admin.sh
+    requires_cred: null
+    produces_cred: null
+
+  - id: WT076
+    phase: 9
+    branch: E
+    title: HTTP suspicious UA
+    path: external60_phase0
+    beachheads: [windows, linux]
+    script: campaign-e/wt076-http-ua.sh
+    requires_cred: null
+    produces_cred: null
+
+  - id: WT077
+    phase: 9
+    branch: E
+    title: HTTP exploit path
+    path: external60_phase0
+    beachheads: [windows, linux]
+    script: campaign-e/wt077-http-exploit-path.sh
+    requires_cred: null
+    produces_cred: null
+
+  - id: WT078
+    phase: 9
+    branch: E
+    title: HTTP content-type mismatch
+    path: external60_phase0
+    beachheads: [windows, linux]
+    script: campaign-e/wt078-http-content-type.sh
+    requires_cred: null
+    produces_cred: null
+
+  - id: WT079
+    phase: 9
+    branch: E
+    title: SSH brute force
+    path: external60_phase0
+    beachheads: [windows, linux]
+    script: campaign-e/wt079-ssh-brute.sh
+    requires_cred: null
+    produces_cred: null
+
+  - id: WT080
+    phase: 9
+    branch: E
+    title: Long connection beacon
+    path: external60_phase0
+    beachheads: [windows, linux]
+    script: campaign-e/wt080-long-connection.sh
+    requires_cred: null
+    produces_cred: null
+
+  - id: WT081
+    phase: 9
+    branch: E
+    title: Outbound anomaly
+    path: external60_phase0
+    beachheads: [windows, linux]
+    script: campaign-e/wt081-outbound-anomaly.sh
+    requires_cred: null
+    produces_cred: null
+
+  - id: WT093
+    phase: 9
+    branch: E
+    title: Ransomware simulation (Windows host)
+    path: external60_phase0
+    beachheads: [windows, linux]
+    script: ""
+    stub: true
+    requires_cred: null
+    produces_cred: null
+
+  # ========== STREAM F — Supply-chain (Plan 0.8) — phase 10 ==========
+  - id: F01
+    phase: 10
+    branch: F
+    title: Malicious postinstall webhook
+    path: external60_phase0
+    beachheads: [windows, linux]
+    script: campaign-f/F01-webhook-postinstall.sh
+    requires_cred: null
+    produces_cred: null
+
+  - id: F02
+    phase: 10
+    branch: F
+    title: TruffleHog download + scan
+    path: external60_phase0
+    beachheads: [windows, linux]
+    script: campaign-f/F02-trufflehog.sh
+    requires_cred: null
+    produces_cred: null
+
+  - id: F03
+    phase: 10
+    branch: F
+    title: Workflow injection
+    path: external60_phase0
+    beachheads: [windows, linux]
+    script: campaign-f/F03-workflow-injection.sh
+    requires_cred: null
+    produces_cred: null
+
+  - id: F04
+    phase: 10
+    branch: F
+    title: Package patching
+    path: external60_phase0
+    beachheads: [windows, linux]
+    script: campaign-f/F04-package-patch.sh
+    requires_cred: null
+    produces_cred: null
+
+  - id: F05
+    phase: 10
+    branch: F
+    title: /tmp download+exec
+    path: external60_phase0
+    beachheads: [windows, linux]
+    script: campaign-f/F05-tmp-download-exec.sh
+    requires_cred: null
+    produces_cred: null
+
+  - id: F06
+    phase: 10
+    branch: F
+    title: npm publish worm
+    path: external60_phase0
+    beachheads: [windows, linux]
+    script: campaign-f/F06-npm-publish-worm.sh
+    requires_cred: null
+    produces_cred: null
+
+  - id: F07
+    phase: 10
+    branch: F
+    title: Cloud metadata probe
+    path: external60_phase0
+    beachheads: [windows, linux]
+    script: campaign-f/F07-cloud-metadata.sh
+    requires_cred: null
+    produces_cred: null
+
+  - id: F08
+    phase: 10
+    branch: F
+    title: Repo weaponization
+    path: external60_phase0
+    beachheads: [windows, linux]
+    script: campaign-f/F08-repo-weaponize.sh
+    requires_cred: null
+    produces_cred: null
+
+  - id: F09
+    phase: 10
+    branch: F
+    title: Bundle worm chain
+    path: external60_phase0
+    beachheads: [windows, linux]
+    script: campaign-f/F09-bundle-worm.sh
+    requires_cred: null
+    produces_cred: null
+
+  - id: F10
+    phase: 10
+    branch: F
+    title: Webhook exfil probe (npm-010)
+    path: external60_phase0
+    beachheads: [windows, linux]
+    script: campaign-f/F10-webhook-exfil-probe.sh
+    requires_cred: null
+    produces_cred: null

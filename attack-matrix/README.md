@@ -2,9 +2,9 @@
 
 100 attacks across 5 streams. Each attack is a verified, step-by-step technique against the CADRE lab substrate that produces observable telemetry.
 
-> **🚀 START HERE → [`CAMPAIGNS.md`](CAMPAIGNS.md)** — the unified attack campaign from zero credentials to full 3-domain compromise. Identity-driven, credential-earned, detection-verified. Walkthroughs are technical reference cards; the campaign is the real attack story.
+> **🚀 START HERE → [`Campaign/Runbooks/CAMPAIGNS-RUNBOOK-README.md`](Campaign/Runbooks/CAMPAIGNS-RUNBOOK-README.md)** — campaign v2 per-phase runbooks (full narrative + commands). Index: [`Campaign/CAMPAIGNS.md`](Campaign/CAMPAIGNS.md). Full reference: [`Campaign/CAMPAIGNS_v2.md`](Campaign/CAMPAIGNS_v2.md).
 >
-> **🔬 DFIR parallel track → [`DFIR-Nexus-Pioneer-workflow.md`](DFIR-Nexus-Pioneer-workflow.md)** — link each campaign exercise to DFIR-Nexus cases and Plan 1 telemetry (`tracker.md`).
+> **🔬 DFIR parallel track → [`Campaign/DFIR-Nexus-Pioneer-workflow.md`](Campaign/DFIR-Nexus-Pioneer-workflow.md)** — link each campaign exercise to DFIR-Nexus cases and Plan 1 telemetry (`tracker.md`).
 
 ```
 CADRE
@@ -12,18 +12,17 @@ CADRE
 ├── A — Agentic     ── 06-telemetry-catalog/ (Plan 7 RAG corpus)
 ├── D — DFIR        ── 07-detection-rules/ + 08-hunting/ (Sigma → Elastic + VQL)
 ├── R — Red-team    ── 01-walkthroughs/ + 04-automation/ (100 attacks, scripted)
-└── E — Environment ── 02-diagrams/ + 03-attackpath/ (architecture + flow)
+└── E — Environment ── 02-diagrams/ (lab architecture) + Campaign/diagrams/ + Campaign/attackpath/
 ```
 
 ## Directory Structure
 
 | Folder | Contents | Count Target | Plan |
 |--------|----------|--------------|------|
+| **`Campaign/`** | v2 index, CAMPAIGNS_v2, metadata, runbooks, study-guide, diagrams, attackpath, artifacts, DFIR bridge | — | Content |
 | `01-walkthroughs/` | Step-by-step attack writeups (markdown) | 100 files | Content |
-| `02-diagrams/` | Architecture + trust topology (SVG/Mermaid) | ~10 | Content |
-| `03-attackpath/` | Sequenced kill-chain flow visualization | 1 SVG + 1 MD | Content |
+| `02-diagrams/` | Lab architecture + trust topology (SVG/Mermaid) | ~3 | Content |
 | `04-automation/` | Reproducible attack scripts (bash + PowerShell) | ~90 scripts | Content |
-| `05-study-guide/` | Deep-dive attack reference per campaign phase | 3 files (growing) | Content |
 | `10-cert-map/` | Per-certification learning paths + technique matrix | 13 files | Content |
 | `06-telemetry-catalog/` | Sigma YAML per attack — expected artifacts | 100 YAML | Plan 1 |
 | `07-detection-rules/` | Elastic TOML detection rules — Windows (Kerberos/ADCS/SCCM/2026 CVEs/lateral) + Linux rules (keytab/SSSD/realmd/container-escape/MSSQL audit) | 30+ TOML | Plan 5 |
@@ -48,24 +47,23 @@ CADRE
 
 ## How to Use
 
-1. **Start with [`CAMPAIGNS.md`](CAMPAIGNS.md)** — pick the campaign path matching your starting position
+1. **Open your phase runbook** from [`Campaign/Runbooks/CAMPAIGNS-RUNBOOK-README.md`](Campaign/Runbooks/CAMPAIGNS-RUNBOOK-README.md) — read theory, then run commands live
 2. Follow each phase — every command is runnable against the live CADRE lab
 3. When a phase references a WT# (e.g., WT#009), flip to `01-walkthroughs/` for the tool reference
 4. Run automation scripts from `04-automation/` for repeatable execution
 5. Observe telemetry in Kibana / Zeek / Velociraptor (see `docs/forensic-workflow.md`)
-6. **Optional:** Run the Pioneer loop — export evidence → DFIR-Nexus case (see [`DFIR-Nexus-Pioneer-workflow.md`](DFIR-Nexus-Pioneer-workflow.md))
+6. **Optional:** Run the Pioneer loop — export evidence → DFIR-Nexus case (see [`Campaign/DFIR-Nexus-Pioneer-workflow.md`](Campaign/DFIR-Nexus-Pioneer-workflow.md))
 7. Revert to clean baseline → next phase
 
 ## Status
 
 | Folder | Status | Files |
 |--------|--------|:-----:|
-| — | `CAMPAIGNS.md` — 5 streams, 100 attacks | ✅ |
+| `Campaign/` | v2 index + CAMPAIGNS_v2 + runbooks + study-guide + diagrams + attackpath | — |
 | 01-walkthroughs | Walkthrough reference cards | 63 (+37 pending) |
-| 02-diagrams | Mermaid attack flow + architecture | 3 |
-| 03-attackpath | Full attack path map | 2 |
+| 02-diagrams | Lab architecture Mermaid | 2 |
 | 04-automation | Core AD + Campaign E/G/H scripts | 91 |
-| 05-study-guide | Deep-dive attack reference (Phase 0-2 complete) | 5 |
+| `Campaign/study-guide` | Deep-dive attack reference (Phase 0-2 complete) | 12 |
 | 10-cert-map | Per-certification study guides | 14 |
 | 06-telemetry-catalog | Empty — Phase 1 fills this | — |
 | 07-detection-rules | Empty — Plan 5 | — |

@@ -5,7 +5,7 @@
 # ACEs use Set-Acl pattern (Get-Acl/Set-Acl) for pre-check + verify.
 
 # =============================================================================
-# PART 1: ACEs — cadre.local (dc01, 14 entries)
+# PART 1: ACEs — cadre.local (dc01, 14 ACEs across 13 entries)
 # =============================================================================
 - name: "dc01 — ACE group 1 (GPO delegations)"
   hosts: dc01
@@ -582,7 +582,7 @@
       failed_when: r.rc not in [0, 2]
 
 # =============================================================================
-# PART 3: ACEs — range.local (dc03, 7 entries)
+# PART 3: ACEs — range.local (dc03, 6 entries)
 # =============================================================================
 - name: "dc03 — range domain ACEs"
   hosts: dc03

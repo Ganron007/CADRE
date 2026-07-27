@@ -1,0 +1,148 @@
+---
+# TYPE: VERIFY-ONLY (rc=0=pass, rc=1=fail)
+# Layer 16: Supply-Chain Emulation — Verify-only counterpart of 16-supplychain.yml
+# Checks that manual installation + post-install config is complete.
+# Reference: docs/internal/plan00-upgrades/plan0.8-supplychain.md §4 (Manual Installation Guide)
+
+- name: "linux01 — Verify supply-chain emulation setup"
+  hosts: linux01
+  gather_facts: false
+  become: true
+  tasks:
+    - name: "[VERIFY] Node.js installed"
+      ansible.builtin.shell: node --version
+      register: r
+      changed_when: false
+      failed_when: r.rc != 0
+
+    - name: "[VERIFY] npm installed"
+      ansible.builtin.shell: npm --version
+      register: r
+      changed_when: false
+      failed_when: r.rc != 0
+
+    - name: "[VERIFY] Python3 installed"
+      ansible.builtin.shell: python3 --version
+      register: r
+      changed_when: false
+      failed_when: r.rc != 0
+
+    - name: "[VERIFY] NPM-Threat-Emulation repo extracted"
+      ansible.builtin.shell: test -d /opt/NPM-Threat-Emulation-main/scenarios
+      register: r
+      changed_when: false
+      failed_when: r.rc != 0
+
+    - name: "[VERIFY] Symlink to canonical path"
+      ansible.builtin.shell: test -L /opt/npm-threat-emulation
+      register: r
+      changed_when: false
+      failed_when: r.rc != 0
+
+    - name: "[VERIFY] 9 scenario scripts present"
+      ansible.builtin.shell: ls /opt/npm-threat-emulation/scenarios/*.sh 2>/dev/null | wc -l
+      register: r
+      changed_when: false
+      failed_when: r.stdout | int < 9
+
+    - name: "[VERIFY] mock_server.py executable"
+      ansible.builtin.shell: test -x /opt/npm-threat-emulation/mock_server.py
+      register: r
+      changed_when: false
+      failed_when: r.rc != 0
+
+    - name: "[VERIFY] setup_test_env.sh executable"
+      ansible.builtin.shell: test -x /opt/npm-threat-emulation/setup_test_env.sh
+      register: r
+      changed_when: false
+      failed_when: r.rc != 0
+
+    - name: "[VERIFY] Mock sink systemd unit exists"
+      ansible.builtin.shell: test -f /etc/systemd/system/npm-mock-sink.service
+      register: r
+      changed_when: false
+      failed_when: r.rc != 0
+
+    - name: "[VERIFY] Mock sink service enabled"
+      ansible.builtin.shell: systemctl is-enabled npm-mock-sink
+      register: r
+      changed_when: false
+      failed_when: r.rc != 0
+
+    - name: "[VERIFY] Mock sink service running"
+      ansible.builtin.shell: systemctl is-active npm-mock-sink
+      register: r
+      changed_when: false
+      failed_when: r.rc != 0
+
+    - name: "[VERIFY] Mock sink responds on :8080"
+      ansible.builtin.shell: curl -s -o /dev/null -w "%{http_code}" --max-time 3 http://localhost:8080/
+      register: r
+      changed_when: false
+      failed_when: r.stdout != "200"
+
+    - name: "[VERIFY] auditd rules file exists"
+      ansible.builtin.shell: test -f /etc/audit/rules.d/cadre-npm.rules
+      register: r
+      changed_when: false
+      failed_when: r.rc != 0
+
+    - name: "[VERIFY] auditd rules content"
+      ansible.builtin.shell: grep -c "npm_emulation\|npm_node_exec" /etc/audit/rules.d/cadre-npm.rules
+      register: r
+      changed_when: false
+      failed_when: r.stdout | int < 2
+
+    - name: "[VERIFY] auditd rules loaded"
+      ansible.builtin.shell: sudo auditctl -l 2>/dev/null | grep -c "npm"
+      register: r
+      changed_when: false
+
+- name: "mbr01 — Verify supply-chain emulation setup"
+  hosts: mbr01
+  gather_facts: false
+  tasks:
+    - name: "[VERIFY] Node.js installed"
+      ansible.windows.win_shell: node --version
+      register: r
+      changed_when: false
+      failed_when: r.rc != 0
+
+    - name: "[VERIFY] npm installed"
+      ansible.windows.win_shell: npm --version
+      register: r
+      changed_when: false
+      failed_when: r.rc != 0
+
+    - name: "[VERIFY] Python installed"
+      ansible.windows.win_shell: python --version
+      register: r
+      changed_when: false
+      failed_when: r.rc != 0
+
+    - name: "[VERIFY] Chocolatey installed"
+      ansible.windows.win_shell: choco --version
+      register: r
+      changed_when: false
+      failed_when: r.rc != 0
+
+    - name: "[VERIFY] NPM-Threat-Emulation repo extracted"
+      ansible.windows.win_shell: |
+        if (Test-Path "C:\Tools\NPM-Threat-Emulation-main\scenarios") { exit 0 }
+        if (Test-Path "C:\Tools\npm-threat-emulation\scenarios") { exit 0 }
+        exit 1
+      register: r
+      changed_when: false
+      failed_when: r.rc != 0
+
+    - name: "[VERIFY] 9 PowerShell scenarios present"
+      ansible.windows.win_shell: |
+        $paths = @("C:\Tools\NPM-Threat-Emulation-main\scenarios", "C:\Tools\npm-threat-emulation\scenarios")
+        foreach ($p in $paths) {
+          $count = (Get-ChildItem "$p\*.ps1" -ErrorAction SilentlyContinue).Count
+          if ($count -ge 9) { Write-Output "PASS: $count scenarios in $p"; exit 0 }
+        }
+        Write-Output "FAIL: No directory with 9+ scenarios found"; exit 1
+      register: r
+      changed_when: false
+      failed_when: r.rc != 0

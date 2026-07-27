@@ -1,13 +1,13 @@
 # CADRE Main Lab — Canonical Checklist
 
 **Path:** `CHECKLIST.md` (repo root)  
-**Last updated:** 2026-07-25  
+**Last updated:** 2026-07-26  
 **Writer repo:** `C:\STUDY\Github\CADRE-Platform\CADRE\`  
 **Scope:** Lab operations, **Plan 1.1 campaign automation (RedStrike)**, **campaign execution**, **Plan 1 telemetry catalog**, **log corpus for DFIR-Nexus**, integrations — **not** per-exercise study progress (`plan1.7-exercises.md` / `plan1.8-exercises.md`).
 
-> **Execution mode (2026-07-25):** Agents/operators fulfill checklist items from **provisioning** without waiting for manual runbook study. Learning is parallel and optional. Flip `CHECKLIST.md` first; docs follow evidence.
+> **Execution mode (2026-07-26):** Agents/operators fulfill checklist items from **provisioning** without waiting for manual runbook study. Learning is parallel and optional. Flip `CHECKLIST.md` first; docs follow evidence.
 >
-> **NEXT ACTION (locked):** **Plan 1.1** — automate Campaign A–D/G via RedStrike (ws01 routing) so Plan 1 telemetry is no longer hand-only. Plan: [`docs/internal/plan1.1-campaign-automation/`](docs/internal/plan1.1-campaign-automation/) · sister [`RedStrike/CAMPAIGN-AUTOMATION-PLAN.md`](../RedStrike/CAMPAIGN-AUTOMATION-PLAN.md).
+> **NEXT ACTION (locked):** **Plan 1 telemetry (P1)** — ES proof → grid after automated/manual runs. **Plan 1.1 M0–M5 + P11.6 live smoke done**. Product: [`red-strike-product.md`](docs/internal/integrations/red-strike-product.md).
 >
 > **Naming:** `plan01-telemetry-catalog/` = **Plan 1**. `plan1.1-campaign-automation/` = **Plan 1.1**. `plan00-foundation/` = **Plan 0**. See [`docs/internal/PLANS.md`](docs/internal/PLANS.md).
 
@@ -49,7 +49,7 @@
 |--------|------|
 | **A.** | Lab access, SSH, profiles, VM health |
 | **C.** | Campaign v3 execution (attack spine + branches + E/F/G/H) |
-| **P11.** | Plan 1.1 — RedStrike campaign automation (**NEXT** — before/with Plan 1) |
+| **P11.** | Plan 1.1 — RedStrike campaign automation (**DONE** 2026-07-26) |
 | **P1.** | Plan 1 — telemetry source matrix + rules + Sigma catalog |
 | **P17.** | Plan 1.7 — defense engineering deploy (rules + infra) |
 | **P18.** | Plan 1.8 — offensive upgrades deploy (with verified attacks) |
@@ -74,7 +74,7 @@
 |------|------:|------:|------:|------:|------:|------:|
 | A — Access & ops | 3 | 2 | 0 | 0 | 0 | 5 |
 | C — Campaign v3 | 3 | 12 | 0 | 4 | 0 | 19 |
-| **P11 — Campaign automation** | **1** | **6** | **0** | **0** | **0** | **7** |
+| **P11 — Campaign automation** | **8** | **0** | **0** | **0** | **0** | **8** |
 | P1 — Telemetry catalog | 2 | 8 | 0 | 0 | 0 | 10 |
 | P17 — Defense engineering | 0 | 6 | 0 | 0 | 0 | 6 |
 | P18 — Offensive upgrades | 0 | 4 | 0 | 0 | 0 | 4 |
@@ -83,21 +83,19 @@
 | D7S — DFIR standalone | 0 | 2 | 5 | 0 | 0 | 7 |
 | P07 — Network defense | 3 | 1 | 1 | 0 | 0 | 5 |
 | P08 — Supply chain | 1 | 2 | 1 | 0 | 0 | 4 |
-| I — Integrations | 0 | 5 | 2 | 0 | 1 | 8 |
+| I — Integrations | 2 | 4 | 2 | 0 | 0 | 8 |
 | O — Cross-cutting | 3 | 1 | 0 | 0 | 0 | 4 |
-| N0 — Decisions | 0 | 0 | 0 | 0 | 3 | 3 |
-| **TOTAL** | **21** | **51** | **15** | **4** | **5** | **96** |
+| N0 — Decisions | 1 | 0 | 0 | 0 | 2 | 3 |
+| **TOTAL** | **30** | **45** | **15** | **4** | **3** | **97** |
 
-**Top priorities — Plan 1.1 first, then Plan 1:**
+**Top priorities — Plan 1 next (Plan 1.1 closed):**
 
-1. **P11 (NEXT):** RedStrike campaign automation — M1 Phases 1–3 via ws01 routing → then full spine + branches. See [`plan1.1-campaign-automation/`](docs/internal/plan1.1-campaign-automation/).  
-2. **P1:** After automated (or manual) runs — ES proof → `verification-table.md` → `source-matrix-grid.md` → bundle. [`ATTACK-STATUS.md`](docs/internal/plan01-telemetry-catalog/phase1-source-matrix/ATTACK-STATUS.md).  
-3. **C.*** — Campaign attacks still valid for ground truth; prefer driving them through **P11** once M1 ships.  
-4. **P1.6–P1.9** — Elastic rules + E2E after PRIMARY confirmed.  
-5. **L.3–L.4** — Evidence bundles (DFIR later — **no D7 ingest until Plan 1 done**).  
-6. **Campaign E paused** (not main AD spine).
+1. **P1:** Automated/manual runs → ES proof → `verification-table.md` → `source-matrix-grid.md` → bundle.  
+2. **P1.6–P1.9** — Elastic rules + E2E after PRIMARY confirmed.  
+3. **L.3–L.4** — Evidence bundles (DFIR later — **no D7 ingest until Plan 1 done**).  
+4. **Live `--execute`** — operator-gated per phase (HITL); dry-run smoke already green on `.60`.
 
-**Blocked:** C.0.5 / C.H — ws01 `.62` on lab net required for beachhead path.
+**Unblocked:** ws01 `.62` — WinRM/config lane + T042 + Elastic CADRE-All. OU=`WS01-MDE` rename deferred.
 
 ---
 
@@ -120,7 +118,7 @@
 | ID | Phase / stream | Profile | Status | Attack | Tracker | Metadata | Notes |
 |----|----------------|---------|--------|--------|---------|----------|-------|
 | C.0 | Phase 0 — Recon | P-CHILD | [ ] | [ ] | [ ] | [ ] | Unauth recon, Kerberos enum, NetExec modules |
-| C.0.5 | Phase 0.5 — ws01 beachhead | **P-BEACH** | [ ] | [ ] | [ ] | [ ] | H-01..H-06; **ws01 `.62` required** |
+| C.0.5 | Phase 0.5 — ws01 beachhead | **P-BEACH** | [ ] | [ ] | [ ] | [ ] | H-01..H-06; **ws01 live** (CADRE-All + soft Defender) — attack path pending |
 | C.1 | Phase 1 — AS-REP | P-CHILD | [x] | [x] | [x] | [~] | WT003/T003; re-verified 2026-07-25 |
 | C.2 | Phase 2 — Kerberoast | P-CHILD | [x] | [x] | [x] | [~] | WT002; re-verified + bundle 2026-07-25 |
 | C.3 | Phase 3 — SQL → GodPotato | P-CHILD | [x] | [x] | [~] | [~] | Needs **mbr01** up |
@@ -137,7 +135,7 @@
 | C.E | Stream E — Network defense (14) | P-PURPLE | [ ] | [ ] | [ ] | [ ] | Plan 0.7 overlap |
 | C.F | Stream F — Supply chain (10) | P-CHILD + linux01 | [ ] | [ ] | [ ] | [ ] | Plan 0.8 |
 | C.G | Stream G — Pre-auth DC CVE lab | snapshot | [~] | [ ] | [ ] | [ ] | Deferred per campaign |
-| C.H | H-01..H-06 placeholders | P-BEACH | [ ] | [ ] | [ ] | [ ] | In `tracker.md`; blocked on ws01 |
+| C.H | H-01..H-06 placeholders | P-BEACH | [ ] | [ ] | [ ] | [ ] | In `tracker.md`; ws01 reachable — execute when ready |
 
 **Campaign hygiene (each phase complete):**
 
@@ -153,19 +151,20 @@
 
 **Plan:** [`docs/internal/plan1.1-campaign-automation/`](docs/internal/plan1.1-campaign-automation/) · **Sister:** [`RedStrike/CAMPAIGN-AUTOMATION-PLAN.md`](../RedStrike/CAMPAIGN-AUTOMATION-PLAN.md) · **Routing:** [`WS01-ROUTING.md`](attack-matrix/04-automation/linux/lib/WS01-ROUTING.md)
 
-> Automate Campaign spine + Branches A–D + G under provisioning→ws01 rules so Plan 1 telemetry runs scale. E/F stay separate script runners (M5).
+> Plan 1.1 **complete** (M0–M5 + P11.6). Automates spine + Branches A–D/G + E/F streams under provisioning→ws01 rules so Plan 1 telemetry can scale.
 
 | ID | Item | Status | Done | Owned by | Notes |
 |----|------|--------|------|----------|-------|
 | P11.0 | Plan docs committed (CADRE plan1.1 + RedStrike mirror) | [x] | 2026-07-25 | `plan1.1-campaign-automation/` · `RedStrike/CAMPAIGN-AUTOMATION-PLAN.md` | Registered in `PLANS.md` |
-| P11.1 | **M1** — Ws01Router + CredentialLedger + `cadre-campaign` + Phases 1–3 graph | [ ] | | RedStrike repo | T003/T002/T041/T043 via `ws01-exec` |
-| P11.2 | **M2** — Full spine Phase 0.5–8 + HITL gates + MCP `campaign_*` | [ ] | | RedStrike + `Red-Strike-workflow.md` | Gates: DCSync, tickets, forest |
-| P11.3 | **M3** — Branches A–D + Campaign G + LAB-PROFILES preflight | [ ] | | RedStrike + `04-automation/` | Refuse Branch C if mbr02 down |
-| P11.4 | **M4** — Typed intents (Rubeus/mimikatz/SQL/bloodyAD/Certipy) | [ ] | | RedStrike | Replace script steps; keep scripts as harness |
-| P11.5 | **M5** — E/F thin stream runners | [ ] | | RedStrike | No ws01 routing required |
-| P11.6 | Install RedStrike on provisioning + smoke `redstrike-campaign` Phases 1–3 | [ ] | | `.60` + RedStrike | Unblocks repeatable Plan 1 runs |
+| P11.0a | **M0** — lab beachhead + playbooks + live verify | [x] | 2026-07-25 | `17-ws01-deploy.yml` · `12-elk-fleet.yml` · `WS01-ROUTING.md` · `CAMPAIGNS_v3.md` | Live: WinRM, T042, `analyst_t1` Admin, Elastic **CADRE-All**, soft Defender, **no MDE**; CADRE-WS01 policy removed |
+| P11.1 | **M1** — BeachheadRouter + CredentialLedger + `cadre-campaign` + Phases 1–3 graph | [x] | 2026-07-25 | `RedStrike\` → sync `tools/red-strike/` | dry-run + 10 unit tests; graph at `Campaign/automation/campaign-graph.yaml` |
+| P11.2 | **M2** — Full spine Phase 0.5–8 + HITL gates + MCP `campaign_*` | [x] | 2026-07-25 | `RedStrike\` + `Red-Strike-workflow.md` | Gates: dcsync/ticket/forest/persistence; API `/campaign/*` |
+| P11.3 | **M3** — Branches A–D + UnPAC + SCCM 35–39 + SQL AI + G | [x] | 2026-07-25 | graph v3 + `--branch` + `lab-profiles.yaml` | Seeds/graph = CADRE glue; engine generic |
+| P11.4 | **M4** — Typed intents (Rubeus/mimikatz/SQL/bloodyAD/Certipy) | [x] | 2026-07-25 | `cadre_strike/builders/` + `intent:` | MCP `build_intent`; `--prefer-script` harness |
+| P11.5 | **M5** — E/F thin stream runners | [x] | 2026-07-26 | `RedStrike\` + `linux/campaign-e|f/` + graph v5 | `stream E|F`; path `external60_phase0`; **0.5.0** |
+| P11.6 | Install RedStrike on provisioning + smoke `redstrike-campaign` Phases 1–3 | [x] | 2026-07-26 | `.60` `~/RedStrike` + `~/CADRE` | venv 0.5.0; dry-run OK: P1–3 win/linux + stream E/F |
 
-**Do next session:** start **P11.1 (M1)** in RedStrike writer repo.
+**Do next:** **Plan 1** telemetry. Deferred: OU=`WS01-MDE` migrate; residual route-ID strip; live `--execute` per phase.
 
 ---
 
@@ -256,7 +255,7 @@
 | L.3 | **Bundle: T003 AS-REP** (2026-07-25 run) | [x] | `~/cadre-evidence/CADRE-T003-ASREP-20260725/` | WinSec 6 / Zeek 7 / Suri 62 |
 | L.4 | **Bundle: T002 Kerberoast** | [x] | `~/cadre-evidence/CADRE-T002-KERB-20260725/` | WinSec 6 / Zeek 7 / Suri 62 |
 | L.5 | **Bundle: Phase 3.5** (first cred technique) | [ ] | same | Tie to `DFIR-Nexus-Pioneer-workflow.md` |
-| L.6 | **Bundle: H-01** (ws01 initial access) | [ ] | same | Sysmon + MDE-forwarded Endpt if Fleet policy ready |
+| L.6 | **Bundle: H-01** (ws01 initial access) | [ ] | same | Sysmon + Elastic Defend events (CADRE-All) |
 | L.7 | Zeek raw log pull from monitor `.55` (optional) | [ ] | Ansible / SSH | Complement ES `logs-zeek.*` |
 | L.8 | Suricata EVE pull from monitor (optional) | [ ] | same | Index: `logs-suricata.eve-*` |
 | L.9 | Index of bundles in `docs/internal/evidence-catalog.md` | [x] | `evidence-catalog.md` | 2026-07-25 |
@@ -330,13 +329,13 @@
 
 | ID | Item | Status | Notes |
 |----|------|--------|-------|
-| I.1 | RedStrike campaign mode on provisioning | [ ] | **Superseded by P11.*** — implement Plan 1.1; old “defer until Phase 1–8 verified” gate lifted for lab automation |
+| I.1 | RedStrike campaign mode on provisioning | [x] | 2026-07-26 | **Done via P11.6** — `~/RedStrike` + dry-run smoke |
 | I.2 | CADRE-RevEng v3 bridge to DFIR-Nexus | [~] | V3.18 decision |
 | I.3 | Praxis: optional scan of CADRE ansible/tools (dogfood) | [ ] | Praxis LEARN Phase 1 Target A = Praxis repo; CADRE is separate |
 | I.4 | Praxis ↔ CADRE log story documented (DFIR consumes logs; Praxis scans code) | [ ] | `O.3` |
 | I.5 | Plan 2 exporter `tools/export-attack/` (8 collectors) | [!] | Unblocks automated `L.*` |
 | I.6 | Plan 3 snapshot `tools/snapshot/cycle.py` | [!] | Post exporter |
-| I.7 | ws01 Fleet policy `CADRE-WS01` + MDE → Elastic | [?] | Required for H-* Endpt telemetry |
+| I.7 | ws01 Fleet **CADRE-All** (Elastic Defend detect/telemetry; no MDE) | [x] | 2026-07-25 — CADRE-WS01 policy removed; enroll via `17-ws01-deploy` / `12-elk-fleet` |
 
 ---
 
@@ -357,7 +356,7 @@
 | ID | Question | Status | Notes |
 |----|----------|--------|-------|
 | N0.1 | DFIR-Nexus: in-tree incubator vs public `DFIR-Nexus/` as writer | [?] | D7.11 |
-| N0.2 | ws01: power schedule + MDE log forwarding to Elastic | [?] | Blocks C.0.5 / C.H |
+| N0.2 | ws01 EDR model | [x] | **Decided 2026-07-25:** Elastic CADRE-All only; soft host Defender; no MDE. OU/GPO migrate later |
 | N0.3 | Evidence bundles: host path vs provisioning-only storage | [?] | L.1 |
 
 ---

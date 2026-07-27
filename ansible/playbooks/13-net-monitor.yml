@@ -83,6 +83,51 @@
         create: true
         mode: "0644"
 
+    - name: Enable attack chain detection @load lines (Plan 0.7)
+      ansible.builtin.lineinfile:
+        path: /opt/zeek/share/zeek/site/local.zeek
+        line: "{{ item }}"
+        create: false
+        mode: "0644"
+      loop:
+        - '@load policy/protocols/conn/mac-logging'
+        - '@load policy/protocols/krb/ticket-logging.zeek'
+
+    - name: Create Zeek site directory for CADRE custom scripts
+      ansible.builtin.file:
+        path: /opt/zeek/share/zeek/site/cadre
+        state: directory
+        mode: "0755"
+
+    - name: Deploy CADRE custom Zeek scripts (Plan 0.7)
+      ansible.builtin.copy:
+        src: "{{ playbook_dir }}/../files/zeek-cadre/{{ item }}"
+        dest: "/opt/zeek/share/zeek/site/{{ item }}"
+        mode: "0644"
+      loop:
+        - cadre-outbound.zeek
+        - cadre-conn-beacon.zeek
+        - cadre-tcp-profile.zeek
+        - cadre-dns-anomaly.zeek
+        - cadre-tls-fingerprint.zeek
+        - cadre-quic-c2.zeek
+        - cadre-supplychain-http.zeek
+
+    - name: Enable CADRE custom Zeek scripts in local.zeek
+      ansible.builtin.lineinfile:
+        path: /opt/zeek/share/zeek/site/local.zeek
+        line: "{{ item }}"
+        create: false
+        mode: "0644"
+      loop:
+        - '@load site/cadre-outbound'
+        - '@load site/cadre-conn-beacon'
+        - '@load site/cadre-tcp-profile'
+        - '@load site/cadre-dns-anomaly'
+        - '@load site/cadre-tls-fingerprint'
+        - '@load site/cadre-quic-c2'
+        - '@load site/cadre-supplychain-http'
+
     - name: Deploy Zeek (first-run config + start)
       ansible.builtin.shell: |
         /opt/zeek/bin/zeekctl deploy
@@ -144,7 +189,7 @@
       changed_when: "'Downloading' in suricata_update.stdout"
       failed_when: false
 
-    - name: Configure Suricata for promiscuous interface
+    - name: Configure Suricata (JA3/JA4 + ET rules + CADRE Phase B)
       ansible.builtin.copy:
         dest: /etc/suricata/suricata.yaml
         content: |
@@ -154,11 +199,50 @@
             address-groups:
               HOME_NET: "[192.168.77.0/24]"
               EXTERNAL_NET: "!$HOME_NET"
+              HTTP_SERVERS: "$HOME_NET"
+              SMTP_SERVERS: "$HOME_NET"
+              SQL_SERVERS: "$HOME_NET"
+              DNS_SERVERS: "$HOME_NET"
+              TELNET_SERVERS: "$HOME_NET"
+              AIM_SERVERS: "$EXTERNAL_NET"
+              DC_SERVERS: "$HOME_NET"
+              FTP_DATA_SERVERS: "$EXTERNAL_NET"
+              FTP_SERVERS: "$HOME_NET"
+              SSH_SERVERS: "$HOME_NET"
+              SIP_SERVERS: "$HOME_NET"
+              LDAP_SERVERS: "$HOME_NET"
+              RDP_SERVERS: "$HOME_NET"
+            port-groups:
+              HTTP_PORTS: "80,443,8080,8443,8888"
+              SMTP_PORTS: "25,465,587"
+              ORACLE_PORTS: "1024:"
+              SHELLCODE_PORTS: "80,443,8080,8443"
+              SSH_PORTS: "22"
           af-packet:
             - interface: {{ promisc_iface }}
               cluster-id: 99
               cluster-type: cluster_flow
               defrag: yes
+          default-rule-path: /var/lib/suricata/rules
+          rule-files:
+            - cadre-ad.rules
+            - cadre-phaseb.rules
+            - cadre-et-lab.rules
+            - cadre-supplychain.rules
+            - cadre-coercion.rules
+          app-layer:
+            protocols:
+              tls:
+                ja3-fingerprints: yes
+                ja4-fingerprints: yes
+              krb5:
+                enabled: yes
+              smb:
+                enabled: yes
+              dns:
+                enabled: yes
+              http:
+                enabled: yes
           outputs:
             - eve-log:
                 enabled: yes
@@ -170,10 +254,55 @@
                   - dns
                   - tls
                   - ssh
-                  - smtp
                   - krb5
                   - smb
         mode: "0644"
+
+    - name: Create Suricata custom rules directory
+      ansible.builtin.file:
+        path: /etc/suricata/rules
+        state: directory
+        mode: "0755"
+
+    - name: Deploy CADRE Suricata AD rules (cadre-ad.rules)
+      ansible.builtin.copy:
+        dest: /etc/suricata/rules/cadre-ad.rules
+        mode: "0644"
+        content: |
+          alert krb5 any any -> any 88 (msg:"CADRE Potential Kerberoast SPN query burst"; krb5_msg_type:10; threshold: type both, count 50, seconds 60, track by_src; sid:1000001; rev:1;)
+          alert dcerpc any any -> any any (msg:"CADRE DCSync replication request"; dcerpc.opnum:3; flow:to_server; sid:1000002; rev:1;)
+
+    - name: Deploy CADRE Phase B Suricata rules (cadre-phaseb.rules)
+      ansible.builtin.copy:
+        src: "{{ playbook_dir }}/../files/zeek-cadre/cadre-phaseb.rules"
+        dest: /etc/suricata/rules/cadre-phaseb.rules
+        mode: "0644"
+
+    - name: Deploy CADRE Curated ET Lab Rules (cadre-et-lab.rules)
+      ansible.builtin.copy:
+        src: "{{ playbook_dir }}/../files/zeek-cadre/cadre-et-lab.rules"
+        dest: /etc/suricata/rules/cadre-et-lab.rules
+        mode: "0644"
+
+    - name: Deploy CADRE Supply-Chain Rules (cadre-supplychain.rules)
+      ansible.builtin.copy:
+        src: "{{ playbook_dir }}/../files/zeek-cadre/cadre-supplychain.rules"
+        dest: /etc/suricata/rules/cadre-supplychain.rules
+        mode: "0644"
+
+    - name: Deploy CADRE Coercion Rules (cadre-coercion.rules)
+      ansible.builtin.copy:
+        src: "{{ playbook_dir }}/../files/zeek-cadre/cadre-coercion.rules"
+        dest: /etc/suricata/rules/cadre-coercion.rules
+        mode: "0644"
+
+    - name: Copy CADRE rules to Suricata default-rule-path
+      ansible.builtin.shell: |
+        cp /etc/suricata/rules/cadre-ad.rules /var/lib/suricata/rules/
+        cp /etc/suricata/rules/cadre-phaseb.rules /var/lib/suricata/rules/
+        cp /etc/suricata/rules/cadre-et-lab.rules /var/lib/suricata/rules/
+        cp /etc/suricata/rules/cadre-supplychain.rules /var/lib/suricata/rules/
+        cp /etc/suricata/rules/cadre-coercion.rules /var/lib/suricata/rules/
 
     - name: Start Suricata
       ansible.builtin.systemd:
@@ -406,6 +535,24 @@
           echo "Importing $FILE into Arkime..."
           /opt/arkime/bin/capture -c /opt/arkime/etc/config.ini -r "$FILE"
           echo "Done. Check viewer at http://$(hostname):8005"
+
+    - name: Deploy file extraction toggle script (session-only)
+      ansible.builtin.copy:
+        src: "{{ playbook_dir }}/../files/zeek-cadre/cadre-extract-toggle.sh"
+        dest: /usr/local/bin/cadre-extract-toggle.sh
+        mode: "0755"
+
+    - name: Deploy RITA analysis script (manual-only)
+      ansible.builtin.copy:
+        src: "{{ playbook_dir }}/../files/zeek-cadre/cadre-rita-analyze.sh"
+        dest: /usr/local/bin/cadre-rita-analyze.sh
+        mode: "0755"
+
+    - name: Deploy RITA query script (provisioning VM usage)
+      ansible.builtin.copy:
+        src: "{{ playbook_dir }}/../files/zeek-cadre/cadre-rita-query.sh"
+        dest: /usr/local/bin/cadre-rita-query.sh
+        mode: "0755"
 
     - name: Logrotate for Arkime raw PCAPs (keep 2 rotations)
       ansible.builtin.copy:
@@ -653,3 +800,99 @@
         enabled: true
         daemon_reload: true
       when: fleet_available
+
+- name: "Play 5 — Install Docker + RITA (manual-only operation)"
+  hosts: monitor
+  gather_facts: true
+  become: yes
+  vars:
+    rita_version: "v5.1.2"
+    clickhouse_version: "24.1.6"
+  tasks:
+    - name: Add Docker CE GPG key
+      ansible.builtin.apt_key:
+        url: https://download.docker.com/linux/ubuntu/gpg
+        keyring: /usr/share/keyrings/docker.gpg
+        state: present
+
+    - name: Add Docker CE repository (Ubuntu 24.04 Noble)
+      ansible.builtin.apt_repository:
+        repo: "deb [arch=amd64 signed-by=/usr/share/keyrings/docker.gpg] https://download.docker.com/linux/ubuntu noble stable"
+        state: present
+        update_cache: true
+
+    - name: Install Docker CE + Compose plugin
+      ansible.builtin.apt:
+        name:
+          - docker-ce
+          - docker-ce-cli
+          - containerd.io
+          - docker-compose-plugin
+        state: present
+
+    - name: Mask Docker systemd service (manual-only operation)
+      ansible.builtin.systemd:
+        name: "{{ item }}"
+        masked: yes
+        enabled: no
+        state: stopped
+      loop:
+        - docker
+        - containerd
+      failed_when: false
+
+    - name: Create /opt/rita directory for image tarballs
+      ansible.builtin.file:
+        path: /opt/rita
+        state: directory
+        mode: "0755"
+
+    - name: Copy RITA Docker image tarballs to /opt/rita/
+      ansible.builtin.copy:
+        src: "{{ playbook_dir }}/../files/rita-images/{{ item.src }}"
+        dest: "/opt/rita/{{ item.dest }}"
+        mode: "0644"
+      loop:
+        - { src: "rita-v5.1.2-image.tar.gz", dest: "rita-v5.1.2-image.tar.gz" }
+        - { src: "clickhouse-24.1.6.tar.gz", dest: "clickhouse-{{ clickhouse_version }}.tar.gz" }
+        - { src: "syslog-ng-latest.tar.gz", dest: "syslog-ng-latest.tar.gz" }
+
+    - name: Download and extract RITA installer
+      ansible.builtin.unarchive:
+        src: https://github.com/activecm/rita/releases/download/{{ rita_version }}/rita-{{ rita_version }}.tar.gz
+        dest: /tmp/
+        remote_src: yes
+        creates: /tmp/rita-{{ rita_version }}-installer/install_rita.sh
+
+    - name: Start Docker temporarily for RITA installation
+      ansible.builtin.systemd:
+        name: docker
+        masked: no
+        state: started
+
+    - name: Wait for Docker daemon to be ready
+      ansible.builtin.wait_for:
+        timeout: 15
+
+    - name: Run RITA installer (loads local images, no internet pull needed)
+      ansible.builtin.shell: |
+        cd /tmp/rita-{{ rita_version }}-installer && bash install_rita.sh
+      register: rita_install
+      changed_when: "'Installation complete' in rita_install.stdout"
+      failed_when: rita_install.rc != 0
+
+    - name: Mask Docker again after RITA install (manual-only)
+      ansible.builtin.systemd:
+        name: "{{ item }}"
+        masked: yes
+        enabled: no
+        state: stopped
+      loop:
+        - docker
+        - containerd
+      failed_when: false
+
+    - name: Clean up RITA installer temp files
+      ansible.builtin.file:
+        path: /tmp/rita-{{ rita_version }}-installer
+        state: absent

@@ -1,4 +1,6 @@
-# WT#028 — Null Session Enumeration
+# ~~WT#028 — Null Session Enumeration~~
+
+> **❌ INVALID — Removed from active campaign.** Server 2025 `RestrictAnonymousSAM=1` blocks SAMR null binds even with `RestrictAnonymous=0`. No replacement. See [`CAMPAIGNS.md`](../Campaign/CAMPAIGNS.md) Phase 1 notes.
 
 ## Metadata
 | Field | Value |

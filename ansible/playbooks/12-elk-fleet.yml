@@ -314,6 +314,20 @@
           Content-Type: "application/json"
         status_code: [200, 409]
       loop:
+        - name: logs@lifecycle
+          body:
+            policy:
+              phases:
+                hot:
+                  min_age: "0ms"
+                  actions:
+                    rollover:
+                      max_age: "7d"
+                      max_primary_shard_size: "50gb"
+                delete:
+                  min_age: "0ms"
+                  actions:
+                    delete: {}
         - name: cadre-3d-retain
           body:
             policy:
@@ -325,7 +339,7 @@
                       max_age: "1d"
                       max_size: "10gb"
                 delete:
-                  min_age: "7d"
+                  min_age: "3d"
                   actions:
                     delete: {}
 
@@ -670,7 +684,7 @@
                   data_stream:
                     type: logs
                     dataset: windows.forwarded
-                  enabled: true
+                  enabled: false
                   vars:
                     preserve_original_event:
                       value: false
@@ -729,15 +743,17 @@
                   value:
                     windows:
                       malware: { mode: detect }
-                      ransomware: { mode: detect }
-                      memory_protection: { mode: detect }
-                      behavior_protection: { mode: detect }
+                      # ransomware/memory/behavior protection require Platinum license
+                      # Basic license restricts these to 'off' regardless of playbook value
+                      ransomware: { mode: off }
+                      memory_protection: { mode: off }
+                      behavior_protection: { mode: off }
                     linux:
                       malware: { mode: detect }
-                      behavior_protection: { mode: detect }
+                      behavior_protection: { mode: off }
                     mac:
                       malware: { mode: detect }
-                      behavior_protection: { mode: detect }
+                      behavior_protection: { mode: off }
         status_code: [200, 409]
       ignore_errors: true
 
@@ -961,6 +977,46 @@
                       value: ["suricata"]
                     preserve_original_event:
                       value: false
+        status_code: [200, 409]
+      ignore_errors: true
+
+    - name: Add Zeek Notice custom log to CADRE-Monitor (filestream)
+      ansible.builtin.uri:
+        url: "http://127.0.0.1:{{ kibana_port }}/api/fleet/package_policies"
+        method: POST
+        user: elastic
+        password: "{{ elastic_password }}"
+        force_basic_auth: true
+        headers:
+          kbn-xsrf: "true"
+        body_format: json
+        body:
+          name: zeek-cadre-notice-1
+          policy_id: "{{ cadre_mon.id }}"
+          package:
+            name: filestream
+            title: Custom Logs (Filestream)
+            version: 2.5.0
+          namespace: ""
+          inputs:
+            - type: filestream
+              policy_template: filestream
+              enabled: true
+              streams:
+                - enabled: true
+                  data_stream:
+                    type: logs
+                    dataset: filestream.filestream
+                    elasticsearch:
+                      dynamic_dataset: true
+                      dynamic_namespace: true
+                  vars:
+                    paths:
+                      type: text
+                      value: ["/opt/zeek/logs/current/notice.log"]
+                    data_stream.dataset:
+                      type: text
+                      value: zeek.notice
         status_code: [200, 409]
       ignore_errors: true
 
@@ -1642,7 +1698,9 @@
 
 
 
-- name: "Play 3 — Enroll Elastic Agent on Windows VMs"
+# ws01 enrolls under CADRE-All (Elastic Defend detect/telemetry; no MDE) — same as other Windows VMs.
+# Standalone re-enroll also in 17-ws01-deploy.yml Play 7.
+- name: "Play 3 — Enroll Elastic Agent on Windows VMs (CADRE-All; includes ws01)"
   hosts: windows_servers
   gather_facts: true
   vars:

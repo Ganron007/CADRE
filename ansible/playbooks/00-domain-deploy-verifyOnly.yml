@@ -95,6 +95,32 @@
       changed_when: false
       failed_when: false
 
+    - name: "[VERIFY] DNS service is running"
+      ansible.windows.win_shell: |
+        $ErrorActionPreference = "Stop"
+        try {
+          $svc = Get-Service -Name DNS -ErrorAction Stop
+          if ($svc.Status -ne "Running") { Write-Output "FAIL: DNS service status is $($svc.Status), expected Running"; exit 1 }
+          $startType = (Get-WmiObject Win32_Service -Filter "Name='DNS'").StartMode
+          if ($startType -ne "Auto") { Write-Output "FAIL: DNS service start mode is $startType, expected Auto"; exit 1 }
+          Write-Output "PASS: DNS service is Running (start mode: $startType)"; exit 0
+        } catch { Write-Output "FAIL: $_"; exit 1 }
+      register: r
+      changed_when: false
+      failed_when: r.rc == 1
+
+    - name: "[VERIFY] DNS can resolve cadre.local zone"
+      ansible.windows.win_shell: |
+        $ErrorActionPreference = "Stop"
+        try {
+          $result = Resolve-DnsName -Name "dc01.cadre.local" -Server 127.0.0.1 -ErrorAction Stop
+          if ($result.IPAddress -eq "192.168.77.10") { Write-Output "PASS: DNS resolves dc01.cadre.local to 192.168.77.10"; exit 0 }
+          Write-Output "FAIL: DNS resolved dc01.cadre.local to unexpected IP $($result.IPAddress)"; exit 1
+        } catch { Write-Output "FAIL: DNS resolution failed — $_"; exit 1 }
+      register: r
+      changed_when: false
+      failed_when: r.rc == 1
+
 - name: "dc02 — Verify AD-DS + child.cadre.local domain"
   hosts: dc02
   gather_facts: false
@@ -196,6 +222,20 @@
       changed_when: false
       failed_when: false
 
+    - name: "[VERIFY] DNS service is running"
+      ansible.windows.win_shell: |
+        $ErrorActionPreference = "Stop"
+        try {
+          $svc = Get-Service -Name DNS -ErrorAction Stop
+          if ($svc.Status -ne "Running") { Write-Output "FAIL: DNS service status is $($svc.Status), expected Running"; exit 1 }
+          $startType = (Get-WmiObject Win32_Service -Filter "Name='DNS'").StartMode
+          if ($startType -ne "Auto") { Write-Output "FAIL: DNS service start mode is $startType, expected Auto"; exit 1 }
+          Write-Output "PASS: DNS service is Running (start mode: $startType)"; exit 0
+        } catch { Write-Output "FAIL: $_"; exit 1 }
+      register: r
+      changed_when: false
+      failed_when: r.rc == 1
+
 - name: "dc03 — Verify AD-DS + range.local forest"
   hosts: dc03
   gather_facts: false
@@ -296,6 +336,20 @@
       register: r
       changed_when: false
       failed_when: false
+
+    - name: "[VERIFY] DNS service is running"
+      ansible.windows.win_shell: |
+        $ErrorActionPreference = "Stop"
+        try {
+          $svc = Get-Service -Name DNS -ErrorAction Stop
+          if ($svc.Status -ne "Running") { Write-Output "FAIL: DNS service status is $($svc.Status), expected Running"; exit 1 }
+          $startType = (Get-WmiObject Win32_Service -Filter "Name='DNS'").StartMode
+          if ($startType -ne "Auto") { Write-Output "FAIL: DNS service start mode is $startType, expected Auto"; exit 1 }
+          Write-Output "PASS: DNS service is Running (start mode: $startType)"; exit 0
+        } catch { Write-Output "FAIL: $_"; exit 1 }
+      register: r
+      changed_when: false
+      failed_when: r.rc == 1
 
 - name: "Verify forest trust — cadre.local side"
   hosts: dc01

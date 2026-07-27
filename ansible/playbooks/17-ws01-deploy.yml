@@ -1,0 +1,651 @@
+---
+# TYPE: DEPLOY (rc=0=skip, rc=2=applied+verified, rc=1=fail)
+# 17-ws01-deploy.yml — Single deploy playbook for the CADRE workstation beachhead
+# Targets: ws01 (192.168.77.62) — Windows 11 Enterprise, child.cadre.local
+# Role: normal AD workstation + Plan 1.1 initial-access / assume-breach entry point
+#
+# EDR: Elastic Agent on Fleet policy CADRE-All (same as other Windows lab VMs) —
+#      Elastic Defend detect/telemetry only. NO Microsoft Defender for Endpoint (MDE).
+# Defender: soft-disable RTP + path/process excludes (do NOT stop WinDefend).
+#          Do NOT run 04-vulnerabilities.yml hard Defender-kill against ws01.
+# OU/GPO: still OU=WS01-MDE today — migrate to normal workstation OU later (deferred).
+# Source of truth: actual ws01 VM (update playbook when manual changes differ).
+#
+# Config lane: ansible_user=vagrant / password=vagrant (same as other Windows VMs).
+# ws01 is not in Vagrantfile yet — access by IP 192.168.77.62. If WinRM is unreachable
+# from provisioning, run Play 0's script ONCE at the guest console as vagrant (Admin).
+
+# =============================================================================
+# Play 0: WinRM lab listener (CADRE-compatible — matches Vagrantfile Windows provision)
+# =============================================================================
+# Host firewall stays on; allow HTTP WinRM :5985 + ICMP from lab.
+- name: "ws01 — Ensure WinRM HTTP/Basic for configurator (vagrant)"
+  hosts: ws01
+  gather_facts: false
+  tasks:
+    - name: "[WINRM] Service running + Basic/AllowUnencrypted + FW 5985/ICMP"
+      ansible.windows.win_shell: |
+        $ErrorActionPreference = "Stop"
+        try {
+          # Service
+          Set-Service WinRM -StartupType Automatic
+          if ((Get-Service WinRM).Status -ne 'Running') { Start-Service WinRM }
+
+          # Listener (HTTP *)
+          winrm quickconfig -quiet -force | Out-Null
+
+          # Auth — match CADRE Windows Vagrant boxes (plaintext/basic)
+          Set-Item -Path WSMan:\localhost\Service\Auth\Basic -Value $true -Force
+          Set-Item -Path WSMan:\localhost\Service\AllowUnencrypted -Value $true -Force
+          try { Set-Item -Path WSMan:\localhost\Client\Auth\Basic -Value $true -Force } catch {}
+
+          # Firewall: allow WinRM + ping without disabling profiles (ws01 stays "defended")
+          $rules = @(
+            @{ Name = 'CADRE-WinRM-HTTP-5985'; Port = 5985; Proto = 'TCP' },
+            @{ Name = 'CADRE-ICMPv4-Echo'; Port = $null; Proto = 'ICMPv4' }
+          )
+          $changed = $false
+          if (-not (Get-NetFirewallRule -DisplayName 'CADRE-WinRM-HTTP-5985' -ErrorAction SilentlyContinue)) {
+            New-NetFirewallRule -DisplayName 'CADRE-WinRM-HTTP-5985' -Direction Inbound `
+              -Protocol TCP -LocalPort 5985 -Action Allow -Profile Any | Out-Null
+            $changed = $true
+          } else {
+            Enable-NetFirewallRule -DisplayName 'CADRE-WinRM-HTTP-5985' -ErrorAction SilentlyContinue
+          }
+          # Also enable built-in WinRM rules if present
+          Get-NetFirewallRule -DisplayGroup 'Windows Remote Management' -ErrorAction SilentlyContinue |
+            Enable-NetFirewallRule -ErrorAction SilentlyContinue
+
+          if (-not (Get-NetFirewallRule -DisplayName 'CADRE-ICMPv4-Echo' -ErrorAction SilentlyContinue)) {
+            New-NetFirewallRule -DisplayName 'CADRE-ICMPv4-Echo' -Direction Inbound `
+              -Protocol ICMPv4 -IcmpType 8 -Action Allow -Profile Any | Out-Null
+            $changed = $true
+          }
+
+          # Verify listen
+          $listen = netstat -an | Select-String ':5985\s+.*LISTENING'
+          if (-not $listen) { throw 'WinRM not listening on 5985' }
+
+          $basic = (Get-Item WSMan:\localhost\Service\Auth\Basic).Value
+          $unenc = (Get-Item WSMan:\localhost\Service\AllowUnencrypted).Value
+          if ($basic -ne $true -and "$basic" -ne 'true') { throw "Basic auth=$basic" }
+          if ($unenc -ne $true -and "$unenc" -ne 'true') { throw "AllowUnencrypted=$unenc" }
+
+          if ($changed) { Write-Output 'APPLIED: WinRM Basic + FW 5985/ICMP'; exit 2 }
+          Write-Output 'OK: WinRM Basic + FW 5985 already configured'; exit 0
+        } catch { Write-Output "FAILED: $_"; exit 1 }
+      register: r_winrm_cfg
+      changed_when: r_winrm_cfg.rc == 2
+      failed_when: r_winrm_cfg.rc == 1
+
+# =============================================================================
+# Play 1: Prepare ws01 — hostname, static IP, DNS, domain join
+# =============================================================================
+- name: "ws01 — Prepare hostname, IP, DNS and join child.cadre.local"
+  hosts: ws01
+  gather_facts: false
+  vars:
+    ws01_ip: "192.168.77.62"
+    ws01_prefix: 24
+    ws01_dns: "192.168.77.11"
+    ws01_dns_fallback: "192.168.77.10"
+    ws01_ou: "OU=WS01-MDE,DC=child,DC=cadre,DC=local"
+    ws01_domain_user: "analyst_t1"
+    ws01_domain_user_password: "T13r_An@lyst!"
+  tasks:
+    - name: "[PREP] Rename computer to ws01"
+      ansible.windows.win_shell: |
+        $ErrorActionPreference = "Stop"
+        try {
+          $current = $env:COMPUTERNAME
+          if ($current -eq "ws01") { Write-Output "OK: Hostname already ws01"; exit 0 }
+          Rename-Computer -NewName "ws01" -Force
+          Write-Output "APPLIED: Renamed to ws01"; exit 2
+        } catch { Write-Output "FAILED: Rename — $_"; exit 1 }
+      register: r
+      changed_when: r.rc == 2
+      failed_when: r.rc == 1
+
+    - name: "[PREP] Detect domain-joined network adapter"
+      ansible.windows.win_shell: |
+        $ErrorActionPreference = "Stop"
+        try {
+          $if = Get-NetAdapter | Where-Object { $_.Status -eq 'Up' } | ForEach-Object {
+            $ip = Get-NetIPAddress -InterfaceIndex $_.ifIndex -AddressFamily IPv4 -ErrorAction SilentlyContinue
+            if ($ip.IPAddress -match '^192\.168\.77\.') { $_ }
+          } | Select-Object -First 1
+          if (-not $if) { throw "No adapter found with 192.168.77.x address" }
+          Write-Output "adapter=$($if.Name)"
+        } catch { Write-Output "FAILED: $_"; exit 1 }
+      register: adapter_detect
+      changed_when: false
+      failed_when: adapter_detect.rc == 1
+
+    - name: "[PREP] Set static IP on domain adapter"
+      ansible.windows.win_shell: |
+        $ErrorActionPreference = "Stop"
+        try {
+          $ifAlias = "{{ (adapter_detect.stdout_lines | select('match','^adapter=') | first | split('=') | last) }}"
+          $ip = Get-NetIPAddress -InterfaceAlias $ifAlias -AddressFamily IPv4 -ErrorAction SilentlyContinue
+          if ($ip) {
+            $currentIP = ($ip | Select-Object -ExpandProperty IPAddress)
+            $currentPrefix = ($ip | Select-Object -ExpandProperty PrefixLength)
+            if ($currentIP -eq "{{ ws01_ip }}" -and $currentPrefix -eq {{ ws01_prefix }}) {
+              Write-Output "OK: Static IP already set"; exit 0
+            }
+          }
+          Remove-NetIPAddress -InterfaceAlias $ifAlias -AddressFamily IPv4 -Confirm:$false -ErrorAction SilentlyContinue
+          Remove-NetRoute -InterfaceAlias $ifAlias -DestinationPrefix "0.0.0.0/0" -Confirm:$false -ErrorAction SilentlyContinue
+          New-NetIPAddress -InterfaceAlias $ifAlias -AddressFamily IPv4 -IPAddress "{{ ws01_ip }}" -PrefixLength {{ ws01_prefix }} -ErrorAction Stop
+          $v = Get-NetIPAddress -InterfaceAlias $ifAlias -AddressFamily IPv4 -ErrorAction Stop
+          if ($v.IPAddress -ne "{{ ws01_ip }}") { throw "IP not set correctly" }
+          Write-Output "APPLIED: Static IP set"; exit 2
+        } catch { Write-Output "FAILED: Static IP — $_"; exit 1 }
+      register: r
+      changed_when: r.rc == 2
+      failed_when: r.rc == 1
+
+    - name: "[PREP] Set DNS to dc02 (child.cadre.local)"
+      ansible.windows.win_dns_client:
+        adapter_names: "{{ (adapter_detect.stdout_lines | select('match','^adapter=') | first | split('=') | last) }}"
+        ipv4_addresses:
+          - "{{ ws01_dns }}"
+          - "{{ ws01_dns_fallback }}"
+
+    - name: "[PREP] Join ws01 to child.cadre.local (OU=WS01-MDE)"
+      ansible.windows.win_shell: |
+        $ErrorActionPreference = "Stop"
+        try {
+          $domain = "child.cadre.local"
+          $current = (Get-WmiObject Win32_ComputerSystem).Domain
+          if ($current -eq $domain) { Write-Output "OK: Already domain-joined to $domain"; exit 0 }
+          $secPwd = ConvertTo-SecureString "vagrant" -AsPlainText -Force
+          $cred = New-Object System.Management.Automation.PSCredential("CADRE\Administrator", $secPwd)
+          Add-Computer -DomainName $domain -Credential $cred -OUPath "{{ ws01_ou }}" -Force -Restart
+          Write-Output "APPLIED: Domain join initiated"; exit 2
+        } catch { Write-Output "FAILED: Domain join — $_"; exit 1 }
+      register: r
+      changed_when: r.rc == 2
+      failed_when: r.rc == 1
+
+    - name: "[PREP] Reboot after hostname/IP/domain join"
+      ansible.windows.win_reboot:
+        reboot_timeout: 600
+      when: r.rc == 2
+
+# =============================================================================
+# Play 2: Sysmon installation
+# =============================================================================
+- name: "ws01 — Sysmon installation"
+  hosts: ws01
+  gather_facts: false
+  tasks:
+    - name: "[SYSMON] Check Sysmon64 service status"
+      ansible.windows.win_service:
+        name: Sysmon64
+      register: sysmon_svc
+      failed_when: false
+
+    - name: "[SYSMON] Create C:\\Tools directory"
+      ansible.windows.win_file:
+        path: C:\Tools
+        state: directory
+
+    - name: "[SYSMON] Download Sysmon from Sysinternals"
+      ansible.windows.win_get_url:
+        url: https://download.sysinternals.com/files/Sysmon.zip
+        dest: C:\Tools\Sysmon.zip
+      when: sysmon_svc.exists is not defined or not sysmon_svc.exists
+
+    - name: "[SYSMON] Extract Sysmon to C:\\Tools\\Sysmon"
+      community.windows.win_unzip:
+        src: C:\Tools\Sysmon.zip
+        dest: C:\Tools\Sysmon
+        creates: C:\Tools\Sysmon\Sysmon64.exe
+      when: sysmon_svc.exists is not defined or not sysmon_svc.exists
+
+    - name: "[SYSMON] Download Olaf Hartong sysmon-modular config"
+      ansible.windows.win_get_url:
+        url: https://raw.githubusercontent.com/olafhartong/sysmon-modular/master/sysmonconfig.xml
+        dest: C:\Tools\Sysmon\sysmonconfig.xml
+      when: sysmon_svc.exists is not defined or not sysmon_svc.exists
+
+    - name: "[SYSMON] Install Sysmon with sysmon-modular config"
+      ansible.windows.win_shell: C:\Tools\Sysmon\Sysmon64.exe -accepteula -i C:\Tools\Sysmon\sysmonconfig.xml
+      when: sysmon_svc.exists is not defined or not sysmon_svc.exists
+      register: sysmon_install
+      changed_when: "'Sysmon installed' in sysmon_install.stdout"
+      failed_when: sysmon_install.rc != 0
+
+    - name: "[SYSMON] Update Sysmon config (existing install)"
+      ansible.windows.win_shell: C:\Tools\Sysmon\Sysmon64.exe -c C:\Tools\Sysmon\sysmonconfig.xml
+      when: sysmon_svc.exists is defined and sysmon_svc.exists
+      register: sysmon_update
+      changed_when: "'Configuration updated' in sysmon_update.stdout"
+      failed_when: sysmon_update.rc != 0
+
+    - name: "[SYSMON] Ensure Sysmon64 service running (auto-start)"
+      ansible.windows.win_service:
+        name: Sysmon64
+        state: started
+        start_mode: auto
+
+# =============================================================================
+# Play 3: DFIR monitoring baseline
+# =============================================================================
+- name: "ws01 — Deploy DFIR monitoring baseline"
+  hosts: ws01
+  gather_facts: false
+  tasks:
+    - name: "[AUDIT] Create C:\\Tools and C:\\PSTranscripts directories"
+      ansible.windows.win_file:
+        path: "{{ item }}"
+        state: directory
+      loop:
+        - C:\Tools
+        - C:\PSTranscripts
+
+    - name: "[AUDIT] Copy cadre-dfir-monitoring.ps1 to C:\\Tools"
+      ansible.windows.win_copy:
+        src: ../files/cadre-dfir-monitoring.ps1
+        dest: C:\Tools\cadre-dfir-monitoring.ps1
+
+    - name: "[AUDIT] Execute DFIR monitoring baseline"
+      ansible.windows.win_shell: |
+        $ErrorActionPreference = "Stop"
+        try {
+          $lsa = (Get-ItemProperty "HKLM:\SYSTEM\CurrentControlSet\Control\Lsa" -Name "SCENoApplyLegacyAuditPolicy" -ErrorAction SilentlyContinue).SCENoApplyLegacyAuditPolicy
+          if ($lsa -eq 1) {
+            $spot = auditpol /get /subcategory:"Logon" 2>&1 | Select-String "Success and Failure"
+            if ($spot) { Write-Output "OK: Monitoring already applied"; exit 0 }
+          }
+          $result = & C:\Tools\cadre-dfir-monitoring.ps1
+          if ($LASTEXITCODE -ne 0) { throw "Script exited with code $LASTEXITCODE" }
+          $v1 = (Get-ItemProperty "HKLM:\SYSTEM\CurrentControlSet\Control\Lsa" -Name "SCENoApplyLegacyAuditPolicy" -ErrorAction Stop).SCENoApplyLegacyAuditPolicy
+          $v2 = (Get-ItemProperty "HKLM:\SOFTWARE\Policies\Microsoft\Windows\PowerShell\ScriptBlockLogging" -Name "EnableScriptBlockLogging" -ErrorAction Stop).EnableScriptBlockLogging
+          if ($v1 -ne 1 -or $v2 -ne 1) { throw "Verify failed: LSA=$v1 PS=$v2" }
+          Write-Output "APPLIED: Monitoring baseline applied and verified"; exit 2
+        } catch { Write-Output "FAILED: $_"; exit 1 }
+      register: r
+      changed_when: r.rc == 2
+      failed_when: r.rc == 1
+
+# =============================================================================
+# Play 4: RDP enablement (attack surface entry point)
+# =============================================================================
+- name: "ws01 — Enable RDP for campaign entry point practice"
+  hosts: ws01
+  gather_facts: false
+  vars:
+    ws01_domain_user: "analyst_t1"
+  tasks:
+    - name: "[RDP] Enable Terminal Server connections"
+      ansible.windows.win_regedit:
+        path: HKLM:\System\CurrentControlSet\Control\Terminal Server
+        name: fDenyTSConnections
+        data: 0
+        type: dword
+
+    - name: "[RDP] Add analyst_t1 to Remote Desktop Users"
+      ansible.windows.win_shell: |
+        $ErrorActionPreference = "Stop"
+        try {
+          $group = [ADSI]"WinNT://$env:COMPUTERNAME/Remote Desktop Users,group"
+          $existing = $group.Members() | Where-Object { $_.GetType().InvokeMember("Name", 'GetProperty', $null, $_, $null) -eq "{{ ws01_domain_user }}" }
+          if ($existing) { Write-Output "OK: {{ ws01_domain_user }} already in Remote Desktop Users"; exit 0 }
+          & net localgroup "Remote Desktop Users" "CHILD\{{ ws01_domain_user }}" /add
+          $verify = $group.Members() | Where-Object { $_.GetType().InvokeMember("Name", 'GetProperty', $null, $_, $null) -eq "{{ ws01_domain_user }}" }
+          if (-not $verify) { throw "Verify failed" }
+          Write-Output "APPLIED: {{ ws01_domain_user }} added to Remote Desktop Users"; exit 2
+        } catch { Write-Output "FAILED: RDP user group — $_"; exit 1 }
+      register: r
+      changed_when: r.rc == 2
+      failed_when: r.rc == 1
+
+    - name: "[RDP] Enable RDP firewall rule"
+      ansible.windows.win_shell: |
+        $ErrorActionPreference = "Stop"
+        try {
+          $rule = Get-NetFirewallRule -DisplayGroup "Remote Desktop" -ErrorAction SilentlyContinue
+          if (-not $rule) { Write-Output "SKIP: RDP firewall group not found"; exit 0 }
+          $enabled = $rule | Where-Object { $_.Enabled -eq $true }
+          if ($enabled) { Write-Output "OK: RDP firewall already enabled"; exit 0 }
+          Enable-NetFirewallRule -DisplayGroup "Remote Desktop"
+          $v = Get-NetFirewallRule -DisplayGroup "Remote Desktop" | Where-Object { $_.Enabled -eq $true }
+          if (-not $v) { throw "Firewall rule not enabled" }
+          Write-Output "APPLIED: RDP firewall rule enabled"; exit 2
+        } catch { Write-Output "FAILED: $_"; exit 1 }
+      register: r
+      changed_when: r.rc == 2
+      failed_when: r.rc == 1
+
+    - name: "[WINRM] Add analyst_t1 to Remote Management Users (assumed-breach pivot from provisioning)"
+      ansible.windows.win_shell: |
+        $ErrorActionPreference = "Stop"
+        try {
+          $group = [ADSI]"WinNT://$env:COMPUTERNAME/Remote Management Users,group"
+          $existing = $group.Members() | Where-Object { $_.GetType().InvokeMember("Name", 'GetProperty', $null, $_, $null) -eq "{{ ws01_domain_user }}" }
+          if ($existing) { Write-Output "OK: {{ ws01_domain_user }} already in Remote Management Users"; exit 0 }
+          & net localgroup "Remote Management Users" "CHILD\{{ ws01_domain_user }}" /add
+          $verify = $group.Members() | Where-Object { $_.GetType().InvokeMember("Name", 'GetProperty', $null, $_, $null) -eq "{{ ws01_domain_user }}" }
+          if (-not $verify) { throw "Verify failed" }
+          Write-Output "APPLIED: {{ ws01_domain_user }} added to Remote Management Users"; exit 2
+        } catch { Write-Output "FAILED: WinRM user group — $_"; exit 1 }
+      register: r_winrm
+      changed_when: r_winrm.rc == 2
+      failed_when: r_winrm.rc == 1
+
+    # Plan 1.1 M0 — assumed-breach Local Admin (config lane via Ansible/vagrant; attack identity stays analyst_t1)
+    - name: "[ADMIN] Add analyst_t1 to local Administrators (Plan 1.1 assumed-breach)"
+      ansible.windows.win_shell: |
+        $ErrorActionPreference = "Stop"
+        try {
+          $member = "CHILD\{{ ws01_domain_user }}"
+          $existing = Get-LocalGroupMember -Group "Administrators" -ErrorAction SilentlyContinue |
+            Where-Object { $_.Name -eq $member -or $_.Name -like "*\{{ ws01_domain_user }}" }
+          if ($existing) { Write-Output "OK: {{ ws01_domain_user }} already in Administrators"; exit 0 }
+          Add-LocalGroupMember -Group "Administrators" -Member $member
+          $verify = Get-LocalGroupMember -Group "Administrators" |
+            Where-Object { $_.Name -eq $member -or $_.Name -like "*\{{ ws01_domain_user }}" }
+          if (-not $verify) { throw "Verify failed — $member not in Administrators" }
+          Write-Output "APPLIED: {{ ws01_domain_user }} added to Administrators"; exit 2
+        } catch { Write-Output "FAILED: Administrators group — $_"; exit 1 }
+      register: r_admin
+      changed_when: r_admin.rc == 2
+      failed_when: r_admin.rc == 1
+
+    - name: "[DEFENDER] Ensure cadre-attack exclusion folder (lab campaign tooling)"
+      ansible.windows.win_shell: |
+        $ErrorActionPreference = "Stop"
+        $dir = "C:\Tools\cadre-attack"
+        try {
+          New-Item -ItemType Directory -Force -Path $dir | Out-Null
+          Add-MpPreference -ExclusionPath $dir -Force
+          $paths = (Get-MpPreference).ExclusionPath
+          if ($paths -contains $dir) { Write-Output "OK: Defender exclusion for $dir"; exit 0 }
+          Write-Output "WARN: ExclusionPath list: $paths"; exit 0
+        } catch { Write-Output "FAIL: Defender exclusion — $_"; exit 1 }
+      register: r_def
+      changed_when: "'APPLIED' in r_def.stdout"
+      failed_when: r_def.rc == 1
+
+# =============================================================================
+# Play 5: Create domain user profile on ws01
+# =============================================================================
+- name: "ws01 — Create domain user profile"
+  hosts: ws01
+  gather_facts: false
+  vars:
+    ws01_domain_user: "analyst_t1"
+    ws01_domain_user_password: "T13r_An@lyst!"
+  tasks:
+    - name: "[PROFILE] Ensure profile directory exists for domain user"
+      ansible.windows.win_shell: |
+        $ErrorActionPreference = "Stop"
+        try {
+          $profilePath = "C:\Users\{{ ws01_domain_user }}"
+          if (Test-Path $profilePath) { Write-Output "OK: Profile path already exists"; exit 0 }
+          New-Item -Path $profilePath -ItemType Directory -Force | Out-Null
+          New-Item -Path "$profilePath\Downloads" -ItemType Directory -Force | Out-Null
+          New-Item -Path "$profilePath\Documents" -ItemType Directory -Force | Out-Null
+          New-Item -Path "$profilePath\Desktop" -ItemType Directory -Force | Out-Null
+          Write-Output "APPLIED: Profile directories created"; exit 2
+        } catch { Write-Output "FAILED: Profile creation — $_"; exit 1 }
+      register: r
+      changed_when: r.rc == 2
+      failed_when: r.rc == 1
+
+# =============================================================================
+# Play 6: DFIR telemetry knobs + soft Defender (no MDE)
+# =============================================================================
+- name: "ws01 — DFIR telemetry knobs + soft Defender"
+  hosts: ws01
+  gather_facts: false
+  tasks:
+    - name: "[DFIR] Set high-performance power plan"
+      ansible.windows.win_shell: |
+        $ErrorActionPreference = "Stop"
+        try {
+          $active = powercfg /getactivescheme
+          if ($active -match 'High performance') { Write-Output "OK: High performance power plan already active"; exit 0 }
+          powercfg /setactive 8c5e7fda-e8bf-4a96-9a85-a6e23a8c635c
+          $verify = powercfg /getactivescheme
+          if ($verify -notmatch 'High performance') { throw "Power plan not set" }
+          Write-Output "APPLIED: High performance power plan set"; exit 2
+        } catch { Write-Output "FAILED: $_"; exit 1 }
+      register: r
+      changed_when: r.rc == 2
+      failed_when: r.rc == 1
+
+    - name: "[DFIR] Enable NTLM auditing (EID 8004/8005/8006)"
+      ansible.windows.win_shell: |
+        $ErrorActionPreference = "Stop"
+        try {
+          $regPath = "HKLM:\\SYSTEM\\CurrentControlSet\\Control\\Lsa\\MSV1_0"
+          if (-not (Test-Path $regPath)) { New-Item -Path $regPath -Force | Out-Null }
+          Set-ItemProperty -Path $regPath -Name "AuditReceivingNTLMTraffic" -Value 2 -Type DWord -Force
+          Set-ItemProperty -Path $regPath -Name "AuditNTLMInDomain" -Value 2 -Type DWord -Force
+          $v1 = (Get-ItemProperty $regPath -Name "AuditReceivingNTLMTraffic" -ErrorAction Stop).AuditReceivingNTLMTraffic
+          $v2 = (Get-ItemProperty $regPath -Name "AuditNTLMInDomain" -ErrorAction Stop).AuditNTLMInDomain
+          if ($v1 -ne 2 -or $v2 -ne 2) { throw "Verify failed: $v1, $v2" }
+          Write-Output "APPLIED: NTLM auditing enabled"; exit 2
+        } catch { Write-Output "FAILED: $_"; exit 1 }
+      register: r
+      changed_when: r.rc == 2
+      failed_when: r.rc == 1
+
+    - name: "[DFIR] Enable ADCS CA auditing (only if CA service present)"
+      ansible.windows.win_shell: |
+        $ErrorActionPreference = "Stop"
+        try {
+          $caSvc = Get-Service -Name "CertSvc" -ErrorAction SilentlyContinue
+          if (-not $caSvc) { Write-Output "SKIP: ADCS CA service not installed (workstation)"; exit 0 }
+          & certutil -setreg CA\\AuditFilter 255 | Out-Null
+          Write-Output "APPLIED: ADCS CA AuditFilter=255"; exit 2
+        } catch { Write-Output "FAILED: $_"; exit 1 }
+      register: r
+      changed_when: r.rc == 2
+      failed_when: r.rc == 1
+
+    - name: "[DFIR] Enable LDAP diagnostic logging (DC-side if present) + client channel"
+      ansible.windows.win_shell: |
+        $ErrorActionPreference = "Stop"
+        try {
+          $ntdsDiag = "HKLM:\\SYSTEM\\CurrentControlSet\\Services\\NTDS\\Diagnostics"
+          if (Test-Path "HKLM:\\SYSTEM\\CurrentControlSet\\Services\\NTDS") {
+            if (-not (Test-Path $ntdsDiag)) { New-Item -Path $ntdsDiag -Force | Out-Null }
+            Set-ItemProperty -Path $ntdsDiag -Name "16 LDAP Interface Events" -Value 5 -Type DWord -Force
+            Write-Output "APPLIED: DC-side LDAP diagnostic logging level 5"
+          } else {
+            Write-Output "SKIP: NTDS service not present (workstation); DC-side LDAP logging not applicable"
+          }
+          'y' | wevtutil sl Microsoft-Windows-LDAP-Client/Debug /e:true 2>&1 | Out-Null
+          if ($LASTEXITCODE -eq 0) { Write-Output "APPLIED: LDAP-Client/Debug channel enabled"; exit 2 }
+          else { Write-Output "SKIP: LDAP-Client/Debug channel not present on this SKU" }
+        } catch { Write-Output "FAILED: $_"; exit 1 }
+      register: r
+      changed_when: r.rc == 2
+
+    - name: "[DFIR] Enable NTLM operational channel"
+      ansible.windows.win_shell: |
+        $ErrorActionPreference = "Stop"
+        try {
+          'y' | wevtutil sl Microsoft-Windows-NTLM/Operational /e:true 2>&1 | Out-Null
+          Write-Output "APPLIED: Microsoft-Windows-NTLM/Operational enabled"; exit 2
+        } catch { Write-Output "FAILED: $_"; exit 1 }
+      register: r
+      changed_when: r.rc == 2
+      failed_when: r.rc == 1
+
+    - name: "[DFIR] Enable Kerberos auditing registry LogLevel"
+      ansible.windows.win_shell: |
+        $ErrorActionPreference = "Stop"
+        try {
+          $kerbParams = "HKLM:\\SYSTEM\\CurrentControlSet\\Control\\Lsa\\Kerberos\\Parameters"
+          if (-not (Test-Path $kerbParams)) { New-Item -Path $kerbParams -Force | Out-Null }
+          Set-ItemProperty -Path $kerbParams -Name "LogLevel" -Value 1 -Type DWord -Force
+          $v = (Get-ItemProperty $kerbParams -Name "LogLevel" -ErrorAction Stop).LogLevel
+          if ($v -ne 1) { throw "Verify failed: $v" }
+          Write-Output "APPLIED: Kerberos LogLevel=1"; exit 2
+        } catch { Write-Output "FAILED: $_"; exit 1 }
+      register: r
+      changed_when: r.rc == 2
+      failed_when: r.rc == 1
+
+    - name: "[DFIR] Enable DNS diagnostic logging (client + server if present)"
+      ansible.windows.win_shell: |
+        $ErrorActionPreference = "Stop"
+        try {
+          'y' | wevtutil sl Microsoft-Windows-DNS-Client/Operational /e:true 2>&1 | Out-Null
+          Write-Output "APPLIED: Microsoft-Windows-DNS-Client/Operational enabled"
+          $dnsSvc = Get-Service -Name "DNS" -ErrorAction SilentlyContinue
+          if ($dnsSvc) {
+            'y' | wevtutil sl Microsoft-Windows-DNS-Server/Analytical /e:true 2>&1 | Out-Null
+            Write-Output "APPLIED: Microsoft-Windows-DNS-Server/Analytical enabled"
+          } else {
+            Write-Output "SKIP: DNS Server not installed"
+          }
+        } catch { Write-Output "FAILED: $_"; exit 1 }
+      register: r
+      changed_when: r.rc == 2
+
+    - name: "[DEFENDER] Soft-disable RTP + excludes (no MDE; Elastic CADRE-All is EDR)"
+      ansible.windows.win_shell: |
+        $ErrorActionPreference = "Continue"
+        try {
+          $tp = 'HKLM:\SOFTWARE\Microsoft\Windows Defender\Features'
+          if (Test-Path $tp) {
+            Set-ItemProperty $tp -Name TamperProtection -Value 0 -Type DWord -Force -ErrorAction SilentlyContinue
+          }
+          Set-MpPreference -DisableRealtimeMonitoring $true -Force -ErrorAction SilentlyContinue
+          Set-MpPreference -DisableBehaviorMonitoring $true -Force -ErrorAction SilentlyContinue
+          Set-MpPreference -DisableIOAVProtection $true -Force -ErrorAction SilentlyContinue
+          Set-MpPreference -DisableScriptScanning $true -Force -ErrorAction SilentlyContinue
+          Set-MpPreference -DisableIntrusionPreventionSystem $true -Force -ErrorAction SilentlyContinue
+          Set-MpPreference -MAPSReporting 0 -Force -ErrorAction SilentlyContinue
+          Set-MpPreference -SubmitSamplesConsent 2 -Force -ErrorAction SilentlyContinue
+          foreach ($p in @('C:\Tools','C:\Tools\cadre-attack','C:\Users\Public','C:\Temp')) {
+            New-Item -ItemType Directory -Force -Path $p | Out-Null
+            Add-MpPreference -ExclusionPath $p -Force -ErrorAction SilentlyContinue
+          }
+          foreach ($proc in @('powershell.exe','pwsh.exe','cmd.exe','Rubeus.exe','mimikatz.exe','SharpHound.exe')) {
+            Add-MpPreference -ExclusionProcess $proc -Force -ErrorAction SilentlyContinue
+          }
+          $st = Get-MpComputerStatus
+          if ($st.RealTimeProtectionEnabled -eq $true -or $st.IsTamperProtected -eq $true) {
+            Write-Output "WARN: RTP=$($st.RealTimeProtectionEnabled) TP=$($st.IsTamperProtected) — turn Tamper Protection OFF in Windows Security GUI then re-run"
+            exit 0
+          }
+          Write-Output "APPLIED: soft Defender (RTP off, excludes set)"; exit 2
+        } catch { Write-Output "FAILED: $_"; exit 1 }
+      register: r_def
+      changed_when: r_def.rc == 2
+      failed_when: r_def.rc == 1
+
+# =============================================================================
+# Play 7: Elastic Agent enrollment into CADRE-All (same as other Windows lab VMs)
+# =============================================================================
+- name: "elk — Retrieve CADRE-All enrollment token"
+  hosts: elk
+  gather_facts: false
+  vars:
+    kibana_port: 5601
+  tasks:
+    - name: "Read persisted elastic password"
+      ansible.builtin.slurp:
+        src: /home/vagrant/es-generated-pw.txt
+      register: es_pw_file
+      ignore_errors: true
+
+    - name: "Override elastic_password from file"
+      ansible.builtin.set_fact:
+        elastic_password: "{{ (es_pw_file.content | b64decode).strip() }}"
+      when: es_pw_file is succeeded
+
+    - name: "Fetch Fleet policies"
+      ansible.builtin.uri:
+        url: "http://127.0.0.1:{{ kibana_port }}/api/fleet/agent_policies"
+        method: GET
+        user: elastic
+        password: "{{ elastic_password }}"
+        force_basic_auth: true
+        headers:
+          kbn-xsrf: "true"
+        status_code: 200
+      register: policies
+
+    - name: "Set CADRE-All policy ID fact"
+      ansible.builtin.set_fact:
+        cadre_all: "{{ (policies.json['items'] | selectattr('name', 'equalto', 'CADRE-All') | first) }}"
+
+    - name: "Fetch enrollment API keys"
+      ansible.builtin.uri:
+        url: "http://127.0.0.1:{{ kibana_port }}/api/fleet/enrollment_api_keys"
+        method: GET
+        user: elastic
+        password: "{{ elastic_password }}"
+        force_basic_auth: true
+        headers:
+          kbn-xsrf: "true"
+        status_code: 200
+      register: enroll_keys
+
+    - name: "Save CADRE-All enrollment token to shared fact"
+      ansible.builtin.set_fact:
+        cadre_all_enroll_token: "{{ (enroll_keys.json['items'] | selectattr('policy_id', 'equalto', cadre_all.id) | first).api_key }}"
+
+- name: "ws01 — Enroll Elastic Agent into CADRE-All policy"
+  hosts: ws01
+  gather_facts: true
+  vars:
+    fleet_server: 192.168.77.50
+    fleet_port: 8220
+    elastic_agent_version: "9.4.3"
+  tasks:
+    - name: "Check if Elastic Agent service exists"
+      ansible.windows.win_service:
+        name: "Elastic Agent"
+      register: agent_svc
+      ignore_errors: true
+      failed_when: false
+
+    - name: "Create Tools directory"
+      ansible.windows.win_file:
+        path: C:\Tools
+        state: directory
+      when: agent_svc is defined and (agent_svc is failed or agent_svc.status is undefined)
+
+    - name: "Download Elastic Agent for Windows"
+      ansible.windows.win_get_url:
+        url: "https://artifacts.elastic.co/downloads/beats/elastic-agent/elastic-agent-{{ elastic_agent_version }}-windows-x86_64.zip"
+        dest: "C:\\Tools\\elastic-agent.zip"
+      when: agent_svc is defined and (agent_svc is failed or agent_svc.status is undefined or agent_svc.status != "running")
+
+    - name: "Extract Elastic Agent"
+      community.windows.win_unzip:
+        src: "C:\\Tools\\elastic-agent.zip"
+        dest: "C:\\Tools\\"
+        creates: "C:\\Tools\\elastic-agent-{{ elastic_agent_version }}-windows-x86_64"
+      when: agent_svc is defined and (agent_svc is failed or agent_svc.status is undefined or agent_svc.status != "running")
+
+    - name: "Enroll and install Elastic Agent (Windows) into CADRE-All"
+      ansible.windows.win_shell: |
+        $svc = Get-Service "Elastic Agent" -ErrorAction SilentlyContinue
+        if ($svc -and $svc.Status -eq "Running") { exit 0 }
+        $env:PATH += ";C:\Tools\elastic-agent-{{ elastic_agent_version }}-windows-x86_64"
+        & "C:\Tools\elastic-agent-{{ elastic_agent_version }}-windows-x86_64\elastic-agent.exe" install `
+          --url="https://{{ fleet_server }}:{{ fleet_port }}" `
+          --enrollment-token="{{ hostvars['elk']['cadre_all_enroll_token'] }}" `
+          --insecure `
+          --non-interactive `
+          --force 2>&1
+      register: win_install
+      when: agent_svc is defined and (agent_svc is failed or agent_svc.status is undefined or agent_svc.status != "running")
+      failed_when: false
+      changed_when: false
+
+    - name: "Ensure Elastic Agent runs as auto + started"
+      ansible.windows.win_service:
+        name: "Elastic Agent"
+        state: started
+        start_mode: auto

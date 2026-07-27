@@ -6,3 +6,4 @@ safe_mode_password: "S@feMode_Ch1ld_2026!"
 domain_type: child
 parent_domain: cadre.local
 parent_dc: dc01.cadre.local
+ansible_password: "V@gr@nt"

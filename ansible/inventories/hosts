@@ -10,6 +10,7 @@ dc03 ansible_host=192.168.77.12 ansible_user=vagrant ansible_connection=winrm an
 [windows_members]
 mbr01 ansible_host=192.168.77.22 ansible_user=vagrant ansible_connection=winrm ansible_winrm_server_cert_validation=ignore ansible_winrm_transport=basic
 mbr02 ansible_host=192.168.77.23 ansible_user=vagrant ansible_connection=winrm ansible_winrm_server_cert_validation=ignore ansible_winrm_transport=basic
+ws01 ansible_host=192.168.77.62 ansible_user=vagrant ansible_connection=winrm ansible_winrm_server_cert_validation=ignore ansible_winrm_transport=basic
 
 [windows_servers:children]
 root_dc

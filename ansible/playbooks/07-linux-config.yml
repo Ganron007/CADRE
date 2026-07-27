@@ -192,7 +192,7 @@
         if podman container exists cadre-monitor; then
           podman start cadre-monitor
         else
-          podman run -d --restart=unless-stopped --name cadre-monitor --privileged --pid=host alpine sleep infinity
+          podman run -d --replace --restart=unless-stopped --name cadre-monitor --privileged --pid=host alpine sleep infinity
         fi
       register: r_podman
       changed_when: r_podman.rc == 0

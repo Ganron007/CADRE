@@ -157,7 +157,7 @@
       changed_when: false
       failed_when: r.rc == 1
 
-    - name: "[SCCM][WT#37-40] Verify svc_sccm is SCCM Full Administrator"
+    - name: 'SCCM — Verify svc_sccm is SCCM Full Administrator'
       ansible.windows.win_shell: |
         $ErrorActionPreference = "Stop"
         try {
@@ -185,6 +185,63 @@
           if ($tpl) { Write-Output "PASS: CADRE-VSC template exists"; exit 0 }
           Write-Output "FAIL: CADRE-VSC template not found"; exit 1
         } catch { Write-Output "FAIL: VSC check error: $_"; exit 1 }
+      register: r
+      changed_when: false
+      failed_when: r.rc == 1
+
+- name: "H — Verify phishing setup on mbr01"
+  hosts: mbr01
+  gather_facts: false
+  tasks:
+    - name: 'H — Verify analyst_cloud in Remote Desktop Users'
+      ansible.windows.win_shell: |
+        try {
+        $ErrorActionPreference = "Stop"
+          $group = [ADSI]"WinNT://./Remote Desktop Users"
+          $member = $group.Members() | Where-Object { $_.GetType().InvokeMember("Name", 'GetProperty', $null, $_, $null) -eq "analyst_cloud" }
+          if ($member) { Write-Output "PASS: analyst_cloud is in Remote Desktop Users"; exit 0 }
+          Write-Output "FAIL: analyst_cloud not in Remote Desktop Users"; exit 1
+        } catch { Write-Output "FAIL: $_"; exit 1 }
+      register: r
+      changed_when: false
+      failed_when: r.rc == 1
+
+    - name: 'H — Verify auto-logon for analyst_cloud'
+      ansible.windows.win_shell: |
+        try {
+        $ErrorActionPreference = "Stop"
+          $regPath = "HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Winlogon"
+          $user = (Get-ItemProperty -Path $regPath -Name "DefaultUserName" -ErrorAction Stop).DefaultUserName
+          $pass = (Get-ItemProperty -Path $regPath -Name "DefaultPassword" -ErrorAction Stop).DefaultPassword
+          $domain = (Get-ItemProperty -Path $regPath -Name "DefaultDomainName" -ErrorAction Stop).DefaultDomainName
+          $auto = (Get-ItemProperty -Path $regPath -Name "AutoAdminLogon" -ErrorAction Stop).AutoAdminLogon
+          if ($user -eq "analyst_cloud" -and $pass -eq "Cl0ud_An@lyst!" -and $domain -eq "CADRE" -and $auto -eq "1") {
+            Write-Output "PASS: auto-logon configured for analyst_cloud"; exit 0
+          }
+          Write-Output "FAIL: auto-logon values mismatch user=$user domain=$domain auto=$auto"; exit 1
+        } catch { Write-Output "FAIL: $_"; exit 1 }
+      register: r
+      changed_when: false
+      failed_when: r.rc == 1
+
+    - name: 'H — Verify analyst_cloud Downloads directory'
+      ansible.windows.win_shell: |
+        try {
+        $ErrorActionPreference = "Stop"
+          if (Test-Path "C:\Users\analyst_cloud\Downloads") { Write-Output "PASS: Downloads directory exists"; exit 0 }
+          Write-Output "FAIL: Downloads directory not found"; exit 1
+        } catch { Write-Output "FAIL: $_"; exit 1 }
+      register: r
+      changed_when: false
+      failed_when: r.rc == 1
+
+    - name: 'H — Verify Tools directory'
+      ansible.windows.win_shell: |
+        try {
+        $ErrorActionPreference = "Stop"
+          if (Test-Path "C:\Tools") { Write-Output "PASS: Tools directory exists"; exit 0 }
+          Write-Output "FAIL: Tools directory not found"; exit 1
+        } catch { Write-Output "FAIL: $_"; exit 1 }
       register: r
       changed_when: false
       failed_when: r.rc == 1

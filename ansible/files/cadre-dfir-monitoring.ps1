@@ -181,6 +181,33 @@ Set-RegDword 'HKLM:\SYSTEM\CurrentControlSet\Control\Lsa\MSV1_0' 'RestrictSendin
 Set-RegDword 'HKLM:\SYSTEM\CurrentControlSet\Control\Lsa\MSV1_0' 'AuditReceivingNTLMTraffic' 2
 Set-RegDword 'HKLM:\SYSTEM\CurrentControlSet\Services\Netlogon\Parameters' 'AuditNTLMInDomain' 7
 Write-OK 'NTLM in/out auditing enabled (events 8001-8004 in NTLM/Operational).'
+Write-Info 'NOTE: RestrictSendingNTLMTraffic=1 blocks outbound NTLM. For MDE P2 audit-only mode, set this to 0.'
+
+
+# =============================================================================
+# [5a/7] SERVER-ROLE AUDITING (ADCS + DNS) — only if the role is installed
+# =============================================================================
+Write-Section '[5a/7] Server-Role Auditing (ADCS + DNS)'
+
+$caSvc = Get-Service -Name 'CertSvc' -ErrorAction SilentlyContinue
+if ($caSvc) {
+    & certutil -setreg CA\AuditFilter 255 | Out-Null
+    Write-OK 'ADCS CA AuditFilter=255 enabled (EIDs 4886/4887/4899 for ESC abuse detection).'
+} else {
+    Write-Info 'ADCS CertSvc not installed; CA auditing skipped.'
+}
+
+$dnsSvc = Get-Service -Name 'DNS' -ErrorAction SilentlyContinue
+if ($dnsSvc) {
+    'y' | wevtutil sl 'Microsoft-Windows-DNS-Server/Analytical' /e:true /ms:268435456 2>$null
+    if ($LASTEXITCODE -eq 0) {
+        Write-OK 'DNS Server Analytical channel enabled (256 MB).'
+    } else {
+        Write-Warn 'DNS Server Analytical channel could not be enabled.'
+    }
+} else {
+    Write-Info 'DNS Server not installed; DNS Server Analytical channel skipped.'
+}
 
 
 # =============================================================================
@@ -236,7 +263,7 @@ $channels = @(
 
 $enabled = 0; $skipped = 0
 foreach ($c in $channels) {
-    wevtutil sl $c /e:true /ms:268435456 2>$null
+    'y' | wevtutil sl $c /e:true /ms:268435456 2>$null
     if ($LASTEXITCODE -eq 0) {
         Write-OK "256MB : $c"
         $enabled++
@@ -262,11 +289,24 @@ $logSizes = [ordered]@{
     'Microsoft-Windows-Sysmon/Operational'                      = 1073741824   # 1 GB (Sysmon gets same as Security)
 }
 foreach ($k in $logSizes.Keys) {
-    wevtutil sl $k /ms:$($logSizes[$k]) 2>$null
-    if ($LASTEXITCODE -eq 0) {
+    # Some Windows 11 builds silently fail if the log channel is actively written
+    # while we resize it. Try up to 3 times with a short pause, and capture the
+    # real error so operators can diagnose failures.
+    $set = $false
+    $lastErr = $null
+    for ($i = 1; $i -le 3; $i++) {
+        $err = (& wevtutil sl $k /ms:$($logSizes[$k]) 2>&1)
+        if ($LASTEXITCODE -eq 0) {
+            $set = $true
+            break
+        }
+        $lastErr = $err
+        Start-Sleep -Milliseconds 250
+    }
+    if ($set) {
         Write-OK ("{0,-55} -> {1} MB" -f $k, ($logSizes[$k] / 1MB))
     } else {
-        Write-Warn "Could not resize: $k"
+        Write-Warn "Could not resize: $k (wevtutil exit $LASTEXITCODE; $lastErr)"
     }
 }
 

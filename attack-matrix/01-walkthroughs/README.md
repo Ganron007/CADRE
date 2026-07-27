@@ -1,6 +1,10 @@
-# CADRE — Walkthroughs (61 attacks)
+# CADRE — Walkthroughs (61 files, 99 attacks planned)
 
 Each walkthrough is a verified, step-by-step attack against the live CADRE substrate. Produces observable telemetry in Elastic/Zeek/Suricata/Velociraptor.
+
+> **Full campaign:** [`../Campaign/CAMPAIGNS.md`](../Campaign/CAMPAIGNS.md) — 8 phases + 4 branches, 75 campaign attacks across a single identity-driven credential chain.
+> **Standalone exercises:** 14 E (network defense) + 10 F (supply-chain). See [`../Campaign/CAMPAIGNS.md`](../Campaign/CAMPAIGNS.md) for details.
+> **Per-attack metadata:** [`../Campaign/CAMPAIGNS-METADATA.md`](../Campaign/CAMPAIGNS-METADATA.md) — playbook refs, ACE#s, telemetry expectations.
 
 ## On-Prem AD (001-033)
 
@@ -22,9 +26,9 @@ Each walkthrough is a verified, step-by-step attack against the live CADRE subst
 | 015 | ACL — ForceChangePassword | dc01 | CRTP, OSCP+ |
 | 016 | ACL — GenericAll on OU | dc01 | CRTE |
 | 017 | PrinterBug coercion | dc01 | CRTE, CAPE |
-| 018 | PetitPotam (EFS) | dc01 | CAPE |
-| 019 | DFSCoerce | dc01/dc02 | CAPE |
-| 020 | ShadowCoerce | dc01 | CAPE |
+| 018 | ~~PetitPotam (EFS)~~ ❌ | dc01 | — |
+| 019 | ~~DFSCoerce~~ ❌ | dc01/dc02 | — |
+| 020 | ~~ShadowCoerce~~ ❌ | dc01 | — |
 | 021 | NTLM relay → LDAP | dc01 | CRTE, CAPE |
 | 022 | NTLM relay → SMB | mbr02 | OSCP+, CAPE |
 | 023 | GPO abuse | dc01 | CRTE |
@@ -32,14 +36,15 @@ Each walkthrough is a verified, step-by-step attack against the live CADRE subst
 | 025 | AdminSDHolder persistence | dc01 | CRTE |
 | 026 | dMSA / BadSuccessor | dc03 | CRTE |
 | 027 | SPN Jacking (CVE-2026-25177) | dc01 | — |
-| 028 | Null session enumeration | dc02 | OSCP+ |
+| ~~028~~ | ~~Null session enumeration~~ ❌ | dc02 | — |
 | 029 | CertPotato (DCOM) | mbr01 | WKL |
 | 030 | WSUS abuse | mbr02 | WKL |
-| 031 | Password spray | dc01 | OSCP+ |
+| ~~031~~ | ~~Password spray~~ ⏳ | dc01 | — |
 | 032 | Token impersonation | mbr01 | OSCP+, CAPE |
 | 033 | Cross-forest Kerberoast | dc03 | CRTE |
 
 > Attacks are numbered from **WT#002** — there is no WT#001. (Kerberoasting starts at WT#002 with AES; RC4 is non-viable on Server 2025.)
+> **Status notes:** ~~WT028~~ ❌ Invalid — SAMR null bind blocked on Server 2025. ~~WT031~~ ⏳ Pending relocation — needs user list source. ~~WT018-020~~ ❌ Non-functional on Server 2025 (EFSR blocked, DFSNM undetectable, FSRVP unavailable). Remaining 75 attacks active.
 
 ## SCCM + Linux + Modern (034-049)
 
@@ -103,4 +108,4 @@ plus `cadre-linux-triage` VR hunt (includes `CADRE.Linux.KeytabFingerprints`).
 
 ## Status
 
-Scaffolded. Walkthroughs written as each attack is verified against the deployed lab.
+Scaffolded. Walkthroughs written as each attack is verified against the deployed lab. New attacks (WT063–WT103) have automation scripts in `04-automation/campaign-{e,g,h}/` but walkthrough markdown files are pending.

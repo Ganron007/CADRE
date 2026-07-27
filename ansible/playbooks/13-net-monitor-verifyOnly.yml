@@ -127,6 +127,209 @@
       changed_when: false
       failed_when: r_suricata_logrotate.rc == 1
 
+    # === Phase B: JA3/JA4 + Curated Rules Checks ===
+
+    - name: Check Suricata JA3 fingerprinting enabled
+      ansible.builtin.shell: grep -q "ja3-fingerprints" /etc/suricata/suricata.yaml 2>/dev/null
+      register: r_suricata_ja3
+      changed_when: false
+      failed_when: r_suricata_ja3.rc == 1
+
+    - name: Check Suricata JA4 fingerprinting enabled
+      ansible.builtin.shell: grep -q "ja4-fingerprints" /etc/suricata/suricata.yaml 2>/dev/null
+      register: r_suricata_ja4
+      changed_when: false
+      failed_when: r_suricata_ja4.rc == 1
+
+    - name: Check CADRE Phase B rules deployed
+      ansible.builtin.shell: test -f /etc/suricata/rules/cadre-phaseb.rules
+      register: r_suricata_phaseb
+      changed_when: false
+      failed_when: r_suricata_phaseb.rc == 1
+
+    - name: Check CADRE Curated ET Lab rules deployed
+      ansible.builtin.shell: test -f /etc/suricata/rules/cadre-et-lab.rules
+      register: r_suricata_etlab
+      changed_when: false
+      failed_when: r_suricata_etlab.rc == 1
+
+    - name: Check Suricata AD rules in rule-files config
+      ansible.builtin.shell: grep -q "cadre-ad.rules" /etc/suricata/suricata.yaml 2>/dev/null
+      register: r_suricata_ad_in_config
+      changed_when: false
+      failed_when: r_suricata_ad_in_config.rc == 1
+
+    - name: Check Suricata Phase B rules in rule-files config
+      ansible.builtin.shell: grep -q "cadre-phaseb.rules" /etc/suricata/suricata.yaml 2>/dev/null
+      register: r_suricata_phaseb_in_config
+      changed_when: false
+      failed_when: r_suricata_phaseb_in_config.rc == 1
+
+    - name: Check Suricata ET Lab rules in rule-files config
+      ansible.builtin.shell: grep -q "cadre-et-lab.rules" /etc/suricata/suricata.yaml 2>/dev/null
+      register: r_suricata_etlab_in_config
+      changed_when: false
+      failed_when: r_suricata_etlab_in_config.rc == 1
+
+    - name: Check Suricata app-layer protocols configured
+      ansible.builtin.shell: |
+        grep -q "krb5:" /etc/suricata/suricata.yaml 2>/dev/null && \
+        grep -q "smb:" /etc/suricata/suricata.yaml 2>/dev/null && \
+        grep -q "dns:" /etc/suricata/suricata.yaml 2>/dev/null
+      register: r_suricata_applayer
+      changed_when: false
+      failed_when: r_suricata_applayer.rc == 1
+
+    - name: Check Suricata port-groups configured
+      ansible.builtin.shell: |
+        grep -q "HTTP_PORTS" /etc/suricata/suricata.yaml 2>/dev/null && \
+        grep -q "SSH_PORTS" /etc/suricata/suricata.yaml 2>/dev/null
+      register: r_suricata_portgroups
+      changed_when: false
+      failed_when: r_suricata_portgroups.rc == 1
+
+    - name: Check Suricata rules copied to default-rule-path
+      ansible.builtin.shell: |
+        test -f /var/lib/suricata/rules/cadre-ad.rules && \
+        test -f /var/lib/suricata/rules/cadre-phaseb.rules && \
+        test -f /var/lib/suricata/rules/cadre-et-lab.rules && \
+        test -f /var/lib/suricata/rules/cadre-coercion.rules
+      register: r_suricata_rules_path
+      changed_when: false
+      failed_when: r_suricata_rules_path.rc == 1
+
+    # === Zeek Phase B: Attack Chain + Custom Scripts Checks ===
+
+    - name: Check Zeek mac-logging loaded
+      ansible.builtin.shell: grep -q "mac-logging" /opt/zeek/share/zeek/site/local.zeek 2>/dev/null
+      register: r_zeek_mac
+      changed_when: false
+      failed_when: r_zeek_mac.rc == 1
+
+    - name: Check Zeek krb/ticket-logging loaded
+      ansible.builtin.shell: grep -q "krb/ticket-logging" /opt/zeek/share/zeek/site/local.zeek 2>/dev/null
+      register: r_zeek_krb
+      changed_when: false
+      failed_when: r_zeek_krb.rc == 1
+
+    - name: Check CADRE Zeek scripts deployed
+      ansible.builtin.shell: |
+        for script in cadre-outbound cadre-conn-beacon cadre-tcp-profile cadre-dns-anomaly cadre-tls-fingerprint cadre-quic-c2 cadre-supplychain-http; do
+          test -f "/opt/zeek/share/zeek/site/${script}.zeek" || { echo "MISSING: ${script}.zeek"; exit 1; }
+        done
+      register: r_zeek_cadre_scripts
+      changed_when: false
+      failed_when: r_zeek_cadre_scripts.rc == 1
+
+    - name: Check CADRE Zeek scripts loaded in local.zeek
+      ansible.builtin.shell: |
+        for script in cadre-outbound cadre-conn-beacon cadre-tcp-profile cadre-dns-anomaly cadre-tls-fingerprint cadre-quic-c2 cadre-supplychain-http; do
+          grep -q "@load site/${script}" /opt/zeek/share/zeek/site/local.zeek 2>/dev/null || { echo "NOT LOADED: ${script}"; exit 1; }
+        done
+      register: r_zeek_cadre_loaded
+      changed_when: false
+      failed_when: r_zeek_cadre_loaded.rc == 1
+
+    - name: Check CADRE Zeek scripts in loaded_scripts.log
+      ansible.builtin.shell: |
+        for script in cadre-outbound cadre-conn-beacon cadre-tcp-profile cadre-dns-anomaly cadre-tls-fingerprint cadre-quic-c2 cadre-supplychain-http; do
+          sudo grep -q "${script}" /opt/zeek/spool/zeek/loaded_scripts.log 2>/dev/null || { echo "NOT IN LOADED_SCRIPTS: ${script}"; exit 1; }
+        done
+      register: r_zeek_cadre_loaded_scripts
+      changed_when: false
+      failed_when: r_zeek_cadre_loaded_scripts.rc == 1
+
+    - name: Check Zeek reporter.log has no unexpected errors
+      ansible.builtin.shell: |
+        if [ -f /opt/zeek/spool/zeek/reporter.log ]; then
+          other=$(sudo grep '"level":"Reporter::ERROR"' /opt/zeek/spool/zeek/reporter.log 2>/dev/null | grep -v 'c$conn$duration' | wc -l)
+          [ "$other" -eq 0 ] || { echo "UNEXPECTED ZEEK ERRORS: $other"; exit 1; }
+        fi
+      register: r_zeek_errors
+      changed_when: false
+      failed_when: r_zeek_errors.rc == 1
+
+    # === RITA + Docker Checks ===
+
+    - name: Check Docker CE installed
+      ansible.builtin.shell: dpkg -l docker-ce 2>/dev/null | grep -q "^ii"
+      register: r_docker_install
+      changed_when: false
+      failed_when: r_docker_install.rc == 1
+
+    - name: Check Docker service masked (manual-only)
+      ansible.builtin.shell: systemctl is-enabled docker 2>&1 | grep -q "masked"
+      register: r_docker_masked
+      changed_when: false
+      failed_when: r_docker_masked.rc == 1
+
+    - name: Check containerd service masked (manual-only)
+      ansible.builtin.shell: systemctl is-enabled containerd 2>&1 | grep -q "masked"
+      register: r_containerd_masked
+      changed_when: false
+      failed_when: r_containerd_masked.rc == 1
+
+    - name: Check RITA binary installed
+      ansible.builtin.shell: test -f /usr/local/bin/rita
+      register: r_rita_install
+      changed_when: false
+      failed_when: r_rita_install.rc == 1
+
+    - name: Check RITA images vendored locally
+      ansible.builtin.shell: |
+        test -f /opt/rita/rita-v5.1.2-image.tar.gz && \
+        test -f /opt/rita/clickhouse-24.1.6.tar.gz && \
+        test -f /opt/rita/syslog-ng-latest.tar.gz
+      register: r_rita_images
+      changed_when: false
+      failed_when: r_rita_images.rc == 1
+
+    - name: Check RITA analysis script deployed
+      ansible.builtin.shell: test -f /usr/local/bin/cadre-rita-analyze.sh
+      register: r_rita_analyze
+      changed_when: false
+      failed_when: r_rita_analyze.rc == 1
+
+    - name: Check RITA query script deployed
+      ansible.builtin.shell: test -f /usr/local/bin/cadre-rita-query.sh
+      register: r_rita_query
+      changed_when: false
+      failed_when: r_rita_query.rc == 1
+
+    # === Phase C: Supply-Chain Detection Checks ===
+
+    - name: Check CADRE Supply-Chain rules deployed
+      ansible.builtin.shell: test -f /etc/suricata/rules/cadre-supplychain.rules
+      register: r_suricata_supplychain
+      changed_when: false
+      failed_when: r_suricata_supplychain.rc == 1
+
+    - name: Check Supply-Chain rules in suricata.yaml config
+      ansible.builtin.shell: grep -q "cadre-supplychain.rules" /etc/suricata/suricata.yaml 2>/dev/null
+      register: r_suricata_supplychain_in_config
+      changed_when: false
+      failed_when: r_suricata_supplychain_in_config.rc == 1
+
+    - name: Check Supply-Chain rules copied to default-rule-path
+      ansible.builtin.shell: test -f /var/lib/suricata/rules/cadre-supplychain.rules
+      register: r_suricata_supplychain_path
+      changed_when: false
+      failed_when: r_suricata_supplychain_path.rc == 1
+
+    # === Coercion Detection Checks (Spec A.2) ===
+
+    - name: Check CADRE Coercion rules deployed
+      ansible.builtin.shell: test -f /etc/suricata/rules/cadre-coercion.rules
+      register: r_suricata_coercion
+      changed_when: false
+      failed_when: r_suricata_coercion.rc == 1
+
+    - name: Check Coercion rules in suricata.yaml config
+      ansible.builtin.shell: grep -q "cadre-coercion.rules" /etc/suricata/suricata.yaml 2>/dev/null
+      register: r_suricata_coercion_in_config
+      changed_when: false
+      failed_when: r_suricata_coercion_in_config.rc == 1
+
 - name: "Play 2 — Verify local ES for Arkime"
   hosts: monitor
   gather_facts: true
@@ -291,6 +494,24 @@
       register: r_ark_import_script
       changed_when: false
       failed_when: r_ark_import_script.rc == 1
+
+    - name: Check file extraction toggle script exists
+      ansible.builtin.shell: test -f /usr/local/bin/cadre-extract-toggle.sh
+      register: r_extract_toggle
+      changed_when: false
+      failed_when: r_extract_toggle.rc == 1
+
+    - name: Check file extraction is disabled by default
+      ansible.builtin.shell: sudo /usr/local/bin/cadre-extract-toggle.sh status 2>&1 | grep -q "DISABLED"
+      register: r_extract_status
+      changed_when: false
+      failed_when: r_extract_status.rc == 1
+
+    - name: Check RITA analysis script exists
+      ansible.builtin.shell: test -f /usr/local/bin/cadre-rita-analyze.sh
+      register: r_rita_analyze
+      changed_when: false
+      failed_when: r_rita_analyze.rc == 1
 
     - name: Check Arkime logrotate config exists
       ansible.builtin.shell: test -f /etc/logrotate.d/cadre-arkime

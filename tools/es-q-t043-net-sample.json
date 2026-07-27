@@ -1,0 +1,15 @@
+{
+  "size": 1,
+  "sort": [{ "@timestamp": "desc" }],
+  "query": {
+    "bool": {
+      "must": [
+        { "range": { "@timestamp": { "gte": "now-2h" } } },
+        { "term": { "host.name": "mbr01" } },
+        { "term": { "source.ip": "192.168.77.60" } },
+        { "term": { "destination.port": 1433 } }
+      ]
+    }
+  },
+  "_source": ["@timestamp", "host.name", "source.ip", "destination.ip", "destination.port", "network.direction", "event.action"]
+}

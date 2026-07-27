@@ -1,0 +1,23 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>DFIR-Nexus Capture</title>
+    <style>
+      body { font-family: sans-serif; width: 320px; padding: 12px; }
+      label { display: block; margin-top: 8px; font-size: 12px; }
+      input { width: 100%; box-sizing: border-box; }
+      button { margin-top: 12px; width: 100%; }
+    </style>
+  </head>
+  <body>
+    <h3>DFIR-Nexus Capture</h3>
+    <label>Case ID <input id="caseId" /></label>
+    <label>Push token <input id="pushToken" type="password" /></label>
+    <label>Push URL <input id="pushUrl" value="http://127.0.0.1:4626/captures" /></label>
+    <button id="save">Save</button>
+    <button id="flush">Flush captures</button>
+    <pre id="status"></pre>
+    <script src="popup.js"></script>
+  </body>
+</html>

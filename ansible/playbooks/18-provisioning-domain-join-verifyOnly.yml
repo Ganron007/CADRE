@@ -1,0 +1,23 @@
+# Verify optional provisioning domain-join (Plan 1.1).
+# Run after 18-provisioning-domain-join.yml with CADRE_PROVISIONING_DOMAIN_JOIN=1.
+
+- name: "provisioning — verify optional domain join"
+  hosts: provisioning
+  gather_facts: false
+  become: true
+  vars:
+    join_domain: "child.cadre.local"
+  tasks:
+    - name: "Verify realm membership"
+      ansible.builtin.shell: |
+        realm list | grep -qi "{{ join_domain }}" || { echo "FAIL: not joined to {{ join_domain }}"; exit 1; }
+        echo "PASS: joined to {{ join_domain }}"
+      args:
+        executable: /bin/bash
+      register: r
+      changed_when: false
+      failed_when: r.rc != 0
+
+    - name: "Verify SSH still accepts local bootstrap (informational)"
+      ansible.builtin.debug:
+        msg: "Manually confirm: ssh vagrant@192.168.77.60 still works without domain creds."

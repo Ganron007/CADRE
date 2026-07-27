@@ -1,4 +1,6 @@
-# WT#018 — PetitPotam
+# ~~WT#018 — PetitPotam~~
+
+> **❌ NON-FUNCTIONAL on Server 2025.** `\PIPE\efsrpc` is blocked by default — cannot coerce authentication via MS-EFSR. Preserved for reference; use WT017 (PrinterBug) instead.
 
 ## Metadata
 | Field | Value |

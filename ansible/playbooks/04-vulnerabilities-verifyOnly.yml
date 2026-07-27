@@ -178,8 +178,9 @@
       changed_when: false
       failed_when: r.rc == 1
 
-- name: "Verify registry vulnerabilities on all Windows VMs"
-  hosts: windows_servers
+# Mirror 04-vulnerabilities.yml — ws01 keeps MDE/Defender; do not assert WDigest/CG/Defender-off.
+- name: "Verify registry vulnerabilities on Windows VMs (exclude ws01 MDE target)"
+  hosts: windows_servers:!ws01
   gather_facts: false
   tasks:
     - name: "[VULN] Verify WDigest credential caching enabled"
@@ -243,30 +244,76 @@
       changed_when: false
       failed_when: r.rc == 1
 
-    - name: "[VULN] Verify Windows Defender real-time monitoring disabled"
+    - name: "[VULN][WT#H] Verify RDP enabled (fDenyTSConnections=0)"
+      ansible.windows.win_shell: |
+        try {
+        $ErrorActionPreference = "Stop"
+          $val = (Get-ItemProperty -Path "HKLM:\System\CurrentControlSet\Control\Terminal Server" -Name "fDenyTSConnections" -ErrorAction Stop).fDenyTSConnections
+          if ($val -eq 0) { Write-Output "PASS: RDP enabled (fDenyTSConnections=0)"; exit 0 }
+          Write-Output "FAIL: expected fDenyTSConnections=0 got $val"; exit 1
+        } catch { Write-Output "FAIL: $_"; exit 1 }
+      register: r
+      changed_when: false
+      failed_when: r.rc == 1
+
+    - name: "[VULN][WT#H] Verify RDP firewall rule enabled"
+      ansible.windows.win_shell: |
+        try {
+        $ErrorActionPreference = "Stop"
+          $rule = Get-NetFirewallRule -DisplayGroup "Remote Desktop" -ErrorAction SilentlyContinue
+          $enabled = $rule | Where-Object { $_.Enabled -eq $true }
+          if ($enabled) { Write-Output "PASS: RDP firewall rule enabled"; exit 0 }
+          Write-Output "FAIL: RDP firewall rule not enabled"; exit 1
+        } catch { Write-Output "FAIL: $_"; exit 1 }
+      register: r
+      changed_when: false
+      failed_when: r.rc == 1
+
+    - name: "[VULN] Verify Windows Firewall profiles disabled (lab servers)"
+      ansible.windows.win_shell: |
+        try {
+          $ErrorActionPreference = "Stop"
+          $still = Get-NetFirewallProfile | Where-Object { $_.Enabled -eq $true }
+          if ($still) {
+            Write-Output ("FAIL: Enabled profiles: " + ($still.Name -join ','))
+            exit 1
+          }
+          Write-Output "PASS: All firewall profiles disabled"
+          exit 0
+        } catch { Write-Output "FAIL: $_"; exit 1 }
+      register: r
+      changed_when: false
+      failed_when: r.rc == 1
+
+    - name: "[VULN] Verify Windows Defender fully disabled"
       ansible.windows.win_shell: |
         $ErrorActionPreference = "Stop"
         
-        # Method 1: Check the registry directly (since the service is likely dead)
-        $regPath = "HKLM:\SOFTWARE\Microsoft\Windows Defender\Real-Time Protection"
-        $reg = Get-ItemProperty -Path $regPath -ErrorAction SilentlyContinue
-        if ($reg -and $reg.DisableRealtimeMonitoring -eq 1 -and $reg.DisableScriptScanning -eq 1) {
-            Write-Output "PASS: Defender monitoring disabled (Registry confirmed)"; exit 0
+        # Check 1: Tamper Protection off (critical — Server 2025 blocks all changes if ON)
+        $tpPath = "HKLM:\SOFTWARE\Microsoft\Windows Defender\Features"
+        $tp = Get-ItemProperty -Path $tpPath -Name "TamperProtection" -ErrorAction SilentlyContinue
+        if ($tp.TamperProtection -ne 0) { Write-Output "FAIL: TamperProtection=$($tp.TamperProtection)"; exit 1 }
+        
+        # Method 2: Check the AntiSpyware policy registry
+        $polPath = "HKLM:\SOFTWARE\Policies\Microsoft\Windows Defender"
+        $pol = Get-ItemProperty -Path $polPath -Name "DisableAntiSpyware" -ErrorAction SilentlyContinue
+        if ($pol.DisableAntiSpyware -eq 1) {
+            Write-Output "PASS: Defender disabled (All registry keys confirmed)"; exit 0
         }
         
-        # Method 2: Try the cmdlet and catch the "service dead" exception
+        # Method 3: Try the cmdlet and catch the "service dead" exception
         try {
           $mp = Get-MpPreference
-          if ($mp.DisableRealtimeMonitoring -eq $true -and $mp.DisableScriptScanning -eq $true) { 
-              Write-Output "PASS: Defender monitoring disabled (Cmdlet confirmed)"; exit 0 
+          if ($mp.DisableRealtimeMonitoring -eq $true) { 
+              Write-Output "PASS: Defender disabled (Cmdlet confirmed)"; exit 0 
           }
         } catch {
           if ($_ -match "0x800106ba") {
-              Write-Output "PASS: Defender service is completely dead (0x800106ba)"; exit 0
+              Write-Output "PASS: Defender service disabled entirely (0x800106ba)"; exit 0
           }
         }
         
-        Write-Output "FAIL: Defender monitoring not fully disabled"
+        Write-Output "FAIL: Defender not fully disabled"
         exit 1
       register: r
       changed_when: false
@@ -306,8 +353,9 @@
       changed_when: false
       failed_when: r.rc == 1
 
-- name: "DNS fix — adapter DNS + gateway verify"
-  hosts: windows_servers
+# ws01 DNS verify lives in 17-ws01-deploy-verifyOnly.yml
+- name: "DNS fix — adapter DNS + gateway verify (exclude ws01)"
+  hosts: windows_servers:!ws01
   gather_facts: false
   tasks:
     - name: "Detect adapters — domain (vmnet2) vs NAT"

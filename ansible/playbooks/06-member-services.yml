@@ -156,7 +156,7 @@
           Client Push Account: RANGE\svc_naa
         force: no
 
-    - name: "[SCCM][WT#37-40] Add RANGE\svc_sccm as SCCM Full Administrator"
+    - name: 'SCCM — Add RANGE\svc_sccm as SCCM Full Administrator'
       ansible.windows.win_shell: |
         $ErrorActionPreference = "Stop"
         try {
@@ -192,3 +192,49 @@
       register: r
       changed_when: false
       failed_when: r.rc not in [0, 2]
+
+- name: H — Phishing setup on mbr01
+  hosts: mbr01
+  gather_facts: false
+  tasks:
+    - name: 'H — Add analyst_cloud to Remote Desktop Users'
+      ansible.windows.win_shell: |
+        $ErrorActionPreference = "Stop"
+        try {
+          $group = [ADSI]"WinNT://./Remote Desktop Users"
+          $existing = $group.Members() | Where-Object { $_.GetType().InvokeMember("Name", 'GetProperty', $null, $_, $null) -eq "analyst_cloud" }
+          if ($existing) { Write-Output "OK: analyst_cloud already in Remote Desktop Users"; exit 0 }
+          $user = [ADSI]"WinNT://CADRE/analyst_cloud"
+          $group.Add($user.Path)
+          $v = $group.Members() | Where-Object { $_.GetType().InvokeMember("Name", 'GetProperty', $null, $_, $null) -eq "analyst_cloud" }
+          if (-not $v) { throw "Verify failed" }
+          Write-Output "APPLIED: analyst_cloud added to Remote Desktop Users"; exit 2
+        } catch { Write-Output "FAILED: $_"; exit 1 }
+      register: r
+      changed_when: r.rc == 2
+      failed_when: r.rc == 1
+
+    - name: 'H — Configure auto-logon for analyst_cloud on mbr01'
+      ansible.windows.win_shell: |
+        $ErrorActionPreference = "Stop"
+        try {
+          $regPath = "HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Winlogon"
+          Set-ItemProperty -Path $regPath -Name "DefaultUserName" -Value "analyst_cloud"
+          Set-ItemProperty -Path $regPath -Name "DefaultPassword" -Value "Cl0ud_An@lyst!"
+          Set-ItemProperty -Path $regPath -Name "DefaultDomainName" -Value "CADRE"
+          Set-ItemProperty -Path $regPath -Name "AutoAdminLogon" -Value "1"
+          Write-Output "APPLIED: auto-logon configured for analyst_cloud"; exit 2
+        } catch { Write-Output "FAILED: $_"; exit 1 }
+      register: r
+      changed_when: r.rc == 2
+      failed_when: r.rc == 1
+
+    - name: 'H — Create analyst_cloud Downloads directory'
+      ansible.windows.win_file:
+        path: C:\Users\analyst_cloud\Downloads
+        state: directory
+
+    - name: 'H — Create C:\Tools directory'
+      ansible.windows.win_file:
+        path: C:\Tools
+        state: directory

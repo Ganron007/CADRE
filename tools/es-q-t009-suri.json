@@ -1,0 +1,12 @@
+{
+  "size": 1,
+  "sort": [{ "@timestamp": "desc" }],
+  "query": {
+    "bool": {
+      "must": [
+        { "range": { "@timestamp": { "gte": "2026-07-25T05:04:36Z" } } },
+        { "term": { "suricata.eve.alert.signature_id": 1000002 } }
+      ]
+    }
+  }
+}

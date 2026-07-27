@@ -1,0 +1,11 @@
+chief_command
+lead_engineering
+eng_agentic
+eng_cloud
+analyst_cloud
+hunter_dfir
+analyst_dfir
+ops_redcell
+lead_redcell
+analyst_purple
+svc_ldap

@@ -1,0 +1,146 @@
+Assessment of Campaign_suggestions.md
+What works well
+
+Tier 1 / 2 / 3 split is sensible — not everything becomes spine.
+“Planning — test before deploy” aligns with tracker-first E2E.
+Phase mapping table at the bottom gives a clear integration queue.
+MSSQLHound (#1) and Certified Pre-Owned (#4) are the strongest CADRE fits — you already have the substrate (3 SQL hosts, 12 ESC templates).
+RTFM (#7) as design justification, not an attack — good use of SpecterOps content.
+Corrections / align with ground truth
+
+Issue	In suggestions doc	CADRE reality
+ADCS template names
+Vuln-Template, EnrollmentAgent
+CADRE-ESC1, CADRE-ESC3-Agent, etc. (adcs-configuration-guide.md)
+ESC5 row
+“Test”
+Out of scope in CAMPAIGNS — mark N/A or remove
+Tooling
+Certify.exe request ...
+Lab narrative uses certipy-ad — note Certify as optional/alternate
+DPAPI (#3)
+“3.5A alternative (instead of Winlogon)”
+In CAMPAIGNS, 3.5A = Winlogon. DPAPI should be 3.5G (new branch), not a replacement
+Branch F timing
+“After Phase 5”
+F is standalone — run after Plan 0.8 install, not spine order
+ghostsurf (#8) → Branch D
+Linux pivot
+Better fit: Phase 5 / WT021–022 (NTLM relay → ESC8 / SMB), not MSSQL→linux01
+CVE EoPs (#2)
+Tier 1, high priority
+Risky for CADRE: misconfig lab, not patch-level vuln lab — demote to research / optional unless you pin SQL/SCCM builds to vulnerable versions
+Shift Happens (#9)
+Initial access
+Server 2025 likely patched — good as negative test, not spine
+Turnstile (#11)
+3.5D
+No Cloudflare in lab — skip unless you add a mock web app
+Priority tweak for where you are now (3.5)
+
+Suggestion	Now (3.5)	Later
+Nemesis DPAPI (#3)
+Maybe — only if analyst_cloud profile has DPAPI-protected blobs (browser, RDP file). Autologon registry + LSASS are already primary/backup.
+Add after 3.5F/3.5A verified
+MSSQLHound (#1)
+Wait — needs SQL creds; best after Phase 3 enum or early Phase 4
+High value then
+Certified Pre-Owned (#4)
+Wait — Branch B after Phase 4
+High value
+MSSQL/SCCM CVEs (#2)
+Defer — changes lab philosophy
+Research only
+Small doc improvements
+
+Add a gate column: Tracker row? / CAMPAIGNS.md section? / Playbook change?
+Cross-link CAMPAIGNS.md WIP — “integrate only after phase owner signs off.”
+Extend checklist with 3.5X / 3.5F / 3.5A / 3.5B rows (your current work).
+Note SharpSCCM already canonical for Branch C — ConfigManBearPig is complementary (BH graph), not a replacement.
+Suggestions on the current SpecterOps picks (by value)
+Keep at top priority (after 3.5)
+MSSQLHound — Fills the gap BloodHound can’t show (IMPERSONATE, linked servers, sysadmin). Complements your Phase 3 story (svc_mssql not sysadmin, analyst_t1 IMPERSONATE). Run from provisioning against mbr01/mbr02/linux01.
+Certified Pre-Owned — Branch B is already playbook-backed; use certipy commands aligned to CADRE-ESC* names, not generic template names.
+NPMHound (#5) — Pairs with Plan 0.8 / F scenarios; adds graph view of supply-chain paths (detection + narrative), not a new attack surface.
+High value, but not spine-critical
+Nemesis DPAPI (#3) — Worth one 3.5G branch if you stage saved creds in analyst_cloud profile (playbook or manual). Otherwise empty profile = weak demo.
+Ludus SCCM / ConfigManBearPig (#6) — SCCM attack-path collection for BH; keep SharpSCCM for execution (WT034–039).
+ghostsurf (#8) — Map to WT021 LDAP relay → ESC8 or coercion relay chain, not Linux pivot.
+Lower priority / context only
+Into The Rainbow (#10) — Lab is Kerberos/AES-heavy; NTLMv1 rare unless you force LM compatibility (you partly allow NTLM in vulns playbook — worth one check, not spine).
+Shift Happens / Turnstile (#9, #11) — External/phishing infra; weak fit unless you expand Campaign H.
+CVE MSSQL/SCCM (#2) — Only if you explicitly want a “vulnerable build” track separate from misconfig spine.
+Other sources that add value (beyond SpecterOps)
+Grouped by what CADRE already optimizes for.
+
+AD attack path & lab design (peer labs / maps)
+Source	Why it helps CADRE
+GOAD + OCD AD mindmap
+Benchmark topology and technique ordering; you already reference the mindmap — use for coverage gaps, not as source of truth
+HackTricks — Active Directory Methodology
+Quick technique index; good for walkthrough cross-links
+PayloadsAllTheThings — Methodology and Resources
+Command cheat sheet per phase
+Podalirius (SCCM, GPO, ADCS posts)
+Deep dives on Branch B/C — complements SpecterOps SCCM/ADCS
+Detection & telemetry (your next phase after tracker)
+Source	Why it helps
+Sigma HQ
+Plan 1 Sigma catalog — map rules to your 99 attacks
+Elastic Detection Rules
+P0a pre-built rules you’re installing
+Mordor / Security Datasets
+Sample events when an attack is hard to re-run
+LOLBAS
+Map WT063–068, certutil, schtasks to parent/child process chains for cadre-e* rules
+CAR (MITRE)
+Analytics ideas per technique
+ADCS / SQL / SCCM (tooling you already touch)
+Source	Why
+certipy docs + ADCSKiller
+Branch B — validate ESC coverage vs 08-adcs-verify.yml
+SharpSCCM / SCCMHunter
+Branch C — you use SharpSCCM; SCCMHunter for path discovery (like MSSQLHound for SQL)
+Impacket MSSQL examples
+Already your Phase 3 spine — official docs for linked-server edge cases
+Server 2025 / platform reality (supports 3.5X narrative)
+Source	Why
+Microsoft Security blog / KBs on credential guard, LSASS PPL, token theft hardening
+Justify 3.5F vs 3.5A vs 3.5X outcomes
+Atomic Red Team (T1003, T1552, T1053)
+Atomic tests aligned to tracker rows — optional harness
+Narrative / campaign style (story-driven CAMPAIGNS)
+Source	Why
+The DFIR Report / SpecterOps “How we think about red teaming” (#12)
+Campaign pacing and “finding → decision” prose for Phase 5–8 when you get there
+MITRE ATT&CK Navigator
+Export coverage of your 75+14+10 vs enterprise matrix (you have internal mitre gap doc)
+Internal (highest signal for you)
+Source	Why
+CAMPAIGNS-METADATA.md
+Playbook refs per WT — suggestions should link here when promoted
+attack-specifications.md
+Ground truth for what’s deployed
+sql-integration-guide.md, adcs-configuration-guide.md, sccm-integration-guide.md
+Before any suggestion changes attack surface
+tracker.md
+Promotion criteria from suggestions → CAMPAIGNS
+Recommended structure for the next revision of Campaign_suggestions.md
+When you edit it (after 3.5):
+
+For each item:
+  - CADRE phase / branch (when)
+  - Playbook dependency (yes/no)
+  - Tracker template (PRIMARY sources)
+  - Promote to CAMPAIGNS? (yes/no/reference-only)
+  - Conflicts with misconfig-first design? (CVE/patch items)
+Near-term additions to the list (high CADRE fit, not in doc yet):
+
+SCCMHunter — mirror of MSSQLHound for Branch C
+BloodHound CE custom queries — SQL/SCCM nodes once MSSQLHound/NPMHound import
+LOLBAS mapping table — tie WT063–068 + 3.5B schtasks to detection fields
+GOAD technique diff — one table: “GOAD has X, CADRE has Y (Server 2025 delta)”
+Bottom line
+Campaign_suggestions.md is worth keeping as a research queue — fix template names, phase labels (3.5G for DPAPI, F standalone), and demote CVE items unless you want a second “vuln build” track.
+Best SpecterOps additions for CADRE: MSSQLHound (Phase 3/4), Certified Pre-Owned / certipy (Branch B), NPMHound (F), Nemesis DPAPI only as optional 3.5G with staged profile data.
+Best non-SpecterOps additions: Sigma/Elastic/Mordor for detection phase, LOLBAS for 3.5/ H process chains, SCCMHunter + GOAD/OCD for path completeness.

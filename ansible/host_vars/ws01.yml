@@ -1,0 +1,12 @@
+---
+# ws01 — Windows 11 Enterprise beachhead (child.cadre.local).
+# Elastic Agent: Fleet policy CADRE-All (Elastic Defend detect/telemetry). No MDE.
+# Soft host Defender (RTP off + excludes) via 17-ws01-deploy.yml.
+# Imported from Eva7ion (local Eva7er account may remain); vagrant/vagrant for CADRE config.
+ansible_user: vagrant
+ansible_password: vagrant
+ansible_connection: winrm
+ansible_winrm_server_cert_validation: ignore
+ansible_winrm_transport: basic
+ansible_winrm_scheme: http
+ansible_winrm_port: 5985
