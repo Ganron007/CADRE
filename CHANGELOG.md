@@ -4,6 +4,43 @@ All notable changes to CADRE are documented here. Format: [Keep a Changelog](htt
 
 ## [Unreleased]
 
+### Added (2026-06-25 — EX-60 SO-CRATES cross-cutting tool + Plan 9 reference [Session 15])
+
+> **Source:** [SO-CRATES](https://github.com/dougburks/so-crates) by Doug Burks (Security Onion creator). Standalone web app for **PCAP + log + binary analysis** with Suricata + Zircolite (Sigma) + YARA baked in. Same engine as [securityonion.net/pcap](https://securityonion.net/pcap). Air-gapped capable. Per user direction (2026-06-25): "b" (low effort, high signal — add EX-60 + Plan 9 reference).
+
+**What SO-CRATES is (and isn't):**
+- ✅ **Per-file analyst UI** for PCAP + log + binary with Suricata + Zircolite (Sigma) + YARA + Sankey + aggregation tables
+- ✅ Bakes in **Zircolite** (Sigma rule engine for log files) — currently missing from our stack
+- ✅ Bakes in **YARA** binary scanning — currently missing
+- ✅ Air-gapped deployment — works offline with baked-in rules
+- ❌ Does NOT replace Elastic Stack (long-term telemetry store)
+- ❌ Does NOT replace Arkime viewer (already on monitor VM, continuous PCAP)
+- ❌ Does NOT replace our Suricata deployment (already on monitor VM, fed to Elastic)
+
+**Files updated (3 total — focused scope per user "b"):**
+
+1. **`docs/internal/plan01-upgrades/plan1.7-exercises.md`** (EX-60 + cross-cutting tool section):
+   - **EX-60 added**: "PCAP + Log Analysis with SO-CRATES (Cross-Cutting Analyst Tool)"
+     - 7-step plan: deploy + analyze EX-47 PCAP + analyze sample log + validate plan1.7 Sigma rules pre-deployment + PCAP validation workflow + cross-check with deployed Suricata + use as Plan 2 design reference
+   - **Source table updated**: +SO-CRATES (cross-cutting) row
+   - **Total: 59 → 60 exercises**
+   - **Cross-Cutting Tool section** (~2 KB): SO-CRATES description, what it adds, what it doesn't replace, tools to install
+
+2. **`docs/internal/roadmapv2.md`** (Plan 9 reference):
+   - **Plan 9 section** updated: added "Cross-cutting analyst tool (NEW session 15)" line referencing SO-CRATES
+   - **Per-plan table**: plan1.7 = 60 ex (was 59)
+   - **File references table**: SO-CRATES source path added (`CADRE-Courses/so-crates/`)
+   - **Footer**: session 15 entry added
+
+3. **`AGENTS.md`** — session 15 entry added (this entry, mirrored to CHANGELOG)
+
+**Status legend:** SO-CRATES is now in scope as a **cross-cutting analyst tool** for Plan 9 (PCAP/log analysis) + plan1.7 EX-47 (PCAP validation) + plan1.7 §10 (PCAP workflow) + Plan 2 design reference. No active deployment in this session — just reference + EX-60 spec.
+
+**Cross-references:**
+- `docs/internal/plan01-upgrades/plan1.7-exercises.md` "Cross-Cutting Tool: SO-CRATES" section + EX-60
+- `docs/internal/roadmapv2.md` Plan 9 line + per-plan table + file references
+- Held for next session: actual deployment of SO-CRATES Docker container on monitor VM
+
 ### Added (2026-06-25 — Roadmapv2 + 13Cubed Linux Forensics Integration + Items EX-49..59 / EX-OFF-32..37 [Session 14])
 
 > **Scope:** Per user direction (2026-06-25): *"save roadmapv2 first and then proceed to review this one as well, i want linux forensics as well into this somehow ... C:\STUDY\Github\CADRE-Courses\13Cubed ... this if anything new, goes into plan1.7 exercises and other places as necessary and update the roadmapv2 in the end. lastly update changelog and agents.md"*
