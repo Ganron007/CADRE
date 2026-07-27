@@ -4,18 +4,24 @@ All notable changes to CADRE are documented here. Format: [Keep a Changelog](htt
 
 ## [Unreleased]
 
-### DFIR-Nexus B.0 "Pathfinder" COMPLETE (2026-06-05)
+### DFIR-Nexus B.0 "Pathfinder" COMPLETE — hardening slices (2026-06-05)
 
-**B.0 shipped** — production-grade foundation on top of A.0 Pioneer (v0.6.0):
+**B.0 fully closed** — production-grade foundation on top of A.0 Pioneer (v0.6.0). Initial release plus final thin slices:
 
-- **B.0.3 HTTP gateway** — `dfir-nexus gateway` — Starlette ASGI, bearer auth, per-IP rate limit, `{backend}__{tool}` prefix, in-process + HTTP backends
-- **B.0.4 Examiner Portal** — `dfir-nexus portal` — 8-tab SPA, challenge-response auth (password never leaves browser as plaintext)
-- **B.0.5 Forensic + detection** — Plaso psort CSV importer (32nd source), Velociraptor MCP server (`vql_query`, `vql_collect_artifact`, `vrun_health`), SigmaHQ download (`detection_sigma_install`), MITRE Navigator layer (`mitre_navigator_layer`), Sigma→KQL (`sigma_translate_kql`)
-- **Tests:** 352 pytest + 52 smoke steps
-- **Docs:** [`tools/dfir-nexus/docs/B0-PATHFINDER.md`](tools/dfir-nexus/docs/B0-PATHFINDER.md)
-- **CADRE bridge:** [`attack-matrix/DFIR-Nexus-Pioneer-workflow.md`](attack-matrix/DFIR-Nexus-Pioneer-workflow.md) updated for B.0 CLI (gateway/portal alongside Pioneer loop)
+| Slice | Shipped |
+|:------|:--------|
+| **B.0.1 DRAFT/HITL** | Password-gated approve/reject, PBKDF2 HMAC signing, 3-attempt lockout |
+| **B.0.2 LangGraph** | 6 agents in `langgraph/agents/*.py`, parallel graph, HITL interrupt |
+| **B.0.3 HTTP gateway** | `dfir-nexus gateway` — in-process + HTTP + **stdio** backends, lazy connect, **idle reaper** (60s) |
+| **B.0.4 Examiner Portal** | `dfir-nexus portal` — 8-tab SPA, **in-browser approve/reject**, live timeline/evidence/hosts APIs |
+| **B.0.5 Forensics + detection** | Plaso importer (32nd source), Velociraptor MCP (`vql_query`, `vql_collect_artifact`, `vrun_health`), `create_velociraptor_client()` (HTTP vs mock via `DFIR_NEXUS_VR_USE_MOCK`), SigmaHQ download (`detection_sigma_install`), MITRE Navigator layer, Sigma translation (`sigma_translate` kql/spl, `sigma_translate_kql`, `sigma_translate_spl`) |
 
-**Next:** C.0 Voyager (RAG + Windows triage). CADRE Ansible wiring on provisioning remains separate.
+- **MCP tools:** 40 (was 35 at v0.6.0)
+- **Tests:** 364 pytest + 52 smoke steps
+- **Docs:** [`tools/dfir-nexus/docs/B0-PATHFINDER.md`](tools/dfir-nexus/docs/B0-PATHFINDER.md), [`SUMMARY.md`](tools/dfir-nexus/docs/SUMMARY.md), [`ARCHITECTURE.md`](tools/dfir-nexus/docs/ARCHITECTURE.md)
+- **CADRE bridge:** [`attack-matrix/DFIR-Nexus-Pioneer-workflow.md`](attack-matrix/DFIR-Nexus-Pioneer-workflow.md) — gateway/portal alongside Pioneer loop; Phase 3.5 active
+
+**Next:** C.0 Voyager (RAG + Windows triage + Volatility 3). CADRE Ansible wiring on provisioning remains separate.
 
 ### DFIR-Nexus v0.6.0 — FEATURE COMPLETE (2026-06-20)
 

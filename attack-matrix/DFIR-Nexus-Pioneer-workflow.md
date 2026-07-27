@@ -8,7 +8,7 @@
 >
 > **Telemetry log:** `docs/internal/plan01-telemetry-catalog/phase1-source-matrix/tracker.md` (internal)
 
-**Status:** Active — Phase 3.5 in progress. **B.0 Pathfinder complete** (gateway, portal, Plaso, SigmaHQ).
+**Status:** Active — Phase 3.5 in progress. **B.0 Pathfinder fully closed** (2026-06-05) — stdio gateway, portal approve/reject UI, Sigma kql/spl, 360 tests, 52 smoke steps.
 
 ---
 
@@ -20,8 +20,24 @@
 | HTTP gateway | `dfir-nexus gateway --token SECRET` | 4623 | Aggregate MCP backends for agents |
 | Examiner Portal | `DFIR_NEXUS_PORTAL_PASSWORD=x dfir-nexus portal` | 4625 | Review DRAFT findings from 3.5 exercises |
 | Velociraptor MCP | `python -m dfir_nexus.integration.velociraptor_mcp_server` | stdio | Endpoint collection on mbr01 |
+| Plaso super-timeline | `psort.py -o dynamic -w timeline.csv ...` then ingest | file | Correlate host-wide events |
+| SigmaHQ rules | `detection_sigma_install` | MCP | Download 3,200+ Sigma rules for gap analysis |
 
-After each 3.5 branch: open Portal → **Findings** / **TODOs** tab → approve DRAFT via MCP or Portal queue.
+After each 3.5 branch: open Portal → **Overview** review queue → approve/reject in-browser (case approval password) or via MCP `case_approve`.
+
+### Recommended service stack for a 3.5 exercise
+
+```bash
+# Terminal 1 — gateway aggregates DFIR-Nexus + Velociraptor MCP
+dfir-nexus gateway --port 4623 --token CADRE-2026
+
+# Terminal 2 — Examiner Portal for HITL review
+export DFIR_NEXUS_PORTAL_PASSWORD=examiner-secret
+dfir-nexus portal --port 4625
+
+# Terminal 3 — run campaign from Kali, export telemetry, then use MCP client
+# or curl gateway endpoints directly.
+```
 
 ---
 
@@ -46,14 +62,16 @@ flowchart LR
         D2["analyze_correlate"]
         D3["case_create + finding_record"]
         D4["case_approve (HITL)"]
+        D5["case_run_agents (agentic)"]
     end
 
     subgraph TRACK["Plan 1"]
-        T1["tracker.md row<br/>PRIMARY + case ID"]
+        T1["tracker.md row\nPRIMARY + case ID"]
     end
 
     A1 --> E1 & E2 & E3
     E1 & E2 & E3 --> D1 --> D2 --> D3 --> D4 --> T1
+    D5 -.->|after manual path proven| D3
 ```
 
 | Step | Owner | Output |
@@ -63,7 +81,8 @@ flowchart LR
 | 3. Ingest | DFIR-Nexus | Normalized artifacts in case store |
 | 4. Correlate | DFIR-Nexus | Shared host/user/MITRE groups |
 | 5. Case | DFIR-Nexus | DRAFT findings → human approve → HMAC audit chain |
-| 6. Track | Plan 1 | `tracker.md` PRIMARY + DFIR case ID + export paths |
+| 6. Agentic (optional) | DFIR-Nexus | `case_run_agents` runs six LangGraph agents on same artifacts |
+| 7. Track | Plan 1 | `tracker.md` PRIMARY + DFIR case ID + export paths |
 
 ---
 
@@ -76,6 +95,8 @@ flowchart LR
 | Suricata | `192.168.77.55` (monitor) | `/var/log/suricata/eve.json` | `suricata` |
 | Zeek | monitor | `/opt/zeek/logs/current/*.log` | `zeek` |
 | Hayabusa (optional) | Kali / provisioning | CSV timeline after EVTX pull | `hayabusa` |
+| Plaso (optional) | Kali / provisioning | `psort.py` CSV export for host super-timeline | `plaso` |
+| Velociraptor (optional) | mbr01 / mbr02 | VQL artifact collection → JSON/CSV | `velociraptor` |
 
 **Attack VM (Phase 3 spine):** `mbr01` `192.168.77.22` · **Kali:** `192.168.77.60` · **Root DC:** `dc01` `192.168.77.10`
 
@@ -121,15 +142,24 @@ reg = get_registry()
 for path, src in [
     (bundle / "elastic-mbr01.json", ArtifactSource.ELASTIC),
     (bundle / "suricata-eve.json", ArtifactSource.SURICATA),
+    (bundle / "velociraptor-mbr01.json", ArtifactSource.VELOCIRAPTOR),
+    (bundle / "plaso-timeline.csv", ArtifactSource.PLASO),
 ]:
     if path.exists():
         reg.import_path(path, source=src)
 
-# 2 — Correlate (10-minute window around attack)
+# 2 — Agentic pipeline (manual first; use case_run_agents once proven)
+# artifacts = ...  # from ingest store / ingest_search MCP tool
+# result = DFIRAgentGraph(case_manager=mgr).run(
+#     case_id=case.id, artifacts=artifacts, case_name=case.name
+# )
+# print(result.pending_human_approval, result.draft_finding_ids)
+
+# 3 — Correlate (10-minute window around attack)
 # artifacts = ...  # from ingest store / ingest_search MCP tool
 # CorrelationEngine(time_window_seconds=600).correlate(artifacts)
 
-# 3 — Case + DRAFT finding
+# 4 — Case + DRAFT finding
 mgr = CaseManager()
 case = mgr.create_case(
     name="CADRE-3.5F — LSASS dump on mbr01",
@@ -146,15 +176,26 @@ finding = mgr.add_finding(
     initial_state=ApprovalState.DRAFT,
 )
 
-# 4 — Sigma stub (Plan 1 seed)
+# 5 — Sigma stub + Navigator layer (Plan 1 seed)
+from dfir_nexus.detection.sigma_repo import mitre_navigator_layer
 rules = generate_sigma_for_techniques(["T1003.001"])
+layer = mitre_navigator_layer(["T1003.001"], name="CADRE-3.5F coverage")
 
-# 5 — Approve after analyst review (set case password once, then approve)
+# 6 — Approve after analyst review (set case password once, then approve)
 # mgr.set_case_approval_password(case.id, password="...")
 # mgr.approve_finding(finding_id=finding.id, password="...", approved_by="examiner")
 ```
 
-**Agentic pass (optional):** MCP tool `case_run_agents` with same ingested artifacts → six LangGraph agents → `interrupt()` for DRAFT approval. Use after manual path works once.
+**Agentic pass (optional):** MCP tool `case_run_agents` with same ingested artifacts → six LangGraph agents (`Timeline`, `Endpoint`, `Network`, `Alert`, `Cloud`, `Synthesis`) → `interrupt()` returns `pending_human_approval=True` with DRAFT findings. Approve via Portal or `case_approve`. Use after manual path works once.
+
+Example call via gateway:
+
+```bash
+curl -H "Authorization: Bearer CADRE-2026" \
+     -H "Content-Type: application/json" \
+     -d '{"name":"dfir-nexus__case_run_agents","arguments":{"case_id":"CASE-...","artifacts":[...],"headless":false}}' \
+     http://127.0.0.1:4623/v1/tools/call
+```
 
 ---
 
@@ -325,7 +366,7 @@ Token impersonation from session 0 → session 1 failed (error 1346). Still run 
 
 ## Future phases (placeholder)
 
-Add sections here when campaign testing reaches each phase. Do not block 3.5 on B.0 Portal/Gateway.
+Add sections here when campaign testing reaches each phase. B.0 Portal/Gateway are now available to accelerate Pioneer loops but are not required for manual 3.5 testing.
 
 | Phase | Campaign | DFIR focus |
 |:------|:---------|:-----------|
@@ -349,4 +390,4 @@ Add sections here when campaign testing reaches each phase. Do not block 3.5 on 
 
 ---
 
-*Last updated: 2026-06-05*
+*Last updated: 2026-06-22*
