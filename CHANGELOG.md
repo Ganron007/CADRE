@@ -4,6 +4,106 @@ All notable changes to CADRE are documented here. Format: [Keep a Changelog](htt
 
 ## [Unreleased]
 
+### Added (2026-06-25 — AMSI Bypass Detection Engineering [Session 16])
+
+> **Source:** [One Bool. Six Shells. AMSI's Design Problem](https://bl4ckarch.github.io/posts/One-Bool.-Six-Shells.-AMSI%27s-Design-Problem/) by bl4ckarch, 2026-06-25. Per user direction: "you can update these 2 and remove from Todo" — apply the bl4ckarch research to plan1.7 §16 + Campaign_suggestions Item #109.
+
+**What changed:**
+- **Campaign_suggestions.md Item #109 REWRITTEN** — Gray Hat Hacking 6th Ed (3 outdated techniques) → bl4ckarch (6 reverse-shell-verified techniques). All previous techniques confirmed broken on modern targets:
+  - `amsiInitFailed` field reflection → fails on PS 7 (field renamed to `s_amsiInitFailed` + `initonly` added)
+  - `AmsiScanBuffer` patching → Defender kernel callback kills session (only works if Defender disabled)
+  - Forced error → superseded by Bypass 5 (pAppName null at ctx+0x08)
+- **6 new confirmed bypass techniques** (Bypass 1-6, all PS 7-relevant except #1, #2):
+  - Bypass 3 — DynamicMethod IL emission (`stsfld`) — PS 7, no VirtualProtect
+  - Bypass 4 — JIT heap patch + `s_amsiNotifyFailed` write — PS 7, no VirtualProtect on amsi.dll
+  - Bypass 5 — `pAppName` null write at ctx+0x08 — PS 7, no VirtualProtect (minimum-API)
+  - Bypass 6 — InternalNotify patch + pAppName null — PS 7, 1 VirtualProtect call
+
+**Files updated (2 total):**
+
+1. **`docs/internal/plan01-upgrades/plan1.7-defense-deepening.md`** — §16 AMSI Bypass Detection Engineering added (~12 KB):
+   - §16.1 Why the previous 3 Gray Hat techniques failed (live-tested)
+   - §16.2 The 6 new confirmed techniques (all reverse-shell verified)
+   - §16.3 Architectural findings (6 null-pointer guards, PS 7 two-path, initonly inconsistency, Defender RVA 0x8160 watch, Event 4104 not suppressed)
+   - §16.4 5 Sigma rules + 1 Elastic KQL (`cadre-010-amsi-bypass`) + Sysmon EID 10/8 additions
+   - §16.5 Memory forensics detection (post-bypass state via CLR profiling API + native patch detection for `InternalScan`/`InternalNotify`)
+   - §16.6 Architectural mitigations (Constrained Language Mode, kernel-mode AMSI, HVCI)
+   - §16.7 Cross-references — what was updated this session
+   - §16.8 Action items (6 — most held for Sprint 1 + Plan 9)
+
+2. **`attack-matrix/Campaign/Campaign_suggestions.md` Item #109 REWRITTEN** — 6 table positions updated:
+   - Phase mapping table (line 1162): Gray Hat → bl4ckarch label
+   - Testing Checklist table (line 1266): updated command snippet (Bypass 5 pAppName null + full detection rules)
+   - Tier 3 Summary table (line 1899): updated source label
+   - Cross-Reference Index (line 1942): noted supersession
+   - Full mechanics section (line 3768): replaced with 6 new techniques + supersession notes + minimum-API snippet
+
+**Cross-references:**
+- Campaign_suggestions.md Item #109 (REWRITTEN)
+- plan1.7-defense-deepening.md §16 (NEW)
+- roadmapv2.md (no change needed)
+- Held for Sprint 1: add EX-61 to plan1.7-exercises.md + write T109-amsi-bypass.yml Sigma YAML
+- Held: test in lab (requires re-enabling Defender per roadmapv2 decision)
+- Related: Item #108 (Defender Exclusion via PowerShell, T1562.001 — complementary runtime disable)
+
+### Changed (2026-06-25 — Campaign v2 + full-content runbooks + coverage audit [Session 17])
+
+> **Per user direction:** Runbooks carry **all campaign details** (theory, prerequisites, detection, tables) — not commands-only. Learn from explanation + live testing. Main campaign is **v2** (`CAMPAIGNS_v1_archived.md` remains archived v1).
+
+**File model (`attack-matrix/Campaign/`):**
+
+| File | Role |
+|------|------|
+| `CAMPAIGNS.md` | **v2 index** — topology, attack flow, runbook table, coverage summary |
+| `CAMPAIGNS_v2.md` | Full monolithic reference (~3,074 lines) for search/print |
+| `CAMPAIGNS_v1_archived.md` | Archived v1 (60-attack campaign) |
+| `Runbooks/CAMPAIGNS-RUNBOOK-*.md` | **Primary lab path** — full phase narrative + commands (18 files) |
+| `Runbooks/CAMPAIGNS-RUNBOOK-README.md` | Runbook index + editing rules |
+
+**Runbooks (18):** Phase 0–8, Branch 3.5, branches A–D, E/F/G. Each includes narrative + commands. Study refs appended to phases 3.5, 4, 6, 8 (incl. Study Reference Library preamble on 3.5). Branch A includes `## Branches` intro; E includes `## Exercises` intro; Phase 1 includes `## Main Spine` header; Phase 3 includes Alternative Execution + LOLBAS subsections.
+
+**Tools:**
+- `tools/split-campaign-runbooks.py` — heading-anchored regen from `CAMPAIGNS_v2.md` → runbooks + index
+- `python tools/split-campaign-runbooks.py --check` — coverage audit (all campaign body lines assigned to a runbook or index)
+
+**Coverage audit fix:** First split used stale hardcoded line numbers → Phase 0 opening truncated, Phase 8 study refs cut short (missing Forshaw refs + “How to use this section”), Branches/Exercises section headers missing. Rebuilt with markdown heading anchors; `--check` reports **OK: full campaign body covered**.
+
+**Editing workflow (going forward):** Update **runbook + matching `CAMPAIGNS_v2.md` section together**. Run `--check` after bulk regen from v2 only (regen overwrites runbooks). Sync rule documented in runbook headers and `CAMPAIGNS_v2.md` how-to block.
+
+**Also updated:** `Campaign/README.md`, `attack-matrix/README.md`, `AGENTS.md`, runbook headers (sync rule).
+
+### Changed (2026-06-25 — Campaign folder restructure + per-phase runbooks [Session 16])
+
+> **Per user direction:** Consolidate all campaign docs under `attack-matrix/Campaign/`. Superseded by Session 17: runbooks are full narrative + commands, not commands-only; `CAMPAIGNS.md` is v2 index, `CAMPAIGNS_v2.md` is full reference.
+
+**New layout (`attack-matrix/Campaign/`):**
+
+| Path | Purpose |
+|------|---------|
+| `CAMPAIGNS.md` | v2 index — topology, runbook table, coverage (see Session 17) |
+| `CAMPAIGNS_v2.md` | Full monolithic narrative (Session 17) |
+| `CAMPAIGNS-METADATA.md` | Per-attack playbook refs, ACE#s, telemetry |
+| `Campaign_suggestions.md` | Research backlog → promote when verified |
+| `ATTACK-MAP.md` | Visual AD attack-surface mindmap |
+| `attack-tools-required.md` | Tools per WT# |
+| `DFIR-Nexus-Pioneer-workflow.md` | Parallel attack + DFIR-Nexus case bridge |
+| `Feedback_loop.txt` | Campaign_suggestions assessment notes |
+| `CAMPAIGNS_v1_archived.md` | Archived 60-attack campaign |
+| `README.md` | Folder index |
+| `Runbooks/` | 18 full-content runbooks (Phase 0–8, 3.5, branches, E/F/G) — see Session 17 |
+| `study-guide/` | Phase deep-dives (was `05-study-guide/`) |
+| `diagrams/attack-flow.md` | Campaign flow Mermaid (was `02-diagrams/attack-flow.md`) |
+| `attackpath/` | 100-attack kill-chain map (was `03-attackpath/`) |
+| `artifacts/` | Campaign captures (BH zip, nmap scan, etc.) |
+
+**Runbooks created (18 files):** Phase 0–8, Branch 3.5, branches A–D, exercises E/F/G. Index: `Runbooks/CAMPAIGNS-RUNBOOK-README.md`. Phase 0 active for lab execution.
+
+**Cross-link updates:** `attack-matrix/README.md`, `prerequisites.md`, `01-walkthroughs/README.md`, `02-diagrams/README.md`, `03-attackpath` → `Campaign/attackpath`, `DFIR-Nexus-Pioneer-workflow` paths, walkthrough WT028/WT031, `Campaign/CAMPAIGNS.md` header (runbook links use `Runbooks/` prefix).
+
+**Still under `attack-matrix/` (not moved):** `01-walkthroughs/` (WT reference cards), `04-automation/` (scripts), `02-diagrams/cadre-architecture-reference.md` (lab topology), `06-telemetry-catalog/` through `10-cert-map/`.
+
+**Path migration (for historical changelog entries):** `attack-matrix/CAMPAIGNS.md` → `attack-matrix/Campaign/CAMPAIGNS.md` (same for `-METADATA`, `Campaign_suggestions`, `DFIR-Nexus-Pioneer-workflow`).
+
 ### Added (2026-06-25 — EX-60 SO-CRATES cross-cutting tool + Plan 9 reference [Session 15])
 
 > **Source:** [SO-CRATES](https://github.com/dougburks/so-crates) by Doug Burks (Security Onion creator). Standalone web app for **PCAP + log + binary analysis** with Suricata + Zircolite (Sigma) + YARA baked in. Same engine as [securityonion.net/pcap](https://securityonion.net/pcap). Air-gapped capable. Per user direction (2026-06-25): "b" (low effort, high signal — add EX-60 + Plan 9 reference).
