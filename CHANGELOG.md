@@ -4,6 +4,368 @@ All notable changes to CADRE are documented here. Format: [Keep a Changelog](htt
 
 ## [Unreleased]
 
+### Added (2026-06-24 — 5 Concrete Techniques Extracted from Reference Books [Items #102-106])
+
+- **Source:** Per user workflow principle (2026-06-24): *"books are reference material, but specific attack techniques IN them should be extracted as new items in Campaign_suggestions, with phase mapping. Only move to CAMPAIGNS.md Mechanics when verified."*
+- **Item #102 — dsHeuristics abuse** (Phase 0/1 Recon) — Forest-level attribute that controls AD behavior. Some flags weaken security (fAllowAnonNSPIUpdates, fDisableListContents). Detect modifications as early-warning signal.
+- **Item #103 — UAC bit exploitation beyond DONT_REQ_PREAUTH** (Phase 0/1/5 Recon) — Enumerate all 20+ UAC flags (TRUSTED_FOR_DELEGATION 0x80000, TRUSTED_TO_AUTH_FOR_DELEGATION 0x40000, DONT_EXPIRE_PASSWORD 0x10000, etc.). Many flags are unenumerated in current campaign.
+- **Item #104 — ms-DS-Machine-Account-Quota check** (Phase 5 RBCD pre-flight) — Default quota = 10 (enables WT007 RBCD). Quota = 0 blocks RBCD from low-priv user. Pre-flight check before attempting RBCD saves time.
+- **Item #105 — SACL/audit policy manipulation for detection evasion** (Phase 5+ red team perspective) — Defenders DETECT these manipulations via WinSec 4907/4719. Adds new Elastic KQL (proposed cadre-008) and Suricata SID (proposed 1000104).
+- **Item #106 — Atomic Red Team as validation framework** (Cross-cutting) — 1000+ pre-built MITRE ATT&CK tests for cross-validation of manual CAMPAIGNS.md attacks. Run `Invoke-AtomicTest T1003.001,T1558.003,...` per phase to validate detection coverage.
+- **CAMPAIGNS.md updated:** Inline cross-references added in Study Reference Library entries for Windows Security Internals + Practical Purple Teaming — listing the 5 extracted items (#102-106) with their book chapter sources.
+- **CAMPAIGNS-METADATA.md updated:** New "Mechanics: Techniques Extracted from Reference Books (#102-106) [STUB — UNTESTED]" section with full 8-part template Mechanics stubs for each item (why/attack commands/expect/failures/CADRE notes/telemetry/detection/pitfalls + reproduction checklist + cross-references). All marked [STUB — UNTESTED] for verification.
+- **Campaign_suggestions.md updated:** 5 new items added (#102-106) with phase mapping, MITRE IDs, attack commands, detection rules, cross-references. Summary table, Phase Mapping, Testing Checklist, Tier 3 Summary, Cross-Reference Index, counts (91 → 96), footer all updated.
+- **Workflow note (2026-06-24 session 9):** Per user direction, extracted 5 concrete techniques from the 2 reference books (#100-101 added in session 8) and added them as new items to Campaign_suggestions + Mechanics stubs to CAMPAIGNS-METADATA.md. NOT added to main CAMPAIGNS.md attack flow yet (waiting for verification per user workflow). Cross-references added in Study Reference Library entries.
+
+### Added (2026-06-24 — NoStarchPress Reference Library Survey [Items #100-101])
+
+- **Survey scope:** All 49 directories in `CADRE-Courses/NoStarchPress_extract/` surveyed via term-frequency analysis. Two books have high direct value to CADRE campaign; rest are lower priority or duplicative.
+- **Item #100 — Windows Security Internals (Forshaw, 2023):** Located at `CADRE-Courses/NoStarchPress_extract/WindowsSecurityInternals_11172023/` (1.3MB .txt, 19.6MB .html). 600 AD-relevant matches. Maps to:
+  - **Chapter 14 (Kerberos)** — Phase 1 (AS-REP), Phase 2 (Kerberoast), Phase 7 (Golden Ticket), Skipjack #97, Onelogon #76, Zerologon Alternative #65
+  - **Chapter 11 (Active Directory)** — Phase 0/4/8, Branch A (14 ACEs), Branch B (ADCS CA ACLs)
+  - Chapter 4 (Access Tokens) — Phase 3.5 LSASS + token impersonation
+  - Chapters 5-8 (Security Descriptors) — Branch A + plan1.7 (AccessMask decoding)
+  - Chapter 9 (Security Auditing) — plan1.7 (SACL audit policy)
+- **Item #101 — Practical Purple Teaming (Petrey):** Located at `CADRE-Courses/NoStarchPress_extract/Practical_Purple_Teaming-0642572230173/` (725KB .txt, 770KB .html). 255 AD-relevant matches. Maps to:
+  - **Chapter 6 (Collecting Telemetry)** — plan1.7 detection engineering (Suricata + Zeek + Sysmon + WinSec + EDR correlation)
+  - **Chapter 8 (Atomic Red Team)** — 1000+ pre-built attack tests for cross-validation of our manual CAMPAIGNS.md commands
+  - Chapter 9 (Caldera AD Recon) — Track B Caldera integration
+  - Chapter 10 (Mythic C2) — Plan 10 (C2+Emulation), Loki integration
+  - **Chapter 11 (Reporting + Tracking)** — `tracker.md` workflow + DFIR-Nexus case reports
+  - Chapter 12 (Purple Teaming Function) — DFIR-Nexus organizational model
+- **CAMPAIGNS.md updated:** New "📖 Windows Security Internals (Forshaw, 2023)" and "📖 Practical Purple Teaming (Petrey)" entries added to Study Reference Library section (just after CVE-2020-0665 Forest Trust entry). Both with chapter → CADRE phase mapping.
+- **CAMPAIGNS-METADATA.md updated:** New "Reference Books — Windows Security Internals + Practical Purple Teaming [STUDY]" section after ADeleg. Full chapter mapping tables for both books + recommended reading order + CADRE-specific notes + cross-references. **Status: study reference, not new attack Mechanics.**
+- **Campaign_suggestions.md updated:** New top-level section "NoStarchPress Reference Library Survey (2026-06-24)" + Item #100 (Windows Security Internals) + Item #101 (Practical Purple Teaming). All 5 tables (summary, Phase Mapping, Testing Checklist, Tier 3 Summary, Cross-Reference Index) + counts (89 → 91) + footer updated.
+- **Lower-value books deprioritized (per survey):**
+  - Pentesting Azure Applications (74 matches) — for Plan 11 Entra ID (held)
+  - EvadingEDR (85 matches) — CADRE doesn't run EDR
+  - Red Team Engineering (53 matches) — for Plan 10
+  - Ethical Hacking (135 matches) — general reference
+  - Black Hat Python (5 matches) — not AD-focused
+  - Gray Hat C# (0 matches) — not relevant
+  - Foundations of Information Security (3 matches) — basics
+- **CADRE applicability (HIGH):** Both books fill reference gaps we have:
+  - Windows Security Internals — directly supports our Onelogon #76 / Skipjack #97 / Zerologon #65 research via deep Kerberos protocol coverage
+  - Practical Purple Teaming — directly supports our plan1.7 detection engineering + DFIR-Nexus integration + tracker.md workflow
+- **Workflow note (2026-06-24 session 8):** Per user direction, scope was 3 campaign docs + CHANGELOG/AGENTS. Books added as Study Reference Library entries (not new attack Mechanics — no Mechanics section for books). Full integration held until post-campaign.
+
+### Added (2026-06-24 — ADeleg: Windows GUI Tool for ACL/ADCS Recon [Episode 173])
+
+- **Source:** ADeleg podcast Episode 173 + course material at `CADRE-Courses/How to Find Insecure Active Directory Permissions with ADeleg/Episode 173_*.txt` (21,554 bytes). ADeleg = Windows GUI tool for AD delegated permission enumeration. https://github.com/trimarc/ADeleg
+- **Why ADeleg:** Per the podcast: *"adelec is an active directory delegation management tool ... it gets you almost the same amount of information that bloodhound gets you but with like a third of the hassle — you don't have to set up bloodhound, you don't have to run the sharp pound collector in your environment and trigger all your edr alerts, you don't have to set up docker to like set up the bloodhound ui and node for neoj"*
+- **Differentiators from BloodHound:**
+  - No SharpHound collector (avoids EDR alerts)
+  - No Docker/Neo4j setup (pure Windows GUI)
+  - No LDAP bind required for full enumeration
+  - Direct View by Trustee (attacker perspective)
+  - ADCS ESC1-8 template misconfiguration flagging
+- **Key concepts from article:**
+  - **"Unsafe users/groups"** to check first: everyone, authenticated users, domain users, domain computers, domain join account (often over-permissioned)
+  - **"Unsafe permissions"** flagged: GenericAll, WriteDacl, WriteOwner, ForceChangePassword, ResetPassword, Delete, AllExtendedRights, Apply-Group-Policy
+- **CAMPAIGNS.md updated (3 sections):**
+  - **Phase 0 Step 7 — ADeleg GUI Recon (Alternative to BloodHound)** — full Mechanics section with workflow, what to expect (success/failure), CADRE-specific notes (visualize 14 ACEs from `05-ad-attack-surface.yml`, ESC1-17 templates from `08-adcs-deploy.yml`), detection (WinSec 4662 bulk, Zeek LDAP, Suricata SID:1000102 proposed)
+  - **Branch A (ACL Abuse)** — added ADeleg pre-BloodHound tip with rationale
+  - **Branch B (ADCS)** — added ADeleg pre-Certipy tip with rationale
+- **CAMPAIGNS-METADATA.md updated:** New "Mechanics: Phase 0 Step 7 — ADeleg GUI Recon [STUB — UNTESTED]" section after Step 0.5b. Full 8-part template: why it works (no EDR/no Docker), attack workflow (powershell commands), success/failure modes, CADRE-specific notes (14 ACEs + ESC1-17 templates), telemetry fingerprint (WinSec 4662 bulk + Sysmon EID 1 ADeleg.exe + Zeek LDAP + Suricata SID:1000102), detection engineering (proposed Suricata SID + Elastic KQL cadre-007), common pitfalls, Wireshark field reference, reproduction checklist, ADeleg vs BloodHound decision matrix.
+- **Campaign_suggestions.md updated:** New top-level section "ADeleg — Windows GUI Tool for ACL/ADCS Recon (Episode 173, 2026-06-24)" + Item #99 added with full details on workflow, CADRE mapping table, detection, cross-references. Summary table, Phase Mapping table, Testing Checklist, Tier 3 Summary, Cross-Reference Index, counts (88 → 89), footer all updated.
+- **CADRE applicability (HIGH):**
+  - Visualizes the 14 ACEs from `05-ad-attack-surface.yml` — fast deployment verification
+  - Visualizes ADCS ESC1-17 templates from `08-adcs-deploy.yml` — pre-Certipy triage
+  - Surfaces domain join account over-permission (real-world common pattern per article)
+  - No EDR triggers (vs SharpHound) — useful in hardened environments
+- **Cross-references:** Phase 4 BloodHound (alternative when EDR blocks SharpHound), Branch A ACL Abuse (visual confirmation), Branch B ADCS (pre-Certipy scan), Campaign_suggestions.md #99.
+- **Workflow note (2026-06-24 session 7):** Per user direction, scope was 3 campaign docs + CHANGELOG/AGENTS. ADeleg integrates into Phase 0 + Branch A + Branch B as alternative recon tool. Detection engineering for new SID:1000102 held for plan1.7 §17.
+
+### Tracked (2026-06-24 — CADRE-Strike Agentic Offense Automation [Defer to Campaign Complete])
+
+- **Project reviewed:** `C:\STUDY\Github\CADRE-Strike\` (separate repo, MIT, ~30 files / ~10K LOC MVP 0.1). CADRE = **Contextual Active Directory Reasoning Engine**. Parallel agentic offense layer for the campaign — drives existing campaign tooling (NetExec, bloodyAD, Certipy, Coercer, Impacket) via LLM agents.
+- **Differentiators from "command-pass-through" wrappers (HexStrike AI, etc.):**
+  - **Intent-level operations** (`enumerate_domain_users`, `find_delegation`, `find_asrep_roastable`, etc.) — semantic ops an LLM agent can reason about
+  - **Typed command builders** with `shell=False`
+  - **Scope policy enforcement** before every action: target IP/CIDR + domain allowlist + engagement mode + high-risk gate
+  - **Pydantic-typed evidence records** with MITRE mapping, automatic secret redaction, confidence scoring
+  - **Read-only by default**: no spraying, dumping, persistence in MVP
+  - **Dual interface**: HTTP API (`cadre-api` on :8890) + MCP server (`cadre-mcp`) for AI agent integration
+- **Roadmap (from CADRE-Strike/ROADMAP.md):**
+  - 0.1 (current): Read-only API + MCP + NetExec builder + evidence model
+  - 0.2: BloodHound JSON + ranked attack-path graph + MITRE mapping
+  - 0.3: Validation mode (explicit approval for high-risk)
+  - 0.4: Web dashboard + report generation
+- **CADRE mapping (when integration starts):** 10+ tools map to CAMPAIGNS.md attacks. `enumerate_domain_users` → Phase 0, `find_asrep_roastable` → Phase 1, `find_kerberoastable` → Phase 2, `enumerate_adcs` → Branch B, `find_delegation_paths` → Phase 5, etc.
+- **Status:** 📋 **Tracked — deferred integration until campaign Phase 1-8 verified** (per user 2026-06-24: "optional approach parallel to campaign we are verifying. For now we keep this recorded somewhere in campaign-suggestions.md/changelog/agents.md so we can comeback to it once the compaign testing is complete.").
+- **Documentation path:** Will create `attack-matrix/CADRE-Strike-workflow.md` (parallel to `attack-matrix/DFIR-Nexus-Pioneer-workflow.md`) when integration starts.
+- **Companion pattern:** DFIR-Nexus (`tools/dfir-nexus/`) is the proven agentic DFIR side. CADRE-Strike is the agentic offense side. Both pair with manual campaign via `tracker.md`.
+- **LLM integration point:** Codex Security (or equivalent) as the LLM reasoning layer that picks next tool → MCP server dispatches → evidence captured.
+- **Files updated:** Campaign_suggestions.md (Track H in Parallel Tracks + summary table row + footer note). AGENTS.md (tracked in workflow context). CHANGELOG.md (this entry).
+
+### Added (2026-06-24 — NetExec `coerce_plus` + 6 new modules + `--kdcHost` flag [Hacking Articles AI+HexStrike Analysis])
+
+- **Source:** https://www.hackingarticles.in/ai-powered-active-directory-pentesting-with-claude-hexstrike-ai-netexec/ (June 21, 2026). Article walks through HexStrike AI + Claude Desktop driving NetExec end-to-end. **Key value for CADRE**: comprehensive NetExec command reference + 6 modules not previously documented.
+- **`--kdcHost` flag** (CRITICAL): Fixes "KDC routing quirk" when running AS-REP roast or Kerberoast against multi-DC environments (we have 3 DCs). Without it, AS-REQ may be sent to unreachable DC and fail silently.
+- **`-M coerce_plus`** (consolidated coercion check): Single command checks PetitPotam, PrinterBug, DFSCoerce, MSEven, MS-RPRN. Replaces running 5 individual coercion checks (WT017-020). Added to CAMPAIGNS.md as **WT096** in Phase 5 Alternative Coercion Techniques.
+- **6 new modules documented:**
+  - `-M pre2k` — Pre-Windows 2000 computer account abuse check (Phase 0 recon)
+  - `-M enum_av` — AV/EDR enumeration (pre-attack OPSEC, Phase 0)
+  - `-M get-desc-users` — User description field enumeration (Phase 0, cheap password leak check)
+  - `-M winscp` — WinSCP saved session decryption (Phase 3.5 creds)
+  - `-M rdp -o ACTION=enable/disable` — RDP enablement (operational primitive)
+  - `--dpapi` — Built-in DPAPI loot (Phase 3.5, alternative to DonPAPI module)
+- **DCSync detection enhancement:** Property GUID `1131f6aa-9c07-11d1-f79f-00c04fc2dcd2` = DS-Replication-Get-Changes. Alert when 4662 references this GUID + subject account is NOT a domain controller → canonical DCSync detection. Added Elastic KQL.
+- **CAMPAIGNS.md updated (5 changes):**
+  - **Step 0.5 (NetExec Quick-Recon)** — added 3 new modules (`-M pre2k`, `-M enum_av`, `-M get-desc-users`) + `--kdcHost` flag examples for AS-REP/Kerberoast
+  - **Phase 1 Step 2 (AS-REP Roast)** — added `--kdcHost` alternative nxc command
+  - **Phase 2 (Kerberoast)** — added `--kdcHost` alternative nxc command
+  - **Phase 5 (Alternative Coercion Techniques table)** — added new WT096 row for `coerce_plus` + full Mechanics section
+  - **Phase 6 Study Reference (DCSync Detection)** — added property GUID signature + Elastic KQL
+- **CAMPAIGNS-METADATA.md updated:**
+  - New "Mechanics: Phase 0 Step 0.5b — NetExec `--kdcHost` flag + 6 new modules [STUB — UNTESTED]" section with detailed stub for each of the 8 items (kdcHost + 6 modules + DCSync GUID).
+- **Campaign_suggestions.md updated:**
+  - New top-level section "NetExec New Modules (Hacking Articles AI+HexStrike Analysis, 2026-06-24)" after Skipjack
+  - Item #98 added with full details on `--kdcHost`, `coerce_plus`, and 5 new modules
+  - Summary table, Phase Mapping, Testing Checklist, Tier 3 Summary, Cross-Reference Index, counts (87 → 88), footer updated
+- **CADRE applicability:**
+  - **CRITICAL** — `--kdcHost` flag fixes silent failure of existing Phase 1/2 commands
+  - **`coerce_plus`** consolidates 5 individual coercion checks (Phase 5 pre-flight)
+  - **3 new recon modules** add Phase 0 coverage (pre2k, enum_av, get-desc-users)
+  - **3 new post-ex modules** add Phase 3.5 coverage (winscp, dpapi, rdp)
+  - **DCSync GUID** adds high-fidelity detection signal (Phase 6)
+- **Cross-references:** All additions complement existing #90 NetExec entry. Detection engineering for new modules → plan1.7 §17.
+- **Workflow note (2026-06-24 session 5):** Per user direction, scope was 3 campaign docs + CHANGELOG/AGENTS. All updates integrated directly into CAMPAIGNS.md (no deferral) since the new commands work with existing tooling. Detection engineering rules held for plan1.7 §17.
+
+### Added (2026-06-24 — Skipjack: Cross-Forest Trust Downgrade via Invalid PAC Signature)
+
+- **Research source:** https://blog.ghostwolflab.com/redteam/786/ — "PAC 签名无效引发的域信任降级攻击" (Domain Trust Downgrade Attack Caused by Invalid PAC Signatures), Ghost Wolf Lab, 2026-06-23.
+- **Attack name:** **Skipjack** (skip the PAC signature check, jack the downgrade logic).
+- **Vulnerability mechanism:** Kerberos **PAC (Privilege Attribute Certificate)** is signed with two signatures (service + KDC). When signature verification **fails**, Windows DCs have a **downgrade fallback** (legacy compatibility): look up user in local AD + rebuild token from AD groups. In **cross-forest trust scenarios where SID filtering is disabled**, an attacker can:
+  1. Get TGT in Forest A
+  2. Modify PAC to inject Forest B's Domain Admins SID (`S-1-5-21-<B>-519`)
+  3. **Delete or corrupt PAC signatures** (so verification fails)
+  4. Submit forged TGT to Forest B's DC
+  5. DC signature verification fails → enters downgrade mode
+  6. Downgrade mode rebuilds token BUT keeps forged SIDs (SID filter OFF)
+  7. **Attacker becomes Domain Admin in Forest B**
+- **CADRE applicability: HIGH** — all pre-conditions met:
+  - 2 forests (cadre.local, range.local) with cross-forest trust
+  - **SID Filter OFF** (verified per `01-core-ad.yml:50`, Server 2025 forest trust default)
+  - Attacker controls user in one forest (`intern_blue` in child.cadre.local)
+  - Target forest (cadre.local) — Enterprise Admins SID available for injection
+- **Skipjack vs current Phase 8 (Golden Ticket):**
+  | Method | Mechanism | Requires krbtgt? | Detection surface |
+  |---|---|---|---|
+  | Golden Ticket (current Phase 8) | Forge TGT with krbtgt hash + SID history | ✅ Yes (DCSync first) | Anomalous ticket encryption, no AS-REQ |
+  | **Skipjack (new)** | Modify legitimate TGT + corrupt signatures + inject SID | ❌ **No** | Legitimate AS-REQ + 4826 PAC verification failed |
+- **CAMPAIGNS.md updated:** New "Skipjack — Cross-Forest Trust Downgrade via PAC Signature Corruption (Phase 8 alt)" section in Phase 8 with full vulnerability mechanism, CADRE applicability (HIGH), Skipjack vs Golden Ticket comparison table, test plan with `Rubeus.exe asktgt /user:intern_blue /password:'1nt3rn_Blu3!' /domain:child.cadre.local /injectSID:S-1-5-21-<cadre.local-domain>-519 /corruptSignature`, detection (WinSec 4826, 4769, Zeek kerberos.log, Suricata SID:1000101), defense (SID filter, KdcValidatePac=1, ESAE).
+- **CAMPAIGNS-METADATA.md updated:** New "Mechanics: Skipjack — Cross-Forest Trust Downgrade via PAC Signature Corruption [STUB — PENDING CUSTOM TOOL]" section after Phase 8 Mechanics. Status ⏳ PENDING. Full 8-part template: why it works (downgrade fallback mechanism), attack commands (predicted — gated on custom tool), success/failure modes, CADRE-specific notes (test target dc01.cadre.local), telemetry fingerprint (WinSec 4826 + cross-forest), detection engineering (proposed Suricata SID:1000101 + Elastic KQL + KdcValidatePac Group Policy), common pitfalls (no /corruptSignature in standard Rubeus), Wireshark field reference, reproduction checklist.
+- **Campaign_suggestions.md updated:** Item #97 (next available) added as new top-level section "Skipjack — Cross-Forest Trust Downgrade via Invalid PAC Signature (GhostWolfLab, 2026-06-23)" after Onelogon section. Vulnerability mechanism explained, full pre-conditions table (all met on CADRE), testing plan, detection rules, defense recommendations, cross-references to items #66 (SID Filtering study ref) + #67 (CVE-2020-0665) + #76 (Onelogon). Summary table, Phase Mapping table, Testing Checklist row, Tier 3 Summary, Cross-Reference Index, counts (86 → 87), footer updated.
+- **Detection engineering candidates (plan1.7 §16 to be added separately):**
+  - Suricata SID:1000101 (new) — cross-realm TGS-REQ with corrupted PAC auth-data
+  - Elastic KQL — WinSec 4826 (PAC verification failed) correlation
+  - Zeek notice — kerberos.log inter-realm TGT with corrupted auth-data
+- **Defense recommendations:**
+  - Enable SID filtering on all cross-forest trusts (CRITICAL — closes the attack entirely)
+  - Force PAC validation: Group Policy → `HKLM\System\CurrentControlSet\Services\Kdc\Parameters\KdcValidatePac = 1`
+  - Monitor WinSec 4826 events (rare in healthy environment — should alert on any)
+  - ESAE (Enhanced Security Admin Environment) for high-priv accounts
+- **Cross-references:** Item #66 Forest Trust SID Filtering (root cause fix), Item #67 CVE-2020-0665 Trust Bypass, Item #76 Onelogon (different vuln class but similar outcome), Phase 8 current (Golden Ticket method).
+- **Workflow note (2026-06-24 session 4):** Per user direction, scope was analyze + 3 campaign docs + CHANGELOG/AGENTS. No PoC exists (blog provides pseudocode only). Custom Rubeus build or `skipjack_forge.py` implementation required to test. Detection rules held for plan1.7 §16 (paired with Onelogon).
+
+### Added (2026-06-24 — CVE-2026-41089 PoC Integration [CVSS 9.8 CRITICAL])
+
+- **PoC cloned from https://github.com/0xABCD01/CVE-2026-41089** (0xABCD01, 171 stars, 60 forks, MIT license). 4 files, 18 KB total (`poc.py` is 299 lines, Python 3.8+, no third-party deps).
+- **Vulnerability:** Windows Netlogon Remote Code Execution via CLDAP Stack Buffer Overflow. `NlGetLocalPingResponse` allocates a 528-byte stack buffer; `NetpLogonPutUnicodeString` receives max length in **bytes** but treats it as **WCHAR count** → strings occupy 2x expected space. CLDAP "User" field (130 wchars = 260 bytes on wire) + other strings overflow the buffer → LSASS crash → DC reboot in ~60s. CWE-121.
+- **Attack vector:** UDP 389 (CLDAP), pre-authentication, **zero credentials required**, single crafted UDP packet. **Most impactful standalone exercise available for the campaign.**
+- **Affected systems (CADRE DCs presumed vulnerable):**
+  - Server 2012 / 2012 R2: ESU-only patches
+  - Server 2016: 10.0.14393.9140
+  - Server 2019: 10.0.17763.8755
+  - Server 2022: 10.0.20348.5074
+  - Server 2022 23H2: 10.0.25398.2330
+  - **Server 2025: 10.0.26100.32772** (CADRE all-3-DCs)
+- **CAMPAIGNS.md updated:** New "G — Pre-Auth DC Exploits (Standalone)" section after F-Supply-Chain. Full entry for CVE-2026-41089 with: vulnerability mechanism, affected systems table, pre-test checklist (snapshot + patch level check), 3-phase test plan (`python3 poc.py <target_ip> <domain_name> -l 130`), expected behavior for vulnerable vs patched, telemetry fingerprint, detection rules to build (proposed Suricata SID:1000100 for oversized CLDAP User attribute), post-test cleanup (`Reset-ComputerMachinePassword`), mitigation strategies.
+- **CAMPAIGNS-METADATA.md updated:** New "Mechanics: G-1 — CVE-2026-41089 Netlogon CLDAP Stack Buffer Overflow" section after WT095 Onelogon. Status 🆕 READY — UNTESTED. Full 8-part template: why it works (vulnerable call path), attack commands (Phase 1/2/3), success/failure modes, CADRE-specific notes (test target = dc02 FIRST), telemetry fingerprint (WinSec 1000, 5805, Zeek udp.log, Suricata SID:1000100), detection engineering (Suricata rule + Zeek cadre-cldap.zeek + Elastic KQL), common pitfalls (snapshot, target, patch level, UDP block), Wireshark field reference, 12-item reproduction checklist.
+- **Campaign_suggestions.md updated:** Item #33 promoted from ⏳ Pending to 🆕 READY. Full entry rewritten with PoC source (0xABCD01), vulnerability mechanism, affected systems table (with build numbers), pre-test snapshot requirement, 3-phase test plan from Kali, detection rules, mitigation, cross-references to #65 Zerologon Alternative (superseded) and #76 Onelogon Zero-Channel (also exploits Netlogon). Summary table, Phase Mapping, Testing Checklist, Tier 3 Summary, Cross-Reference Index, counts, and footer updated. New 🆕 count: 4 → 5.
+- **Pre-test checklist (CRITICAL — don't crash a production DC):**
+  - [ ] Snapshot dc01, dc02, dc03 before testing (VMware `vmrun.exe snapshot`)
+  - [ ] Verify DC patch level: `Get-ItemProperty -Path 'HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion' -Name CurrentBuild, UBR` (need UBR < 32772 on Server 2025)
+  - [ ] Test target = **dc02 FIRST** (child DC, less critical than dc01)
+  - [ ] UDP/389 reachable from Kali (`nmap -sU -p 389 <dc_ip>`)
+  - [ ] Notify team DC will be down ~60 seconds
+- **Detection engineering candidates (plan1.7 §17 to be added separately):**
+  - Suricata SID:1000100 (new) — oversized CLDAP User attribute
+  - Zeek `cadre-cldap.zeek` (new script) — flag oversized search filter attributes
+  - Elastic KQL — WinSec 1000 with netlogon.dll SourceName
+- **Cross-references:** Item #65 Zerologon Alternative (superseded), Item #76 Onelogon Zero-Channel (different Netlogon vuln class — single-channel NRPC bypass vs CLDAP stack overflow), Plan 1.7 detection engineering.
+- **Why standalone (not main campaign):** Unauthenticated DC compromise would short-circuit the entire credential chain (Phases 1-3 become unnecessary). CADRE's main campaign demonstrates misconfiguration-based attacks, not CVE exploits. But CVE-2026-41089 is valuable as a standalone exercise: tests detection of Netlogon exploitation, shows what happens when a critical CVE hits.
+
+### Added (2026-06-24 — Modern AD Attack Tool Landscape Update + NetExec/Bark Research)
+
+- **Comprehensive AD attack tool research:** `docs/internal/references/ad-tools-landscape-2026-06-24.md` (~30 KB, 10 sections, 60+ tool inventory). Full tool audit per AD attack lifecycle phase.
+- **NetExec confirmed (v1.5.1, Feb 23 2026):** Replaces CrackMapExec (abandoned Sep 2023). 10 protocols (SMB/LDAP/MSSQL/WinRM/WMI/SSH/RDP/FTP/NFS/VNC), 16+ dump modules, native Windows binary. https://github.com/Pennyw0rth/NetExec
+- **Bark definitively identified as BARK (BloodHound Attack Research Kit):** https://github.com/BloodHoundAD/BARK by Andy Robbins / SpecterOps. PowerShell, **Azure/Entra ID ONLY** — no on-prem AD functionality. User's "azure only" memory was correct. 80+ functions for token management, Entra enumeration, AzureRM enumeration, Intune enumeration, abuse functions. Companion to bloodyAD (same author CravateRouge). Maps to Plan 11 only.
+- **7 new items added to Campaign_suggestions.md (#90-96):**
+  - **#90 NetExec (nxc)** — CrackMapExec replacement, cross-cutting Phases 0-5
+  - **#91 bloodyAD v2.5.4** — already adopted (update version note for dMSA + ACL helpers)
+  - **#92 Certipy v5.1.0** — already adopted (update version note for ESC17 + golden cert)
+  - **#93 DonPAPI v2.0+** — Remote DPAPI credential harvesting (12+ collectors)
+  - **#94 lsassy v3.1.16** — Remote LSASS dump (15+ methods)
+  - **#95 KrbRelay + KrbRelayUp** — LPE via Kerberos relay (no-CVE)
+  - **#96 BARK** — Azure/Entra ID abuse validation (Plan 11 only)
+- **CAMPAIGNS.md updated (5 changes):**
+  - **Lab topology diagram** — Kali tool list updated: added `nxc`, `lsassy`, `DonPAPI` to existing `impacket · certipy · bloodyAD · coercer`
+  - **Phase 0 Step 0.5 — NetExec Quick-Recon** (new) — 10-protocol recon section with example commands
+  - **Phase 3.5 3.5F-alt — Remote LSASS Dump via lsassy** (new) — alternative to manual procdump + schtasks
+  - **Phase 3.5 3.5F-dpapi — Remote DPAPI Harvesting via DonPAPI** (new) — DPAPI remote collection
+  - **Phase 3.5 3.5N — BARK bridge to Plan 11** (new) — Azure/Entra ID validation framework reference after 3.5M adconnectdump
+- **CAMPAIGNS-METADATA.md updated (4 new Mechanics sections):**
+  - **Phase 0 Step 0.5 — NetExec Quick-Recon** [READY — UNTESTED] — 8-part Mechanics section
+  - **Phase 3.5 3.5F-alt — lsassy v3.1.16** [STUB — UNTESTED] — 8-part Mechanics section
+  - **Phase 3.5 3.5F-dpapi — DonPAPI v2.0+** [STUB — UNTESTED] — 8-part Mechanics section
+  - **Phase 3.5 3.5P — KrbRelayUp LPE** [STUB — UNTESTED] — 8-part Mechanics section
+- **Recommended update order (per research):**
+  1. **Phase 0** — `nxc smb/ldap/mssql` quick-recon (low risk, high value)
+  2. **Phase 3.5** — `lsassy` + `donpapi` modules via NetExec (medium value, no infra change)
+  3. **Phase 2** — `bloodyAD` for ACL abuse (already in CADRE, update version)
+  4. **Phase 5 Branch B** — `Certipy` (already in CADRE, update version for ESC17)
+  5. **Phase 5 Branch 3.5** — `KrbRelayUp` + `Whisker` for LPE + Shadow Creds
+  6. **Phase 1** — `nxc winrm/ssh/ftp/vnc` modules for protocol coverage
+  7. **Phase 5 Coercion** — Migrate to `Coercer`; await Onelogon (Aug 2026) PoC
+  8. **Plan 1.7 (Defense)** — Run `Locksmith` + `certipy find` as defender view after each Phase 5 attack
+- **Confirmed deprecated/absorbed tools (do NOT use):**
+  - `crackmapexec` (CME) — abandoned Sep 2023, use `nxc` (NetExec)
+  - `Certify.exe` — archived 2021, use `Certipy` (Certipy-ad)
+  - `aclpwn.py` (0x9c5a) — repo returns 404, absorbed into bloodyAD + Certipy + Impacket
+  - `pyWhisker` (Dirk-jan) — no separate repo, absorbed into `Certipy shadow auto` (Linux) and `Whisker` (elad shamir, Windows)
+- **Recommended new external references (15 items #123-137):** NetExec wiki + repo, BARK, bloodyAD, Certipy, DonPAPI, lsassy, KrbRelay, KrbRelayUp, Locksmith, Whisker, minikerberos, SharpView, kerbrute. (external-references.md update held per user scope.)
+- **Counts updated:** 77 → 86 items (24 ✅ / 51 ⏳ / 4 🔬 / 1 ⏭️ / 2 ref / 4 🆕). Tier 3 total: 19 → 26.
+
+### Added (2026-06-24 — Onelogon: Single-Channel NRPC Authentication Bypass [WOOT 2026])
+
+- **Paper analyzed:** "Onelogon: An Authentication Bypass for Windows Active Directory via Single-Channel Netlogon" — Alexandru-Vlad Pădurean, WOOT 2026 (Workshop on Offensive Technologies, Aug 1-3 2026). Same author as `krbrelayx`. Paper text at `C:\STUDY\Github\CADRE-Courses\woot2026-onelogon\woot2026-onelogon.txt` (923 lines).
+- **Vulnerability:** MS-NRPC's single-channel variant (over SMB/445 via `\PIPE\netlogon`) was **not covered by the post-Zerologon hardening** (CVE-2020-1472 patch + SpecterOps "Renaissance of NTLM Relay Attacks" 2025 mitigations). The hardening was only added to multi-channel NRPC (DC-to-DC replication). Single-channel NRPC still accepts pre-Zerologon non-secure-RPC calls, exposing two attacks:
+  - **Section 5.2 Zero-Channel:** Call `NetrServerPasswordSet2` against target DC machine account → set DC machine password to attacker-known value → DCSync → KRBTGT → full domain takeover in 1 RPC call.
+  - **Section 5.1 AES-CBC8 Downgrade:** Compute hash of ANY password (machine, KRBTGT, user) offline via RFC 4753 weak DES challenge-response.
+- **Author tested on:** Windows Server 2022 (latest patches). Server 2025 not explicitly tested but the single-channel path is unchanged since 2016 — hardening is what changed, and it doesn't cover this path. **All 3 CADRE DCs (dc01/dc02/dc03) are presumed vulnerable.**
+- **CAMPAIGNS-METADATA.md updated:** New "Mechanics: WT095 — Onelogon Zero-Channel" stub section after "Mechanics: WT018-020 — Non-functional Coercion". Status: ⏳ PENDING — gated on author PoC release post-WOOT 2026. Includes predicted attack interface, expected telemetry, detection engineering candidates (Suricata SID:1000098, Zeek `cadre-nrpc.zeek`, Elastic cadre-006), and reproduction checklist.
+- **CAMPAIGNS.md updated:** New "095 — Onelogon Zero-Channel" entry in Phase 5 "Alternative Coercion Techniques" table (after WT094 UnCanny). New full Mechanics section in Phase 5 detailing attack chain, 5 downstream routes (DCSync / AES-CBC8 direct / RBCD / ADCS ESC1 / Phase 8 SID history), detection rules (Suricata SID:1000098, WinSec 4662 WriteProperty on DC unicodePwd, Zeek named-pipe netlogon notice), and critical cleanup step (`Reset-ComputerMachinePassword` to avoid breaking AD replication).
+- **Campaign_suggestions.md updated:** New top-level section "Onelogon — Single-Channel NRPC Authentication Bypass (WOOT 2026, 2026-06-24)" added before "Next Actions / Parallel Tracks". Items #76 (Onelogon Zero-Channel, Phase 5 → 7 shortcut) and #77 (Onelogon AES-CBC8 Downgrade, Phase 3.5 → 7) fill the #76-77 reserved gap from the 2026-06-23 numbering audit. **Supersedes item #65 (Zerologon Alternative "patched on Server 2025")** — single-channel NRPC bypass proves Zerologon-class attacks are still viable in 2026. Counts: 75 → 77 items (22 ✅ / 48 ⏳ / 4 🔬 / 1 ⏭️ / 2 ref). Updated summary table, Phase Mapping table, Testing Checklist rows, Tier 3 Summary table, Cross-Reference Index, and footer.
+- **Detection engineering candidates (plan1.7 §16 to be added separately):**
+  - Suricata SID:1000098 — single-channel NRPC anomaly (`\PIPE\netlogon` over SMB/445 from non-DC source)
+  - Zeek `cadre-nrpc.zeek` (new script) — named-pipe `netlogon` from non-DC + `NetrServerPasswordSet2` (opnum 6) DCE-RPC notice
+  - Elastic cadre-006 — WinSec 4662 WriteProperty on `CN=DC0*` machine account `unicodePwd`
+  - Suricata SID:1000099 — AES-CBC8 cipher in NRPC (weak crypto detection)
+- **Pre-test verification (do BEFORE author PoC release):** Snapshot dc01/dc02/dc03, confirm SMB/445 reachable, confirm `DC01$`/`DC02$`/`DC03$` machine account names via Phase 0 Kerberos enum, verify WT017 PrinterBug still works (12 Suricata SID:1000050 fires baseline), prepare `Reset-ComputerMachinePassword` cleanup script.
+- **Cleanup CRITICAL:** After attack, run `Reset-ComputerMachinePassword` on dc01 to re-establish proper machine password. Without this, AD replication breaks across the forest.
+- **Why this matters for CADRE:** Single RPC call = full domain admin on patched Server 2022/2025. Most impactful AD authentication bypass since Zerologon (CVE-2020-1472). Maps directly to existing Phase 5 WT017 PrinterBug coercion primitive (already working). Provides alternative entry path to Phase 6/7 (DCSync → Golden Ticket) without needing Kerberos ticket forgery or RBCD setup.
+- **Cross-references:** Replaces/supersedes item #65 (Zerologon Alternative). Complements WT017 (MS-RPRN coercion — supplies auth prerequisite). Provides shortcut for Phase 6 (DCSync) and Phase 7 (Golden Ticket). Bypasses Phase 5 unconstrained delegation entirely. Phase 8 impact: with SID Filter OFF (verified in `01-core-ad.yml:50`), compromise of any DC = Enterprise Admin.
+
+### DFIR-Nexus v1.0.0 E.0 "Constellation" — Production Platform COMPLETE
+
+**Release:** E.0 Constellation closes the assessment roadmap (A.0 → E.0). Lab/CADRE-integrated use is ready; internet-facing production requires the hardening checklist in `E0-CONSTELLATION.md`.
+
+| Metric | Value |
+|---|---|
+| **MCP tools** | 96 (+4: `case_push_token`, `case_export`, `integration_notify`, `case_knowledge_graph`) |
+| **Unit tests** | 475 |
+| **Smoke steps** | 72 (all pass) |
+| **Modules** | 18 (+ `push/`) |
+
+**E.0.1 Push ingest** — `push/` module: per-case bearer tokens, `dfir-nexus push-server`, MCP `case_push_token`; global token cross-case rejected.
+
+**E.0.2 Browser extension** — MV3 scaffold at `tools/dfir-nexus-extension/`; [`tools/dfir-nexus/docs/EXTENSION.md`](tools/dfir-nexus/docs/EXTENSION.md).
+
+**E.0.3 Integrations** — env-only webhooks (SSRF-safe), `integration_notify` MCP, exporter stubs.
+
+**E.0.4 Export parity** — CSV, DOCX, ZIP, snapshot, IOC blocklist, SVG; `case_export` + `case_knowledge_graph` MCP.
+
+**Docs:** [`tools/dfir-nexus/docs/E0-CONSTELLATION.md`](tools/dfir-nexus/docs/E0-CONSTELLATION.md); registry + integration 1-pager updated.
+
+**Next:** CADRE platform wiring (Ansible on `provisioning`, live SSH connectors, end-to-end lab telemetry).
+
+### DFIR-Nexus — Production hardening (D.0 post-review + low-priority)
+
+- **VQL policy** — catalog allowlist + escaping; ad-hoc VQL blocked unless `DFIR_NEXUS_VR_ALLOW_ADHOC_VQL=1`
+- **MCP path sandbox** — `paths.py`; ingest/sigma/export roots via `DFIR_NEXUS_DATA_ROOTS`
+- **Audit secret** — `DFIR_NEXUS_AUDIT_SECRET` for HMAC chain
+- **Gateway** — bearer required on non-loopback bind
+- **Portal** — password default-on; per-IP rate limits (`DFIR_NEXUS_PORTAL_RATE_LIMIT`)
+- **HITL** — password-gated cases force DRAFT on unsigned APPROVED findings
+- **TI/triage/detection** — URL encoding, merge verdicts, indexer tactics, sigma ZIP safety
+- **Tests:** `test_hardening.py`, `test_hardening_lp.py`, push security in `test_push.py`
+
+### DFIR-Nexus D.0.3 "Stellar" — MITRE Navigator + threat actors + RBA COMPLETE
+
+**Scope:** MITRE Navigator v4.5 layers, seed threat-actor profiles, rule-based RBA scoring, LangGraph AlertAgent enrichment.
+
+| Tool | Purpose |
+|:-----|:--------|
+| `mitre_navigator_layer` | Observed techniques layer (v4.5 upgrade) |
+| `mitre_navigator_coverage_layer` | Detection coverage heatmap |
+| `mitre_navigator_gap_layer` | Gap analysis layer |
+| `mitre_navigator_actor_layer` | Single-actor overlay |
+| `mitre_list_actors`, `mitre_get_actor` | Actor catalog |
+| `mitre_match_actors` | Technique → actor overlap |
+| `mitre_rba_score` | 0–100 risk score + tier |
+
+- **MCP tools:** 92 (+7 MITRE/RBA); **module:** `tools/dfir-nexus/src/dfir_nexus/mitre/`
+- **Gateway:** +4 MITRE tools on in-process backend (47 total)
+- **Tests:** 448 pytest + 68 smoke
+- **Docs:** [`tools/dfir-nexus/docs/D0-STELLAR.md`](tools/dfir-nexus/docs/D0-STELLAR.md)
+
+**D.0 Stellar release complete.** Superseded by v1.0.0 E.0 Constellation (see above).
+
+### DFIR-Nexus D.0.2 "Stellar" — Velociraptor framework COMPLETE
+
+**Scope:** CADRE vr VM (192.168.77.51) — hunt catalog, orchestration, LangGraph EndpointAgent, 9 MCP tools.
+
+| Tool | Purpose |
+|:-----|:--------|
+| `vr_health`, `vrun_health` | CADRE VR connectivity |
+| `vr_list_clients`, `vr_list_hunts`, `vr_list_artifacts`, `vr_get_hunt` | Catalog |
+| `vr_run_hunt`, `vr_collect_artifact`, `vql_query`, `vql_collect_artifact` | Collection |
+
+- **MCP tools:** 85 (+10 VR, incl. `vrun_health` + `vql_collect_artifact` aliases); **module:** `tools/dfir-nexus/src/dfir_nexus/vr/`
+- **Tests:** 439 pytest + 64 smoke
+- **Docs:** [`tools/dfir-nexus/docs/D0-STELLAR.md`](tools/dfir-nexus/docs/D0-STELLAR.md)
+
+### DFIR-Nexus D.0.1 "Stellar" — TI providers COMPLETE
+
+**Policy:** **Core loop** uses only **abuse.ch** (incl. URLhaus) and **self-hosted MISP**. Commercial or API-key feeds stay **optional** — never in `ti_fanout` or default `ti_lookup`; call explicit `ti_otx` / `ti_shodan` / … tools or pass `providers=[...]`. LLM providers unchanged.
+
+| Tier | Tools |
+|:-----|:------|
+| **Core** | `ti_list_providers`, `ti_lookup`, `ti_fanout`, `ti_threatfox`, `ti_malware_bazaar`, `ti_urlhaus`, `ti_yaraify`, `ti_misp` |
+| **Optional** | `ti_otx`, `ti_shodan`, `ti_virustotal`, `ti_abuseipdb`, `ti_crowdstrike` |
+
+- **MCP tools:** 75 (+13 TI); **gateway:** +10 TI tools on in-process backend
+- **LangGraph:** NetworkAgent + `ti/enrich.py` (core-only IOC enrichment)
+- **CrowdStrike:** OAuth2 client-credentials live path (Falcon Intel API)
+- **Unconfigured providers:** clear env-var hints (no blind HTTP 401)
+- **Ingest:** optional offline export parsers (OTX, VirusTotal, AbuseIPDB JSON)
+- **Tests:** 431 pytest + 60 smoke steps
+- **Docs:** [`tools/dfir-nexus/docs/D0-STELLAR.md`](tools/dfir-nexus/docs/D0-STELLAR.md)
+
+**Next:** D.0.2 VR framework, D.0.3 MITRE/actors/RBA.
+
+### DFIR-Nexus C.0 "Voyager" COMPLETE (2026-06-05)
+
+**C.0 fully closed** — production RAG, Windows triage, and analysis bonus on top of B.0 Pathfinder (v0.7.0):
+
+| Slice | Shipped |
+|:------|:--------|
+| **C.0.1 Forensic RAG** | `rag_search`, `rag_list_sources`, `rag_stats`; production index via `dfir-nexus data download-rag` (~22K records) |
+| **C.0.2 Windows triage** | 13 `triage_*` tools; production `known_good.db` + `context.db` via `dfir-nexus data download-triage` (~2.7M paths) |
+| **C.0.3 Analysis bonus** | `artifact_deobfuscate`, `llm_anonymize`, `llm_restore`, `case_evidence_graph`, `case_graph_context`, `ez_tool_run` |
+| **Volatility 3 importer** | 33rd source — `ingest_from_source` with `volatility` on JSON/JSONL memory exports |
+
+- **MCP tools:** 62 (was 40 at B.0)
+- **Importers:** 33 (was 32 at B.0)
+- **Tests:** 420 pytest + 57 smoke steps
+- **Docs:** [`tools/dfir-nexus/docs/C0-VOYAGER.md`](tools/dfir-nexus/docs/C0-VOYAGER.md), [`DATA.md`](tools/dfir-nexus/docs/DATA.md), updated README/ARCHITECTURE/STUDY-GUIDE
+- **Distribution:** Multi-GB RAG/triage DBs **not** in git — CLI download with `DFIR_NEXUS_*_RELEASE_REPO` pointing to your org's release bundle
+- **Policy:** DFIR-Nexus docs and code contain **no upstream repo references** — features are native to `tools/dfir-nexus/`
+
+**Next:** D.0 Stellar (TI providers + full VR framework). CADRE Ansible wiring on provisioning remains separate.
+
 ### DFIR-Nexus B.0 "Pathfinder" COMPLETE — hardening slices (2026-06-05)
 
 **B.0 fully closed** — production-grade foundation on top of A.0 Pioneer (v0.6.0). Initial release plus final thin slices:
@@ -21,20 +383,13 @@ All notable changes to CADRE are documented here. Format: [Keep a Changelog](htt
 - **Docs:** [`tools/dfir-nexus/docs/B0-PATHFINDER.md`](tools/dfir-nexus/docs/B0-PATHFINDER.md), [`SUMMARY.md`](tools/dfir-nexus/docs/SUMMARY.md), [`ARCHITECTURE.md`](tools/dfir-nexus/docs/ARCHITECTURE.md)
 - **CADRE bridge:** [`attack-matrix/DFIR-Nexus-Pioneer-workflow.md`](attack-matrix/DFIR-Nexus-Pioneer-workflow.md) — gateway/portal alongside Pioneer loop; Phase 3.5 active
 
-**Next:** C.0 Voyager (RAG + Windows triage + Volatility 3). CADRE Ansible wiring on provisioning remains separate.
+**Superseded by C.0 Voyager (see above).** CADRE Ansible wiring on provisioning remains separate.
 
 ### DFIR-Nexus v0.6.0 — FEATURE COMPLETE (2026-06-20)
 
 **DFIR-Nexus** — our agentic super DFIR tool — is now **feature-complete**. All 6 phases shipped in a single day (2026-06-20). Local git initialized at `C:\STUDY\Github\CADRE\tools\dfir-nexus\` (commit `5b37837` on `master`, no push per user instruction).
 
-**Source projects (DFIR-mcp is 3+1 sub-repos by AppliedIR):**
-- **Valhuntir** — umbrella platform (audit chain, DRAFT/HITL approval, LangGraph integration)
-- **sift-mcp** — SIFT-side monorepo (11 packages: forensic-mcp, case-mcp, report-mcp, sift-mcp, sift-gateway, forensic-knowledge, forensic-rag, windows-triage, opencti, sift-common, case-dashboard)
-- **wintools-mcp** — Windows forensic tool execution
-- **opensearch-mcp** (optional) — 17 evidence-indexing tools
-- **DFIR-Companion** (hasamba) — 24+ artifact importers, AI vision, IOC enrichment
-- **Security-Detections-MCP** (michaelhaag) — detection rule layer
-- **CADRE** — testing, requirements, integrations
+**Predecessor features** (detection, ingest, case, RAG, triage) were ported into DFIR-Nexus during A.0–C.0. Historical assessment docs live in `docs/internal/integrations/`.
 
 | Metric | v0.6.0 |
 |---|---|

