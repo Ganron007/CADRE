@@ -4,6 +4,31 @@ All notable changes to CADRE are documented here. Format: [Keep a Changelog](htt
 
 ## [Unreleased]
 
+### Added (2026-06-24 — Item #107: GitHub Actions Supply-Chain Attack Patterns [Session 11])
+
+> **Source:** [GMO Flatt Security Blog Part 1](https://blog.flatt.tech/entry/2026-github-actions-security-part1) by Sato (@Nick_nick310), 2026-06-24.
+
+**Why this matters for CADRE:**
+- **Plan 0.8 expansion:** F-11 (cache poisoning) + F-12 (tag pollution analog via `npm dist-tag`) extend the existing F-01 to F-10 npm supply-chain scenarios. Adds CI-side attack patterns to our Plan 0.8 chain.
+- **CADRE-Strike defensive guardrails (Track H):** The cline incident uses `anthropics/claude-code-action` — the same tool class we'll integrate for CADRE-Strike. Article provides concrete defense checklist (restrict `allowed_non_write_users`, scope `--allowedTools`, minimize workflow `permissions`, commit-hash pinning).
+
+**3 attack patterns documented (MITRE T1195.001):**
+1. **Vulnerable trigger injection** — `pull_request_target` + `actions/checkout@${{ github.event.pull_request.head.sha }}` + `npm install` = preinstall RCE. Real-world: Ultralytics (Dec 2024), nx (Aug 2025).
+2. **Tag pollution** — move `@v1` to malicious commit. **Imposter Commits** (reference fork commit hash as parent repo commit) — trivy (Feb 2026), tj-actions/changed-files (Mar 2025).
+3. **AI agent over-permission** — `allowed_non_write_users: "*"` + bare `Bash` in `--allowedTools` + Issue title prompt injection = arbitrary `npm install`. Real-world: cline (Feb 2026) → `cline@2.3.0` malicious publish.
+
+**Files updated (4 total — focused scope per user direction "Do it"):**
+- **`attack-matrix/Campaign_suggestions.md`**: New Item #107 added with full source info, 3 attack chains, MITRE mapping, CADRE applicability (Plan 0.8 + Track H), test plan, defenses. All 5 summary tables updated (Phase Mapping, Testing Checklist, Tier 3 Summary, Cross-Reference Index). Counts: 96 → 97 items (24 ✅ / 54 ⏳ / 4 🔬 / 1 ⏭️ / 2 ref / 12 🆕). Tier 3: 26 → 32. Last updated footer added.
+- **`attack-matrix/CAMPAIGNS-METADATA.md`**: New "Mechanics: Item #107 — GitHub Actions Supply-Chain Attack Patterns [STUB — UNTESTED]" section inserted between Phase 8 and Branch A. Full 8-part template: why it works (3 attack chains), attack workflow (vulnerable workflow YAML + tag manipulation commands + cline vulnerable config + Plan 0.8 analogs + CADRE-Strike hardened config), success/failure modes, CADRE-specific notes (no GitHub Actions in lab, applies to Plan 0.8 + Track H), telemetry fingerprint, detection engineering (held for plan1.7 §17), pitfalls, Wireshark field reference, reproduction checklists (Plan 0.8 + Track H), cross-references.
+- **`attack-matrix/CAMPAIGNS.md`**: Added F-11 (cache poisoning) + F-12 (tag pollution analog) rows to F section table with held status. Added inline note explaining the Flatt Security source + CADRE applicability (Plan 0.8 + CADRE-Strike guardrails).
+- **`AGENTS.md`**: This entry.
+
+**NOT in main spine:** Item #107 is NOT applicable to AD lab Phase 0-8 (no GitHub Actions in our VMs). Belongs to Plan 0.8 (Supply-Chain) and Track H (CADRE-Strike).
+
+**Status:** ⏳ Held — Plan 0.8 expansion or Track H integration. No immediate test plan.
+
+**Cross-references:** Plan 0.8 (`docs/internal/npm-supplychain-installation-guide.md`), Track H (Campaign_suggestions.md §"Track H"), plan1.7 §17 (detection rules held), external-references.md #124+ (held).
+
 ### Fixed (2026-06-24 — CAMPAIGNS.md Flow Correction: NetExec Commands Repositioned to Right Stages [Session 10])
 
 > ⚠️ **Per user feedback (2026-06-24):** "campaign is like the story we simulate a real world attack in the order typically seen in real world... at every stage and at every credentials gains."

@@ -113,13 +113,14 @@
 | **Phase 8 alt (Forest Trust)** | Skipjack — PAC signature downgrade (GhostWolfLab 2026-06-23) | ⏳ |
 | **Phase 0/3.5/5** | NetExec `coerce_plus` + 5 new modules (`pre2k`, `enum_av`, `get-desc-users`, `winscp`, `rdp`) + `--kdcHost` flag | 🆕 |
 | **Exercise (Standalone)** | CVE-2026-41089 Netlogon RCE (PoC available — pre-auth DC crash) | 🆕 |
+| **Plan 0.8 + Track H (defensive)** | GitHub Actions Supply-Chain Attack Patterns (cache poisoning + tag pollution analog + AI agent guardrails) — Flatt Security 2026-06-24 | ⏳ |
 | **Research** | MSSQL + SCCM CVEs | 🔬 |
 | **Reference** | How We Think about Red Teading | — |
 | | Attack Paths Don't Stop at IdP | — |
 | | dirkjanm.io — AD/Azure Research Blog | — |
 | **Skip** | Don't Jump the Turnstile | ⏭️ |
 
-**Counts:** ✅ Adopted: 24 | ⏳ Pending: 53 | 🔬 Research: 4 | ⏭️ Skip: 1 | Reference: 2 | 🆕 New: 12 | **Total: 96**
+**Counts:** ✅ Adopted: 24 | ⏳ Pending: 54 | 🔬 Research: 4 | ⏭️ Skip: 1 | Reference: 2 | 🆕 New: 12 | **Total: 97**
 
 ---
 
@@ -1148,6 +1149,7 @@ psexec.py -k -no-pass child.cadre.local/Administrator@dc02.child.cadre.local
 | Phase 5 (RBCD pre-flight) | 104 | ms-DS-Machine-Account-Quota check | 🆕 Add — check quota before WT007 RBCD |
 | Phase 5+ (Defense Evasion) | 105 | SACL/audit policy manipulation for detection evasion | 🆕 Add — DETECT this in plan1.7 |
 | Cross-cutting (validation) | 106 | Atomic Red Team as validation framework | 🆕 Add — cross-validate manual attacks |
+| Plan 0.8 + Track H | 107 | GitHub Actions Supply-Chain Attack Patterns (cache poisoning + tag pollution analog + AI agent guardrails) — Flatt Security 2026-06-24 | ⏳ Pending — Plan 0.8 expansion F-11/F-12 + CADRE-Strike defensive |
 | Phase 5 (Persistence) | 39 | Named Pipe Impersonation | ⏳ Pending — priv-esc via pipe |
 | Phase 5 (Persistence) | 41 | Token Dance | ⏳ Pending — token manipulation persistence |
 | Phase 6 (Persistence) | 11 | Golden/Silver Ticket | ⏳ Pending — enhances Phase 6/7 |
@@ -1243,6 +1245,7 @@ psexec.py -k -no-pass child.cadre.local/Administrator@dc02.child.cadre.local
 | 104 | ms-DS-Machine-Account-Quota check 🆕 | `Get-ADObject -Identity (Get-ADDomain).DistinguishedName -Properties ms-DS-Machine-Account-Quota` | Pre-flight check before WT007 RBCD — quota > 0 enables RBCD path | WinSec 4741 (Computer Object Created) |
 | 105 | SACL/audit policy manipulation 🆕 | `auditpol /set /category:"DS Access" /success:disable` (red team perspective) | DETECT in plan1.7: WinSec 4907 + 4719 (audit policy changes) | WinSec 4907/4719 + Elastic KQL cadre-008 |
 | 106 | Atomic Red Team validation 🆕 | `Invoke-AtomicTest T1003.001,T1558.003,T1003.006 -ShowDetails` | Cross-validate manual CAMPAIGNS.md attacks — 1000+ pre-built MITRE ATT&CK tests | Same as the underlying attack (T1003.001 → Sysmon 10, etc.) |
+| 107 | GitHub Actions Supply-Chain patterns ⏳ | `npm publish --tag` + `npm dist-tag add` (analog) / `claude-code-action` defensive config (Track H) | Plan 0.8 F-11/F-12 cache poisoning + tag pollution + CADRE-Strike guardrails | Sysmon EID 1 `npm publish` from non-standard path + Zeek HTTP POST to npm registry |
 | 68 | Azure AD Connect DPAPI Dump ⏳ | `adconnectdump` on dc01 (Cloud Sync) | MSOL credentials → Entra ID bridge | Sysmon EID 1 |
 | 69 | Actor Tokens → Global Admin ⏳ | Request Actor token via PoC | Entra ID Global Admin | Entra audit log |
 | 70 | Cloud Kerberos Trust → DA ⏳ | ROADtools + Hybrid device Kerberos ticket | On-prem DA via cloud | Zeek kerberos.log + Entra log |
@@ -1871,9 +1874,10 @@ psexec.py -k -no-pass child.cadre.local/Administrator@dc02.child.cadre.local
 | 104 | ms-DS-Machine-Account-Quota check | Phase 5 (RBCD pre-flight) | 2026 | 🆕 |
 | 105 | SACL/audit policy manipulation for detection evasion | Phase 5+ (Defense Evasion) | 2026 | 🆕 |
 | 106 | Atomic Red Team as validation framework | Cross-cutting (validation) | 2026 | 🆕 |
+| 107 | GitHub Actions Supply-Chain Attack Patterns | Plan 0.8 + Track H | 2026 | ⏳ |
 | 59 | Electron App Backdooring (Loki C2) | Phase 3 | 2026 | ✅ |
 
-**16 new items added (Items 60-75, Dirk-jan blog)**. **Plus Item 59** (Electron backdooring). **Plus Items 76-77** (Onelogon WOOT 2026, fills #76-77 gap). **Plus Items 90-96** (7 modern AD tool updates, 2026-06-24). **Total Tier 3: 26.**
+**16 new items added (Items 60-75, Dirk-jan blog)**. **Plus Item 59** (Electron backdooring). **Plus Items 76-77** (Onelogon WOOT 2026, fills #76-77 gap). **Plus Items 90-96** (7 modern AD tool updates, 2026-06-24). **Plus Items 97-107** (Skipjack, Onelogon detect ref, NetExec additions, CVE-2026-41089, ADeleg, books #100-101, 5 extracted techniques #102-106, GitHub Actions supply-chain #107). **Total Tier 3: 32.**
 
 ---
 
@@ -1905,6 +1909,7 @@ This is the running index of all items by source. Updated as items are added.
 | **100** | **Windows Security Internals — Kerberos/AD internals reference (Phase 1/2/5/6/7/8)** | **James Forshaw, NoStarchPress 2023 (`CADRE-Courses/NoStarchPress_extract/WindowsSecurityInternals_11172023/`)** |
 | **101** | **Practical Purple Teaming — lab + DFIR reference (DFIR + plan1.7)** | **Chase Petrey, NoStarchPress (`CADRE-Courses/NoStarchPress_extract/Practical_Purple_Teaming-0642572230173/`)** |
 | **102-106** | **5 concrete techniques extracted from reference books** | **Same sources as #100-101** |
+| **107** | **GitHub Actions Supply-Chain Attack Patterns (cache poisoning + tag pollution analog + AI agent guardrails)** | **GMO Flatt Security blog Part 1 (Sato, 2026-06-24)** |
 
 **Numbering notes:**
 - #9 missing (Tier 1 skipped during original write — see Tier 1 between #8 WMI and #10 Invisible Tasks)
@@ -3280,6 +3285,104 @@ Invoke-AtomicTest T1003.001, T1558.003, T1003.006 -ShowDetails
 
 ---
 
+## GitHub Actions Supply-Chain Attack Patterns (Flatt Security, 2026-06-24)
+
+**Source:** [GMO Flatt Security Blog — GitHub Actions Initial Access Part 1](https://blog.flatt.tech/entry/2026-github-actions-security-part1) by Sato (@Nick_nick310), 2026-06-24. 4-part series on GitHub Actions security. Part 1 covers Initial Access techniques derived from real-world compromises (Ultralytics, nx, tj-actions/changed-files, trivy, cline).
+
+**Why relevant for CADRE:**
+- **Plan 0.8 (Supply-Chain Emulation) expansion** — current scenarios F-01 to F-10 cover npm-side attacks. This article introduces **CI/CD-side** attack patterns that lead to the npm publish step in our chain. Specifically: **F-11 cache poisoning** and **F-12 tag pollution** complete the full kill chain.
+- **CADRE-Strike (Track H) defensive guardrails** — the cline incident uses `anthropics/claude-code-action` which is the same tool class we'll deploy for CADRE-Strike. Article provides concrete defense checklist (`allowed_non_write_users`, `--allowedTools` scoping, `permissions` minimization, commit-hash pinning).
+- **MITRE T1195.001** — explicitly frames "supply-chain compromise via CI/CD" as initial-access vector. Maps to our existing Plan 0.8 framing.
+- **Cache poisoning chain** — cline attack shows attacker → Issue prompt injection → AI agent `npm install` → cache poison → nightly release workflow → `NPM_RELEASE_TOKEN` exfil. This is the exact pattern that turns an isolated PR into a registry-wide compromise.
+
+**3 attack patterns (MITRE T1195.001 initial access):**
+
+1. **Vulnerable trigger configuration injection** — `pull_request_target` + `actions/checkout@${{ github.event.pull_request.head.sha }}` + `npm install` = arbitrary code via preinstall script. Real-world: Ultralytics (Dec 2024), nx (Aug 2025).
+2. **Tag pollution** — move `@v1` or `@v1.2.3` to a malicious commit. **Imposter Commits** (reference fork commit hash as if parent repo) amplify this. Real-world: tj-actions/changed-files (Mar 2025), trivy twice (Feb + Mar 2026).
+3. **AI agent over-permissioning** — `allowed_non_write_users: "*"` + `--allowedTools Bash` + Issue title prompt injection = arbitrary `npm install`. Real-world: cline (Feb 2026) → malicious `cline@2.3.0` published.
+
+**MITRE ATT&CK mapping:**
+- **T1195.001** Supply Chain Compromise: Compromise Software Dependencies and Development Tools
+- **T1554** Compromise Client Software Binary
+- **T1195.002** Compromise Software Supply Chain (for npm publish side)
+
+**Detections (for plan1.7 §17 — held):**
+- WinSec 4624 Type 3 (Network Logon) from runner IPs after build
+- WinSec 4663 file access on `C:\actions-runner\_work\*\.npmrc` or `.npm/_cacache`
+- Zeek HTTP POST to npm registry from build runner IP during `npm publish` window
+- Zeek DNS queries to unexpected package mirror domains from runner
+- Suricata SID (proposed): TLS anomaly — outbound to non-corporate npm mirror during build
+
+### 107. GitHub Actions Supply-Chain Attack Patterns (Plan 0.8 expansion + CADRE-Strike guardrails) ⏳
+
+**Status:** ⏳ NEW (2026-06-24 session 11). Source: Flatt Security blog Part 1. Maps to **Plan 0.8** (Supply-Chain) as F-11/F-12 and **Track H** (CADRE-Strike) as defensive guardrails.
+
+**Campaign location:** Branch F — Plan 0.8 expansion (F-11 cache poisoning, F-12 tag pollution analog). NOT part of main spine (no GitHub Actions in our AD lab). Belongs to **Track H** (CADRE-Strike defensive checklist) when sister repo integration begins.
+
+**Phase mapping:**
+| Phase | Application |
+|---|---|
+| Plan 0.8 (Supply-Chain Emulation) | F-11 cache poisoning + F-12 tag pollution analog as new scenarios |
+| Phase 5+ (Persistence) | Cache poisoning → nightly release → persistent registry access (theory) |
+| Track H (CADRE-Strike) | Defensive guardrails — `allowed_non_write_users`, `--allowedTools` scoping, commit-hash pinning |
+
+**CADRE applicability (Plan 0.8 expansion):**
+- **F-11 Cache Poisoning:** Stage a poisoned `~/.npm/_cacache` via malicious `npm install` in PR-triggered workflow. Subsequent release workflow uses poisoned cache. Equivalent attack vector for npm — analogous to GitHub Actions cache poisoning.
+- **F-12 Tag Pollution analog:** npm doesn't support Git-style tag rewriting cleanly, but `--tag` flag on `npm publish` + later `npm dist-tag add <pkg>@<ver> <newtag>` can simulate. Maps to Plan 0.8 npm scenario.
+- **Detection engineering (held for plan1.7 §17):**
+  - Sysmon EID 1 — `npm publish` from non-standard directory
+  - Zeek HTTP POST volume from build runner IPs to npm registry
+  - WinSec 4663 — access to `.npm/_cacache/index.json` outside normal install workflow
+
+**CADRE applicability (CADRE-Strike defensive guardrails — Track H):**
+When integrating `anthropics/claude-code-action` for CADRE-Strike automation:
+- **NEVER** set `allowed_non_write_users: "*"` — restrict to maintainers only
+- **NEVER** pass bare `Bash` to `--allowedTools` — scope to `'Bash(npm run test:*)'` etc.
+- **ALWAYS** pin external actions to commit hash (not `@v4`)
+- **ALWAYS** set minimal workflow `permissions:` (don't rely on default `contents: write`)
+- **ALWAYS** validate artifacts via `path:` + delimiter syntax on `GITHUB_OUTPUT`
+- **OR** keep workflow AI agent isolated to a non-secret job (no `secrets:` access)
+
+**Test plan (Plan 0.8 — when expanded):**
+```bash
+# On linux01 (Plan 0.8 supply-chain lab)
+
+# F-11: Cache poisoning simulation
+mkdir -p ~/.npm/_cacache
+# Stage poisoned package metadata
+npm install --cache ~/.npm/_cacache /tmp/attacker-payload.tgz
+# Next workflow run uses poisoned cache
+
+# F-12: Tag pollution analog
+npm publish /tmp/malicious-pkg.tgz --tag latest
+npm dist-tag add malicious-pkg@1.0.0 stable  # move to known-good tag
+```
+
+**Test plan (CADRE-Strike guardrails — when sister repo created):**
+- Create test workflow with `allowed_non_write_users: "*"` + `--allowedTools Bash` — verify attack succeeds (cline-style)
+- Apply minimum-privilege config — verify attack fails
+- Document the difference as a Track H scenario
+
+**Defenses (from article + extension to Plan 0.8):**
+- **GitHub Actions side:** Pin to commit hash. Use `pull_request` not `pull_request_target` when possible. Validate artifacts. Intermediate env vars for external context. Minimal permissions everywhere.
+- **npm side (Plan 0.8 analog):** Pin package versions exactly (`"pkg": "1.2.3"`, not `"^1.2.3"`). Use lockfiles (`package-lock.json`). Audit `npm install --dry-run` in CI. Use Sigstore/npm provenance verification (TUF + sigstore-js).
+- **CADRE-Strike side:** Follow cline post-mortem hardening checklist above. Consider GitHub Agentic Workflows (new secure architecture).
+
+**Why supersedes nothing:** This is a NEW track (Plan 0.8 expansion + Track H defensive). Does NOT supersede any existing item.
+
+**Workflow note (2026-06-24 session 11):** Per user direction "Do it" — adding Item #107 with full Campaign_suggestions entry. Mechanics stub will go to CAMPAIGNS-METADATA.md (not main CAMPAIGNS.md — no GitHub Actions in our AD lab, so F-11/F-12 are Plan 0.8 expansion topics).
+
+**Status legend for new item:** ⏳ Pending — held for Plan 0.8 expansion or Track H (CADRE-Strike) integration.
+
+**Cross-references:**
+- **Plan 0.8** (`docs/internal/npm-supplychain-installation-guide.md`) — F-01 through F-10 already deployed. F-11/F-12 expand the chain.
+- **Track H** (Campaign_suggestions.md §"Track H - CADRE-Strike") — defensive guardrails when sister repo created
+- **Item #98 (NetExec)** — `--kdcHost` flag fixes Phase 1/2 Kerberos routes (unrelated but adjacent tool class)
+- **External reference #124+** (held) — add to `docs/internal/plan01-upgrades/external-references.md`
+- **plan1.7 §17** (held) — detection rules for cache poisoning + tag pollution
+
+---
+
 ### Items NOT to add to CAMPAIGNS.md (per current scope)
 
 Per user direction (2026-06-24): **All 8 items in #98 already updated in CAMPAIGNS.md**:
@@ -3513,3 +3616,5 @@ Phase 4-8: DCSync, RBCD, ADCS, forest trust (all work)
 *Last updated: 2026-06-24 (session 2) — Added 7 modern AD attack tool items (#90-96) based on `docs/internal/references/ad-tools-landscape-2026-06-24.md` research: NetExec (nxc) v1.5.1, bloodyAD v2.5.4, Certipy v5.1.0, DonPAPI v2.0+, lsassy v3.1.16, KrbRelay+KrbRelayUp, BARK (Azure/Entra only). Confirms Bark = BloodHound Attack Research Kit (Azure/Entra ID only, Andy Robbins / SpecterOps, companion to bloodyAD). Counts: 77 → 86 items (24 ✅ / 51 ⏳ / 4 🔬 / 1 ⏭️ / 2 ref / 4 🆕).*
 
 *Last updated: 2026-06-24 (session 1) — Added items #76 (Onelogon Zero-Channel) and #77 (Onelogon AES-CBC8 Downgrade) — Pădurean WOOT 2026 single-channel NRPC bypass. Fills the #76-77 reserved gap. Supersedes #65 Zerologon Alternative as "still works in 2026" (single-channel NRPC not hardened). Counts: 75 → 77 items (22 ✅ / 48 ⏳ / 4 🔬 / 1 ⏭️ / 2 ref).*
+
+*Last updated: 2026-06-24 (session 11) — Added item #107 GitHub Actions Supply-Chain Attack Patterns (GMO Flatt Security blog Part 1, Sato 2026-06-24). Maps to Plan 0.8 expansion (F-11 cache poisoning + F-12 tag pollution analog) + Track H (CADRE-Strike defensive guardrails from cline incident). 3 attack patterns: vulnerable trigger injection (Ultralytics, nx), tag pollution + Imposter Commits (tj-actions, trivy), AI agent over-permissioning (cline — uses `anthropics/claude-code-action`). NOT in main AD spine. Counts: 96 → 97 items (24 ✅ / 54 ⏳ / 4 🔬 / 1 ⏭️ / 2 ref / 12 🆕).*
