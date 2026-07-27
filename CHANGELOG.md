@@ -4,6 +4,87 @@ All notable changes to CADRE are documented here. Format: [Keep a Changelog](htt
 
 ## [Unreleased]
 
+### Added (2026-06-25 — Roadmapv2 + 13Cubed Linux Forensics Integration + Items EX-49..59 / EX-OFF-32..37 [Session 14])
+
+> **Scope:** Per user direction (2026-06-25): *"save roadmapv2 first and then proceed to review this one as well, i want linux forensics as well into this somehow ... C:\STUDY\Github\CADRE-Courses\13Cubed ... this if anything new, goes into plan1.7 exercises and other places as necessary and update the roadmapv2 in the end. lastly update changelog and agents.md"*
+
+**Roadmapv2 saved (new file):**
+- **`docs/internal/roadmapv2.md`** (new, ~333 lines, 8 sections) — supersedes `roadmap.md` as the "where are we" + "what to do next" doc. Sections: (1) State of the Lab, (2) Why we're slow, (3) 2-sprint plan (9 sessions to v1.0), (4) After Sprint 2, (5) Critical decisions, (6) Out-of-scope for v1.0, (7) 13Cubed Course Library, (8) Per-plan quick reference, (9) Key file references.
+- **Sprint 1 (sessions 14-17):** Deploy Plan 1.7 detection rules + run plan1.7/1.8 exercises + batch-write Sigma YAMLs (round 1).
+- **Sprint 2 (sessions 18-22):** Lab testing + Plan 2 exporter + Plan 3 cycle script + Plan 5 CI + Sigma YAMLs round 2+3.
+- **v1.0 ship = 9 total sessions from now.**
+
+**13Cubed Linux Forensics Integration:**
+
+**Source:** `C:\STUDY\Github\CADRE-Courses\13Cubed\` — three courses by ForensicJason:
+- **Investigating Linux Devices** (44 topics, 11 sections) — primary value for CADRE linux01
+- **Investigating Windows Endpoints** (32 topics, 10 sections) — cross-validation
+- **Investigating Windows Memory** (48 topics, 10 sections) — Plan 9 cross-reference
+
+**Files updated (4 total):**
+
+1. **`docs/internal/plan01-upgrades/plan1.7-exercises.md`** (+Category H, ~15 KB):
+   - **EX-49 to EX-59** added (11 new Linux forensics exercises):
+     - EX-49: Sysmon for Linux Configuration and Analysis
+     - EX-50: Linux Persistence via init.d and systemd Services
+     - EX-51: Linux systemd Timers and Cron Job Forensics
+     - EX-52: Linux SSH Key Forensics and Backdoor Detection
+     - EX-53: Linux Timestomping Detection (Anti-Forensics)
+     - EX-54: Linux File System Forensics with The Sleuth Kit (TSK) fls + mactime
+     - EX-55: Linux Persistence via SSH Keys + Cron + systemd (Offensive + Defensive chain)
+     - EX-56: Linux Super-Timeline with Plaso/Log2Timeline
+     - EX-57: Linux Memory Forensics with Volatility 3
+     - EX-58: Linux Live Response with UAC (Unix-like Artifacts Collector)
+     - EX-59: Compromised Linux System Analysis — Full Scenario Walkthrough
+   - Total: **48 → 59 exercises** (+11)
+   - New source: **13Cubed Linux** (added to "Exercise Count by Source" table)
+
+2. **`docs/internal/plan01-upgrades/plan1.8-exercises.md`** (+Category I, ~11 KB):
+   - **EX-OFF-32 to EX-OFF-37** added (6 new Linux offensive exercises):
+     - EX-OFF-32: Linux Persistence via systemd Service (T1543.002)
+     - EX-OFF-33: Linux SSH Authorized Keys Backdoor (T1098.004)
+     - EX-OFF-34: Linux Timestomping Anti-Forensics (T1070.006)
+     - EX-OFF-35: Linux File System Recovery (defender skill)
+     - EX-OFF-36: Linux Memory Forensics (AVML + Volatility 3)
+     - EX-OFF-37: WSL Persistence — Cross-OS Attack Chain
+   - Total: **31 → 37 exercises** (+6)
+
+3. **`docs/internal/plan01-upgrades/plan1.7-defense-deepening.md`** (+§15, ~12 KB):
+   - **§15 13Cubed Linux Forensics Integration** added
+   - 11 sections covering 13Cubed course library, critical new tools (Sysmon for Linux, AVML, UAC, Plaso, TSK, debugfs, WSL2), Sysmon for Linux deployment plan, AVML+UAC as Plan 9 stack, 7 Linux Sigma rules to port, 3 Suricata SID proposals, action items for 07-linux-config.yml + extension rules
+
+4. **`docs/internal/roadmapv2.md`** (new file, ~333 lines, 8 sections) — see "Roadmapv2 saved" above
+   - Per-plan table updated: 1.7 = 59 ex, 1.8 = 37 ex
+   - New section 7: 13Cubed Course Library with full Linux course mapping
+   - File references table updated with 13Cubed source paths
+
+5. **`AGENTS.md`** — session 14 entry added (this entry, mirrored to CHANGELOG)
+
+**Critical new tools from 13Cubed (not in our existing toolset):**
+- **Sysmon for Linux** (Microsoft eBPF port) — fills "process + network + file" gap that auditd doesn't unify
+- **AVML** (Microsoft Rust tool) — Linux memory acquisition, no kernel deps
+- **UAC** (Thiago Canoza-Lar) — modern live-response collection tool
+- **Plaso/Log2Timeline** + **Timesketch** — Linux super-timeline
+- **The Sleuth Kit (TSK)** — Linux MFT equivalent (fls, icat, istat, mactime)
+- **debugfs** — ext2/3/4 inode + timestomp detection
+
+**CADRE applicability:**
+- **Plan 9 (Memory/Disk Forensics)** — primary beneficiary. UAC + AVML + TSK + Plaso + Volatility 3 = complete Linux evidence collection + analysis pipeline.
+- **Plan 1.7 EX-49..59** — 11 new Linux forensics detection exercises for linux01.
+- **Plan 1.8 EX-OFF-32..37** — 6 new Linux offensive primitives (systemd persistence, SSH backdoor, timestomping, memory forensics, WSL cross-OS).
+- **Branch D (Linux Pivot)** in CAMPAIGNS.md — 13Cubed references should be added to study guide (held for next session).
+- **Plan 11 (Cloud)** — WSL2 forensics relevant for hybrid Windows+Linux attack surface.
+- **plan0.7** (already deployed) — add Sysmon for Linux alongside auditd on linux01.
+
+**Status legend:** 13Cubed Linux content now fills the **Linux DFIR gap** that SANS courses (FOR500/508/608) cover only briefly. Direct fit for Plan 9 + linux01 lab VM.
+
+**Cross-references:**
+- `docs/internal/plan01-upgrades/plan1.7-exercises.md` Category H
+- `docs/internal/plan01-upgrades/plan1.8-exercises.md` Category I
+- `docs/internal/plan01-upgrades/plan1.7-defense-deepening.md` §15
+- `docs/internal/roadmapv2.md` §7 + §8
+- Held for next session: update `07-linux-config.yml` to add Sysmon for Linux, deploy 7 Linux Sigma rules, add 3 Suricata SIDs
+
 ### Added (2026-06-25 — ebooks Survey + Items #109-115 [Session 13])
 
 > **Survey scope:** All 75 .txt files in `C:\STUDY\Github\CADRE-Courses\ebooks\` surveyed via term-frequency analysis for AD attack vocabulary + DFIR/detection keywords. Per user direction (2026-06-25): "look only at the txt files for now... propose your suggestions here."
