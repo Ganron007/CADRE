@@ -90,6 +90,11 @@
 
 **Top priorities — Plan 1 next (Plan 1.1 closed):**
 
+> **Plan 1 two-phase strategy (locked 2026-07-27):**
+> - **Phase 1 — Full RedStrike attack run** across the campaign: validates tool capability + campaign/attack-surface design. Live `--execute`, operator-gated per phase (HITL).
+> - **Phase 2 — Telemetry capture:** once the attack run is green across the board, replay attacks deterministically and capture telemetry across all sources → grid fill → rules. Easy + fast since we control the attack.
+> - VMs currently down — operator starts them when ready.
+
 1. **P1:** Automated/manual runs → ES proof → `verification-table.md` → `source-matrix-grid.md` → bundle.  
 2. **P1.6–P1.9** — Elastic rules + E2E after PRIMARY confirmed.  
 3. **L.3–L.4** — Evidence bundles (DFIR later — **no D7 ingest until Plan 1 done**).  
@@ -172,8 +177,11 @@
 
 **Pipeline:** fill grid → write rules → E2E → Sigma YAML. **Dir:** [`docs/internal/plan01-telemetry-catalog/phase1-source-matrix/`](docs/internal/plan01-telemetry-catalog/phase1-source-matrix/)
 
+**Two-phase approach (2026-07-27):** Phase 1 = full RedStrike campaign run (tool + campaign validation); Phase 2 = deterministic replay → telemetry capture → grid. VMs down until operator starts.
+
 | ID | Item | Status | Done | Owned by | Notes |
 |----|------|--------|------|----------|-------|
+| P1.0 | **Phase 1 — full RedStrike attack run** (validate tool + campaign) | [ ] | | `redstrike-campaign` on `.60` | Live `--execute`, HITL per phase; VMs down — waiting on operator |
 | P1.1 | Field dictionary populated (`elastic-field-dictionary/`) | [x] | 2026-06+ | `elastic-field-dictionary/` | roadmapv2 §2.2 stale — dirs exist |
 | P1.2 | `source-matrix-grid.md` framework + T002/T003 partial | [x] | partial | `source-matrix-grid.md` | ~98% rows still blank |
 | P1.3 | **Grid fill — Campaign A** (12 attacks) | [~] | 2026-07-25 | `source-matrix-grid.md` + `verification-table.md` | ✅ T002/T003/T031/T041/T043; ⛔ T028; 🔧 T042; 5 cred-gated |
