@@ -4,6 +4,19 @@ All notable changes to CADRE are documented here. Format: [Keep a Changelog](htt
 
 ## [Unreleased]
 
+### DFIR-Nexus B.0 "Pathfinder" COMPLETE (2026-06-05)
+
+**B.0 shipped** — production-grade foundation on top of A.0 Pioneer (v0.6.0):
+
+- **B.0.3 HTTP gateway** — `dfir-nexus gateway` — Starlette ASGI, bearer auth, per-IP rate limit, `{backend}__{tool}` prefix, in-process + HTTP backends
+- **B.0.4 Examiner Portal** — `dfir-nexus portal` — 8-tab SPA, challenge-response auth (password never leaves browser as plaintext)
+- **B.0.5 Forensic + detection** — Plaso psort CSV importer (32nd source), Velociraptor MCP server (`vql_query`, `vql_collect_artifact`, `vrun_health`), SigmaHQ download (`detection_sigma_install`), MITRE Navigator layer (`mitre_navigator_layer`), Sigma→KQL (`sigma_translate_kql`)
+- **Tests:** 352 pytest + 52 smoke steps
+- **Docs:** [`tools/dfir-nexus/docs/B0-PATHFINDER.md`](tools/dfir-nexus/docs/B0-PATHFINDER.md)
+- **CADRE bridge:** [`attack-matrix/DFIR-Nexus-Pioneer-workflow.md`](attack-matrix/DFIR-Nexus-Pioneer-workflow.md) updated for B.0 CLI (gateway/portal alongside Pioneer loop)
+
+**Next:** C.0 Voyager (RAG + Windows triage). CADRE Ansible wiring on provisioning remains separate.
+
 ### DFIR-Nexus v0.6.0 — FEATURE COMPLETE (2026-06-20)
 
 **DFIR-Nexus** — our agentic super DFIR tool — is now **feature-complete**. All 6 phases shipped in a single day (2026-06-20). Local git initialized at `C:\STUDY\Github\CADRE\tools\dfir-nexus\` (commit `5b37837` on `master`, no push per user instruction).
