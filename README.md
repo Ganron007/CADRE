@@ -62,9 +62,7 @@ Full guide: [docs/deployment.md](docs/deployment.md)
 - **Zeek + Suricata + Arkime** — network telemetry (promiscuous NIC, full PCAP)
 - **Velociraptor** — endpoint DFIR (Windows + Linux clients)
 
-<p align="center">
-  <img src="docs/img/cadre-architecture-dark.png" alt="CADRE Architecture" width="100%">
-</p>
+![CADRE Architecture](docs/img/cadre-architecture-dark.png)
 
 Full topology: [docs/architecture.md](docs/architecture.md)
 
