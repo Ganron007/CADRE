@@ -4,6 +4,41 @@ All notable changes to CADRE are documented here. Format: [Keep a Changelog](htt
 
 ## [Unreleased]
 
+### Added (2026-06-24 — Item #108: Defender Exclusion via PowerShell (T1562.001) [Session 12])
+
+> **Source:** [Testing AI Threat Hunting against Real-World KQL: A Side-by-Side Test](https://detect.fyi/testing-ai-threat-hunting-against-real-world-kql-a-side-by-side-test-4cdda76a5772) by Alex Teixeira, *Detect FYI* publication, 2026-06-24.
+
+**Why this matters for CADRE:**
+- **Phase 3 (Execution) — real attack primitive:** `Add-MpPreference -ExclusionPath "C:\Users\target\AppData\Local\Temp" -ExclusionProcess "mimikatz.exe"` before running mimikatz/AMSI bypass. Maps to MITRE **T1562.001** Impair Defenses: Disable or Modify Tools. We disable Defender via `04-vulnerabilities.yml` for the lab, but real-world attackers do this dynamically.
+- **plan1.7 §17 (Detection Engineering) — KQL→Elastic KQL port:** Article's 15-line human KQL query is a clean, complete reference. Patterns port to Elastic: `arg_max(Timestamp, *)` → `top_hits`, `dcount(DeviceId)` → `cardinality`, `parse_json(AdditionalFields)["X"]` → `JsonProperty(winlog.event_data.X)`, `search in (T1, T2) "term"` → `(T1:term OR T2:term)`.
+- **AI meta-finding (CRITICAL for CADRE-Strike + DFIR-Nexus):** LLMs miss 75% of real matches (Claude 9/12 false-negatives; ChatGPT didn't even compile). "Use AI to review and improve human queries — not generate from scratch." Validates our Atomic Red Team (#106) cross-validation strategy.
+- **Track C (Sigma) candidate:** `win_defender_folder_exclusion.yml` rule from human-improved query.
+- **External reference #125** (held) — useful as a realistic AI failure case study in plan1.7 §1.
+
+**Attack primitive (T1562.001):**
+```powershell
+Add-MpPreference -ExclusionPath "C:\Users\target\AppData\Local\Temp"
+Add-MpPreference -ExclusionProcess "mimikatz.exe"
+Add-MpPreference -ExclusionExtension ".exe"
+```
+
+**Detections (translatable to Elastic KQL — held for plan1.7 §17):**
+- WinSec 5001 — Defender configuration change
+- WinSec 4688 + Sysmon EID 1 — `powershell.exe` + `*MpPreference*ExclusionPath*`
+- Sysmon EID 13 — Registry modification at `HKLM\SOFTWARE\Microsoft\Windows Defender\Exclusions\Paths`
+- Elastic KQL `cadre-009` candidate: `process.command_line:*MpPreference*ExclusionPath* and process.name:"powershell.exe"`
+- Sigma rule candidate: `win_defender_folder_exclusion.yml`
+
+**Files updated (4 total — focused scope per user direction "yes add item #108"):**
+- **`attack-matrix/Campaign_suggestions.md`**: New Item #108 added with full source info, attack primitive, MITRE mapping, CADRE applicability (Phase 3 + plan1.7 + Track C + Track H), test plan, defenses, KQL→Elastic KQL pattern table, AI meta-finding. All 5 summary tables updated (Summary, Phase Mapping, Testing Checklist, Tier 3 Summary, Cross-Reference Index). Counts: 97 → 98 items (24 ✅ / 55 ⏳ / 4 🔬 / 1 ⏭️ / 2 ref / 12 🆕). Tier 3: 32 → 33. Last updated footer added.
+- **`attack-matrix/CAMPAIGNS-METADATA.md`**: New "Mechanics: Item #108 — Defender Exclusion via PowerShell (T1562.001) [STUB — UNTESTED]" section inserted between Phase 3 and Phase 3.5 Mechanics. Full 8-part template: why it works (COM interface + admin context), attack workflow (5 steps + cleanup + GPO persistence), KQL hunt query (15-line reference), KQL→Elastic KQL port, Sigma rule, success/failure modes, CADRE-specific notes, telemetry fingerprint, detection engineering, KQL pattern table, pitfalls, reproduction checklists (Phase 3 + plan1.7), AI-vs-Human meta-finding, cross-references.
+- **`attack-matrix/CAMPAIGNS.md`**: Inline note added in Phase 3 Execution section, right after the GodPotato SYSTEM achievement. Note describes T1562.001 as an "Optional Precursor" for Phase 3 — held for alternative execution cycle, NOT in main spine. Mentions current lab has Defender fully disabled per `04-vulnerabilities.yml`; realistic test requires re-enabling Defender.
+- **`AGENTS.md`**: This entry.
+
+**Status:** ⏳ Held — Phase 3 alternative execution cycle + plan1.7 §16/§17 deployment.
+
+**Cross-references:** Item #106 (Atomic Red Team T1562.001), Item #101 (Practical Purple Teaming Ch 6), plan1.7 §16/§17, Track C (Sigma), Track H (CADRE-Strike — HITL validation), External reference #125 (held).
+
 ### Added (2026-06-24 — Item #107: GitHub Actions Supply-Chain Attack Patterns [Session 11])
 
 > **Source:** [GMO Flatt Security Blog Part 1](https://blog.flatt.tech/entry/2026-github-actions-security-part1) by Sato (@Nick_nick310), 2026-06-24.

