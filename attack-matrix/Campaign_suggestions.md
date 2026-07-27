@@ -90,9 +90,9 @@
 | **External Vuln Research (2026-06-18)** | MiniPlasma (CVE-2020-17103 unpatched → SYSTEM) | 🔬 |
 | | GreenPlasma (CTFMON arbitrary section → EoP) | 🔬 |
 | | YellowKey (BitLocker bypass via FsTx + WinRE) | 🔬 |
-| **Phase 5 — Lateral Movement** | UnCanny Coerce (NTLM coercion via InstallService) | 🔬 |
-| **Phase 3.5 — Credential Access** | UnCanny LPE (Non-admin → SYSTEM via InstallService) | 🔬 |
-| **Detection Engineering** | IPv4-mapped IPv6 URL Parser Bypass (SANS ISC 33090) | 🔬 |
+| **Phase 5 — Lateral Movement** | UnCanny Coerce (NTLM coercion via InstallService) | ⏳ |
+| **Phase 3.5 — Credential Access** | UnCanny LPE (Non-admin → SYSTEM via InstallService) | ⏳ |
+| **Detection Engineering** | IPv4-mapped IPv6 URL Parser Bypass (SANS ISC 33090) | ⏳ |
 | **Post-DA Cleanup** | KDS Root Key Extraction (prerequisite for #85-89) | ⏳ |
 | | Golden gMSA Attack (offline password computation) | ⏳ |
 | | DSRM Password Extract & Set (DC persistence) | ⏳ |
@@ -106,7 +106,7 @@
 | | dirkjanm.io — AD/Azure Research Blog | — |
 | **Skip** | Don't Jump the Turnstile | ⏭️ |
 
-**Counts:** ✅ Adopted: 40 | ⏳ Pending: 38 | 🔬 Research: 7 | ⏭️ Skip: 1 | Reference: 3 | **Total: 89**
+**Counts:** ✅ Adopted: 22 | ⏳ Pending: 46 | 🔬 Research: 4 | ⏭️ Skip: 1 | Reference: 2 | **Total: 75**
 
 ---
 
@@ -1042,10 +1042,26 @@ psexec.py -k -no-pass child.cadre.local/Administrator@dc02.child.cadre.local
 | Phase 5 (Persistence) | 36 | IFEO | ⏳ Pending — persistence |
 | Phase 5 (Persistence) | 37 | LSA SSP / Password Filter | ⏳ Pending — persistence + cred access |
 | Phase 6 (Lateral Movement) | 44 | RBCD | ⏳ Pending — ACE#20 → mbr01$ impersonation |
+| Phase 6 (Lateral Movement) | 61 | RBCD + NTLM Relay | ⏳ Pending — dirkjanm.io + ACE#20 |
 | Phase 7 (DCSync) | 46 | DCSync Detection | ⏳ Pending — detection reference |
 | Phase 8 (Forest Trust) | 43 | BetterSuccessor (dMSA post-patch) | ⏳ Pending — extends #23 |
+| Phase 8 (Forest Trust) | 66 | Forest Trust SID Filtering | ✅ Adopted — Study Reference Library |
+| Phase 8 (Forest Trust) | 67 | CVE-2020-0665 Trust Bypass | ✅ Adopted — Study Reference Library |
 | Phase 3.5 (Credential Access) | 47 | Logon Types Reference | ⏳ Pending — credential location ref |
+| Phase 3.5 (Credential Access) | 68 | Azure AD Connect DPAPI Dump | ✅ Adopted — Branch 3.5M |
 | Plan 11 (Cloud/Entra) | 45 | Pass-the-Cert | ⏳ Pending — Entra ID lateral movement |
+| Plan 11 (Cloud/Entra) | 69 | Actor Tokens → Global Admin | ⏳ Pending — P11.1 EntraGoat |
+| Plan 11 (Cloud/Entra) | 70 | Cloud Kerberos Trust → DA | ⏳ Pending — P11.2 (CRITICAL for CADRE) |
+| Plan 11 (Cloud/Entra) | 71 | PRT Phishing | ⏳ Pending — P11.3 initial access |
+| Plan 11 (Cloud/Entra) | 72 | Intune ADCS ESC1 | ⏳ Pending — P11.4 hybrid attack |
+| Plan 11 (Cloud/Entra) | 73 | Temporary Access Pass Lateral | ⏳ Pending — P11.5 MFA bypass |
+| Plan 11 (Cloud/Entra) | 74 | Federated Credentials Persistence | ⏳ Pending — P11.6 persistence |
+| Plan 11 (Cloud/Entra) | 75 | Application Admin → GA | ⏳ Pending — P11.7 |
+| Phase 0 (Recon) | 60 | ADIDNSDump | ⏳ Pending — DNS enumeration |
+| Phase 5 (Lateral Movement) | 62 | Unconstrained Delegation (krbrelayx) | ⏳ Pending — mbr01$ TGT capture |
+| Branch B (ADCS) | 63 | NTLM Relay to ADCS (ESC8) | ⏳ Pending — chains Coercer → relay → cert → UnPAC |
+| Phase 6 (Study ref) | 64 | SMB-to-LDAP Relay (CVE-2019-1040) | ⏳ Pending — patched on Server 2025 |
+| Phase 7 (Study ref) | 65 | Zerologon Alternative | ⏳ Pending — patched on Server 2025 |
 | Phase 5 (Persistence) | 39 | Named Pipe Impersonation | ⏳ Pending — priv-esc via pipe |
 | Phase 5 (Persistence) | 41 | Token Dance | ⏳ Pending — token manipulation persistence |
 | Phase 6 (Persistence) | 11 | Golden/Silver Ticket | ⏳ Pending — enhances Phase 6/7 |
@@ -1116,6 +1132,26 @@ psexec.py -k -no-pass child.cadre.local/Administrator@dc02.child.cadre.local
 | 45 | Pass-the-Cert ⏳ | Certificate-based Entra ID auth | Cloud lateral movement | Entra sign-in logs |
 | 46 | DCSync Detection ⏳ | Study reference — DRSBind/DRSGetNCChanges patterns | DCSync detection | WinSec 4662, Zeek dce_rpc |
 | 47 | Logon Types ⏳ | Study reference — logon type → credential location | Credential access ref | WinSec 4624 |
+| 60 | ADIDNSDump ⏳ | `adidnsdump -u cadre.local\intern_blue dc01.cadre.local` | DNS enumeration | Zeek dns.log |
+| 61 | RBCD + NTLM Relay ⏳ | `ntlmrelayx.py -t ldap://dc01 --delegate-access --escalate-user dir_operations` | RBCD on mbr01$ via ACE#20 | Suricata SID:1000050-1000053 |
+| 62 | Unconstrained Delegation ⏳ | `krbrelayx.py` on mbr01 + Coercer MS-RPRN | Capture dc02$ TGT | Suricata SID:1000050 |
+| 63 | NTLM Relay to ADCS (ESC8) ⏳ | `ntlmrelayx.py -t http://cadre-dc01-ca/certsrv/certfnsh.asp --adcs` + certipy | Cert issuance from relayed auth | Suricata HTTP ESC8 |
+| 64 | SMB-to-LDAP Relay ⏳ | Study reference — CVE-2019-1040 patched on Server 2025 | n/a (study) | n/a |
+| 65 | Zerologon Alternative ⏳ | Study reference — CVE-2020-1472 patched on Server 2025 | n/a (study) | n/a |
+| 68 | Azure AD Connect DPAPI Dump ⏳ | `adconnectdump` on dc01 (Cloud Sync) | MSOL credentials → Entra ID bridge | Sysmon EID 1 |
+| 69 | Actor Tokens → Global Admin ⏳ | Request Actor token via PoC | Entra ID Global Admin | Entra audit log |
+| 70 | Cloud Kerberos Trust → DA ⏳ | ROADtools + Hybrid device Kerberos ticket | On-prem DA via cloud | Zeek kerberos.log + Entra log |
+| 71 | PRT Phishing ⏳ | Phishing page mimicking Azure AD device join | Persistent MFA-bypassing token | Entra sign-in log |
+| 72 | Intune ADCS ESC1 ⏳ | Intune SCEP profile with vulnerable template | Cloud admin → on-prem DA | ADCS EID 4886/4887 + Intune audit |
+| 73 | Temporary Access Pass Lateral ⏳ | Intercept TAP → ROADtools → PRT → MFA bypass | Exchange Online access | Entra audit log |
+| 74 | Federated Credentials Persistence ⏳ | Add federated credential (GitHub OIDC) to app | Long-term persistence | Entra audit log |
+| 75 | Application Admin → GA ⏳ | Add client secret to MS Graph SP → app auth → GA | Global Admin escalation | Entra audit log |
+| 84 | KDS Root Key Extraction ⏳ | `Get-ADReplKdsRootKey -Domain child.cadre.local` | KDS root key (prereq for #85-89) | WinSec 4662 + Zeek DRSGetNCChanges |
+| 85 | Golden gMSA ⏳ | `Get-ADDBServiceAccount -DatabasePath ntds.dit` | gMSA current + future passwords | None (offline) |
+| 86 | DSRM Persistence ⏳ | `Set-LsaPolicyInformation` on dc01 | DC persistence across AD cred rotation | WinSec 4662 + Event 100 |
+| 87 | LAPS Bulk Extraction ⏳ | `Get-ADDBAccount -LapsPasswords` | All LAPS passwords in bulk | WinSec 4662 |
+| 88 | Golden dMSA ⏳ | `Get-ADDBServiceAccount` filter dMSA | Server 2025 dMSA password offline | None (offline, needs dMSA infra) |
+| 89 | DPAPI-NG SID Protector ⏳ | SID protector decryption for BitLocker/PFX/DNSSEC/ASP.NET | Any DPAPI-NG secret | File writes to `%LOCALAPPDATA%\Microsoft\Crypto\KdsKey\` |
 
 ---
 
@@ -1165,6 +1201,28 @@ psexec.py -k -no-pass child.cadre.local/Administrator@dc02.child.cadre.local
 45. **Pass-the-Cert** ⏳ — Plan 11b, Entra ID lateral movement
 46. **DCSync Detection** ⏳ — Phase 7, detection reference
 47. **Logon Types Reference** ⏳ — Phase 3.5, credential location reference
+60. **ADIDNSDump** ⏳ — Phase 0 DNS enumeration (dirkjanm.io 2019)
+61. **RBCD + NTLM Relay** ⏳ — Phase 6, chains ACE#20 + relay (dirkjanm.io 2019)
+62. **Unconstrained Delegation (krbrelayx)** ⏳ — Phase 5/6, mbr01$ TGT capture (dirkjanm.io 2019)
+63. **NTLM Relay to ADCS (ESC8)** ⏳ — Branch B, chains Coercer → relay → cert → UnPAC (dirkjanm.io 2021)
+64. **SMB-to-LDAP Relay (CVE-2019-1040)** ⏳ — Phase 6 study ref, patched on Server 2025 (dirkjanm.io 2019)
+65. **Zerologon Alternative** ⏳ — Phase 7 study ref, patched on Server 2025 (dirkjanm.io 2020)
+66. **Forest Trust SID Filtering** ✅ — Phase 8 study ref (already adopted; dirkjanm.io 2018)
+67. **CVE-2020-0665 Trust Bypass** ✅ — Phase 8 study ref (already adopted; dirkjanm.io 2021)
+68. **Azure AD Connect DPAPI Dump** ⏳ — Branch 3.5M, dc01 Cloud Sync (dirkjanm.io 2019)
+69. **Actor Tokens → Global Admin** ⏳ — Plan 11.1 EntraGoat (dirkjanm.io 2025)
+70. **Cloud Kerberos Trust → DA** ⏳ — Plan 11.2 EntraGoat (dirkjanm.io 2023)
+71. **PRT Phishing** ⏳ — Plan 11.3 EntraGoat (dirkjanm.io 2023)
+72. **Intune ADCS ESC1** ⏳ — Plan 11.4 EntraGoat (dirkjanm.io 2025)
+73. **Temporary Access Pass Lateral** ⏳ — Plan 11.5 EntraGoat (dirkjanm.io 2024)
+74. **Federated Credentials Persistence** ⏳ — Plan 11.6 EntraGoat (dirkjanm.io 2024)
+75. **Application Admin → GA** ⏳ — Plan 11.7 EntraGoat (dirkjanm.io 2019)
+84. **KDS Root Key Extraction** ⏳ — Post-DA prereq (Grafnetter TROOPERS26)
+85. **Golden gMSA** ⏳ — Post-DA (Grafnetter)
+86. **DSRM Persistence** ⏳ — DC persistence (Grafnetter)
+87. **LAPS Bulk Extraction** ⏳ — enhance Branch 3.5L (Grafnetter)
+88. **Golden dMSA** ⏳ — Server 2025, needs dMSA infra (Grafnetter)
+89. **DPAPI-NG SID Protector Decryption** ⏳ — needs BitLocker/PFX/DNSSEC infra (Grafnetter)
 
 ---
 
@@ -1251,7 +1309,7 @@ psexec.py -k -no-pass child.cadre.local/Administrator@dc02.child.cadre.local
 
 **Why this tier:** Dirk-jan Mollema is the primary researcher for both on-prem AD (forest trusts, delegation, ADCS) and Azure/Entra ID (PRT, Cloud Kerberos Trust, Actor tokens). His blog (https://dirkjanm.io/) is the canonical reference for many of the techniques in this campaign. CADRE has direct attack surface: mbr01 has unconstrained delegation, dc01 has Cloud Sync agent, and CADRE has 2 forests with SID Filter OFF.
 
-### 43. ADIDNSDump — DNS Reconnaissance (Phase 0) ⏳
+### 60. ADIDNSDump — DNS Reconnaissance (Phase 0) ⏳
 
 **Source:** https://dirkjanm.io/getting-in-the-zone-dumping-active-directory-dns-using-adidnsdump/
 **Year:** 2019
@@ -1274,7 +1332,7 @@ psexec.py -k -no-pass child.cadre.local/Administrator@dc02.child.cadre.local
 
 ---
 
-### 44. RBCD + NTLM Relay (Phase 6 Lateral Movement) ⏳
+### 61. RBCD + NTLM Relay (Phase 6 Lateral Movement) ⏳
 
 **Source:** https://dirkjanm.io/worst-of-both-worlds-ntlm-relaying-and-kerberos-delegation/
 **Year:** 2019
@@ -1299,7 +1357,7 @@ psexec.py -k -no-pass child.cadre.local/Administrator@dc02.child.cadre.local
 
 ---
 
-### 45. Unconstrained Delegation Abuse via krbrelayx (Phase 6) ⏳
+### 62. Unconstrained Delegation Abuse via krbrelayx (Phase 6) ⏳
 
 **Source:** https://dirkjanm.io/krbrelayx-unconstrained-delegation-abuse-toolkit/
 **Year:** 2019
@@ -1325,7 +1383,7 @@ psexec.py -k -no-pass child.cadre.local/Administrator@dc02.child.cadre.local
 
 ---
 
-### 46. NTLM Relay to ADCS (ESC8) ⏳
+### 63. NTLM Relay to ADCS (ESC8) ⏳
 
 **Source:** https://dirkjanm.io/ntlm-relaying-to-ad-cs/
 **Year:** 2021
@@ -1350,7 +1408,7 @@ psexec.py -k -no-pass child.cadre.local/Administrator@dc02.child.cadre.local
 
 ---
 
-### 47. SMB-to-LDAP Relay (CVE-2019-1040) ⏳
+### 64. SMB-to-LDAP Relay (CVE-2019-1040) ⏳
 
 **Source:** https://dirkjanm.io/exploiting-CVE-2019-1040-relay-vulnerabilities-for-rce-and-domain-admin/
 **Year:** 2019
@@ -1370,7 +1428,7 @@ psexec.py -k -no-pass child.cadre.local/Administrator@dc02.child.cadre.local
 
 ---
 
-### 48. Zerologon Alternative Exploitation (Phase 7) ⏳
+### 65. Zerologon Alternative Exploitation (Phase 7) ⏳
 
 **Source:** https://dirkjanm.io/a-different-way-of-abusing-zerologon/
 **Year:** 2020
@@ -1390,7 +1448,7 @@ psexec.py -k -no-pass child.cadre.local/Administrator@dc02.child.cadre.local
 
 ---
 
-### 49. Forest Trust SID Filtering Study (Phase 8) ✅
+### 66. Forest Trust SID Filtering Study (Phase 8) ✅
 
 **Source:** https://dirkjanm.io/active-directory-forest-trusts-part-one-how-does-sid-filtering-work/
 **Year:** 2018
@@ -1414,7 +1472,7 @@ psexec.py -k -no-pass child.cadre.local/Administrator@dc02.child.cadre.local
 
 ---
 
-### 50. CVE-2020-0665 Forest Trust Bypass Study (Phase 8) ✅
+### 67. CVE-2020-0665 Forest Trust Bypass Study (Phase 8) ✅
 
 **Source:** https://dirkjanm.io/active-directory-forest-trusts-part-2-trust-bypass/
 **Year:** 2021
@@ -1434,7 +1492,7 @@ psexec.py -k -no-pass child.cadre.local/Administrator@dc02.child.cadre.local
 
 ---
 
-### 51. Azure AD Connect DPAPI Dump (Phase 3.5) ✅
+### 68. Azure AD Connect DPAPI Dump (Phase 3.5) ✅
 
 **Source:** https://dirkjanm.io/active-directory-azure-ad-connect-vulnerabilities/
 **Year:** 2019
@@ -1459,7 +1517,7 @@ psexec.py -k -no-pass child.cadre.local/Administrator@dc02.child.cadre.local
 
 ---
 
-### 52. Actor Tokens → Global Admin (Plan 11) ⏳
+### 69. Actor Tokens → Global Admin (Plan 11) ⏳
 
 **Source:** https://dirkjanm.io/one-token-to-rule-them-all/
 **Year:** 2025
@@ -1484,7 +1542,7 @@ psexec.py -k -no-pass child.cadre.local/Administrator@dc02.child.cadre.local
 
 ---
 
-### 53. Cloud Kerberos Trust → Domain Admin (Plan 11) ⏳
+### 70. Cloud Kerberos Trust → Domain Admin (Plan 11) ⏳
 
 **Source:** https://dirkjanm.io/obtaining-domain-admin-from-azure-ad-via-cloud-kerberos-trust/
 **Year:** 2023
@@ -1509,7 +1567,7 @@ psexec.py -k -no-pass child.cadre.local/Administrator@dc02.child.cadre.local
 
 ---
 
-### 54. PRT Phishing (Plan 11) ⏳
+### 71. PRT Phishing (Plan 11) ⏳
 
 **Source:** https://dirkjanm.io/phishing-for-primary-refresh-tokens/
 **Year:** 2023
@@ -1534,7 +1592,7 @@ psexec.py -k -no-pass child.cadre.local/Administrator@dc02.child.cadre.local
 
 ---
 
-### 55. Intune ADCS ESC1 (Plan 11) ⏳
+### 72. Intune ADCS ESC1 (Plan 11) ⏳
 
 **Source:** https://dirkjanm.io/extending-ad-cs-attack-surface-to-the-cloud-with-intune-certificates/
 **Year:** 2025
@@ -1559,7 +1617,7 @@ psexec.py -k -no-pass child.cadre.local/Administrator@dc02.child.cadre.local
 
 ---
 
-### 56. Temporary Access Pass Lateral Movement (Plan 11) ⏳
+### 73. Temporary Access Pass Lateral Movement (Plan 11) ⏳
 
 **Source:** https://dirkjanm.io/lateral-movement-with-temporary-access-passes/
 **Year:** 2024
@@ -1584,7 +1642,7 @@ psexec.py -k -no-pass child.cadre.local/Administrator@dc02.child.cadre.local
 
 ---
 
-### 57. Federated Credentials Persistence (Plan 11) ⏳
+### 74. Federated Credentials Persistence (Plan 11) ⏳
 
 **Source:** https://dirkjanm.io/persisting-on-entra-id-apps-with-federated-credentials/
 **Year:** 2024
@@ -1610,7 +1668,7 @@ psexec.py -k -no-pass child.cadre.local/Administrator@dc02.child.cadre.local
 
 ---
 
-### 58. Abusing Application Admin → Global Admin (Plan 11) ⏳
+### 75. Abusing Application Admin → Global Admin (Plan 11) ⏳
 
 **Source:** https://dirkjanm.io/azure-ad-privilege-escalation-application-admin/
 **Year:** 2019
@@ -1673,25 +1731,25 @@ psexec.py -k -no-pass child.cadre.local/Administrator@dc02.child.cadre.local
 
 | # | Item | Phase | Year | Status |
 |---|------|-------|------|--------|
-| 43 | ADIDNSDump | Phase 0 | 2019 | ⏳ |
-| 44 | RBCD + NTLM Relay | Phase 6 | 2019 | ⏳ |
-| 45 | Unconstrained Delegation (krbrelayx) | Phase 6 | 2019 | ⏳ |
-| 46 | NTLM Relay to ADCS (ESC8) | Branch B | 2021 | ⏳ |
-| 47 | SMB-to-LDAP Relay (CVE-2019-1040) | Phase 6 | 2019 | ⏳ |
-| 48 | Zerologon Alternative | Phase 7 | 2020 | ⏳ |
-| 49 | Forest Trust SID Filtering | Phase 8 | 2018 | ⏳ |
-| 50 | CVE-2020-0665 Trust Bypass | Phase 8 | 2021 | ⏳ |
-| 51 | Azure AD Connect DPAPI Dump | Phase 3.5 | 2019 | ✅ |
-| 52 | Actor Tokens → Global Admin | Plan 11 | 2025 | ⏳ |
-| 53 | Cloud Kerberos Trust → DA | Plan 11 | 2023 | ⏳ |
-| 54 | PRT Phishing | Plan 11 | 2023 | ⏳ |
-| 55 | Intune ADCS ESC1 | Plan 11 | 2025 | ⏳ |
-| 56 | Temporary Access Pass Lateral | Plan 11 | 2024 | ⏳ |
-| 57 | Federated Credentials Persistence | Plan 11 | 2024 | ⏳ |
-| 58 | Application Admin → GA | Plan 11 | 2019 | ⏳ |
+| 60 | ADIDNSDump | Phase 0 | 2019 | ⏳ |
+| 61 | RBCD + NTLM Relay | Phase 6 | 2019 | ⏳ |
+| 62 | Unconstrained Delegation (krbrelayx) | Phase 6 | 2019 | ⏳ |
+| 63 | NTLM Relay to ADCS (ESC8) | Branch B | 2021 | ⏳ |
+| 64 | SMB-to-LDAP Relay (CVE-2019-1040) | Phase 6 | 2019 | ⏳ |
+| 65 | Zerologon Alternative | Phase 7 | 2020 | ⏳ |
+| 66 | Forest Trust SID Filtering | Phase 8 | 2018 | ✅ |
+| 67 | CVE-2020-0665 Trust Bypass | Phase 8 | 2021 | ✅ |
+| 68 | Azure AD Connect DPAPI Dump | Phase 3.5 | 2019 | ✅ |
+| 69 | Actor Tokens → Global Admin | Plan 11 | 2025 | ⏳ |
+| 70 | Cloud Kerberos Trust → DA | Plan 11 | 2023 | ⏳ |
+| 71 | PRT Phishing | Plan 11 | 2023 | ⏳ |
+| 72 | Intune ADCS ESC1 | Plan 11 | 2025 | ⏳ |
+| 73 | Temporary Access Pass Lateral | Plan 11 | 2024 | ⏳ |
+| 74 | Federated Credentials Persistence | Plan 11 | 2024 | ⏳ |
+| 75 | Application Admin → GA | Plan 11 | 2019 | ⏳ |
 | 59 | Electron App Backdooring (Loki C2) | Phase 3 | 2026 | ✅ |
 
-**16 new items added** (Items 43-58). **Plus Item 59** (Electron backdooring). **Total Tier 3: 17.**
+**16 new items added (Items 60-75, Dirk-jan blog)**. **Plus Item 59** (Electron backdooring). **Total Tier 3: 17.**
 
 ---
 
@@ -1701,27 +1759,24 @@ This is the running index of all items by source. Updated as items are added.
 
 | # | Item | Source |
 |---|------|--------|
-| 1-2 | MSSQL/SCCM CVEs, MSSQLHound | SpecterOps (2026) |
-| 3-4 | iPurple ADWS, WMI | iPurple (2025) |
-| 5-9 | WerFault, SharpHound, Cross-Session, BadSuccessor, WinGet, etc. | iPurple (2025) |
-| 10 | NTLMv1 Rainbow Tables | iPurple (2025) |
-| 11-13 | ADWS, WerFault, Cross-Session | iPurple (2025) |
-| 14 | SpeechRuntime Lateral | iPurple (2025) |
-| 15 | UnPAC-the-Hash | SpecterOps (2025) |
-| 16 | ETW Internals | kernullist (2025) |
-| 17 | DCOMIllusionist | Synacktiv (2025) |
-| 18 | SQL Server 2025 AI Abuse | SpecterOps (2025) |
-| 19 | CVE-2026-41089 Netlogon RCE | CERT-EU (2026) |
-| 20-28 | RTO course techniques (DLL/COM/IFEO/LSA/UACME/Piper/Handle/Token/LAPS) | Zero Point Security (2025) |
-| 29-33 | BetterSuccessor, RBCD, Pass-the-Cert, DCSync Detection, Logon Types | Altered Security (2025) |
-| 34-36 | LAPS, BloodHound, ctfmon | iPurple (2025) |
-| 37-42 | RTO additional techniques | Zero Point Security (2025) |
-| **43-58** | **Dirk-jan blog (ADCS, Forest Trust, Azure, PRT, etc.)** | **dirkjanm.io (2018-2025)** |
+| 1-12 | Tier 1: MSSQLHound, MSSQL/SCCM CVEs, Nemesis DPAPI, ctfmon, Certified Pre-Owned, Shai-Hulud, Ludus SCCM, WMI, Invisible Tasks, Golden/Silver, Device Code | SpecterOps (2026) + dbgman |
+| 13-16 | Tier 2: ghostsurf, Shift Happens, NTLMv1 Rainbow, Skip Turnstile | SpecterOps (2026) |
+| 17-18 | Tier 3 reference: Red Team philosophy, IdP attack paths | SpecterOps methodology |
+| 19-28 | iPurple additions: ADWS, WerFault, Cross-Session, SharpHound Detection, BadSuccessor, WinGet, EntryPoint, SpeechRuntime, GAC Hijacking, Credential Guard | iPurple.team (2024-2026) |
+| 29-33 | SpecterOps 2025 additions: UnPAC-the-Hash, ETW Internals, MSSQL 2025 AI, DCOMIllusionist, CVE-2026-41089 Netlogon | SpecterOps + Synacktiv + CERT-EU |
+| 34-42 | RTO course techniques: DLL Hijack, COM Hijack, IFEO, LSA SSP, UACME, Named Pipe, Handle Leak, Token Dance, LAPS | Zero Point Security (2025) |
+| 43-47 | Altered Security additions: BetterSuccessor, RBCD, Pass-the-Cert, DCSync Detection, Logon Types | Altered Security (2025) |
 | 59 | Electron App Backdooring (Loki C2) | White Knight Labs (2026) |
-| **78-80** | **MiniPlasma, GreenPlasma, YellowKey (Win EoP / BitLocker bypass)** | **Project NightCrawler (NightmareEclipse, 2026-06)** |
+| **60-75** | **Dirk-jan blog (ADCS, Forest Trust, Azure, PRT, etc.) — renumbered from 43-58 in 2026-06-23 audit** | **dirkjanm.io (2018-2025)** |
+| **78-80** | **MiniPlasma, GreenPlasma, YellowKey (Win EoP / BitLocker bypass)** | **Project NightCrawler (NightmareEclipse, 2026-06-18)** |
 | **81-82** | **UnCanny Coerce (NTLM coercion via InstallService) + UnCanny LPE (SYSTEM via InstallService)** | **0xHossam (2026-06-19)** |
 | 83 | IPv4-mapped IPv6 Phishing URL Parser Bypass | SANS ISC (Xavier Mertens, 2026-06-19) |
 | **84-89** | **KDS Root Key Attacks — Golden gMSA/dMSA, DSRM, LAPS bulk, DPAPI-NG SID Protector** | **Grafnetter TROOPERS26 (2026-06-20)** |
+
+**Numbering notes:**
+- #9 missing (Tier 1 skipped during original write — see Tier 1 between #8 WMI and #10 Invisible Tasks)
+- #76-77 unused (reserved gap for future additions)
+- Items #60-75 were originally numbered #43-58 when first added (Dirk-jan section). They collided with the Altered Security items at the same numbers. Renumbered to #60-75 in 2026-06-23 audit.
 
 ---
 
@@ -2181,4 +2236,4 @@ Phase 4-8: DCSync, RBCD, ADCS, forest trust (all work)
 
 ---
 
-*Last updated: 2026-06-14*
+*Last updated: 2026-06-23 — Renumbered Dirk-jan items (#43-58 → #60-75) to fix duplicate numbering with Altered Security section. Updated counts to actual (75 items). Added cross-reference notes for #9 gap and #76-77 reserved gap.*
