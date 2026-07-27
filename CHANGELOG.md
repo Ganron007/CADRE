@@ -4,6 +4,46 @@ All notable changes to CADRE are documented here. Format: [Keep a Changelog](htt
 
 ## [Unreleased]
 
+### Added (2026-06-25 — ebooks Survey + Items #109-115 [Session 13])
+
+> **Survey scope:** All 75 .txt files in `C:\STUDY\Github\CADRE-Courses\ebooks\` surveyed via term-frequency analysis for AD attack vocabulary + DFIR/detection keywords. Per user direction (2026-06-25): "look only at the txt files for now... propose your suggestions here."
+
+**Survey findings:**
+- 11 books identified as **Tier 1+2 high-value new content** (not duplicates of existing sources)
+- 3 concrete techniques extracted as Items #109-111 (AMSI Bypass, DCShadow, Rubeus cross-validation)
+- 4 study reference books added as Items #112-115 (Practical AI Security, Cyber Threat Hunting, Practical Threat Detection Engineering, Windows Internals Part 1)
+- Tier 3 + skip list documented (programming/theory/compliance/wrong-domain)
+
+**3 new attack items:**
+- **#109 AMSI Bypass Techniques** (Gray Hat Hacking 6th Ed) — Phase 3 attack primitive before mimikatz/Rubeus. 3 techniques (amsiInitFailed flag, AmsiScanBuffer patching, forced error). Detection: WinSec 4104 + Sigma `win_amsi_bypass.yml`.
+- **#110 DCShadow Attack** (Applied Incident Response + Practical-Red-Teaming) — Phase 7 alternative persistence (inverse of DCSync). Push fake SID history/SPN/group via DRS replication. Detection: WinSec 4662 from non-DC + Zeek DCE-RPC drsuapi.
+- **#111 Rubeus/Kerberoast/AS-REP cross-validation** (Practical-Red-Teaming + Gray Hat Hacking 6th Ed) — Verify existing Phase 1/2/7 commands against book recommendations. Check for missing flags (`/rc4opsec`, `/authexp`, `/tgtdeleg`).
+
+**4 study reference items:**
+- **#112 Practical AI Security (2025)** — LLM security for CADRE-Strike (prompt injection, RAG poisoning)
+- **#113 Cyber Threat Hunting** — hypothesis-driven hunting methodology for plan1.7
+- **#114 Practical Threat Detection Engineering** — Sigma rule writing methodology
+- **#115 Windows Internals Part 1, 7th Ed** — LSASS/UAC/Kerberos/Credential Guard internals
+
+**Files updated (4 total):**
+- **`attack-matrix/Campaign_suggestions.md`**: New top-level section "CADRE-Courses/ebooks Survey (2026-06-25)" with full survey methodology + Tier 3/skip list + Tier 1+2 book lists + 3 new items #109-111 + 4 study reference items #112-115. All 5 summary tables updated (Summary, Phase Mapping, Testing Checklist, Tier 3 Summary, Cross-Reference Index). Counts: 98 → 102 items (24 ✅ / 59 ⏳ / 4 🔬 / 1 ⏭️ / 2 ref / 12 🆕). Tier 3: 33 → 40. Last updated footer added.
+- **`attack-matrix/CAMPAIGNS.md`**: New "📖 ebooks/ Survey (2026-06-25)" section in Study Reference Library (after Practical Purple Teaming). 11 book entries with chapter-to-phase mappings + recommended reading order + action items.
+- **`attack-matrix/CAMPAIGNS-METADATA.md`**: 3 new Mechanics stubs (#109-111) inserted after Item #108 stub. Full 8-part templates each (AMSI bypass 3 techniques + WinSec 4104 detection; DCShadow Mimikatz commands + WinSec 4662 detection; Rubeus flag cross-validation). Plus new "Reference Books — CADRE-Courses/ebooks/ Survey" section with 11 study-reference stubs (chapter-to-phase tables for each book + reproduction checklist + cross-references).
+- **`AGENTS.md`**: This entry.
+
+**Survey findings — duplicates to skip:**
+- `Active Directory Pentesting Mind Map.txt` (5 KB, EMPTY — extraction failed)
+- `Rana-Khalil-Lab-Setup.txt` (NOT AD — PortSwigger Web Security Academy setup guide)
+- `mdmz_book.txt` (0 AD matches)
+- `Practical Malware Analysis.txt` (CONFIRMED DUPLICATE of NoStarchPress_extract)
+- SANS DFPS posters (FOR500/508/509/572/578) — already in `CADRE-Courses/sans/pdf_extract/`
+
+**Survey findings — 2025+ publications flagged:**
+- **Practical AI Security (2025)** — Tier 2 above; fills CADRE-Strike LLM security gap
+- **SANS-2025-Detection-Response-Survey** — industry AI/ML adoption trends, useful for DFIR-Nexus positioning context (NOT techniques)
+
+**Cross-references:** Item #100-101 (NoStarchPress books — same study reference pattern), Item #107 (GitHub Actions supply-chain — overlaps with Practical AI Security prompt injection), Item #108 (Defender exclusion — alternative AMSI bypass approach), plan1.7 §16/§17 (held), Track C (Sigma), Track H (CADRE-Strike).
+
 ### Added (2026-06-24 — Item #108: Defender Exclusion via PowerShell (T1562.001) [Session 12])
 
 > **Source:** [Testing AI Threat Hunting against Real-World KQL: A Side-by-Side Test](https://detect.fyi/testing-ai-threat-hunting-against-real-world-kql-a-side-by-side-test-4cdda76a5772) by Alex Teixeira, *Detect FYI* publication, 2026-06-24.
