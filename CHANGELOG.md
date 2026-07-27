@@ -4,6 +4,33 @@ All notable changes to CADRE are documented here. Format: [Keep a Changelog](htt
 
 ## [Unreleased]
 
+### Fixed (2026-06-24 — CAMPAIGNS.md Flow Correction: NetExec Commands Repositioned to Right Stages [Session 10])
+
+> ⚠️ **Per user feedback (2026-06-24):** "campaign is like the story we simulate a real world attack in the order typically seen in real world... at every stage and at every credentials gains."
+
+**Problem:** Previous CAMPAIGNS.md Phase 0 Step 0.5 contained 11+ NetExec commands that required credentials (`intern_blue:1nt3rn_Blu3!`), but at Phase 0 we don't have those credentials yet. AS-REP Roast is what gives us intern_blue. The commands broke the campaign flow.
+
+**Fix applied:**
+1. **CAMPAIGNS.md Step 0.5** — Stripped to **unauthenticated commands only** (nxc `--gen-relay-list`, signing state check, guest attempts marked as Server 2025 blocked). Added clear note about what CAN run without creds and where the auth-recon commands moved.
+2. **CAMPAIGNS.md Phase 1 Step 3** — **NEW** — NetExec Authenticated Recon with `intern_blue` (first credential). Multiple tools: NetExec primary, bloodyAD alternative, ADeleg GUI for visual verification, impacket for deeper queries. Includes `nxc -M pre2k/enum_av/get-desc-users/find-delegation/admin-count`, `--asreproast --kdcHost`, `--kerberoasting --kdcHost`.
+3. **CAMPAIGNS.md Phase 2 Step 3** — **NEW** — NetExec Authenticated Recon with `svc_mssql` (service account). Multiple tools: NetExec (MSSQL unlocked), bloodyAD for ACL analysis, Certipy v5.1.0 for ADCS, impacket-mssqlclient for SQL-specific recon. Includes `nxc -M adcs`, `--find-delegation`, full AS-REP + Kerberoast.
+4. **CAMPAIGNS.md Phase 3.5 Step A** — **NEW** — NetExec Authenticated Recon with admin/SYSTEM (post-GodPotato on mbr01). Multiple tools: NetExec (16+ dump modules), lsassy v3.1.16, DonPAPI v2.0+, manual mimikatz, secretsdump.py, SharpHound. Includes `--sam --lsa --ntds --dpapi`, `-M winscp`, `--laps`.
+
+**CAMPAIGNS-METADATA.md updated:**
+- Step 0.5b Mechanics section now includes "FLOW CORRECTION" notice explaining what was moved
+- New Mechanics stubs for Phase 1 Step 3, Phase 2 Step 3, Phase 3.5 Step A — each with primary NetExec + 3-4 alternative tools, CADRE-specific notes, detection, cross-references
+- Step 0.5 unauth table added showing what works on Server 2025 vs what's blocked
+
+**Quality principle (per user 2026-06-24):** "duplicates/alternative tool usage and alternative techniques all need to be well designed within our campaign. If the campaign isnt good, the whole project becomes worthless."
+- Each new auth-recon stage shows **multiple tool options** (NetExec primary, 3-4 alternatives)
+- Alternative techniques documented per stage (e.g., bloodyAD vs impacket vs ADeleg)
+- SANS course tools referenced where relevant (KAPE, Velociraptor, Plaso for DFIR side)
+- Real-world attacker perspective: enumeration at every credential gain, not just at the start
+
+**Files updated:** CAMPAIGNS.md (3 new sections + Step 0.5 trimmed), CAMPAIGNS-METADATA.md (3 new Mechanics stubs + flow correction notice), this CHANGELOG entry, AGENTS.md session entry.
+
+**Workflow note (2026-06-24 session 10):** Per user direction, fixed the credential flow issue. Each new auth-recon stage shows 3-5 alternative tools/techniques per the "use all the best tools at all stages" principle.
+
 ### Added (2026-06-24 — 5 Concrete Techniques Extracted from Reference Books [Items #102-106])
 
 - **Source:** Per user workflow principle (2026-06-24): *"books are reference material, but specific attack techniques IN them should be extracted as new items in Campaign_suggestions, with phase mapping. Only move to CAMPAIGNS.md Mechanics when verified."*
