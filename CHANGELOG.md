@@ -9,40 +9,45 @@ All notable changes to CADRE are documented here. Format: [Keep a Changelog](htt
 > **Source:** [One Bool. Six Shells. AMSI's Design Problem](https://bl4ckarch.github.io/posts/One-Bool.-Six-Shells.-AMSI%27s-Design-Problem/) by bl4ckarch, 2026-06-25. Per user direction: "you can update these 2 and remove from Todo" — apply the bl4ckarch research to plan1.7 §16 + Campaign_suggestions Item #109.
 
 **What changed:**
-- **Campaign_suggestions.md Item #109 REWRITTEN** — Gray Hat Hacking 6th Ed (3 outdated techniques) → bl4ckarch (6 reverse-shell-verified techniques). All previous techniques confirmed broken on modern targets:
-  - `amsiInitFailed` field reflection → fails on PS 7 (field renamed to `s_amsiInitFailed` + `initonly` added)
-  - `AmsiScanBuffer` patching → Defender kernel callback kills session (only works if Defender disabled)
-  - Forced error → superseded by Bypass 5 (pAppName null at ctx+0x08)
-- **6 new confirmed bypass techniques** (Bypass 1-6, all PS 7-relevant except #1, #2):
-  - Bypass 3 — DynamicMethod IL emission (`stsfld`) — PS 7, no VirtualProtect
-  - Bypass 4 — JIT heap patch + `s_amsiNotifyFailed` write — PS 7, no VirtualProtect on amsi.dll
-  - Bypass 5 — `pAppName` null write at ctx+0x08 — PS 7, no VirtualProtect (minimum-API)
-  - Bypass 6 — InternalNotify patch + pAppName null — PS 7, 1 VirtualProtect call
+- **plan1.7-defense-deepening.md §16 AMSI Bypass Detection Engineering added (~12 KB)** — 5 Sigma rules + Elastic KQL `cadre-010-amsi-bypass` + memory forensics + 6 architectural findings + root cause mitigations. See plan1.7 §16 for full content.
+- **AMSИ bypass AD-specific tracking** — kept in `docs/internal/plan01-upgrades/ad-evasion-gap-analysis.md` reference doc (sister project integration; per user: "AMSI goes int this if you thin its rlevant to AD only" — AMSI IS AD-specific since PowerShell bypass is core to AD attack chains).
+
+**Removed (session 16 — partial revert):**
+- **Campaign_suggestions.md Item #109 (AMSI Bypass) FULLY REMOVED** — per user direction (2026-06-25):
+  - "Remove AMSI from campaign_suggestions entirely as it has nothing to do with campaign (we disabled defender - no relevance now)"
+  - "remove any mistaken defense work from this doc as well"
+  - Routing clarified: AD-specific evasion goes in `ad-evasion-gap-analysis.md` (held for future cross-project integration); defensive detection goes in plan1.7 (already in §16)
+  - 6 places removed: Phase mapping table, Testing Checklist table, Tier 3 Summary table, Cross-Reference Index (with replacement marker "Item REMOVED"), source-style entry, full mechanics section
+- **Item count:** 102 → 101 items (1 removed)
+- **Numbering:** Item #109 retired. Next Item = #110 (DCShadow), #111 (Rubeus cross-validation), #112-115 (study refs) — no renumbering needed, gap is intentional.
 
 **Files updated (2 total):**
 
 1. **`docs/internal/plan01-upgrades/plan1.7-defense-deepening.md`** — §16 AMSI Bypass Detection Engineering added (~12 KB):
    - §16.1 Why the previous 3 Gray Hat techniques failed (live-tested)
    - §16.2 The 6 new confirmed techniques (all reverse-shell verified)
-   - §16.3 Architectural findings (6 null-pointer guards, PS 7 two-path, initonly inconsistency, Defender RVA 0x8160 watch, Event 4104 not suppressed)
+   - §16.3 Architectural findings (6 null-pointer guards, PS 7 two-path, initonly inconsistency on `s_amsiNotifyFailed`, Defender RVA 0x8160 watch, JIT heap + vtable + InternalScan/InternalNotify unmonitored, Event 4104 NOT suppressed by any bypass)
    - §16.4 5 Sigma rules + 1 Elastic KQL (`cadre-010-amsi-bypass`) + Sysmon EID 10/8 additions
-   - §16.5 Memory forensics detection (post-bypass state via CLR profiling API + native patch detection for `InternalScan`/`InternalNotify`)
-   - §16.6 Architectural mitigations (Constrained Language Mode, kernel-mode AMSI, HVCI)
+   - §16.5 Memory forensics (post-bypass state via CLR profiling API + native patch detection for `InternalScan`/`InternalNotify`)
+   - §16.6 Architectural mitigations (Constrained Language Mode + AppLocker, kernel-mode AMSI consumer, HVCI)
    - §16.7 Cross-references — what was updated this session
    - §16.8 Action items (6 — most held for Sprint 1 + Plan 9)
 
-2. **`attack-matrix/Campaign/Campaign_suggestions.md` Item #109 REWRITTEN** — 6 table positions updated:
-   - Phase mapping table (line 1162): Gray Hat → bl4ckarch label
-   - Testing Checklist table (line 1266): updated command snippet (Bypass 5 pAppName null + full detection rules)
-   - Tier 3 Summary table (line 1899): updated source label
-   - Cross-Reference Index (line 1942): noted supersession
-   - Full mechanics section (line 3768): replaced with 6 new techniques + supersession notes + minimum-API snippet
+2. **`attack-matrix/Campaign/Campaign_suggestions.md`** — Item #109 FULLY REMOVED (6 places cleaned).
+
+**Routing clarification (locked in this session):**
+- **plan1.7 / plan1.8** = CADRE project upgrades (plan1.7 defense, plan1.8 offense). Outside core campaign. Practical exercises for skill building.
+- **plan1.7-exercises / plan1.8-exercises** = practice library (EX-01..60 plan1.7, EX-OFF-01..37 plan1.8).
+- **Campaign_suggestions / CAMPAIGNS_v2 / CAMPAIGNS-METADATA / Runbooks** = core campaign plan00 + plan01 validation. Testing deployed environment end-to-end. Offensive attack primitives only.
+- **ad-evasion-gap-analysis.md** = AD-specific evasion (held, sister project integration). AD-only techniques tracked here.
+- **Defensive (plan1.7)** = detection rules, hardening, monitoring, deception.
+- **Offensive (plan1.8)** = attack techniques for skill building.
+- **Offensive (Campaign)** = attack primitives tested against deployed lab.
 
 **Cross-references:**
-- Campaign_suggestions.md Item #109 (REWRITTEN)
-- plan1.7-defense-deepening.md §16 (NEW)
-- roadmapv2.md (no change needed)
-- Held for Sprint 1: add EX-61 to plan1.7-exercises.md + write T109-amsi-bypass.yml Sigma YAML
+- plan1.7-defense-deepening.md §16 (NEW — defensive detection)
+- ad-evasion-gap-analysis.md (FUTURE — AD-specific evasion, sister project integration)
+- Held for Sprint 1: add EX-61 to plan1.7-exercises.md + write T109-amsi-bypass.yml Sigma YAML + deploy to Kibana
 - Held: test in lab (requires re-enabling Defender per roadmapv2 decision)
 - Related: Item #108 (Defender Exclusion via PowerShell, T1562.001 — complementary runtime disable)
 
