@@ -72,7 +72,7 @@
 
 | Area | `[x]` | `[ ]` | `[~]` | `[!]` | `[?]` | Total |
 |------|------:|------:|------:|------:|------:|------:|
-| A — Access & ops | 3 | 2 | 0 | 0 | 0 | 5 |
+| A — Access & ops | 3 | 3 | 0 | 0 | 0 | 6 |
 | C — Campaign v3 | 3 | 12 | 0 | 4 | 0 | 19 |
 | **P11 — Campaign automation** | **8** | **0** | **0** | **0** | **0** | **8** |
 | P1 — Telemetry catalog | 2 | 8 | 0 | 0 | 0 | 10 |
@@ -113,6 +113,7 @@
 | A.3 | Smoke: `ssh vagrant@192.168.77.60` + ES HTTP on `.50` | [x] | 2026-07-25 | — | `elastic` password per ansible `group_vars` |
 | A.4 | Document VM dir + `vagrant global-status` in vm-access | [x] | 2026-07-25 | `Tools/vm-access.md` | `C:\Users\Ganro\VMs\CADRE`; all core+ext running except legacy `kali` VM |
 | A.5 | Optional: `Host cadre-prov` in `~/.ssh/config` | [ ] | | operator | Snippet in vm-access |
+| A.6 | Automated boot-time log cleanup on `elk` + `monitor` VMs | [ ] | | `ansible/playbooks/` or `systemd` | Clear old ES GC logs, Suricata/Zeek archives, Arkime raw pcaps, journal vacuum; preserve current logs and ES data |
 
 ---
 
