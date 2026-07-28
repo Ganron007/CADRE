@@ -38,9 +38,11 @@ ansible/roles/cloud/files/AADConnectProvisioningAgentSetup.exe
 *.pfx
 *.p12
 *.retry
+.env
 
 # ───────────────────────── Agent / editor tooling (local, not shipped) ──────
 .claude/
+.cursor/
 .opencode/
 .agents/
 
@@ -54,4 +56,8 @@ Thumbs.db
 
 # Local RITA/docker image tarballs (too large for git)
 ansible/files/rita-images/
+
+# Scratch / transient output
+tmp/
+*.log
 
