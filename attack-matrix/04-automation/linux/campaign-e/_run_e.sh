@@ -1,21 +1,30 @@
 #!/bin/bash
-# Plan 1.1 M5 — stage campaign-e script so ../lib resolves to linux/lib.
+# Plan 1.1 M5 thin wrapper — Campaign E: delegates to the actual Plan 0.7 attack script.
 set -euo pipefail
-_RUN_E_HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-_RUN_E_AUTO="$(cd "${_RUN_E_HERE}/../.." && pwd)"
-_run_e() {
-  local name="$1"
-  local src="${_RUN_E_AUTO}/campaign-e/${name}"
-  if [[ ! -f "$src" ]]; then
-    echo "[-] missing campaign-e script: $src" >&2
-    return 1
-  fi
-  local stage
-  stage="$(mktemp -d)"
-  # shellcheck disable=SC2064
-  trap "rm -rf \"${stage}\"" RETURN
-  ln -s "${_RUN_E_HERE}/../lib" "${stage}/lib"
-  mkdir -p "${stage}/campaign-e"
-  cp "$src" "${stage}/campaign-e/${name}"
-  (cd "${stage}/campaign-e" && bash "./${name}")
-}
+RUN_HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+SCRIPT="$(basename "${BASH_SOURCE[1]}")"
+
+case "$SCRIPT" in
+  wt069-dns-dga.sh)          MAP="dns-dga" ;;
+  wt070-dns-txt.sh)          MAP="dns-txt" ;;
+  wt071-dns-nxdomain.sh)     MAP="dns-nxdomain-burst" ;;
+  wt072-dns-tld.sh)          MAP="dns-suspicious-tld" ;;
+  wt073-dns-ip-literal.sh)   MAP="dns-ip-literal" ;;
+  wt074-tls-v1.sh)           MAP="tls-v1" ;;
+  wt075-smb-admin.sh)        MAP="smb-admin-share" ;;
+  wt076-http-ua.sh)          MAP="http-suspicious-ua" ;;
+  wt077-http-exploit-path.sh) MAP="http-exploit-path" ;;
+  wt078-http-content-type.sh) MAP="http-suspicious-content-type" ;;
+  wt079-ssh-brute.sh)        MAP="ssh-bruteforce" ;;
+  wt080-long-connection.sh)  MAP="long-connection" ;;
+  wt081-outbound-anomaly.sh) MAP="cross-subnet" ;;
+  *) echo "[-] Unknown wrapper: $SCRIPT" >&2; exit 1 ;;
+esac
+
+TARGET="${RUN_HERE}/../attacks/plan0.7-${MAP}.sh"
+if [[ ! -f "$TARGET" ]]; then
+  echo "[-] Missing target: $TARGET" >&2
+  exit 1
+fi
+cd "$(dirname "$TARGET")"
+exec bash "$(basename "$TARGET")"

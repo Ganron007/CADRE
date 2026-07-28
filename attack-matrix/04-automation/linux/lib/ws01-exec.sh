@@ -30,4 +30,4 @@ exec nxc winrm "${WS01_IP}" \
   -u "${WS01_AD_USER}" \
   -p "${WS01_AD_PASS}" \
   -d "${WS01_DOMAIN}" \
-  -X "${CMD}"
+  -X "${CMD}; exit \$LASTEXITCODE"

@@ -13,13 +13,13 @@ step "Generating 25 random DGA-style domain queries against DC01"
 for i in $(seq 1 25); do
     len=$((12 + RANDOM % 20))   # 12–31 chars (DNS label max 63)
     label=$(tr -dc 'a-z0-9' </dev/urandom | head -c "$len")
-    run_cmd "dig +short +timeout=2 ${label}.example.com @${DC01} A"
+    run_cmd "dig +short +timeout=1 ${label}.example.com @8.8.8.8 A"
 done
 
 step "Generating 15 high-entropy labels (15+ chars) against DC02"
 for i in $(seq 1 15); do
     label=$(cat /dev/urandom | tr -dc 'a-z0-9' | head -c16)
-    run_cmd "dig +short +timeout=2 $label.malware-c2.evil @$DC02 A"
+    run_cmd "dig +short +timeout=1 $label.malware-c2.evil @8.8.8.8 A"
 done
 
 echo ""

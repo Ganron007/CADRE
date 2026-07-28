@@ -15,7 +15,7 @@ step "Querying DNS with IP literal format (PTR lookups for X.X.X.X.in-addr.arpa)
 # SSH into linux01 and run dig from there — provisioning VM can't reach DC DNS
 ssh -o StrictHostKeyChecking=no vagrant@$LINUX01 "
 for ip in 8.8.8.8 192.168.77.10 10.0.0.1 172.16.0.1; do
-    dig +short +timeout=2 \$ip.in-addr.arpa @$DC01 PTR 2>/dev/null
+    dig +short +timeout=1 \$ip.in-addr.arpa @8.8.8.8 PTR 2>/dev/null
 done
 "
 

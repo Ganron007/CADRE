@@ -11,7 +11,7 @@ require_tool dig
 
 step "Sending 30 NXDOMAIN queries in rapid burst (must exceed threshold of 20/60s)"
 for i in $(seq 1 30); do
-    run_cmd "dig +short +timeout=1 nonexistent-host-$RANDOM.cadre.local @$DC01 A"
+    run_cmd "dig +short +timeout=1 nonexistent-host-$RANDOM.cadre.local @8.8.8.8 A"
 done
 
 echo ""

