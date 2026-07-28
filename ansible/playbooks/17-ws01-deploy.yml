@@ -34,6 +34,16 @@
           # Listener (HTTP *)
           winrm quickconfig -quiet -force | Out-Null
 
+          # Trust lab targets for PSRemoting from ws01 (campaign lateral movement)
+          $trusted = (Get-Item WSMan:\localhost\Client\TrustedHosts).Value
+          $needed = @('mbr01.child.cadre.local', '192.168.77.22')
+          foreach ($n in $needed) {
+            if ($trusted -notlike "*$n*") {
+              Set-Item -Path WSMan:\localhost\Client\TrustedHosts -Value "$trusted,$n" -Force
+              $trusted = (Get-Item WSMan:\localhost\Client\TrustedHosts).Value
+            }
+          }
+
           # Auth — match CADRE Windows Vagrant boxes (plaintext/basic)
           Set-Item -Path WSMan:\localhost\Service\Auth\Basic -Value $true -Force
           Set-Item -Path WSMan:\localhost\Service\AllowUnencrypted -Value $true -Force

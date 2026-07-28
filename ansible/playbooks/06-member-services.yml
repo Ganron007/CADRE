@@ -176,6 +176,31 @@
       changed_when: r.rc == 2
       failed_when: r.rc == 1
 
+- name: "Campaign pivot — Remote Management Users on mbr01"
+  hosts: mbr01
+  gather_facts: false
+  tasks:
+    - name: "[PIVOT] Add analyst_t1 + svc_mssql to Remote Management Users"
+      ansible.windows.win_shell: |
+        $ErrorActionPreference = "Stop"
+        try {
+          $group = "Remote Management Users"
+          $members = @("child\analyst_t1", "child\svc_mssql")
+          $changed = $false
+          foreach ($m in $members) {
+            $inGroup = Get-LocalGroupMember -Group $group -Member $m -ErrorAction SilentlyContinue
+            if (-not $inGroup) {
+              Add-LocalGroupMember -Group $group -Member $m
+              $changed = $true
+            }
+          }
+          if ($changed) { Write-Output "APPLIED: Added campaign identities to $group"; exit 2 }
+          Write-Output "OK: Campaign identities already in $group"; exit 0
+        } catch { Write-Output "FAILED: $_"; exit 1 }
+      register: r
+      changed_when: r.rc == 2
+      failed_when: r.rc == 1
+
 - name: "VSC template verification — dc01"
   hosts: dc01
   gather_facts: false

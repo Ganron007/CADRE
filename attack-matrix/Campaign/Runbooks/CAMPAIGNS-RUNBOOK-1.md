@@ -1,10 +1,10 @@
-# CAMPAIGNS v2 — Phase 1 — Initial Access (AS-REP Roast)
+# CAMPAIGNS v3 — Phase 1 — Initial Access (AS-REP Roast)
 
-> **Campaign v2** — read the theory here, run each command block live, then update [`CAMPAIGNS-METADATA.md`](../CAMPAIGNS-METADATA.md).
-> **Index:** [`CAMPAIGNS-RUNBOOK-README.md`](CAMPAIGNS-RUNBOOK-README.md) · **Full reference:** [`CAMPAIGNS_v2.md`](../CAMPAIGNS_v2.md) · **Topology:** [`CAMPAIGNS.md`](../CAMPAIGNS.md)
+> **Campaign v3** — read the theory here, run each command block live, then update [`CAMPAIGNS-METADATA.md`](../CAMPAIGNS-METADATA.md).
+> **Index:** [`CAMPAIGNS-RUNBOOK-README.md`](CAMPAIGNS-RUNBOOK-README.md) · **Full reference:** [`CAMPAIGNS_v3.md`](../CAMPAIGNS_v3.md) · **Topology:** [`CAMPAIGNS.md`](../CAMPAIGNS.md)
 > **DFIR track:** [`DFIR-Nexus-Pioneer-workflow.md`](../DFIR-Nexus-Pioneer-workflow.md)
 >
-> **Sync rule:** When you change this runbook during lab work, apply the same edit to [`CAMPAIGNS_v2.md`](../CAMPAIGNS_v2.md) (matching section). Re-run `python tools/split-campaign-runbooks.py --check` to verify coverage.
+> **Sync rule:** When you change this runbook during lab work, apply the same edit to [`CAMPAIGNS_v3.md`](../CAMPAIGNS_v3.md) (matching section). Re-run `python tools/split-campaign-runbooks.py --check` to verify coverage.
 
 **Default host:** Kali / provisioning (`192.168.77.60`) unless a step says otherwise.
 
@@ -15,11 +15,11 @@
 ### Phase 1 — Initial Access (WT003: AS-REP Roast)
 
 
-**Scenario:** You're a contractor working from the company's internal network. Your Kali machine (192.168.77.60) has LAN access to the `child.cadre.local` domain controller (dc02, 192.168.77.11). You don't have domain credentials yet — only network access.
+**Scenario:** The campaign now starts from the Phase 0.5 beachhead. The attacker has a C2 session on `ws01` (`192.168.77.62`) as `child.cadre.local\analyst_t1`. From this domain-joined workstation, the attacker discovers the `intern_blue` account and performs an AS-REP roast against the `child.cadre.local` domain controller (`dc02`, `192.168.77.11`). The attacker does not yet have a usable domain credential — only the low-privileged user context from the phishing payload.
 
 #### Step 1 — Discover valid usernames
 
-From the reconnaissance above, Kerberos user enum already identified valid accounts in both domains. We can also use kerbrute for a more targeted scan:
+From the `ws01` beachhead as `analyst_t1`, the attacker can run lightweight domain reconnaissance. Kerberos user enumeration already identified valid accounts in both domains during Phase 0.5. We can also use `kerbrute` from `ws01` or Kali for a more targeted scan:
 
 ```bash
 kerbrute userenum -d child.cadre.local --dc 192.168.77.11 /usr/share/wordlists/names.txt
@@ -31,8 +31,8 @@ The scan reveals several valid accounts. One stands out: `intern_blue`.
 |                   |                                                                    |
 | ----------------- | ------------------------------------------------------------------ |
 | **Target**        | `intern_blue` — child.cadre.local user with `DONT_REQUIRE_PREAUTH` |
-| **From**          | Kali (192.168.77.60) → dc02 (192.168.77.11)                        |
-| **Starting cred** | None (zero knowledge)                                              |
+| **From**          | `ws01` (`192.168.77.62`) → dc02 (`192.168.77.11`)                  |
+| **Starting cred** | `child.cadre.local\analyst_t1` C2 session (Phase 0.5)              |
 | **What you earn** | `1nt3rn_Blu3!` — low-privilege credential in child.cadre.local     |
 
 

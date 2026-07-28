@@ -1,10 +1,10 @@
-# CAMPAIGNS v2 — Branch D — Linux Pivot
+# CAMPAIGNS v3 — Branch D — Linux Pivot
 
-> **Campaign v2** — read the theory here, run each command block live, then update [`CAMPAIGNS-METADATA.md`](../CAMPAIGNS-METADATA.md).
-> **Index:** [`CAMPAIGNS-RUNBOOK-README.md`](CAMPAIGNS-RUNBOOK-README.md) · **Full reference:** [`CAMPAIGNS_v2.md`](../CAMPAIGNS_v2.md) · **Topology:** [`CAMPAIGNS.md`](../CAMPAIGNS.md)
+> **Campaign v3** — read the theory here, run each command block live, then update [`CAMPAIGNS-METADATA.md`](../CAMPAIGNS-METADATA.md).
+> **Index:** [`CAMPAIGNS-RUNBOOK-README.md`](CAMPAIGNS-RUNBOOK-README.md) · **Full reference:** [`CAMPAIGNS_v3.md`](../CAMPAIGNS_v3.md) · **Topology:** [`CAMPAIGNS.md`](../CAMPAIGNS.md)
 > **DFIR track:** [`DFIR-Nexus-Pioneer-workflow.md`](../DFIR-Nexus-Pioneer-workflow.md)
 >
-> **Sync rule:** When you change this runbook during lab work, apply the same edit to [`CAMPAIGNS_v2.md`](../CAMPAIGNS_v2.md) (matching section). Re-run `python tools/split-campaign-runbooks.py --check` to verify coverage.
+> **Sync rule:** When you change this runbook during lab work, apply the same edit to [`CAMPAIGNS_v3.md`](../CAMPAIGNS_v3.md) (matching section). Re-run `python tools/split-campaign-runbooks.py --check` to verify coverage.
 
 **Default host:** Kali / provisioning (`192.168.77.60`) unless a step says otherwise.
 
@@ -13,8 +13,9 @@
 ### Branch D: Linux Pivot
 
 
-**Diverges from:** Phase 3 (MSSQL linked-server recon discovers linux01).
-**Converges to:** Phase 6 (domain credentials from linux01 help accelerate child DA).
+**Diverges from:** Phase 3 (MSSQL linked-server recon discovers linux01).  
+**Converges to:** Phase 6 (domain credentials from linux01 help accelerate child DA).  
+**Plan 1.1:** First-class branch graph (M3) — missing Linux-origin / linux01 endpoint fidelity is an **acceptable** trade-off; do not add provisioning monitoring.  
 **Root on linux01 required** — two ways to achieve it.
 
 #### Entry: MSSQL Linked Server Recon (WT044)

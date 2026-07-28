@@ -1,10 +1,10 @@
-# CAMPAIGNS v2 — Branch 3.5 — Credential Theft from SYSTEM
+# CAMPAIGNS v3 — Branch 3.5 — Credential Theft from SYSTEM
 
-> **Campaign v2** — read the theory here, run each command block live, then update [`CAMPAIGNS-METADATA.md`](../CAMPAIGNS-METADATA.md).
-> **Index:** [`CAMPAIGNS-RUNBOOK-README.md`](CAMPAIGNS-RUNBOOK-README.md) · **Full reference:** [`CAMPAIGNS_v2.md`](../CAMPAIGNS_v2.md) · **Topology:** [`CAMPAIGNS.md`](../CAMPAIGNS.md)
+> **Campaign v3** — read the theory here, run each command block live, then update [`CAMPAIGNS-METADATA.md`](../CAMPAIGNS-METADATA.md).
+> **Index:** [`CAMPAIGNS-RUNBOOK-README.md`](CAMPAIGNS-RUNBOOK-README.md) · **Full reference:** [`CAMPAIGNS_v3.md`](../CAMPAIGNS_v3.md) · **Topology:** [`CAMPAIGNS.md`](../CAMPAIGNS.md)
 > **DFIR track:** [`DFIR-Nexus-Pioneer-workflow.md`](../DFIR-Nexus-Pioneer-workflow.md)
 >
-> **Sync rule:** When you change this runbook during lab work, apply the same edit to [`CAMPAIGNS_v2.md`](../CAMPAIGNS_v2.md) (matching section). Re-run `python tools/split-campaign-runbooks.py --check` to verify coverage.
+> **Sync rule:** When you change this runbook during lab work, apply the same edit to [`CAMPAIGNS_v3.md`](../CAMPAIGNS_v3.md) (matching section). Re-run `python tools/split-campaign-runbooks.py --check` to verify coverage.
 
 **Default host:** Kali / provisioning (`192.168.77.60`) unless a step says otherwise.
 
@@ -47,7 +47,7 @@ We have SYSTEM on mbr01. analyst_cloud has an active console session (auto-logon
 | 3.5B   | Scheduled task as analyst_cloud  | Password known               | SharpHound as analyst_cloud           |
 | 3.5B†  | Invisible scheduled tasks        | Task created                 | Task hidden from all tools            |
 | 3.5C   | RDP interactive session          | Password known               | Full SharpHound data                  |
-| 3.5D   | File detonation (WT063-068)      | User click                   | Telemetry demo                        |
+| 3.5D   | File detonation (H-01..H-06 / WT063-068) — post-exploit telemetry | User click                   | Telemetry demo                        |
 | 3.5E   | Logon trigger (Startup folder)   | User profile exists          | Auto-execution                        |
 | 3.5I   | Token impersonation ❌            | Session context              | Failed (error 1346)                   |
 | 3.5J   | WMI event subscriptions          | SYSTEM on mbr01              | Fileless persistence                  |
@@ -426,9 +426,9 @@ xfreerdp /v:192.168.77.22 /u:analyst_cloud /p:'Cl0ud_An@lyst!' /d:CADRE /cert-ig
 
 ---
 
-#### 3.5D — File Detonation (WT063-068) — Telemetry Path
+#### 3.5D — File Detonation (H-01..H-06 / WT063-068) — Post-Exploit Telemetry Demo
 
-**Purpose:** Initial-access simulation and H telemetry. Not the fastest spine path.
+**Purpose:** The same six file-delivery vectors are now the **main spine Phase 0.5** entry point on `ws01` / `analyst_t1`. This section is the post-exploit telemetry demo — re-running the vectors from an already-compromised `mbr01` (`analyst_cloud`) to generate detection artifacts. It is no longer an alternate or optional entry path.
 
 ```bash
 # SYSTEM drops payload to analyst_cloud's Downloads
@@ -439,11 +439,14 @@ EXEC xp_cmdshell 'C:\Users\Public\GodPotato.exe -cmd "cmd /c echo [payload] > C:
 ```
 
 
-| WT# | Technique               | Credential Yield     |
-| --- | ----------------------- | -------------------- |
-| 063 | LNK → Mimikatz as user  | Limited token (weak) |
-| 065 | CHM → fake login CredUI | Plaintext password   |
-| 068 | EXE → certutil stealer  | Stored creds         |
+| H-# | WT# | Technique               | Target / User        | Credential Yield     |
+| --- | --- | ----------------------- | -------------------- | -------------------- |
+| H-01 | 063 | LNK → Mimikatz as user  | ws01 / analyst_t1    | Limited token (weak) |
+| H-02 | 064 | MSI Installer           | ws01 / analyst_t1    | User-context code exec |
+| H-03 | 065 | CHM → fake login CredUI | ws01 / analyst_t1    | Plaintext password   |
+| H-04 | 066 | HTML Smuggling          | ws01 / analyst_t1 browser | User-context code exec |
+| H-05 | 067 | AutoIt3 payload         | ws01 / analyst_t1    | User-context code exec |
+| H-06 | 068 | EXE → certutil stealer  | ws01 / analyst_t1    | Stored creds         |
 
 
 **Gap:** Current H scripts are detection demos (create in %TEMP%, delete). For cred theft, payload must exfiltrate (HTTP POST to Kali :8080).

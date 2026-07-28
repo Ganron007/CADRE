@@ -2,7 +2,7 @@
 
 **Path:** `docs/internal/plan1.1-campaign-automation/SCRIPTED-VS-REDSTRIKE-MAPPING.md`  
 **Last updated:** 2026-07-28  
-**Scope:** Every node in `attack-matrix/Campaign/automation/campaign-graph.yaml` v6.  
+**Scope:** Every node in `attack-matrix/Campaign/automation/campaign-graph.yaml` v7 (multi-hop lateral movement update).  
 **Legend:**
 - **Scripted** = a `.sh` harness exists in `attack-matrix/04-automation/linux/` and can be run standalone.
 - **RedStrike** = `campaign-graph.yaml` has an `intent:` (typed builder) and/or the node is routable through `redstrike-campaign`.
@@ -32,8 +32,9 @@
 | T002 | 2 | Kerberoast (svc_mssql) | ws01 | `campaign-a/T002-kerb-ws01.sh` | `rubeus.kerberoast` | ✅ | Direct Rubeus from ws01 |
 | T041 | 3 | SQL auth → xp_cmdshell | ws01 | `campaign-a/T041-xpcmd-ws01.sh` + `windows/campaign-a-t041-xpcmd.ps1` | `sql.xp_cmdshell` | ✅ | IMPERSONATE sa on mbr01 |
 | T043 | 3 | IMPERSONATE sa → GodPotato | ws01 | `campaign-a/T043-impersonate-ws01.sh` + `windows/campaign-a-t043-impersonate.ps1` | — | ✅ | SYSTEM on ws01 via GodPotato |
-| T035-CREDS | 3.5 | Post-SYSTEM credential dump | ws01 | `campaign-a/T035-creds-ws01.sh` | — | ✅ | `mimikatz.exe` sekurlsa::logonpasswords + lsadump::sam from `C:\Tools\ADTools` |
-| T004-BH | 4 | BloodHound collection (analyst context) | ws01 | `campaign-a/T004-bh-ws01.sh` | — | ⚠️ | SharpHound 1.1.0 present; needs correct LDAP bind syntax fix post ws01 reboot |
+| T035-CREDS | 3.5 | Post-SYSTEM credential dump | ws01 | `campaign-a/T035-creds-ws01.sh` | `mimikatz.logonpasswords` | ✅ | `mimikatz.exe` sekurlsa::logonpasswords + lsadump::sam from `C:\Tools\ADTools` |
+| T101 | 3.5 | WinRS lateral movement ws01→mbr01 | ws01 | `campaign-a/T101-winrs-pivot-ws01.sh` | `winrs.command` | ✅ | PSRemoting as `child\analyst_t1` to mbr01; requires TrustedHosts + Remote Management Users |
+| T004-BH | 4 | BloodHound collection (analyst context) | ws01 | `campaign-a/T004-bh-ws01.sh` | `winrs.command` | ✅ | Manual gate: run SharpHound as `analyst_t1` via RDP/runas; script validates zip |
 | T017 | 5 | PrinterBug / MS-RPRN coercion | ws01 | `attacks/WT017-printerbug-spoolsample.sh` | — | ✅ | MS-RPRN.exe on ws01 via WinRM |
 | T009 | 6 | DCSync | ws01 | `campaign-a/T009-dcsync-ws01.sh` | — | ✅ | Extracts krbtgt from cadre.local |
 | T010 | 7 | Golden Ticket | ws01 | `campaign-a/T010-golden-ws01.sh` | — | ✅ | Forged with extracted krbtgt AES256 |
@@ -149,7 +150,7 @@ All run from `external60_phase0` via `_run_f.sh` staging to `linux01`.
 
 | Category | Total | ✅ Validated | 📝 Stubs / Aliased | ❌ Not implemented |
 |----------|------:|------------:|-------------------:|------------------:|
-| Spine | 15 | 13 | 2 (H-ASSUME, T004-BH) | 0 |
+| Spine | 15 | 14 | 1 (H-ASSUME) | 0 |
 | Branch A | 7 | 7 | 0 | 0 |
 | Branch B | 4 | 4 | 0 | 0 |
 | Branch C | 6 | 6 | 0 | 0 |

