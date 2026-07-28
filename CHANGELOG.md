@@ -4,6 +4,26 @@ All notable changes to CADRE are documented here. Format: [Keep a Changelog](htt
 
 ## [Unreleased]
 
+### Added (2026-07-28 — P1.0 full campaign attack run complete)
+
+> **Scope:** Validate the entire campaign attack surface end-to-end via RedStrike with `ws01` as assumed-breach beachhead.
+
+**Execution results (RC=0):**
+- Spine: T003, T002, T041, T043, T017, T009, T010, T011, T012, T033, T042 — all OK.
+- Branch A (ACL): T013, T014, T015, T016, T023, T008, T024 — all OK.
+- Branch B (ADCS): T050, T051, T056, T-UNPAC — all OK.
+- Branch C (SCCM): T034, T035, T036, T037, T038, T039 — all OK.
+- Branch D (Linux pivot): T040 — OK.
+- Branch G: T007 — OK.
+- Stream E (network defense): WT069–WT081 — all OK.
+- Stream F (supply chain): F01–F10 — all OK.
+
+**New attack scripts:** 20 `attack-matrix/04-automation/linux/campaign-a/*-ws01.sh` files plus Windows PowerShell helpers under `attack-matrix/04-automation/linux/windows/`.
+
+**Docs:** `attack-matrix/Campaign/automation/SCRIPTED-VS-REDSTRIKE-MAPPING.md` — full per-node scripted vs RedStrike matrix; copied to `docs/internal/plan1.1-campaign-automation/` for convenience.
+
+**Next:** Plan 1.1 telemetry capture (P1.1–P1.5) — deterministic replay + ES/Zeek/Suri/Endpt bundles → grid fill.
+
 ### Added (2026-07-26 — Plan 1.1 M5 + P11.6 complete)
 
 > **Scope:** Close Plan 1.1 — E/F thin streams + live dry-run smoke on provisioning `.60`.
