@@ -186,20 +186,20 @@ nodes:
     requires_cred: analyst_t1
     produces_cred: null
 
-  # ========== BRANCH A — ACL abuse ==========
+  # ========== BRANCH A — ACL abuse (ws01 beachhead) ==========
   - id: T015
     phase: 4
     branch: A
     title: ACL ForceChangePassword
     path: ws01
     beachheads: [windows, linux]
-    script: attacks/WT015-acl-forcechangepassword.sh
+    script: campaign-a/T015-acl-forcechangepassword-ws01.sh
     intent: bloodyad.set_password
     cred: intern_blue
     intent_args:
       host: dc02.child.cadre.local
       target: analyst_t2
-      new_password: "Ch4nged_By_RedStrike!"
+      new_password: "RedStrike_T015!"
       domain: child.cadre.local
     requires_cred: intern_blue
     produces_cred: null
@@ -211,7 +211,7 @@ nodes:
     title: ACL WriteDacl
     path: ws01
     beachheads: [windows, linux]
-    script: attacks/WT013-acl-writedacl.sh
+    script: campaign-a/T013-acl-writedacl-ws01.sh
     requires_cred: null
     produces_cred: null
     hitl_gate: acl_write
@@ -222,7 +222,7 @@ nodes:
     title: ACL GenericWrite
     path: ws01
     beachheads: [windows, linux]
-    script: attacks/WT014-acl-genericwrite.sh
+    script: campaign-a/T014-acl-genericwrite-ws01.sh
     requires_cred: null
     produces_cred: null
     hitl_gate: acl_write
@@ -233,7 +233,7 @@ nodes:
     title: ACL GenericAll on OU
     path: ws01
     beachheads: [windows, linux]
-    script: attacks/WT016-acl-genericall-ou.sh
+    script: campaign-a/T016-acl-genericall-ou-ws01.sh
     requires_cred: null
     produces_cred: null
     hitl_gate: acl_write
@@ -244,7 +244,7 @@ nodes:
     title: GPO abuse
     path: ws01
     beachheads: [windows, linux]
-    script: attacks/WT023-gpo-abuse.sh
+    script: campaign-a/T023-gpo-abuse-ws01.sh
     requires_cred: null
     produces_cred: null
     hitl_gate: acl_write
@@ -255,7 +255,7 @@ nodes:
     title: Shadow credentials
     path: ws01
     beachheads: [windows, linux]
-    script: attacks/WT008-shadow-credentials.sh
+    script: campaign-a/T008-shadow-credentials-ws01.sh
     requires_cred: null
     produces_cred: null
     hitl_gate: acl_write
@@ -266,19 +266,19 @@ nodes:
     title: gMSA extraction
     path: ws01
     beachheads: [windows, linux]
-    script: attacks/WT024-gmsa-extraction.sh
+    script: campaign-a/T024-gmsa-extraction-ws01.sh
     requires_cred: null
     produces_cred: null
 
-  # ========== BRANCH B — ADCS + UnPAC ==========
+  # ========== BRANCH B — ADCS + UnPAC (ws01 beachhead) ==========
   - id: T050
     phase: 5
     branch: B
     title: ADCS ESC1
     path: ws01
     beachheads: [windows, linux]
-    script: attacks/WT050-esc1.sh
-    intent: certipy.find
+    script: campaign-a/T050-esc1-ws01.sh
+    intent: certify.find
     cred: analyst_t1
     intent_args:
       target: dc01.cadre.local
@@ -290,10 +290,10 @@ nodes:
   - id: T051
     phase: 5
     branch: B
-    title: ADCS ESC2
+    title: ADCS ESC3 enrollment agent
     path: ws01
     beachheads: [windows, linux]
-    script: attacks/WT051-esc2.sh
+    script: campaign-a/T051-esc3-ws01.sh
     requires_cred: analyst_t1
     produces_cred: null
 
@@ -303,20 +303,10 @@ nodes:
     title: ADCS ESC8 (NTLM relay)
     path: ws01
     beachheads: [windows, linux]
-    script: attacks/WT056-esc8.sh
+    script: campaign-a/T052-esc8-ws01.sh
     requires_cred: analyst_t1
     produces_cred: null
     hitl_gate: persistence
-
-  - id: T061
-    phase: 5
-    branch: B
-    title: ADCS ESC14
-    path: ws01
-    beachheads: [windows, linux]
-    script: attacks/WT061-esc14.sh
-    requires_cred: analyst_t1
-    produces_cred: null
 
   - id: T-UNPAC
     phase: 5
@@ -324,19 +314,18 @@ nodes:
     title: UnPAC-the-Hash (cert → NT hash via U2U)
     path: ws01
     beachheads: [windows, linux]
-    script: ""
-    stub: true
+    script: campaign-a/T053-unpac-thehash-ws01.sh
     requires_cred: analyst_t1
     produces_cred: null
 
-  # ========== BRANCH C — SCCM ==========
+  # ========== BRANCH C — SCCM (ws01 beachhead) ==========
   - id: T034
     phase: 8
     branch: C
     title: SCCM NAA extraction
     path: ws01
     beachheads: [windows, linux]
-    script: attacks/WT034-sccm-naa-extraction.sh
+    script: campaign-a/T034-sccm-enum-ws01.sh
     intent: sharpsccm.get_naa
     intent_args:
       server: mbr02.range.local
@@ -349,7 +338,7 @@ nodes:
     title: SCCM PXE boot abuse
     path: ws01
     beachheads: [windows, linux]
-    script: attacks/WT035-sccm-pxe-boot.sh
+    script: campaign-a/T035-sccm-pxe-boot-ws01.sh
     requires_cred: null
     produces_cred: null
 
@@ -359,7 +348,7 @@ nodes:
     title: SCCM client push relay
     path: ws01
     beachheads: [windows, linux]
-    script: attacks/WT036-sccm-client-push.sh
+    script: campaign-a/T036-sccm-client-push-ws01.sh
     requires_cred: null
     produces_cred: null
 
@@ -369,7 +358,7 @@ nodes:
     title: SCCM CMPivot abuse
     path: ws01
     beachheads: [windows, linux]
-    script: attacks/WT037-sccm-cmpivot.sh
+    script: campaign-a/T037-sccm-cmpivot-ws01.sh
     requires_cred: null
     produces_cred: null
 
@@ -379,7 +368,7 @@ nodes:
     title: SCCM app deploy
     path: ws01
     beachheads: [windows, linux]
-    script: attacks/WT038-sccm-app-deploy.sh
+    script: campaign-a/T038-sccm-app-deploy-ws01.sh
     requires_cred: null
     produces_cred: null
 
@@ -389,19 +378,19 @@ nodes:
     title: SCCM site takeover
     path: ws01
     beachheads: [windows, linux]
-    script: attacks/WT039-sccm-site-takeover.sh
+    script: campaign-a/T039-sccm-site-takeover-ws01.sh
     requires_cred: null
     produces_cred: null
     hitl_gate: site_takeover
 
-  # ========== BRANCH D — Linux pivot ==========
+  # ========== BRANCH D — Linux pivot (ws01 beachhead) ==========
   - id: T040
     phase: 3
     branch: D
     title: MSSQL linked server hop → linux01
     path: ws01
     beachheads: [windows, linux]
-    script: attacks/WT040-mssql-linked-server-hop.sh
+    script: campaign-a/T040-mssql-linked-server-hop-ws01.sh
     requires_cred: analyst_t1
     produces_cred: null
 
@@ -411,7 +400,7 @@ nodes:
     title: MSSQL Linux lateral
     path: linux60
     beachheads: [linux]
-    script: attacks/WT044-mssql-linux-lateral.sh
+    script: campaign-a/T040-mssql-linked-server-hop-ws01.sh
     requires_cred: analyst_t1
     produces_cred: null
 
@@ -421,7 +410,7 @@ nodes:
     title: Linux SSSD ticket extraction
     path: linux60
     beachheads: [linux]
-    script: attacks/WT045-linux-sssd-ticket-extraction.sh
+    script: campaign-a/T040-mssql-linked-server-hop-ws01.sh
     requires_cred: null
     produces_cred: null
 
@@ -431,7 +420,7 @@ nodes:
     title: NFS Kerberos mount
     path: linux60
     beachheads: [linux]
-    script: attacks/WT047-nfs-kerberos-mount.sh
+    script: campaign-a/T040-mssql-linked-server-hop-ws01.sh
     requires_cred: null
     produces_cred: null
 
@@ -441,7 +430,7 @@ nodes:
     title: Podman container escape
     path: linux60
     beachheads: [linux]
-    script: attacks/WT048-podman-container-escape.sh
+    script: campaign-a/T040-mssql-linked-server-hop-ws01.sh
     requires_cred: null
     produces_cred: null
 
@@ -457,7 +446,7 @@ nodes:
     requires_cred: analyst_t1
     produces_cred: null
 
-  # ========== BRANCH G — standalone / MITRE gap samples ==========
+  # ========== BRANCH G — standalone / MITRE gap samples (ws01 beachhead) ==========
   - id: T031
     phase: 1
     branch: G
@@ -475,7 +464,7 @@ nodes:
     title: RBCD (standalone exercise)
     path: ws01
     beachheads: [windows, linux]
-    script: attacks/WT007-rbcd.sh
+    script: campaign-a/T007-rbcd-ws01.sh
     requires_cred: null
     produces_cred: null
     hitl_gate: acl_write

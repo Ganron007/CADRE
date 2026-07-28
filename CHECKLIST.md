@@ -7,7 +7,7 @@
 
 > **Execution mode (2026-07-26):** Agents/operators fulfill checklist items from **provisioning** without waiting for manual runbook study. Learning is parallel and optional. Flip `CHECKLIST.md` first; docs follow evidence.
 >
-> **NEXT ACTION (locked):** **Plan 1 telemetry (P1)** — ES proof → grid after automated/manual runs. **Plan 1.1 M0–M5 + P11.6 live smoke done**. Product: [`red-strike-product.md`](docs/internal/integrations/red-strike-product.md).
+> **NEXT ACTION (locked):** **Plan 1 telemetry capture (P1.1–P1.5)** — deterministic replay + ES/Zeek/Suri/Endpt evidence bundles → grid fill → Sigma catalog. **P1.0 RedStrike campaign run complete.**
 >
 > **Naming:** `plan01-telemetry-catalog/` = **Plan 1**. `plan1.1-campaign-automation/` = **Plan 1.1**. `plan00-foundation/` = **Plan 0**. See [`docs/internal/PLANS.md`](docs/internal/PLANS.md).
 
@@ -175,16 +175,18 @@
 
 ## P1 — Plan 1 telemetry catalog
 
-**Pipeline:** fill grid → write rules → E2E → Sigma YAML. **Dir:** [`docs/internal/plan01-telemetry-catalog/phase1-source-matrix/`](docs/internal/plan01-telemetry-catalog/phase1-source-matrix/)
+**Pipeline:** deterministic replay → capture across all sources → fill grid → write rules → E2E → Sigma YAML. **Dir:** [`docs/internal/plan01-telemetry-catalog/phase1-source-matrix/`](docs/internal/plan01-telemetry-catalog/phase1-source-matrix/)
 
-**Two-phase approach (2026-07-27):** Phase 1 = full RedStrike campaign run (tool + campaign validation); Phase 2 = deterministic replay → telemetry capture → grid. VMs down until operator starts.
+**Two-phase approach (2026-07-27 → 2026-07-28):**
+- **Phase 1 — Full RedStrike attack run:** ✅ **complete** (spine + A/B/C/D/G OK; streams E/F OK; stubs remain).
+- **Phase 2 — Telemetry capture:** now active — replay attacks deterministically, export ES/Zeek/Suri/Endpt evidence bundles, fill `source-matrix-grid.md`, then write Sigma/KQL rules.
 
 | ID | Item | Status | Done | Owned by | Notes |
 |----|------|--------|------|----------|-------|
-| P1.0 | **Phase 1 — full RedStrike attack run** (validate tool + campaign) | [ ] | | `redstrike-campaign` on `.60` | Live `--execute`, HITL per phase; VMs down — waiting on operator |
-| P1.1 | Field dictionary populated (`elastic-field-dictionary/`) | [x] | 2026-06+ | `elastic-field-dictionary/` | roadmapv2 §2.2 stale — dirs exist |
-| P1.2 | `source-matrix-grid.md` framework + T002/T003 partial | [x] | partial | `source-matrix-grid.md` | ~98% rows still blank |
-| P1.3 | **Grid fill — Campaign A** (12 attacks) | [~] | 2026-07-25 | `source-matrix-grid.md` + `verification-table.md` | ✅ T002/T003/T031/T041/T043; ⛔ T028; 🔧 T042; 5 cred-gated |
+| P1.0 | **Phase 1 — full RedStrike attack run** (validate tool + campaign) | [x] | 2026-07-28 | `redstrike-campaign` on `.60` | Live `--execute`, HITL per phase; spine+A+B+C+D+G all OK; E/F streams OK |
+| P1.1 | Deterministic replay bundle: spine T003/T002/T041/T043/T017/T009/T010/T011/T012/T033/T042 | [ ] | | `campaign-a/` scripts + `cadre-es-export.sh` | Use fixed T0 per attack |
+| P1.2 | Deterministic replay bundle: branches A/B/C/D/G + streams E/F | [ ] | | same | Branch A ws01 scripts new this session |
+| P1.3 | `source-matrix-grid.md` fill — Campaign A (12 attacks) | [~] | 2026-07-25 | `source-matrix-grid.md` + `verification-table.md` | ✅ T002/T003/T031/T041/T043; ⛔ T028; 🔧 T042; 5 cred-gated |
 | P1.4 | **Grid fill — Campaign B–D + ADCS + coercion** (59) | [ ] | | same | Batched by profile |
 | P1.5 | **Grid fill — E + F + G + H** (41) | [~] | 2026-07-25 | same | E: 10✅ + 5 blocked/deferred; F/G/H ⏳ |
 | P1.6 | **P0a** — Install pre-built Elastic SIEM rules | [ ] | | `state01.md` | Blocked on grid for priority attacks |
