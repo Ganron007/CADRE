@@ -32,8 +32,8 @@
 | T002 | 2 | Kerberoast (svc_mssql) | ws01 | `campaign-a/T002-kerb-ws01.sh` | `rubeus.kerberoast` | ✅ | Direct Rubeus from ws01 |
 | T041 | 3 | SQL auth → xp_cmdshell | ws01 | `campaign-a/T041-xpcmd-ws01.sh` + `windows/campaign-a-t041-xpcmd.ps1` | `sql.xp_cmdshell` | ✅ | IMPERSONATE sa on mbr01 |
 | T043 | 3 | IMPERSONATE sa → GodPotato | ws01 | `campaign-a/T043-impersonate-ws01.sh` + `windows/campaign-a-t043-impersonate.ps1` | — | ✅ | SYSTEM on ws01 via GodPotato |
-| T035-CREDS | 3.5 | Post-SYSTEM credential dump | ws01 | — | — | 📝 | Stub — need mimikatz sekurlsa/lsassy |
-| T004-BH | 4 | BloodHound collection (analyst context) | ws01 | — | — | 📝 | Stub — need SharpHound.exe from ws01 |
+| T035-CREDS | 3.5 | Post-SYSTEM credential dump | ws01 | `campaign-a/T035-creds-ws01.sh` | — | ✅ | `mimikatz.exe` sekurlsa::logonpasswords + lsadump::sam from `C:\Tools\ADTools` |
+| T004-BH | 4 | BloodHound collection (analyst context) | ws01 | `campaign-a/T004-bh-ws01.sh` | — | ⚠️ | SharpHound 1.1.0 present; needs correct LDAP bind syntax fix post ws01 reboot |
 | T017 | 5 | PrinterBug / MS-RPRN coercion | ws01 | `attacks/WT017-printerbug-spoolsample.sh` | — | ✅ | MS-RPRN.exe on ws01 via WinRM |
 | T009 | 6 | DCSync | ws01 | `campaign-a/T009-dcsync-ws01.sh` | — | ✅ | Extracts krbtgt from cadre.local |
 | T010 | 7 | Golden Ticket | ws01 | `campaign-a/T010-golden-ws01.sh` | — | ✅ | Forged with extracted krbtgt AES256 |
@@ -149,7 +149,7 @@ All run from `external60_phase0` via `_run_f.sh` staging to `linux01`.
 
 | Category | Total | ✅ Validated | 📝 Stubs / Aliased | ❌ Not implemented |
 |----------|------:|------------:|-------------------:|------------------:|
-| Spine | 15 | 12 | 3 (H-ASSUME, T035-CREDS, T004-BH) | 0 |
+| Spine | 15 | 13 | 2 (H-ASSUME, T004-BH) | 0 |
 | Branch A | 7 | 7 | 0 | 0 |
 | Branch B | 4 | 4 | 0 | 0 |
 | Branch C | 6 | 6 | 0 | 0 |

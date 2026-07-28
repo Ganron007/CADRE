@@ -91,11 +91,10 @@ nodes:
   - id: T035-CREDS
     phase: 3.5
     branch: spine
-    title: Post-SYSTEM credential dump (lsassy/DonPAPI/mimikatz)
+    title: Post-SYSTEM credential dump (mimikatz)
     path: ws01
     beachheads: [windows, linux]
-    script: ""
-    stub: true
+    script: campaign-a/T035-creds-ws01.sh
     requires_cred: analyst_t1
     produces_cred: null
 
@@ -105,8 +104,7 @@ nodes:
     title: BloodHound collection (analyst context)
     path: ws01
     beachheads: [windows, linux]
-    script: ""
-    stub: true
+    script: campaign-a/T004-bh-ws01.sh
     requires_cred: analyst_t1
     produces_cred: null
 
