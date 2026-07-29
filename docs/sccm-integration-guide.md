@@ -340,7 +340,7 @@ From now on, every regression on mbr02 is `vagrant snapshot restore mbr02 sccm-d
 ## After Completing This Guide
 
 1. Flip `plan_status.md` row "SCCM misconfigs (NAA, PXE, auto client push)" from ⚠️ to ✅
-2. Update `cert-coverage.md` WKL OADOC row from 50% to 93%
+2. Update `docs/internal/cert-coverage.md` (internal) WKL OADOC row from 50% to 93%
 3. Append a Session entry to `BUG_FIX_TRACKING.md` with the manual-completion note
 4. Update `attack-matrix/01-walkthroughs/README.md` to mark W034-W039 as practicable
 5. Re-enable the SCCM smoke test in any `validate-plan0.ps1` you've written

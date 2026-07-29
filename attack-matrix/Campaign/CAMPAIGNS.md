@@ -137,7 +137,7 @@ graph LR
 
 
 
-**START HERE.** The main spine begins with **Phase 0.5** (initial access on the `ws01` workstation via phishing/file execution). Unlike CRTP/CRTE/CAPE/GOAD — where most attacks run directly from the Kali attacker box — **CADRE forces the learner to chain beachheads**: `ws01 → mbr01 → dc02 → dc01 → range.local`. Each hop uses a different identity, crosses a different sensor boundary, and leaves distinct telemetry.
+**START HERE.** The main spine begins with **Phase 0.5** (initial access on the `ws01` workstation via phishing/file execution). The campaign is built as a multi-hop chain: `ws01 → mbr01 → dc02 → dc01 → range.local`. Each hop uses a different identity, crosses a different sensor boundary, and leaves distinct telemetry.
 
 - **Branch A** — ACL abuse in cadre.local (ForceChangePassword, WriteDacl, GenericWrite, GPO, gMSA, Shadow Creds)
 - **Branch B** — ADCS certificate template abuse (ESC1–14)
@@ -155,15 +155,15 @@ Branches converge back into the main spine — they earn credentials that accele
 
 ---
 
-## Multi-Hop Campaign Philosophy — Why This Beats CRTP/CRTE/CAPE/GOAD
+## Multi-Hop Campaign Philosophy
 
-Most lab curricula (CRTP, CRTE, CAPE, GOAD) teach attack primitives in isolation or run the majority of the chain from a single attacker box. **CADRE's v3 campaign is designed to feel like a real red-team engagement** within the same VM budget:
+The v3 campaign is designed as a realistic red-team engagement within a single VM budget. The chain is not a checklist of isolated tools — it is a sequence of beachheads, each with its own identity, sensor context, and fallback options.
 
-1. **Beachhead diversity.** The spine does not start on Kali — it starts on a **compromised Windows workstation** (`ws01`) with real EDR visibility. The operator must work within MDE telemetry, just like a real intruder.
+1. **Beachhead diversity.** The spine starts on a compromised Windows workstation (`ws01`) with endpoint telemetry visible. The operator must work inside that context, just as a real intruder would.
 
 2. **Mandatory lateral movement.** The campaign cannot reach domain admin without moving from `ws01 → mbr01 → dc02`. Each hop crosses a distinct identity boundary: `analyst_t1` (workstation user) → `svc_mssql` (service account) → `dc02$` (machine account) → `krbtgt` (domain tier).
 
-3. **Tool staging on intermediate hosts.** Rubeus, mimikatz, and coercion tools are staged on `mbr01`, not kept on the operator's Kali box. This teaches real OPSEC: minimize C2-to-DC traffic, use legitimate member servers as proxies.
+3. **Tool staging on the initial beachhead (`ws01`).** Rubeus, mimikatz, and LPE tools are downloaded once onto `ws01` (the first compromised domain workstation), then copied laterally to `mbr01`/`dc02`/`dc01` over SMB (`C$`/`ADMIN$`). This mirrors real-world CRTP/CAPE operator behavior and avoids C2-to-DC HTTP traffic.
 
 4. **Failure-tolerant paths.** Every major objective has a fallback:
    - If `T101` WinRS is blocked → fallback to `psexec` over SMB or PowerShell remoting.
@@ -176,7 +176,7 @@ Most lab curricula (CRTP, CRTE, CAPE, GOAD) teach attack primitives in isolation
    - `dc02/dc01` → DC replication events, DCSync detections, Kerberos alerts.
    - `dc03/mbr02` → cross-forest logs, SCCM audit, WSUS telemetry.
 
-6. **Outcome.** A learner who completes this campaign can articulate not just *what* each tool does, but *where* to run it, *why* the location matters, and *what telemetry* it generates — the gap most certification labs leave open.
+6. **Outcome.** A learner who completes this campaign can articulate not just *what* each tool does, but *where* to run it, *why* the location matters, and *what telemetry* it generates.
 
 ---
 

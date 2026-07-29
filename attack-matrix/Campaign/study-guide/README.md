@@ -58,4 +58,4 @@ Each attack entry follows this structure:
 
 - `../CAMPAIGNS-METADATA.md` — structured per-attack data (playbook refs, ACE#s, telemetry)
 - `../CAMPAIGNS.md` — campaign narrative and attack flow
-- `../../10-cert-map/` — per-certification learning paths (CRTP, CRTE, CAPE, etc.)
+- `../../docs/internal/cert-map/` — per-certification learning paths (internal reference, not linked publicly)

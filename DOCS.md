@@ -36,7 +36,7 @@ CADRE
 | Add a telemetry extension (ELK-Fleet, Net-Monitor, Velociraptor, MISP, C2Stack) | [`docs/extensions.md`](docs/extensions.md) |
 | Verify a deploy actually works (5-stage checklist, copy-paste commands) | [`docs/testing-recommendations.md`](docs/testing-recommendations.md) |
 | Look up every logging source (channel / EID / index / sample query) | [`docs/dfir-logging-reference.md`](docs/dfir-logging-reference.md) |
-| See coverage % for all 8 certifications (CRTP/CRTE/ADCS/CAPE/OSCP+/WKL/CARTP/CARTE) | [`docs/cert-coverage.md`](docs/cert-coverage.md) |
+| See coverage % for all certifications (internal reference) | Internal certification mapping (maintainers only) |
 
 Per-extension details live in [`docs/extensions.md`](docs/extensions.md). Playbooks are self-contained in `ansible/playbooks/`.
 
@@ -52,7 +52,7 @@ scripts, study guides, detection rules, cloud scenarios.
 | Browse all 60 walkthroughs + cert alignment | [`attack-matrix/README.md`](attack-matrix/README.md) |
 | Find a walkthrough for a specific technique | [`attack-matrix/01-walkthroughs/README.md`](attack-matrix/01-walkthroughs/README.md) |
 | Run an attack from a script (user-managed Kali) | [`attack-matrix/04-automation/README.md`](attack-matrix/04-automation/README.md) |
-| Follow a certification study path (CRTP/CRTE/ADCS/CAPE/OSCP+/WKL/CARTP/CARTE) | [`attack-matrix/05-study-guide/README.md`](attack-matrix/05-study-guide/README.md) |
+| Follow a structured study path | [`attack-matrix/Campaign/study-guide/README.md`](attack-matrix/Campaign/study-guide/README.md) |
 | Cloud + hybrid attacks (Plan 11) | [`attack-matrix/09-cloud/README.md`](attack-matrix/09-cloud/README.md) |
 
 ---
@@ -82,7 +82,7 @@ include a test plan and reference the relevant `docs/` section your change touch
 `docs/forensic-workflow.md` → `docs/extensions.md` for the tools you'll touch.
 
 **Cert student picking a path:**
-`docs/goals.md` (cert table) → `attack-matrix/05-study-guide/<your-cert>-path.md` → walkthroughs in listed order.
+`docs/goals.md` → `docs/internal/cert-map/<your-cert>-path.md` → walkthroughs in listed order.
 
 ---
 

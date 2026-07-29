@@ -93,15 +93,41 @@ nodes:
   - id: T035-CREDS
     phase: 3.5
     branch: spine
-    title: Post-SYSTEM credential dump (mimikatz)
+    title: Post-SYSTEM credential dump (mimikatz on mbr01)
     path: ws01
     beachheads: [windows, linux]
-    script: campaign-a/T035-creds-ws01.sh
+    script: campaign-a/T035-mbr01-creds-ws01.sh
     intent: mimikatz.logonpasswords
     intent_args:
       privilege_debug: true
     requires_cred: analyst_t1
+    produces_cred: analyst_cloud
+    pivot_to: mbr01
+    produces_beachhead: mbr01_SYSTEM
+
+  - id: T035A-WINLOGON
+    phase: 3.5
+    branch: spine
+    title: Winlogon auto-logon credential extraction on mbr01
+    path: ws01
+    beachheads: [windows, linux]
+    script: campaign-a/T035A-winlogon-creds-ws01.sh
+    requires_cred: analyst_t1
+    produces_cred: analyst_cloud
+    pivot_to: mbr01
+    produces_beachhead: mbr01_SYSTEM
+
+  - id: T004-MBR01-BH
+    phase: 4
+    branch: spine
+    title: BloodHound collection as SYSTEM on mbr01
+    path: ws01
+    beachheads: [windows, linux]
+    script: campaign-a/T004-mbr01-bh-ws01.sh
+    requires_cred: analyst_t1
     produces_cred: null
+    pivot_to: mbr01
+    produces_beachhead: mbr01_SYSTEM
 
   - id: T101
     phase: 3.5
@@ -137,6 +163,23 @@ nodes:
     requires_cred: analyst_t1
     produces_cred: null
     hitl_gate: null
+
+  - id: T102-COERCE-DC02
+    phase: 5
+    branch: spine
+    title: Coerce dc02$ to auth to mbr01 + capture TGT (from mbr01 beachhead)
+    path: ws01
+    beachheads: [windows, linux]
+    script: campaign-a/T102-coerce-dc02-ws01.sh
+    intent: rubeus.monitor
+    intent_args:
+      target_user: DC02$
+      capture_server: mbr01.child.cadre.local
+      coerce_method: spoolsample
+    requires_cred: analyst_t1
+    produces_cred: null
+    pivot_to: mbr01
+    produces_beachhead: mbr01_dc02_tgs
 
   - id: T017
     phase: 5

@@ -104,7 +104,7 @@ enum4linux -a 192.168.77.10
 # Result: NT_STATUS_ACCESS_DENIED
 ```
 
-**Finding:** Server 2025 blocks all anonymous enumeration by default. Both DCs (child.cadre.local and cadre.local) reject anonymous sessions. This is a hardening improvement over older Windows Server versions — GOAD (Server 2016/2019) allowed anonymous user listing.
+**Finding:** Server 2025 blocks all anonymous enumeration by default. Both DCs (child.cadre.local and cadre.local) reject anonymous sessions. This is the expected hardening for current Windows Server versions.
 
 ### Step 2 — Kerberos User Enumeration (no creds needed)
 

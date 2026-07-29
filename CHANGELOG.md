@@ -24,6 +24,32 @@ All notable changes to CADRE are documented here. Format: [Keep a Changelog](htt
 
 **Next:** Plan 1.1 telemetry capture (P1.1–P1.5) — deterministic replay + ES/Zeek/Suri/Endpt bundles → grid fill.
 
+### Added (2026-07-29 — T035/T035A/T004-mbr01 + T102 coercion scripts + v3 campaign doc updates)
+
+> **Scope:** Continue P1.0 campaign validation from the mbr01 SYSTEM beachhead; document proven paths and reject scheduled-task abuse for attack execution.
+
+**Verified paths (from `ws01` as `analyst_t1`):**
+- `T043-impersonate-ws01.sh` → `campaign-a-t043-impersonate.ps1` → `nt authority\system` on `mbr01` via SQL `analyst_t1` + `IMPERSONATE sa` + `xp_cmdshell` + GodPotato.
+- `T035-mbr01-creds-ws01.sh` → `campaign-a-t035-mbr01-creds.ps1` → mimikatz as SYSTEM on `mbr01`, output pulled back to `ws01`.
+- `T035A-winlogon-creds-ws01.sh` → `campaign-a-t035a-winlogon-creds.ps1` → extracted `CADRE\analyst_cloud:Cl0ud_An@lyst!` from `HKLM\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Winlogon` as SYSTEM.
+- `T004-mbr01-bh-ws01.sh` → `campaign-a-t004-mbr01-bh.ps1` → `SharpHound.exe` as SYSTEM on `mbr01`, zip pulled back to `ws01`.
+- `T102-coerce-dc02-ws01.sh` → `campaign-a-t102-coerce-dc02.ps1` → stages Rubeus + SpoolSample on `mbr01` from `ws01` beachhead; execution paused for user review.
+
+**Reusable helper:** `campaign-a-t043-system-exec.ps1` — run an arbitrary PowerShell script block as SYSTEM on `mbr01` through the verified SQL → GodPotato channel. Used by T035, T035A, T004-mbr01, T102, and T043-disable-defender.
+
+**Campaign v3 doc updates (`attack-matrix/Campaign/CAMPAIGNS_v3.md`):**
+- Phase 3: clarified that `analyst_t1` (not `svc_mssql`) is the SQL identity with `IMPERSONATE` on `sa`; `svc_mssql` is the Phase 2 service account.
+- Phase 3 LPE section: marked GodPotato via SQL as the primary, verified path; added helper-chain note.
+- Phase 3.5: added T035/T035A automation references; rejected scheduled-task abuse for running attack tools (scheduled tasks are for persistence only).
+- Phase 4: documented `T004-mbr01-bh-ws01.sh` as the preferred BloodHound collection path from the mbr01 SYSTEM beachhead.
+- Phase 5: added T102 coercion script reference and noted execution paused.
+- General: emphasized multi-credential campaign flow (`analyst_t1` on ws01/mbr01, `svc_mssql` Phase 2, `analyst_cloud` extracted from mbr01) instead of reusing one account everywhere.
+
+**Campaign graph update (`attack-matrix/Campaign/automation/campaign-graph.yaml`):**
+- v7 → v8: replaced old T035-CREDS node with `T035-mbr01-creds-ws01.sh`; added `T035A-WINLOGON`, `T004-MBR01-BH`, and `T102-COERCE-DC02` nodes; wired `pivot_to: mbr01` and `produces_beachhead: mbr01_SYSTEM` / `mbr01_dc02_tgs`.
+
+**Next:** Resume T102 execution test, then T009 DCSync, T010+ ticket attacks, and T033 cross-forest. Update `04-vulnerabilities.yml` to permanently disable Defender on DCs/mbrs per user decision.
+
 ### Added (2026-07-26 — Plan 1.1 M5 + P11.6 complete)
 
 > **Scope:** Close Plan 1.1 — E/F thin streams + live dry-run smoke on provisioning `.60`.

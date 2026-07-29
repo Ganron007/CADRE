@@ -22,7 +22,7 @@
 | <img src="https://img.shields.io/badge/R--Red_Team-ef4444?style=flat-for-the-badge&logo=target&logoColor=white" alt="Red-Team"> | **Offensive Emulation** | 60+ scripted attack walkthroughs against live multi-domain AD + Azure, spanning on-prem, hybrid, and cloud identity |
 | <img src="https://img.shields.io/badge/E--Environment-14532d?style=flat-for-the-badge&logo=virtualbox&logoColor=white" alt="Environment"> | **Active Substrate** | Server 2025 (3 DCs, 2 members) • Ubuntu 24.04 Linux AD • 7 core VMs + 3 extensions (ELK, Net-Monitor, VR) |
 
-The first open-source lab combining red-team practice, agentic AI investigation, DFIR tooling, cloud identity (Azure/Entra), and major AD certification-level attack coverage in a single instrumented substrate. Every attack produces ground-truth telemetry. Investigate manually or via multi-agent AI pipeline. Export structured evidence. Reset. Repeat.
+An open-source lab combining red-team practice, agentic AI investigation, DFIR tooling, and cloud identity (Azure/Entra) in a single instrumented substrate. Every attack produces ground-truth telemetry. Investigate manually or via multi-agent AI pipeline. Export structured evidence. Reset. Repeat.
 
 MIT licensed. $0 baseline cost.
 
@@ -44,7 +44,7 @@ Full guide: [docs/deployment.md](docs/deployment.md)
 
 ## Core Capabilities
 
-1. **Red-team practice** — 60 walkthroughs across major AD certification-level attack areas against live multi-domain AD + Azure
+1. **Red-team practice** — 60+ scripted attack walkthroughs against live multi-domain AD + Azure environments
 2. **Telemetry knowledge via offense** — every attack produces artifacts across Sysmon, Elastic Defend, Zeek, Suricata, Arkime, Velociraptor
 3. **DFIR investigation** — Velociraptor VQL hunts, Hayabusa timelines, Plaso, KAPE, Volatility 3
 4. **Agentic AI investigation** — LangGraph multi-agent pipeline (6 agents) + DFIR-Nexus + multi-LLM router

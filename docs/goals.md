@@ -9,13 +9,13 @@ CADRE
 └── E — Environment ── Server 2025 + Linux AD · 7 core VMs + 3 extensions 
 ```
 
-**CADRE** — *Cloud · Agentic · DFIR · Red-team · Environment* — is an open-source MIT-licensed hybrid identity attack + investigation lab. The first open-source environment combining red-team practice, agentic AI investigation, DFIR tooling, cloud identity (Azure/Entra), and 8 industry certifications in a single instrumented substrate.
+**CADRE** — *Cloud · Agentic · DFIR · Red-team · Environment* — is an open-source MIT-licensed hybrid identity attack + investigation lab. The first open-source environment combining red-team practice, agentic AI investigation, DFIR tooling, cloud identity (Azure/Entra), and leading industry certifications in a single instrumented substrate.
 
 ---
 
 ## What CADRE Does
 
-1. **Red-team practice** — 60 walkthroughs covering CRTP, CRTE, CESP-ADCS, HTB-CAPE, OSCP+, WKL-OADOC, CARTP, CARTE + 2026 CVEs. Practice attacks against a live multi-domain AD + Azure environment.
+1. **Red-team practice** — 60+ walkthroughs covering modern Active Directory, cloud identity, and 2026 CVEs. Practice attacks against a live multi-domain AD + Azure environment.
 
 2. **Telemetry knowledge via offense** — every attack produces ground-truth telemetry (Windows Events, Sysmon, Elastic Defend EDR, Zeek network logs, PCAP, Velociraptor artifacts). Learn what attacks look like by executing them.
 
@@ -29,23 +29,9 @@ CADRE
 
 ---
 
-## 8 Certification Coverage
+## Industry Certification Coverage
 
-> Detailed per-cert syllabus-to-walkthrough mapping with honest % coverage:
-> [`cert-coverage.md`](cert-coverage.md).
-
-
-
-| Certification | What it covers | CADRE alignment |
-|---------------|---------------|-----------------|
-| **CRTP** | AD pentesting fundamentals | 10/13 techniques + modern replacements |
-| **CRTE** | AD expert (cross-forest, delegation, dMSA) | 10/10 + SOAPHound + cross-forest Kerberoast |
-| **CESP-ADCS** | Certificate Services abuse | ESC1-14 matrix · ESC15 excluded (Server 2025 rejects v1 schema) · ESC12 N/A |
-| **HTB CAPE** | AD pentesting expert + coercion + Linux | Full coercion + ADCS + MSSQL on Windows + Linux |
-| **OSCP+** | Offensive Security AD portion | All + AMSI/logging awareness |
-| **WKL OADOC** | WhiteKnight Labs offensive AD | Full SCCM Misconfiguration-Manager + Virtual Smart Cards |
-| **CARTP** | Certified Azure Red Team Professional | Azure attack scenarios + Cloud Sync + hybrid chains |
-| **CARTE** | Certified Azure Red Team Expert | Azure RM RBAC + PIM + multi-tenant + Azure Arc |
+> Detailed syllabus-to-walkthrough mapping is kept internal (maintainers only). Public docs describe the attack surface without naming or comparing specific certifications.
 
 ---
 
@@ -84,7 +70,7 @@ CADRE
 | Azure RM CARTE-level content | None | ✅ |
 | Hybrid attack chains (on-prem ↔ cloud) | None | ✅ |
 | Offline + tenant dual-mode for cloud content | None | ✅ |
-| 8 industry certifications aligned | 1-2 typically | ✅ |
+| Industry certification coverage mapping (internal) | 1-2 typically | ✅ |
 | 2026 CVE coverage (SPN Unicode, RC4 deprecation, BadSuccessor) | None | ✅ |
 | Multi-LLM cloud agent harness | None | ✅ |
 | Python deployer, no WSL2 | WSL2-dependent | ✅ |

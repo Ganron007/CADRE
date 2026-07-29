@@ -23,7 +23,7 @@ CADRE
 | `01-walkthroughs/` | Step-by-step attack writeups (markdown) | 100 files | Content |
 | `02-diagrams/` | Lab architecture + trust topology (SVG/Mermaid) | ~3 | Content |
 | `04-automation/` | Reproducible attack scripts (bash + PowerShell) | ~90 scripts | Content |
-| `10-cert-map/` | Per-certification learning paths + technique matrix | 13 files | Content |
+| `Campaign/study-guide/` | Phase deep-dives + attack theory | 13 files | Content |
 | `06-telemetry-catalog/` | Sigma YAML per attack — expected artifacts | 100 YAML | Plan 1 |
 | `07-detection-rules/` | Elastic TOML detection rules — Windows (Kerberos/ADCS/SCCM/2026 CVEs/lateral) + Linux rules (keytab/SSSD/realmd/container-escape/MSSQL audit) | 30+ TOML | Plan 5 |
 | `08-hunting/` | PEAK/TaHiTI hypothesis templates + VQL hunts | ~30 files | Plan 6 |
@@ -64,8 +64,7 @@ CADRE
 | 02-diagrams | Lab architecture Mermaid | 2 |
 | 04-automation | Core AD + Campaign E/G/H scripts | 91 |
 | `Campaign/study-guide` | Deep-dive attack reference (Phase 0-2 complete) | 12 |
-| 10-cert-map | Per-certification study guides | 14 |
-| 06-telemetry-catalog | Empty — Phase 1 fills this | — |
+| `docs/internal/cert-map` | Per-certification study paths (internal) | 14 || 06-telemetry-catalog | Empty — Phase 1 fills this | — |
 | 07-detection-rules | Empty — Plan 5 | — |
 | 08-hunting | Empty — Plan 6 | — |
 | 09-cloud | Empty — Plan 11 | — |
