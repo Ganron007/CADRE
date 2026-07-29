@@ -19,9 +19,9 @@ Default paths:
 - Insecure Vagrant key: `C:\Users\<user>\.vagrant.d\insecure_private_key`
 - Per-VM generated key: `C:\Users\<user>\.vagrant\machines\provisioning\vmware_desktop\private_key`
 
-Example direct SSH:
+Confirmed working direct SSH (when Vagrant key insertion is disabled):
 ```powershell
-ssh -i "$env:USERPROFILE\.vagrant\machines\provisioning\vmware_desktop\private_key" vagrant@192.168.77.60
+sshpass -p "vagrant" ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=NUL vagrant@192.168.77.60 "<command>"
 ```
 
 Use `vagrant ssh provisioning` (from the `Vagrantfile` directory) when available — it resolves the correct key automatically.

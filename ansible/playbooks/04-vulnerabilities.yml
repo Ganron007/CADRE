@@ -23,6 +23,14 @@
         data: 0
         type: dword
 
+    - name: "[VULN][WT#17] Print-Services feature installed (Spooler prerequisite)"
+      ansible.windows.win_feature:
+        name: Print-Services
+        state: present
+        include_management_tools: true
+      register: r_printsvc
+      failed_when: false
+
     - name: "[VULN][WT#17] Print Spooler enabled (auto)"
       ansible.windows.win_service:
         name: Spooler

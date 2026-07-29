@@ -667,7 +667,7 @@ We have `nt authority\system` on mbr01 via GodPotato. `analyst_cloud` has an act
 
 | Field | Value |
 |-------|-------|
-| **Status** | ⏳ In progress (T102 script created, execution paused) |
+| **Status** | ⚠️ BLOCKED — T102 unconstrained-delegation capture produced 0 Kirbi tickets for DC02$ (Rubeus dump size 51789, Kirbi count 0). Pivot used: WT031 password spray validated `chief_command` / `analyst_dfir` / `analyst_cloud` credentials on cadre.local. `chief_command` is DA+EA → campaign proceeds to Phase 7/8 without dc02$ TGT. |
 | **Stream** | Core AD |
 | **Att&ck** | T1187 (Forced Authentication) + T1550.002 (Use Alternate Authentication Material: Kerberos) |
 | **Technique** | Coerce `dc02$` to authenticate to `mbr01`, capture TGT via Rubeus monitor |
@@ -750,6 +750,7 @@ We have `nt authority\system` on mbr01 via GodPotato. `analyst_cloud` has an act
 | **Command** | `Rubeus.exe ptt /ticket:<dc02$ TGT>` then `impacket-secretsdump 'child.cadre.local/dc02$@dc02.child.cadre.local' -k -no-pass` or `mimikatz # lsadump::dcsync /domain:child.cadre.local /user:krbtgt` |
 | **Key telemetry** | WinSec 4662 (DS Replication); Sysmon EID 3; Zeek dce_rpc.log (DRSUAPI); Suri SID:1000002 (63 fires) |
 | **Script** | `attack-matrix/04-automation/linux/campaign-a/T009-dcsync-ws01.sh` |
+| **Note** | ⚠️ As-written path blocked — Phase 5 `dc02$` TGT not captured, and `child\analyst_t1` lacks DCSync rights. Pivot: root `krbtgt` extracted via Phase 8 fallback (`chief_command` EA). Root DA/EA achieved without child `krbtgt`. |
 
 ---
 
@@ -775,6 +776,7 @@ We have `nt authority\system` on mbr01 via GodPotato. `analyst_cloud` has an act
 | **Step 3** | `lsadump::dcsync /domain:cadre.local /user:krbtgt` |
 | **Key telemetry** | WinSec 4624/4672 (EA logon); Zeek kerberos.log (cross-realm TGS) |
 | **Script** | `attack-matrix/04-automation/linux/campaign-a/T010-golden-ws01.sh` (Golden), `T011-silver-ws01.sh`, `T012-diamond-ws01.sh` |
+| **Note** | ⚠️ Bypassed in current run — root `krbtgt` and EA access achieved directly via WT031 fallback (`chief_command` DA+EA). Phase 7 as-written remains valid for a pure main-spine run. |
 
 #### WT011 — Silver Ticket
 
@@ -804,7 +806,7 @@ We have `nt authority\system` on mbr01 via GodPotato. `analyst_cloud` has an act
 
 | Field | Value |
 |-------|-------|
-| **Status** | ✅ Active |
+| **Status** | ✅ Active — WT033 cross-forest Kerberoast verified from ws01; WT034-039 SCCM branch ⚠️ BLOCKED (SCCM site server not deployed on mbr02) |
 | **Stream** | Core AD / Branch C |
 | **Att&ck** | T1558.003 (Cross-forest Kerberoasting), T1213 (Data from Information Repositories), T1071 (Application Layer Protocol) |
 | **Technique** | Use root domain `EA` rights to pivot across forest trust to `range.local` and abuse SCCM / delegations |
@@ -836,6 +838,7 @@ We have `nt authority\system` on mbr01 via GodPotato. `analyst_cloud` has an act
 
 | Field | Value |
 |-------|-------|
+| **Status** | ⚠️ BLOCKED — SCCM site server not deployed on mbr02 (verify-only playbook `10-sccm-verify.yml` exists; no deploy playbook) |
 | **Technique** | Extract SCCM Network Access Account (NAA) credentials from WMI on mbr02 |
 | **What it earns** | `range.local\SCCM_NAA$` or similar high-priv account |
 | **RedStrike Intent** | — |
@@ -844,13 +847,13 @@ We have `nt authority\system` on mbr01 via GodPotato. `analyst_cloud` has an act
 
 #### WT035-039 — SCCM Attack Chain
 
-| WT# | Technique | Target | What it earns |
-|-----|-----------|--------|---------------|
-| WT035 | SCCM PXE Boot abuse | mbr02 | Bare-metal boot → domain join account |
-| WT036 | SCCM Client Push | mbr02 | Coerced auth / lateral movement |
-| WT037 | SCCM CMPivot | mbr02 | Remote query/exec on managed clients |
-| WT038 | SCCM Application Deploy | mbr02 | Push malicious app to clients |
-| WT039 | SCCM Site Takeover | mbr02 | Full SCCM site admin → DA in range.local |
+| WT# | Technique | Status | Target | What it earns |
+|-----|-----------|--------|--------|---------------|
+| WT035 | SCCM PXE Boot abuse | ⚠️ BLOCKED | mbr02 | Bare-metal boot → domain join account |
+| WT036 | SCCM Client Push | ⚠️ BLOCKED | mbr02 | Coerced auth / lateral movement |
+| WT037 | SCCM CMPivot | ⚠️ BLOCKED | mbr02 | Remote query/exec on managed clients |
+| WT038 | SCCM Application Deploy | ⚠️ BLOCKED | mbr02 | Push malicious app to clients |
+| WT039 | SCCM Site Takeover | ⚠️ BLOCKED | mbr02 | Full SCCM site admin → DA in range.local |
 
 #### Skipjack — Cross-Forest Trust Downgrade via PAC Signature Corruption (Phase 8 alt)
 

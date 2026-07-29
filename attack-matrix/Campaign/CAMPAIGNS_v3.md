@@ -146,7 +146,7 @@ PHASE 4 — DISCOVERY (BloodHound as analyst_cloud)
   └──────────────────────────────────────────────────────────────────────────
 
 
-PHASE 5 — COERCION + DELEGATION (Capture dc02$ TGT)
+PHASE 5 — COERCION + DELEGATION (Capture dc02$ TGT) ⚠️ BLOCKED
 ═══════════════════════════════════════════════════════════════════════════════
   Source: ws01 → SYSTEM on mbr01
   Target: dc02 (.11) coerced to auth to mbr01 (.22)
@@ -156,11 +156,36 @@ PHASE 5 — COERCION + DELEGATION (Capture dc02$ TGT)
           SpoolSample triggers dc02$ to authenticate to mbr01
   Tools:  SpoolSample.exe, Rubeus.exe monitor, MS-RPRN (PrinterBug)
   Detect: Suricata SID:1000050 (12 fires confirmed), Zeek dce_rpc.log
+  Status: ⚠️ BLOCKED — Rubeus `monitor` captures local Kerberos traffic, not
+          incoming coerced auth from dc02. Correct capture method (Rubeus dump
+          of LSASS after coercion) produced 0 Kirbi tickets for DC02$.
+          Marked for revisit; see T102-BLOCKED note below.
   ───────────────────────────────────────────────────────────────────────────
   │  ALTERNATIVE: RBCD (WT007) — if unconstrained delegation not available   │
   │  [CRED] svc_mssql or any cred with GenericWrite on target computer       │
   │  [GAIN] S4U2Proxy as DA on target                                        │
-  └──────────────────────────────────────────────────────────────────────────
+  │  ALTERNATIVE: Branch A (WT015/WT031) — ForceChangePassword via           │
+  │  hunter_dfir or password spray to cadre.local privileged users.           │
+  │  WT031 validated: chief_command / analyst_dfir / analyst_cloud.          │
+  │  chief_command is DA+EA in cadre.local → fastest path to root DA.        │
+  └──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┘
+
+**T102-BLOCKED note:**
+The T102 automation script ran on mbr01 as SYSTEM, triggered PrinterBug, and
+executed `Rubeus dump /user:DC02$`. The dump completed (51789 bytes) but
+reported `Kirbi count: 0`, indicating the dc02$ TGT was not cached in mbr01
+LSASS. Possible causes: (1) coercion traffic did not authenticate back to mbr01
+in a way that populates a delegable TGT, (2) Server 2025 unconstrained
+delegation capture behavior differs from the assumed model, or (3) the
+SpoolSample trigger needs a different listener configuration. The script and
+metadata are preserved; revisit after verifying delegation settings and
+capture tooling.
+
+**Validated fallback:** WT031 password spray against dc01 (cadre.local) yielded
+valid credentials for `chief_command`, `analyst_dfir`, and `analyst_cloud`.
+`chief_command` is a member of Domain Admins and Enterprise Admins in
+cadre.local. This satisfies the Branch A credential gap and allows the
+campaign to proceed straight to Phase 7/8 without a captured dc02$ TGT.
 
 
 PHASE 6 — DCSYNC (Child Domain Admin)
@@ -232,11 +257,12 @@ STREAMS E / F / G — STANDALONE EXERCISES (Not part of campaign narrative)
   2  intern_blue       child.cadre.local   Phase 1 (AS-REP roast)     1     ACE#18 bridge
   3  svc_mssql         child.cadre.local   Phase 2 (Kerberoast)       2     SQL auth, recon
   4  analyst_cloud     cadre.local         Phase 3.5A (Winlogon reg)  3.5   BH, Branch B, GPO
-  5  dc02$             child.cadre.local   Phase 5 (coercion capture) 5     DCSync
-  6  child krbtgt      child.cadre.local   Phase 6 (DCSync)           6     Golden Ticket
-  7  cadre EA          cadre.local         Phase 7 (Golden+ExtraSids) 7     Cross-forest
-  8  svc_sccm          range.local         Phase 8 (X-forest roast)   8     Branch C
-  9  svc_naa           range.local         Phase 8 (SCCM NAA)         8     range DA, DCSync
+  5  dc02$             child.cadre.local   Phase 5 (coercion capture) 5     DCSync (BLOCKED)
+  6  child krbtgt      child.cadre.local   Phase 6 (DCSync)           6     Golden Ticket (BLOCKED as written)
+  7  cadre EA          cadre.local         Phase 7 (Golden+ExtraSids) 7     Cross-forest (BYPASSED via WT031 chief_command)
+  8  svc_sccm          range.local         Phase 8 (X-forest roast)   8     Branch C (hash captured; SCCM path BLOCKED)
+  9  svc_naa           range.local         Phase 8 (SCCM NAA)         8     range DA, DCSync (BLOCKED — no SCCM site)
+  F1 chief_command     cadre.local         WT031 password-spray       —     root DA+EA (fallback pivot)
   ── ───────────────── ─────────────────── ───────────────────────── ────── ───────────────
   S1 hunter_dfir       cadre.local         [SEED] Password spray      —     Branch A (ACE#7)
   S2 analyst_dfir      cadre.local         [SEED] Password spray      —     Branch A (ACE#5)
@@ -252,7 +278,7 @@ STREAMS E / F / G — STANDALONE EXERCISES (Not part of campaign narrative)
   Full learning experience          Main Spine    (earned in-chain)     Nothing
   Fastest to cadre.local DA         Branch A      hunter_dfir [SEED]    P5, P6, P7
   DA without krbtgt (cert-based)    Branch B      analyst_cloud         P5, P6, P7
-  range.local DA (required)         Branch C      svc_sccm (from P8)    Nothing
+  range.local DA (required)         Branch C      svc_sccm (from P8)    Nothing  ⚠️ currently blocked — SCCM site not deployed
   Linux post-exploitation           Branch D      analyst_t1 (SQL)      Nothing
 
 
@@ -2786,7 +2812,7 @@ bloodyAD --host dc02 -d child.cadre.local -u svc_mssql -p 's3rv1c3_MSSQL!' \
 | 087   | Pass-the-Hash (T1550.002) | WinSec 4624 Type 3 (NTLM) |
 
 
-### Phase 6 — Privilege Escalation (DCSync — WT009)
+### Phase 6 — Privilege Escalation (DCSync — WT009) ⚠️ AS-WRITTEN BLOCKED
 
 
 |                   |                                                                                      |
@@ -2798,7 +2824,9 @@ bloodyAD --host dc02 -d child.cadre.local -u svc_mssql -p 's3rv1c3_MSSQL!' \
 | **MITRE**         | T1003.006 (DCSync)                                                                   |
 
 
-In the realistic multi-hop chain, DCSync is executed **from mbr01** using the captured dc02$ machine account credentials, or from ws01 after bringing the captured material back. This mirrors real operations where the attacker uses a member server with existing domain trust rather than running everything from their C2.
+**Status:** ⚠️ As-written path blocked. Phase 5 T102 coercion did not capture a usable `dc02$` TGT. `child\analyst_t1` authenticates to dc02 but lacks DCSync rights. Campaign pivoted to WT031 password-spray fallback, which yielded `chief_command` (DA+EA in `cadre.local`). Root `krbtgt` was extracted via `chief_command` DCSync against `dc01`.
+
+**Validated pivot:** root domain `cadre.local` compromise achieved without child `krbtgt`.
 
 **Step 1 — Transfer captured dc02$ TGT from mbr01 to ws01 (or use directly on mbr01):**
 
@@ -2819,7 +2847,7 @@ export KRB5CCNAME=/tmp/dc02.ccache
 impacket-secretsdump -just-dc child.cadre.local/ -dc-ip 192.168.77.11 -k
 ```
 
-### Phase 7 — Forest Trust Escalation (SID History — WT010-012)
+### Phase 7 — Forest Trust Escalation (SID History — WT010-012) ⚠️ BYPASSED
 
 
 |                   |                                                   |
@@ -2831,7 +2859,9 @@ impacket-secretsdump -just-dc child.cadre.local/ -dc-ip 192.168.77.11 -k
 | **MITRE**         | T1550.002 (Use Alternate Auth Mat: Kerberos) + T1134.005 (SID-History Injection) |
 
 
-The child has a bidirectional transitive trust with the root. From the mbr01 beachhead, forge a golden ticket with the root's EA SID injected via Rubeus, then authenticate to dc01.
+**Status:** ⚠️ Bypassed in current run. Phase 7 as-written requires child `krbtgt` from Phase 6. Instead, WT031 password-spray fallback yielded `chief_command` (DA+EA in `cadre.local`), and root `krbtgt` was DCSync'd directly from `dc01`. The EA objective is already satisfied.
+
+**Phase 7 remains valid** for a clean main-spine run after Phase 6 is unblocked.
 
 **Step 1 — Get root EA SID from mbr01 using child DA hash:**
 
@@ -2876,7 +2906,7 @@ impacket-psexec cadre.local/Administrator@192.168.77.10 -k -no-pass
 | 089   | Registry Run Key (T1547.001) | Sysmon EID 12-13 |
 
 
-### Phase 8 — Cross-Forest + External Domain (WT033-039)
+### Phase 8 — Cross-Forest + External Domain (WT033-039) ⚠️ PARTIAL
 
 
 |                   |                                                                       |
@@ -2886,6 +2916,13 @@ impacket-psexec cadre.local/Administrator@192.168.77.10 -k -no-pass
 | **Starting cred** | Cadre.local EA (from Phase 7)                                         |
 | **What you earn** | `s3rv1c3_SCCM!` → `N@A_s3rv1c3!` → **range.local DA** → all 3 domains |
 | **MITRE**         | T1550.002 (Use Alternate Auth Mat) + T1078 (Valid Accounts)             |
+
+**Status:**
+- **WT033** ✅ — cross-forest Kerberoast from `ws01` succeeded; captured `svc_mssql` and `svc_sccm` TGS hashes for `range.local`.
+- **WT034-039 / Branch C** ⚠️ **BLOCKED** — SCCM site server is not deployed on `mbr02`. Only verify-only playbook `10-sccm-verify.yml` exists; no deploy playbook (`07-sccm-config.yml` referenced in metadata does not exist). Services `SMS_EXECUTIVE`, `SMS_NOTIFICATION_SERVER`, `SMS_SITE_COMPONENT_MANAGER` are absent on `mbr02`.
+- **Skipjack** ⏳ — still deferred pending custom tool.
+
+**Fallback path already achieved:** root `cadre.local` DA/EA via WT031 (`chief_command`), so the primary campaign objective (root domain compromise) is satisfied. The `range.local` DA step is blocked pending SCCM deployment.
 
 
 cadre.local has a bidirectional forest trust with range.local (SID Filter OFF). In the realistic multi-hop chain, the operator uses the cadre.local Enterprise Admin ticket on `mbr01` or a fresh session staged from `dc01` to cross-forest authenticate to `range.local`.

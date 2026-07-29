@@ -30,6 +30,30 @@
       changed_when: false
       failed_when: r.rc == 1
 
+    - name: "[VULN][WT#17] Verify Print-Services feature installed"
+      ansible.windows.win_shell: |
+        try {
+        $ErrorActionPreference = "Stop"
+          $feature = Get-WindowsFeature -Name Print-Services -ErrorAction Stop
+          if ($feature.Installed -eq $true) { Write-Output "PASS: Print-Services feature installed"; exit 0 }
+          Write-Output "FAIL: Print-Services feature not installed"; exit 1
+        } catch { Write-Output "FAIL: $_"; exit 1 }
+      register: r
+      changed_when: false
+      failed_when: r.rc == 1
+
+    - name: "[VULN][WT#17] Verify Print-Services feature installed"
+      ansible.windows.win_shell: |
+        try {
+          $ErrorActionPreference = "Stop"
+          $feat = Get-WindowsFeature -Name "Print-Services" -ErrorAction Stop
+          if ($feat.InstallState -eq "Installed") { Write-Output "PASS: Print-Services feature installed"; exit 0 }
+          Write-Output "FAIL: Print-Services feature not installed (state=$($feat.InstallState))"; exit 1
+        } catch { Write-Output "FAIL: $_"; exit 1 }
+      register: r
+      changed_when: false
+      failed_when: r.rc == 1
+
     - name: "[VULN][WT#17] Verify Print Spooler enabled (auto)"
       ansible.windows.win_shell: |
         try {
