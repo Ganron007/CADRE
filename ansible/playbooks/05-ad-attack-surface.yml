@@ -185,7 +185,8 @@
           $ObjectType = [GUID]"00299570-246d-11d0-a768-00aa006e0529"
           $Acl = Get-Acl -Path $TargetDN
           $Identity = New-Object System.Security.Principal.NTAccount($Principal)
-          $exists = $Acl.Access | Where-Object { $_.IdentityReference.Value -eq $Identity.Translate([System.Security.Principal.SecurityIdentifier]).Value }
+          $sid = $Identity.Translate([System.Security.Principal.SecurityIdentifier]).Value
+          $exists = $Acl.Access | Where-Object { $_.IdentityReference.Value -eq $sid -and $_.ObjectType -eq $ObjectType }
           if ($exists) { Write-Output "OK: ACE exists"; exit 0 }
           if (-not $ObjectType) {
             $Rule = New-Object System.DirectoryServices.ActiveDirectoryAccessRule($Identity, $Rights, $AccessControlType)
@@ -195,7 +196,7 @@
           $Acl.AddAccessRule($Rule)
           Set-Acl -Path $TargetDN -AclObject $Acl
           $vAcl = Get-Acl -Path $TargetDN
-          $verified = $vAcl.Access | Where-Object { $_.IdentityReference.Value -eq $Identity.Translate([System.Security.Principal.SecurityIdentifier]).Value }
+          $verified = $vAcl.Access | Where-Object { $_.IdentityReference.Value -eq $sid -and $_.ObjectType -eq $ObjectType }
           if (-not $verified) { throw "Verify failed" }
           Write-Output "APPLIED: hunter_dfir ForceChangePassword on chief_command"; exit 2
         } catch { Write-Output "FAILED: $_"; exit 1 }

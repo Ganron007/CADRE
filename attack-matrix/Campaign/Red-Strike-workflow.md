@@ -72,7 +72,17 @@ redstrike-campaign run --phase 1-3 --beachhead linux --engage lab1
 | `acl_write` | Branch A (M3) | Directory modification |
 | `site_takeover` | Branch C (M3) | SCCM site admin |
 
-Approvals persist in `~/.redstrike/engagements/<id>/state.json` (or `REDSTRIKE_HOME`).
+## RedStrike verified run (2026-07-29)
+
+- **Phases 1-3** ✅ — T003 AS-REP, T002 Kerberoast, T041 SQL xp_cmdshell, T043 GodPotato LPE all executed via `redstrike-campaign run --phase 1-3 --beachhead windows --engage lab1 --execute --prefer-script`.
+- **Phase 3.5** ✅ — T035-CREDS (mimikatz on mbr01 as SYSTEM), T035A (Winlogon auto-logon extracted `CADRE\analyst_cloud:Cl0ud_An@lyst!`), T101 (WinRS pivot ws01 → mbr01).
+- **Phase 4** skipped per user instruction.
+- **Phase 5** ⚠️ — T102 coercion produced `T102_KIRBI_COUNT=0` (blocked, same as scripted run); T017 paused at HITL `persistence` gate.
+- **Phase 6/7** ⚠️ bypassed — WT031 password spray validated `chief_command` (DA+EA) and root `krbtgt` was DCSync'd (`7676f125332e45f4482e4eafc8c4a917`).
+- **Phase 8 T033** ✅ — cross-forest Kerberoast from `ws01` to `range.local` captured `svc_mssql` and `svc_sccm` TGS hashes.
+- **Phase 8 SCCM branch** ⚠️ BLOCKED — no SCCM site server on `mbr02`.
+
+**Engine note:** RedStrike M5 intent builders (`rubeus.asreproast`, etc.) currently invoke the local `CommandRunner` instead of routing `ws01` path nodes through `ws01-exec.sh`. Use `--prefer-script` for live CADRE campaign execution until M4 routing is fixed.
 
 ---
 

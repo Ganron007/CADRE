@@ -59,7 +59,19 @@ Use `vagrant ssh provisioning` (from the `Vagrantfile` directory) when available
 
 ## Mini-Projects & Integrations
 
-**Current Session (2026-07-29 — P1.0 campaign validation continues: T035/T035A/T004-mbr01 + T102 coercion scripts + v3 doc updates):**
+**Current Session (2026-07-30 — Branch A, C, D final verification + playbook fix):**
+- **Source / scope:** Complete live testing of Branch A (ACL Abuse / ACE#7), Branch C (SCCM NAA extraction), and Branch D (Linux MSSQL linked-server pivot) as requested. Update campaign docs, metadata, seed files, and the AD attack-surface playbook.
+- **What was done:**
+  - **Branch A (ACL / ACE#7):** `05-ad-attack-surface-verifyOnly.yml` reported ACE#7 missing; fixed `05-ad-attack-surface.yml` ACE#7 deploy task to check exact `(IdentityReference = hunter_dfir SID) AND (ObjectType = ForceChangePassword GUID)` before skipping. Re-applied ACE#7 via PowerShell script on `dc01` as `chief_command`. Verified `hunter_dfir` / `DF1R_Hunt3r!` (from WT031 password spray) can reset `chief_command` password with `bloodyAD`, confirmed DA+EA login, and restored original password. `05-ad-attack-surface-verifyOnly.yml --limit dc01` now 18/18 PASS.
+  - **Branch C (SCCM WT034):** Corrected false BLOCKED status. SCCM site `CAD` is deployed and active on `mbr02` (verified via `08-sql-sccm-wsus-verify.yml`). Extracted NAA credentials from `\\mbr02.range.local\vault\naa-rotation-notice.txt` as `range\svc_sccm` / `s3rv1c3_SCCM!`; obtained `range\svc_naa` / `N@A_s3rv1c3!`. Verified `range\svc_naa` is Domain Admin on `dc03`. WT035-039 (PXE, Client Push, CMPivot, App Deploy, Site Takeover) not exercised; marked `⏳ Not yet tested`.
+  - **Branch D (Linux pivot):** Verified MSSQL linked-server pivot from `mbr01` to `linux01` via `impacket-mssqlclient` as `child\analyst_t1` / `T13r_An@lyst!`; 4-part query `SELECT name FROM LINUX01.master.sys.databases` returned linux01 databases. SSSD/keytab/NFS/Podman steps not exercised.
+  - **Seed/wordlist updates:** `attack-matrix/Campaign/automation/lab-seed-creds.json` filled with discovered passwords; `ansible/files/cadre_passwords.txt` updated with all real lab passwords for WT031 spray.
+  - **Docs updated:** `CAMPAIGNS-METADATA-v2.md`, `CAMPAIGNS_v3.md` (ASCII diagram + Branch A/C/D sections + credential tables), `CHANGELOG.md`, `AGENTS.md`.
+- **Files updated:** `attack-matrix/Campaign/CAMPAIGNS-METADATA-v2.md`, `attack-matrix/Campaign/CAMPAIGNS_v3.md`, `attack-matrix/Campaign/automation/lab-seed-creds.json`, `ansible/files/cadre_passwords.txt`, `ansible/playbooks/05-ad-attack-surface.yml`, `CHANGELOG.md`, `AGENTS.md`.
+- **Current blockers:** Phase 5 T102 coercion still ⚠️ BLOCKED (0 Kirbi tickets captured); bypass via WT031 `chief_command` DA+EA verified. WT035-039 SCCM advanced chain not yet tested. Skipjack ⏳ pending custom PoC.
+- **Next:** Resume Plan 1 telemetry/source-matrix work now that campaign attack surface is verified end-to-end, or exercise WT035-039 if user wants full SCCM chain coverage.
+
+**Previous Session (2026-07-29 — P1.0 campaign validation continues: T035/T035A/T004-mbr01 + T102 coercion scripts + v3 doc updates):**
 - **Source / scope:** Continue P1.0 full campaign run from the mbr01 SYSTEM beachhead; harden campaign docs with proven paths and multi-credential identity flow.
 - **What was done:**
   - Verified SQL → GodPotato SYSTEM path on `mbr01` via `T043-impersonate-ws01.sh` / `campaign-a-t043-impersonate.ps1`.

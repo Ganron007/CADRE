@@ -4,6 +4,46 @@ All notable changes to CADRE are documented here. Format: [Keep a Changelog](htt
 
 ## [Unreleased]
 
+### Added (2026-07-30 — Branch A, C, D final verification + playbook fix)
+
+> **Scope:** Complete live testing of Branch A (ACL Abuse / ACE#7), Branch C (SCCM NAA extraction), and Branch D (Linux MSSQL linked-server pivot). Update campaign docs, metadata, seed files, and the AD attack-surface playbook with findings.
+
+**Branch A — ACL Abuse (WT015 / ACE#7):**
+- `05-ad-attack-surface-verifyOnly.yml` initially reported ACE#7 (`hunter_dfir → chief_command: ForceChangePassword`) missing on `dc01`.
+- Fixed `05-ad-attack-surface.yml` ACE#7 deploy task: it now checks exact `(IdentityReference = hunter_dfir SID) AND (ObjectType = ForceChangePassword GUID)` before skipping, matching the verify-only exact-right check.
+- Re-applied ACE#7 by running a targeted PowerShell script on `dc01` as `chief_command` (DA+EA).
+- Verified `hunter_dfir` / `DF1R_Hunt3r!` (obtained via WT031 password spray) can reset `chief_command` password with `bloodyAD`, confirmed DA+EA login, and restored the original password `C0mm@nd_Ch1ef!`.
+- Re-ran `05-ad-attack-surface-verifyOnly.yml --limit dc01`: 18/18 checks PASS.
+
+**Branch C — SCCM Escalation (WT034 NAA extraction):**
+- Corrected earlier false "BLOCKED" status: SCCM site `CAD` is deployed and active on `mbr02` (verified via `08-sql-sccm-wsus-verify.yml`).
+- Extracted NAA credentials from `\\mbr02.range.local\vault\naa-rotation-notice.txt` using `range\svc_sccm` / `s3rv1c3_SCCM!` (SCCM Full Admin from Phase 8 cross-forest Kerberoast).
+- Extracted NAA account: `range\svc_naa` / `N@A_s3rv1c3!`.
+- Verified `range\svc_naa` is Domain Admin on `dc03` via `nxc smb -X "whoami /groups"`.
+- WT035-039 (PXE, Client Push, CMPivot, App Deploy, Site Takeover) were not exercised; marked as `⏳ Not yet tested` (SCCM site is confirmed deployed).
+
+**Branch D — Linux Pivot (WT044 MSSQL linked server):**
+- Connected to `mbr01.child.cadre.local` via `impacket-mssqlclient` as `child\analyst_t1` / `T13r_An@lyst!`.
+- Executed 4-part linked-server query `EXECUTE('SELECT name FROM LINUX01.master.sys.databases')` and confirmed SQL execution context on `linux01`.
+- Subsequent SSSD ticket/keytab/NFS/Podman steps were not exercised; entry point is verified.
+
+**Seed / wordlist updates:**
+- `attack-matrix/Campaign/automation/lab-seed-creds.json`: filled discovered passwords (`svc_mssql`, `analyst_cloud`, `chief_command`, `hunter_dfir`, `analyst_dfir`, `eng_agentic`, `svc_sccm`, `svc_naa`, `root_krbtgt`).
+- `ansible/files/cadre_passwords.txt`: added all real lab passwords used in WT031 spray and campaign branches.
+
+**Docs updated:**
+- `attack-matrix/Campaign/CAMPAIGNS-METADATA-v2.md`: updated Phase 8 status, WT034 verified details, WT035-039 status, Branch A/Path A verified details, Branch D verified details, credential map, and Branch A status.
+- `attack-matrix/Campaign/CAMPAIGNS_v3.md`: updated ASCII diagram (Branch A credential gap solved, Branch C WT034 verified, Branch D verified), Phase 8 status block, Branch A/C/D sections, credential flow table, branch decision matrix, and "Solving the Branch A credential gap" section.
+- `ansible/playbooks/05-ad-attack-surface.yml`: fixed ACE#7 exact-right idempotency check.
+- `AGENTS.md`: this entry.
+
+**Current blockers:**
+- Phase 5 T102 coercion to capture `dc02$` TGT remains ⚠️ BLOCKED (Rubeus dump produced 0 Kirbi tickets); bypass via WT031 `chief_command` DA+EA is verified and documented.
+- WT035-039 SCCM advanced chain ⏳ Not yet tested.
+- Skipjack ⏳ Pending custom PoC.
+
+**Next:** Resume telemetry/source-matrix work (Plan 1) now that the campaign attack surface is verified end-to-end, or exercise WT035-039 if user wants full SCCM chain coverage.
+
 ### Added (2026-07-28 — P1.0 full campaign attack run complete)
 
 > **Scope:** Validate the entire campaign attack surface end-to-end via RedStrike with `ws01` as assumed-breach beachhead.

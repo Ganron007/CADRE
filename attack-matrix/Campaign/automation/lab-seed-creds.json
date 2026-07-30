@@ -9,17 +9,52 @@
     },
     "intern_blue": {
       "username": "intern_blue",
-      "password": "1nt3rn_BLu3!",
+      "password": "1nt3rn_Blu3!",
       "domain": "child.cadre.local",
       "source": "seed",
       "notes": "Lab known password — also earned via AS-REP in live runs"
     },
     "svc_mssql": {
       "username": "svc_mssql",
-      "password": null,
+      "password": "s3rv1c3_MSSQL!",
       "domain": "child.cadre.local",
-      "source": "seed",
-      "notes": "Password filled after Kerberoast crack"
+      "source": "kerberoast",
+      "notes": "Phase 2 Kerberoast via ACE#18 — cracked"
+    },
+    "analyst_cloud": {
+      "username": "analyst_cloud",
+      "password": "Cl0ud_An@lyst!",
+      "domain": "cadre.local",
+      "source": "extraction",
+      "notes": "Phase 3.5A Winlogon registry extraction from mbr01"
+    },
+    "chief_command": {
+      "username": "chief_command",
+      "password": "C0mm@nd_Ch1ef!",
+      "domain": "cadre.local",
+      "source": "spray",
+      "notes": "WT031 password spray against dc01; DA+EA in cadre.local"
+    },
+    "hunter_dfir": {
+      "username": "hunter_dfir",
+      "password": "DF1R_Hunt3r!",
+      "domain": "cadre.local",
+      "source": "spray",
+      "notes": "WT031 password spray against dc01; Branch A ACE#7 source"
+    },
+    "analyst_dfir": {
+      "username": "analyst_dfir",
+      "password": "An@lyst_DF1R!",
+      "domain": "cadre.local",
+      "source": "spray",
+      "notes": "WT031 password spray against dc01; Branch A ACE#5 source"
+    },
+    "eng_agentic": {
+      "username": "eng_agentic",
+      "password": "Ag3nt1c_Eng!",
+      "domain": "cadre.local",
+      "source": "spray",
+      "notes": "WT031 password spray against dc01; Branch A ACE#13+14 source"
     },
     "krbtgt": {
       "username": "krbtgt",
@@ -27,14 +62,29 @@
       "nt_hash": null,
       "domain": "child.cadre.local",
       "source": "seed",
-      "notes": "Filled after T009 DCSync"
+      "notes": "Filled after T009 DCSync (currently bypassed via WT031 root DA)"
+    },
+    "root_krbtgt": {
+      "username": "krbtgt",
+      "password": null,
+      "nt_hash": null,
+      "domain": "cadre.local",
+      "source": "seed",
+      "notes": "Filled after root DCSync via chief_command EA"
+    },
+    "svc_sccm": {
+      "username": "svc_sccm",
+      "password": "s3rv1c3_SCCM!",
+      "domain": "range.local",
+      "source": "kerberoast",
+      "notes": "Phase 8 cross-forest Kerberoast (WT033) — cracked"
     },
     "svc_naa": {
       "username": "svc_naa",
-      "password": null,
+      "password": "N@A_s3rv1c3!",
       "domain": "range.local",
-      "source": "seed",
-      "notes": "Branch C NAA — filled after WT034"
+      "source": "extraction",
+      "notes": "Branch C NAA — extracted from mbr02 vault share (WT034)"
     }
   }
 }

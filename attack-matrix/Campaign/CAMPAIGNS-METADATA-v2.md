@@ -41,7 +41,7 @@
 | `dc02$` | `child.cadre.local` | TGT | Phase 6 DCSync | Phase 5 coercion + Rubeus monitor (T102) | `dc02_machine` | `creds.dc02_machine.ticket` |
 | `child\krbtgt` | `child.cadre.local` | hash | Phase 7 Golden Ticket | Phase 6 DCSync (WT009) | `child_krbtgt` | `creds.child_krbtgt.nt_hash` |
 | `root EA` | `cadre.local` | TGT | Phase 8 cross-forest | Phase 7 Golden Ticket + ExtraSids | `cadre_ea` | `creds.cadre_ea.ticket` |
-| `svc_sccm` | `range.local` | cracked from TGS | Branch C SCCM operations | Phase 8 cross-forest Kerberoast (WT033) | `svc_sccm` | `creds.svc_sccm.password` |
+| `svc_sccm` | `range.local` | `s3rv1c3_SCCM!` | Branch C SCCM operations | Phase 8 cross-forest Kerberoast (WT033) | `svc_sccm` | `creds.svc_sccm.password` |
 | `svc_naa` | `range.local` | `N@A_s3rv1c3!` | range.local Domain Admin | Branch C NAA extraction (WT034) | `svc_naa` | `creds.svc_naa.password` |
 
 **Realistic Attack Principles**
@@ -806,7 +806,7 @@ We have `nt authority\system` on mbr01 via GodPotato. `analyst_cloud` has an act
 
 | Field | Value |
 |-------|-------|
-| **Status** | ✅ Active — WT033 cross-forest Kerberoast verified from ws01; WT034-039 SCCM branch ⚠️ BLOCKED (SCCM site server not deployed on mbr02) |
+| **Status** | ✅ Active — WT033 cross-forest Kerberoast verified from ws01 (scripted + RedStrike); WT034 NAA extraction verified via `vault` share on `mbr02` (scripted + RedStrike); WT035-039 SCCM attack chain ⏳ not yet tested (SCCM site `CAD` confirmed deployed and active on `mbr02`) |
 | **Stream** | Core AD / Branch C |
 | **Att&ck** | T1558.003 (Cross-forest Kerberoasting), T1213 (Data from Information Repositories), T1071 (Application Layer Protocol) |
 | **Technique** | Use root domain `EA` rights to pivot across forest trust to `range.local` and abuse SCCM / delegations |
@@ -818,7 +818,7 @@ We have `nt authority\system` on mbr01 via GodPotato. `analyst_cloud` has an act
 | **Starting credential** | `cadre.local\Enterprise Admin` (Golden Ticket from Phase 7) |
 | **What it earns** | `range.local` domain compromise; SCCM Full Admin (`svc_sccm`) |
 | **RedStrike Intent** | `rubeus.kerberoast` (cross-forest) / `sharpsccm.get_naa` |
-| **State Output** | SET_STATE(creds.svc_sccm.password = <cracked>; creds.svc_naa.password = "N@A_s3rv1c3!") |
+| **State Output** | SET_STATE(creds.svc_sccm.password = "s3rv1c3_SCCM!"; creds.svc_naa.password = "N@A_s3rv1c3!") |
 | **Key commands** | Cross-forest Kerberoast `svc_sccm`; SCCM NAA extraction; SCCM site takeover |
 | **Key telemetry** | WinSec 4624 cross-forest; Zeek kerberos.log cross-realm; SCCM logs |
 | **Script** | `attack-matrix/04-automation/linux/campaign-a/T033-xforest-ws01.sh`, `T034-sccm-enum-ws01.sh`, `T035-sccm-pxe-boot-ws01.sh`, `T036-sccm-client-push-ws01.sh`, `T037-sccm-cmpivot-ws01.sh`, `T038-sccm-app-deploy-ws01.sh`, `T039-sccm-site-takeover-ws01.sh` |
@@ -838,22 +838,23 @@ We have `nt authority\system` on mbr01 via GodPotato. `analyst_cloud` has an act
 
 | Field | Value |
 |-------|-------|
-| **Status** | ⚠️ BLOCKED — SCCM site server not deployed on mbr02 (verify-only playbook `10-sccm-verify.yml` exists; no deploy playbook) |
-| **Technique** | Extract SCCM Network Access Account (NAA) credentials from WMI on mbr02 |
-| **What it earns** | `range.local\SCCM_NAA$` or similar high-priv account |
-| **RedStrike Intent** | — |
-| **State Output** | SET_STATE(<manual>) |
-| **Key telemetry** | WinSec 4624; Sysmon EID 1 (WMI tool), EID 10; Zeek dce_rpc.log |
+| **Status** | ✅ Verified — SCCM NAA credentials extracted from `\\mbr02\vault\naa-rotation-notice.txt` using `svc_sccm` (SCCM Full Admin) read access. Actual NAA account: `range\svc_naa` / `N@A_s3rv1c3!`. Verified `range\svc_naa` is Domain Admin on `dc03` via `nxc smb dc03 -u 'range\svc_naa' -p 'N@A_s3rv1c3!' -X 'whoami /groups'`. |
+| **Technique** | Extract SCCM Network Access Account (NAA) credentials from the SCCM `vault` share on `mbr02` |
+| **What it earns** | `range.local\svc_naa` (Domain Admin) |
+| **RedStrike Intent** | `sharpsccm.get_naa` |
+| **State Output** | SET_STATE(creds.svc_naa.password = "N@A_s3rv1c3!"; creds.svc_naa.domain = "range.local") |
+| **Key telemetry** | WinSec 4624 (SMB logon to `mbr02`); SMB read to `vault\naa-rotation-notice.txt`; Zeek `smb_files.log` / `dce_rpc.log` |
+| **Playbook fix** | No playbook fix required — SCCM site deployed via manual steps in `docs/sccm-integration-guide.md`; verify-only playbook is `08-sql-sccm-wsus-verify.yml` (not `10-sccm-verify.yml`) |
 
 #### WT035-039 — SCCM Attack Chain
 
 | WT# | Technique | Status | Target | What it earns |
 |-----|-----------|--------|--------|---------------|
-| WT035 | SCCM PXE Boot abuse | ⚠️ BLOCKED | mbr02 | Bare-metal boot → domain join account |
-| WT036 | SCCM Client Push | ⚠️ BLOCKED | mbr02 | Coerced auth / lateral movement |
-| WT037 | SCCM CMPivot | ⚠️ BLOCKED | mbr02 | Remote query/exec on managed clients |
-| WT038 | SCCM Application Deploy | ⚠️ BLOCKED | mbr02 | Push malicious app to clients |
-| WT039 | SCCM Site Takeover | ⚠️ BLOCKED | mbr02 | Full SCCM site admin → DA in range.local |
+| WT035 | SCCM PXE Boot abuse | ⏳ Not yet tested | mbr02 | Bare-metal boot → domain join account |
+| WT036 | SCCM Client Push | ⏳ Not yet tested | mbr02 | Coerced auth / lateral movement |
+| WT037 | SCCM CMPivot | ⏳ Not yet tested | mbr02 | Remote query/exec on managed clients |
+| WT038 | SCCM Application Deploy | ⏳ Not yet tested | mbr02 | Push malicious app to clients |
+| WT039 | SCCM Site Takeover | ⏳ Not yet tested | mbr02 | Full SCCM site admin → DA in range.local |
 
 #### Skipjack — Cross-Forest Trust Downgrade via PAC Signature Corruption (Phase 8 alt)
 
@@ -866,8 +867,8 @@ We have `nt authority\system` on mbr01 via GodPotato. `analyst_cloud` has an act
 | **Source** | `ws01` as `intern_blue` or any child user |
 | **Target** | dc01 (`cadre.local`) or dc03 (`range.local`) |
 | **What it earns** | Domain Admin / Enterprise Admin in target forest without DCSync |
-| **RedStrike Intent** | `rubeus.kerberoast` (cross-forest) / `sharpsccm.get_naa` |
-| **State Output** | SET_STATE(creds.svc_sccm.password = <cracked>; creds.svc_naa.password = "N@A_s3rv1c3!") |
+| **RedStrike Intent** | `rubeus.pac_corrupt` / `rubeus.asktgt` |
+| **State Output** | SET_STATE(creds.<target_forest>_ea.ticket = <forged PAC TGT>) |
 | **Key telemetry** | WinSec 4826 (rare); Zeek cross-realm TGS with corrupted PAC auth-data |
 | **Status** | ⏳ Pending custom PoC |
 
@@ -877,34 +878,35 @@ We have `nt authority\system` on mbr01 via GodPotato. `analyst_cloud` has an act
 
 | Field | Value |
 |-------|-------|
-| **Status** | ✅ Active |
+| **Status** | ✅ Verified live — WT015 (ACE#7 ForceChangePassword) tested end-to-end. Credential gap solved via WT031 password spray: `chief_command` / `C0mm@nd_Ch1ef!` obtained and used to restore missing ACE#7. `hunter_dfir` / `DF1R_Hunt3r!` then reset `chief_command` password and restored it. |
 | **Stream** | Branch A |
 | **Att&ck** | T1098 (Account Manipulation), T1484 (Domain Policy Modification), T1548 (Abuse Elevation Control Mechanism) |
 | **Technique** | Abuse over-permissive ACEs discovered by BloodHound to escalate to DA in `cadre.local` |
-| **Playbook** | `05-ad-attack-surface.yml` — ACEs 1-26 |
+| **Playbook** | `05-ad-attack-surface.yml` — ACEs 1-26 (ACE#7 exact-right check fixed in deploy task) |
 | **Prerequisite** | Any credential with rights to modify the target AD object (user, group, computer, OU) |
 | **Source machine** | `ws01` as `intern_blue` or other compromised user |
 | **Target machine** | dc01 (`192.168.77.10`) — root DC / cadre.local |
 | **Domain** | `cadre.local` |
-| **Key finding** | ACE#7: `hunter_dfir → chief_command: ForceChangePassword` — fastest path to root DA |
+| **Key finding** | ACE#7: `hunter_dfir → chief_command: ForceChangePassword` — fastest path to root DA+EA |
 | **Key telemetry** | WinSec 4662 (write to AD object), 4738 (password reset), 5136 (directory service change); Zeek ldap.log |
 | **Script** | `T013-acl-writedacl-ws01.sh`, `T014-acl-genericwrite-ws01.sh`, `T015-acl-forcechangepassword-ws01.sh`, `T016-acl-genericall-ou-ws01.sh`, `T023-gpo-abuse-ws01.sh`, `T024-gmsa-extraction-ws01.sh` |
-| **RedStrike Intent** | — |
-| **State Output** | SET_STATE(<manual>) |
+| **RedStrike Intent** | `bloodyad.set_password` / `bloodyad.add_generic_all` |
+| **State Output** | SET_STATE(creds.chief_command.password = "<new password>") |
 
 #### Path A — ForceChangePassword (WT015)
 
 | Field | Value |
 |-------|-------|
 | **WT#** | 015 |
-| **Status** | ✅ Active |
+| **Status** | ✅ Verified live — ACE#7 was missing on `chief_command` during test; re-applied via corrected `05-ad-attack-surface.yml` (exact-right check now matches verify-only) and verified with `05-ad-attack-surface-verifyOnly.yml` (18/18 PASS). `hunter_dfir` successfully reset `chief_command` password to `NewChiefPass123!` and restored to original `C0mm@nd_Ch1ef!`. |
 | **Technique** | Reset password of high-priv user using `ForceChangePassword` ACE |
 | **ACE#** | 7 (`hunter_dfir → chief_command: ForceChangePassword`) |
-| **What it earns** | `chief_command` credential → root DA |
-| **RedStrike Intent** | — |
-| **State Output** | SET_STATE(<manual>) |
-| **Command** | `bloodyAD --host dc01.cadre.local -u hunter_dfir -p '<pwd>' -d cadre.local set password chief_command 'NewPass123!'` |
+| **What it earns** | `chief_command` credential → root DA+EA |
+| **RedStrike Intent** | `bloodyad.set_password` |
+| **State Output** | SET_STATE(creds.chief_command.password = "<new password>") |
+| **Command** | `bloodyAD --host dc01.cadre.local -u hunter_dfir -p 'DF1R_Hunt3r!' -d cadre.local set password chief_command 'NewChiefPass123!'` |
 | **Script** | `T015-acl-forcechangepassword-ws01.sh` |
+| **Playbook fix** | `05-ad-attack-surface.yml` ACE#7 deploy task now checks exact `(IdentityReference = hunter_dfir SID) AND (ObjectType = ForceChangePassword GUID)` before skipping, matching `05-ad-attack-surface-verifyOnly.yml` exact-right check. |
 
 #### Path B — WriteDacl Self-Escalate (WT013)
 
@@ -1128,19 +1130,19 @@ We have `nt authority\system` on mbr01 via GodPotato. `analyst_cloud` has an act
 
 | Field | Value |
 |-------|-------|
-| **Status** | ✅ Active |
+| **Status** | ✅ Verified — MSSQL linked-server pivot from `mbr01` to `linux01` works via `impacket-mssqlclient` as `analyst_t1`; 4-part name query `SELECT name FROM LINUX01.master.sys.databases` returned linux01 databases. |
 | **Stream** | Branch D |
 | **Att&ck** | T1071 (Application Layer Protocol), T1550 (Use Alternate Auth Material), T1059 (Command and Scripting Interpreter) |
 | **Technique** | Pivot from Windows compromise to linux01 via MSSQL linked server, SSH, or NFS Kerberos |
-| **Playbook** | `07-linux-config.yml` — deploys SSSD, NFS krb5p, Podman on linux01 |
+| **Playbook** | `07-linux-config.yml` — deploys SSSD, NFS krb5p, Podman on linux01; `08-sql-sccm-wsus-verify.yml` verifies linked server `LINUX01` on `mbr01` |
 | **Prerequisite** | Domain credential or Kerberos ticket valid for `linux01` |
 | **Source machine** | `ws01` or mbr01/mbr02 |
 | **Target machine** | linux01 (`192.168.77.40`) — Ubuntu 24.04 domain-joined |
 | **Domain** | `cadre.local` |
-| **Starting credential** | `analyst_t1` TGT or `svc_mssql` |
-| **What it earns** | Linux shell, keytab, NFS access, container escape |
-| **RedStrike Intent** | — |
-| **State Output** | SET_STATE(<manual>) |
+| **Starting credential** | `analyst_t1` / `T13r_An@lyst!` (or `svc_mssql` / `s3rv1c3_MSSQL!`) |
+| **What it earns** | SQL execution context on linux01; foundation for SSSD ticket / keytab / NFS / Podman escalation |
+| **RedStrike Intent** | `sql.mssqlclient` / `sql.xp_cmdshell` |
+| **State Output** | SET_STATE(creds.linux01.pivot = "mssql_linked_server") |
 | **Key telemetry** | Linux auditd; SSSD logs; Zeek ssh.log / nfs.log; Suricata SID for linux01 traffic |
 | **Script** | `T040-mssql-linked-server-hop-ws01.sh`, `T044-linux-sssd-ticket-ws01.sh`, `T045-linux-keytab-ws01.sh`, `T046-linux-mssql-keytab-ws01.sh`, `T047-linux-nfs-ws01.sh`, `T048-linux-podman-escape-ws01.sh` |
 
@@ -1148,12 +1150,14 @@ We have `nt authority\system` on mbr01 via GodPotato. `analyst_cloud` has an act
 
 | Field | Value |
 |-------|-------|
+| **WT#** | 044 |
+| **Status** | ✅ Verified live |
 | **Technique** | Query linked server from mbr01/mbr02 to linux01 MSSQL |
-| **Command** | `EXECUTE('SELECT * FROM OPENQUERY(LINUX01,''SELECT @@version'')')` |
-| **What it earns** | SQL execution context on linux01 |
-| **RedStrike Intent** | — |
-| **State Output** | SET_STATE(<manual>) |
-| **Script** | `T040-mssql-linked-server-hop-ws01.sh` |
+| **Command** | `impacket-mssqlclient child/analyst_t1:'T13r_An@lyst!'@mbr01.child.cadre.local -db master` then `EXECUTE('SELECT name FROM LINUX01.master.sys.databases')` |
+| **What it earns** | SQL execution context on linux01; list of databases returned |
+| **RedStrike Intent** | `sql.mssqlclient` |
+| **State Output** | SET_STATE(creds.linux01.pivot = "mssql_linked_server") |
+| **Automation note** | Do **not** use a multi-line `<<EOF` heredoc with `impacket-mssqlclient`; the interpreter treats the terminator as a stored procedure name and loops. Use the `-query` flag (single-line) or a Python `pymssql` wrapper for scripted execution. |
 
 #### WT045 — SSSD Ticket Extraction
 
