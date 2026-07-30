@@ -357,6 +357,7 @@
 | **Key telemetry** | WinSec 4624 Type 8, 4688; Sysmon EID 1 (cmd/powershell), 3; Endpt process; Zeek smb.log; PS EID 4104 |
 | **Script** | `attack-matrix/04-automation/linux/campaign-a/T043-impersonate-ws01.sh` + `campaign-a-t043-impersonate.ps1` |
 | **Helper** | `campaign-a-t043-system-exec.ps1` — runs arbitrary PowerShell script block as SYSTEM on mbr01 via the SQL → GodPotato channel |
+| **Note** | ✅ Tested from ws01 — GodPotato via SQL xp_cmdshell returns `nt authority\system` on mbr01. |
 | **Identity note** | `analyst_t1` (not `svc_mssql`) is the SQL identity with `IMPERSONATE sa`. `svc_mssql` is the Phase 2 Kerberoasted service account. |
 
 #### WT042 — CLR Assembly (Alternative SQL execution on mbr02)
@@ -364,7 +365,7 @@
 | Field | Value |
 |-------|-------|
 | **WT#** | 042 |
-| **Status** | ✅ Active — alternative SQL execution |
+| **Status** | ✅ Tested from ws01 — SQL CLR execution path on mbr02 reachable via SQL auth |
 | **Att&ck** | T1059 |
 | **Technique** | Deploy malicious CLR assembly on mbr02 (CLR enabled, TRUSTWORTHY ON, strict security=0) |
 | **What it does** | Load .NET assembly inside SQL Server and execute arbitrary code as the SQL service account. |
@@ -383,7 +384,7 @@
 | Field | Value |
 |-------|-------|
 | **WT#** | 101 |
-| **Status** | ⏳ Not yet tested from ws01 |
+| **Status** | ✅ Tested from ws01 |
 | **Stream** | Core AD |
 | **Att&ck** | T1021.006 (Remote Services: Windows Remote Management) |
 | **Technique** | WinRS/PSRemoting from `ws01` to `mbr01` as `analyst_t1` |
@@ -460,7 +461,7 @@ We have `nt authority\system` on mbr01 via GodPotato. `analyst_cloud` has an act
 
 | Field | Value |
 |-------|-------|
-| **Status** | ⏳ Not yet tested |
+| **Status** | ⏳ Not yet tested — Nemesis DPAPI extraction not exercised in this run |
 | **Att&ck** | T1555 (Credentials from Password Stores) |
 | **Technique** | Nemesis 2.2+ automates DPAPI decryption chain — SYSTEM/user masterkeys → CNG keys → Chromium App-Bound encryption |
 | **What it does** | SYSTEM on mbr01 extracts DPAPI masterkeys for `analyst_cloud` → Nemesis decrypts Chromium App-Bound cookies, saved RDP file credentials, Outlook cached creds, WiFi passwords. |
@@ -478,7 +479,7 @@ We have `nt authority\system` on mbr01 via GodPotato. `analyst_cloud` has an act
 
 | Field | Value |
 |-------|-------|
-| **Status** | ⏳ Not yet tested |
+| **Status** | ⏳ Not yet tested — ctfmon extraction not exercised in this run |
 | **Att&ck** | T1003 (OS Credential Dumping) |
 | **Technique** | Typed passwords persist in `ctfmon.exe` memory after app close. Not protected by PPL. |
 | **What it does** | SYSTEM dumps `ctfmon.exe` process memory via procdump. Typed passwords (PuTTY, WinSCP, MySQL, SSH) remain in memory minutes/hours after the application closes. |
@@ -556,7 +557,7 @@ We have `nt authority\system` on mbr01 via GodPotato. `analyst_cloud` has an act
 
 | Field | Value |
 |-------|-------|
-| **Status** | ⏳ Not yet tested |
+| **Status** | ⏳ Not yet tested — WMI event subscription not exercised in this run |
 | **Att&ck** | T1546.003 (Event Triggered Execution: WMI Event Subscription) |
 | **Technique** | SYSTEM creates `__EventFilter` + `CommandLineEventConsumer` + `__FilterToConsumerBinding` |
 | **What it does** | Fileless persistence: WMI subscription triggers payload on system uptime or other event. |
@@ -572,7 +573,7 @@ We have `nt authority\system` on mbr01 via GodPotato. `analyst_cloud` has an act
 
 | Field | Value |
 |-------|-------|
-| **Status** | ⏳ Not yet tested |
+| **Status** | ⏳ Not yet tested — WerFault LSASS dump not exercised in this run |
 | **Att&ck** | T1003.001 (OS Credential Dumping: LSASS Memory) |
 | **Technique** | Microsoft-signed `WerFaultSecure.exe` triggers LSASS crash dump via Windows Error Reporting |
 | **What it does** | Stealthier than procdump; trusted binary; not flagged by most EDR. |
@@ -587,7 +588,7 @@ We have `nt authority\system` on mbr01 via GodPotato. `analyst_cloud` has an act
 
 | Field | Value |
 |-------|-------|
-| **Status** | ⏳ Not yet tested |
+| **Status** | ⏳ Not yet tested — LAPS extraction not exercised in this run |
 | **Att&ck** | T1552.004 (Unsecured Credentials: Private Keys) |
 | **Technique** | Extract LAPS password from AD attribute `ms-Mcs-AdmPwd` |
 | **What it does** | LAPS manages unique local admin passwords per machine, stored in AD. If read permission is compromised, gives local admin on any LAPS-managed machine. |
@@ -603,7 +604,7 @@ We have `nt authority\system` on mbr01 via GodPotato. `analyst_cloud` has an act
 
 | Field | Value |
 |-------|-------|
-| **Status** | ⏳ Not yet tested |
+| **Status** | ⏳ Not yet tested — Azure AD Connect DPAPI extraction not exercised in this run |
 | **Att&ck** | T1555 (Credentials from Password Stores) |
 | **Technique** | Extract MSOL account credentials stored using DPAPI on dc01 |
 | **What it does** | `adconnectdump` extracts Cloud Sync agent credentials. Bridge from on-prem to Entra ID. |
@@ -686,7 +687,7 @@ We have `nt authority\system` on mbr01 via GodPotato. `analyst_cloud` has an act
 | **Step 4** | Collect captured TGT from monitor output |
 | **Key telemetry** | WinSec 4662 (RPC); Zeek dce_rpc.log (opnum 1,65); Suri SID:1000050 (PrinterBug) |
 | **Script** | `attack-matrix/04-automation/linux/campaign-a/T102-coerce-dc02-ws01.sh` + `campaign-a-t102-coerce-dc02.ps1` |
-| **Status** | Script created; execution paused pending user review |
+| **Status** | Script tested 2026-07-30 — still blocked; Rubeus monitor captures 0 Kirbi tickets from dc02$ coercion (dump size 51789, Kirbi count 0). Print Spooler service on dc02 needs to be running/exposed. |
 
 #### Alternative Coercion Techniques
 
@@ -696,7 +697,7 @@ We have `nt authority\system` on mbr01 via GodPotato. `analyst_cloud` has an act
 | WT018 | MS-EFSR (PetitPotam) | ❌ Non-functional | `\PIPE\efsrpc` blocked on Server 2025 |
 | WT019 | MS-DFSNM (DFSCoerce) | ❌ Non-functional | SMB-pipe DCE-RPC not detectable by Suricata 8.0.5 |
 | WT020 | MS-FSRVP (ShadowCoerce) | ❌ Non-functional | Service not available on Server 2025 |
-| WT096 | `coerce_plus` — consolidated | ⏳ Not tested | NetExec module combining PrinterBug/DFSCoerce/MSEven/PetitPotam |
+| WT096 | `coerce_plus` — consolidated | ⏳ Not tested — could be used once spooler is enabled on dc02 | NetExec module combining PrinterBug/DFSCoerce/MSEven/PetitPotam |
 | WT094 | UnCanny Coerce (InstallService) | 🔬 Deferred | Requires Developer Mode |
 | WT095 | Onelogon Zero-Channel | 🔬 Deferred | PoC expected Aug 2026 |
 
@@ -705,7 +706,7 @@ We have `nt authority\system` on mbr01 via GodPotato. `analyst_cloud` has an act
 | Field | Value |
 |-------|-------|
 | **WT#** | 007 |
-| **Status** | ✅ Active — alternative to unconstrained delegation |
+| **Status** | ⚠️ BLOCKED — PowerView LDAP query from ws01 fails with "An operations error occurred"; script/DC connectivity issue needs fix |
 | **Technique** | Resource-Based Constrained Delegation |
 | **What it does** | Create fake computer, set RBCD on target, S4U2Proxy as DA |
 | **Playbook** | N/A — RBCD abuse; requires GenericWrite on target computer |
@@ -850,11 +851,11 @@ We have `nt authority\system` on mbr01 via GodPotato. `analyst_cloud` has an act
 
 | WT# | Technique | Status | Target | What it earns |
 |-----|-----------|--------|--------|---------------|
-| WT035 | SCCM PXE Boot abuse | ⏳ Not yet tested | mbr02 | Bare-metal boot → domain join account |
-| WT036 | SCCM Client Push | ⏳ Not yet tested | mbr02 | Coerced auth / lateral movement |
-| WT037 | SCCM CMPivot | ⏳ Not yet tested | mbr02 | Remote query/exec on managed clients |
-| WT038 | SCCM Application Deploy | ⏳ Not yet tested | mbr02 | Push malicious app to clients |
-| WT039 | SCCM Site Takeover | ⏳ Not yet tested | mbr02 | Full SCCM site admin → DA in range.local |
+| WT035 | SCCM PXE Boot abuse | ⏳ Not yet tested — no SCCM client on ws01; actual mbr02 exploitation not exercised | mbr02 | Bare-metal boot → domain join account |
+| WT036 | SCCM Client Push | ⏳ Not yet tested — no SCCM client on ws01; actual mbr02 exploitation not exercised | mbr02 | Coerced auth / lateral movement |
+| WT037 | SCCM CMPivot | ⏳ Not yet tested — no SCCM client on ws01; actual mbr02 exploitation not exercised | mbr02 | Remote query/exec on managed clients |
+| WT038 | SCCM Application Deploy | ⏳ Not yet tested — no SCCM client on ws01; actual mbr02 exploitation not exercised | mbr02 | Push malicious app to clients |
+| WT039 | SCCM Site Takeover | ⏳ Not yet tested — no SCCM client on ws01; actual mbr02 exploitation not exercised | mbr02 | Full SCCM site admin → DA in range.local |
 
 #### Skipjack — Cross-Forest Trust Downgrade via PAC Signature Corruption (Phase 8 alt)
 
@@ -1017,7 +1018,7 @@ We have `nt authority\system` on mbr01 via GodPotato. `analyst_cloud` has an act
 
 | Field | Value |
 |-------|-------|
-| **Status** | ✅ Active |
+| **Status** | ⚠️ BLOCKED — Certify.exe from ws01 fails with DirectoryServices operations error; ADCS surface likely present but scripts need proper domain context or fix |
 | **Stream** | Branch B |
 | **Att&ck** | T1649 (Steal Crypto Wallet / Private Key), T1550 (Use Alternate Auth Material), T1553 (Subvert Trust Controls) |
 | **Technique** | Abuse misconfigured ADCS templates to request certificates as any user or escalate to DA |
@@ -1322,3 +1323,57 @@ Standalone supply-chain attack scenarios on linux01 / mbr01 / npm registry. See 
 ## Change Log
 
 - **2026-07-29** — Created `CAMPAIGNS-METADATA-v2.md` aligned with `CAMPAIGNS_v3.md`. Documented all 8 main-spine phases, Branch 3.5 alternatives, Branches A-D, G section, E/F exercises, identity/credential map, and machine roles. Marked T035/T035A/T004-mbr01 as tested from `ws01`. Marked T102 as in-progress with script created.
+
+
+---
+
+## Validation Run — 2026-07-30
+
+A batch of campaign scripts was executed from `provisioning` (`192.168.77.60`) via NetExec WinRM to `ws01` (`192.168.77.62`).
+
+### Results Summary
+
+| Script | RC | Outcome |
+|--------|----|---------|
+| T041-xpcmd-ws01.sh | 0 | SQL auth + `xp_cmdshell` as analyst_t1 on mbr01 works (returns `nt service\mssql$sqlexpress`) |
+| T042-clr-ws01.sh | 0 | CLR execution path on mbr02 reachable |
+| T043-impersonate-ws01.sh | 0 | GodPotato returns `nt authority\system` on mbr01 |
+| T043-lpe-alternatives-ws01.sh | 0 | All alternative LPE binaries failed to return SYSTEM on Server 2025 |
+| T035-mbr01-creds-ws01.sh | 0 | Mimikatz via GodPotato SYSTEM executed; output pulled |
+| T035A-winlogon-creds-ws01.sh | 0 | Plaintext `CADRE\analyst_cloud:Cl0ud_An@lyst!` extracted |
+| T101-winrs-pivot-ws01.sh | 0 | WinRS from ws01 to mbr01 as analyst_t1 works |
+| T101a-trustedhosts-ws01.sh | 0 | TrustedHosts configured |
+| T007-rbcd-ws01.sh | 0 | PowerView LDAP query fails with "An operations error occurred" — blocked |
+| T009-dcsync-ws01.sh | 0 | DCSync against cadre.local via chief_command works |
+| T010-golden-ws01.sh | 0 | Golden Ticket script executes |
+| T011-silver-ws01.sh | 0 | Silver Ticket script executes |
+| T012-diamond-ws01.sh | 0 | Diamond Ticket script executes |
+| T013-acl-writedacl-ws01.sh | 0 | Script executes |
+| T014-acl-genericwrite-ws01.sh | 0 | Script executes |
+| T016-acl-genericall-ou-ws01.sh | 0 | Script executes |
+| T023-gpo-abuse-ws01.sh | 0 | Script executes |
+| T024-gmsa-extraction-ws01.sh | 0 | Script executes |
+| T008-shadow-credentials-ws01.sh | 0 | Script executes |
+| T050-esc1-ws01.sh | 0 | Certify fails with DirectoryServices error from ws01 |
+| T051-esc3-ws01.sh | 0 | Certify fails with DirectoryServices error from ws01 |
+| T052-esc8-ws01.sh | 0 | Web enrollment 401 from ws01 |
+| T053-unpac-thehash-ws01.sh | 0 | Certify fails with DirectoryServices error from ws01 |
+| T034-sccm-enum-ws01.sh | 0 | SCCM client not present on ws01 |
+| T035-sccm-pxe-boot-ws01.sh | 0 | SCCM client not present on ws01 |
+| T036-sccm-client-push-ws01.sh | 0 | SCCM client not present on ws01 |
+| T037-sccm-cmpivot-ws01.sh | 0 | SCCM client not present on ws01 |
+| T038-sccm-app-deploy-ws01.sh | 0 | SCCM client not present on ws01 |
+| T039-sccm-site-takeover-ws01.sh | 0 | SCCM client not present on ws01 |
+| T040-mssql-linked-server-hop-ws01.sh | 0 | Linked-server query to linux01 from mbr01 works |
+| T102-coerce-dc02-ws01.sh | 0 | Spooler triggered but 0 Kirbi captured from dc02$ |
+| T102-coerce-from-mbr01.sh | 0 | No output file (coercion not producing captured TGT) |
+
+### Blocked Items Requiring Fixes
+
+1. **Phase 5 / T102 coercion** — Print Spooler on dc02 must be running/exposed. Verify `04-vulnerabilities.yml` and `04-vulnerabilities-verifyOnly.yml`.
+2. **Phase 5 / WT007 RBCD** — PowerView LDAP query fails from ws01. Fix script or verify dc02 LDAP connectivity.
+3. **Branch B / ADCS ESC1/ESC3/ESC8/UnPAC** — Certify from ws01 fails with DirectoryServices operations error. Run from a `cadre.local` domain-joined machine or provide explicit DC/domain credentials.
+4. **Branch C / WT035-039 SCCM chain** — Requires running from a SCCM client/site system (e.g., mbr02) or with SCCM PowerShell module; not exercisable from ws01.
+5. **Branch D / WT045-048** — Linux pivot scripts do not exist; manual execution required.
+6. **Branch 3.5 / 3.5G, 3.5H, 3.5J, 3.5K, 3.5L, 3.5M** — Not exercised in this run.
+7. **Phase 0.5 / H-01..H-06** — Intentionally excluded per user request (barring initial access).
