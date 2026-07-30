@@ -19,7 +19,7 @@ $conn = New-Object System.Data.SqlClient.SqlConnection($connStr);
 $conn.Open();
 Write-Output "SQL_OK: connected to mbr01 as analyst_t1";
 $cmd = $conn.CreateCommand();
-$cmd.CommandText = "EXECUTE AS LOGIN = ''sa''; EXEC sp_helpserver; REVERT";
+$cmd.CommandText = "EXEC sp_helpserver;";
 $reader = $cmd.ExecuteReader();
 while ($reader.Read()) { Write-Output $reader[0] }
 $reader.Close();

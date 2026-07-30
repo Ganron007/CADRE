@@ -20,7 +20,8 @@ if (-not (Test-Path $pv)) { throw "PowerView.ps1 not found" }
 . $pv;
 $ErrorActionPreference = "Stop";
 $c = Get-DomainComputer -Identity "'''"${TARGET_COMPUTER}"'''" -DomainController "'''"${DC02}"'''" -Domain "'''"${DOMAIN_CHILD}"'''";
-Write-Output ("msDS-AllowedToActOnBehalfOfOtherIdentity present: " + ($c.''msDS-AllowedToActOnBehalfOfOtherIdentity'' -ne $null));
+  $prop = $c | Select-Object -ExpandProperty 'msDS-AllowedToActOnBehalfOfOtherIdentity' -ErrorAction SilentlyContinue
+  Write-Output ("msDS-AllowedToActOnBehalfOfOtherIdentity present: " + ($prop -ne $null));
 Write-Output "T007_OK: RBCD check complete"
 '
 

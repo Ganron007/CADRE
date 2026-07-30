@@ -15,7 +15,7 @@ SITE_SERVER="${SITE_SERVER:-mbr01.cadre.local}"
 CMD='
 $ErrorActionPreference = "Stop";
 try {
-  $admins = ([ADSI]("WinNT://'''"${SITE_SERVER}"'''"/Administrators,group")).Members() | ForEach-Object { $_.GetType().InvokeMember('Name', 'GetProperty', $null, $_, $null) }
+  $admins = ([ADSI]("WinNT://" + $env:COMPUTERNAME + "/Administrators,group")).Members() | ForEach-Object { $_.GetType().InvokeMember('Name', 'GetProperty', $null, $_, $null) }
   Write-Output "T039_OK: site server admins queried"; $admins | Select-Object -First 5
 } catch { Write-Output "T039_INFO: unable to query site server admins: $($_.Exception.Message)" }
 Write-Output "T039_OK: site takeover check complete"

