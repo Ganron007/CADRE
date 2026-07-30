@@ -884,8 +884,8 @@ We have `nt authority\system` on mbr01 via GodPotato. `analyst_cloud` has an act
 | **Att&ck** | T1098 (Account Manipulation), T1484 (Domain Policy Modification), T1548 (Abuse Elevation Control Mechanism) |
 | **Technique** | Abuse over-permissive ACEs discovered by BloodHound to escalate to DA in `cadre.local` |
 | **Playbook** | `05-ad-attack-surface.yml` — ACEs 1-26 (ACE#7 exact-right check fixed in deploy task) |
-| **Prerequisite** | Any credential with rights to modify the target AD object (user, group, computer, OU) |
-| **Source machine** | `ws01` as `intern_blue` or other compromised user |
+| **Prerequisite** | Earned `cadre.local` credential with rights to modify the target AD object (user, group, computer, OU). `analyst_t1` (child domain) is **not** valid for root-domain ACL abuse. Primary entry: `hunter_dfir` (WT031 password spray or Phase 3.5A-derived). Fallback: `chief_command` (DA). |
+| **Source machine** | `ws01` as `hunter_dfir` / `DF1R_Hunt3r!` (or `chief_command` fallback). `analyst_t1` must not be used here. |
 | **Target machine** | dc01 (`192.168.77.10`) — root DC / cadre.local |
 | **Domain** | `cadre.local` |
 | **Key finding** | ACE#7: `hunter_dfir → chief_command: ForceChangePassword` — fastest path to root DA+EA |
@@ -899,7 +899,8 @@ We have `nt authority\system` on mbr01 via GodPotato. `analyst_cloud` has an act
 | Field | Value |
 |-------|-------|
 | **WT#** | 015 |
-| **Status** | ✅ Verified live — ACE#7 was missing on `chief_command` during test; re-applied via corrected `05-ad-attack-surface.yml` (exact-right check now matches verify-only) and verified with `05-ad-attack-surface-verifyOnly.yml` (18/18 PASS). `hunter_dfir` successfully reset `chief_command` password to `NewChiefPass123!` and restored to original `C0mm@nd_Ch1ef!`. |
+| **Status** | ✅ Verified live — ACE#7 was missing on `chief_command` during test; re-applied via corrected `05-ad-attack-surface.yml`
+| **Starting credential** | `hunter_dfir` / `DF1R_Hunt3r!` (WT031 password spray or Phase 3.5A-derived) | (exact-right check now matches verify-only) and verified with `05-ad-attack-surface-verifyOnly.yml` (18/18 PASS). `hunter_dfir` successfully reset `chief_command` password to `NewChiefPass123!` and restored to original `C0mm@nd_Ch1ef!`. |
 | **Technique** | Reset password of high-priv user using `ForceChangePassword` ACE |
 | **ACE#** | 7 (`hunter_dfir → chief_command: ForceChangePassword`) |
 | **What it earns** | `chief_command` credential → root DA+EA |
@@ -916,6 +917,7 @@ We have `nt authority\system` on mbr01 via GodPotato. `analyst_cloud` has an act
 | **WT#** | 013 |
 | **Status** | ✅ Active |
 | **Technique** | Grant self GenericAll on own user or other object using WriteDacl |
+| **Starting credential** | `chief_command` / `C0mm@nd_Ch1ef!` (DA earned via Branch A T015) |
 | **What it earns** | Full control over target AD object |
 | **RedStrike Intent** | — |
 | **State Output** | SET_STATE(<manual>) |
@@ -928,6 +930,7 @@ We have `nt authority\system` on mbr01 via GodPotato. `analyst_cloud` has an act
 | **WT#** | 014 |
 | **Status** | ✅ Active |
 | **Technique** | `GenericWrite` on user → add `msDS-KeyCredentialLink` (Shadow Credentials) → authenticate as that user via PKINIT |
+| **Starting credential** | `chief_command` / `C0mm@nd_Ch1ef!` (DA earned via Branch A T015) |
 | **What it earns** | NT hash / TGT of target user |
 | **RedStrike Intent** | — |
 | **State Output** | SET_STATE(<manual>) |
@@ -940,6 +943,7 @@ We have `nt authority\system` on mbr01 via GodPotato. `analyst_cloud` has an act
 | **WT#** | 016 |
 | **Status** | ✅ Active |
 | **Technique** | `GenericAll` on OU → add GPO link or modify child objects |
+| **Starting credential** | `chief_command` / `C0mm@nd_Ch1ef!` (DA earned via Branch A T015) |
 | **What it earns** | DA or mass object control |
 | **RedStrike Intent** | — |
 | **State Output** | SET_STATE(<manual>) |
@@ -952,6 +956,7 @@ We have `nt authority\system` on mbr01 via GodPotato. `analyst_cloud` has an act
 | **WT#** | 008 |
 | **Status** | ✅ Active |
 | **Technique** | Add Shadow Credentials to `dc01$` computer account → authenticate as DC |
+| **Starting credential** | `chief_command` / `C0mm@nd_Ch1ef!` (DA earned via Branch A T015) |
 | **What it earns** | DC machine account TGT → DCSync rights |
 | **RedStrike Intent** | — |
 | **State Output** | SET_STATE(<manual>) |
@@ -964,6 +969,7 @@ We have `nt authority\system` on mbr01 via GodPotato. `analyst_cloud` has an act
 | **WT#** | 023 |
 | **Status** | ✅ Active |
 | **Technique** | Modify GPO to push scheduled task, registry, or rights assignment |
+| **Starting credential** | `analyst_cloud` / `Cl0ud_An@lyst!` (Phase 3.5A extraction from mbr01) — alternative GPO path |
 | **What it earns** | Lateral movement / persistence / privilege escalation across OU |
 | **RedStrike Intent** | — |
 | **State Output** | SET_STATE(<manual>) |
@@ -976,6 +982,7 @@ We have `nt authority\system` on mbr01 via GodPotato. `analyst_cloud` has an act
 | **WT#** | 024 |
 | **Status** | ✅ Active |
 | **Technique** | Extract Group Managed Service Account password using `GoldenGMSA` or DSInternals |
+| **Starting credential** | `chief_command` / `C0mm@nd_Ch1ef!` (DA earned via Branch A T015) |
 | **What it earns** | High-priv service account password |
 | **RedStrike Intent** | — |
 | **State Output** | SET_STATE(<manual>) |
@@ -1023,11 +1030,11 @@ We have `nt authority\system` on mbr01 via GodPotato. `analyst_cloud` has an act
 | **Att&ck** | T1649 (Steal Crypto Wallet / Private Key), T1550 (Use Alternate Auth Material), T1553 (Subvert Trust Controls) |
 | **Technique** | Abuse misconfigured ADCS templates to request certificates as any user or escalate to DA |
 | **Playbook** | `08-adcs-deploy.yml` — deploys ADCS with ESC1-ESC8 vulnerable configurations |
-| **Prerequisite** | Valid domain credential + vulnerable ADCS template |
-| **Source machine** | `ws01` |
+| **Prerequisite** | Domain Admin in `cadre.local` (from Branch A WT015 `chief_command`, or Phase 7 Golden Ticket). ADCS is in the root domain; a child-domain user cannot authenticate to the CA templates. |
+| **Source machine** | `ws01` as `chief_command@cadre.local` / `C0mm@nd_Ch1ef!` (or any `cadre.local` DA/EQ credential; optionally via Golden Ticket). |
 | **Target machine** | dc01 (`192.168.77.10`) — CA host |
 | **Domain** | `cadre.local` |
-| **Starting credential** | `analyst_t1` or any compromised domain user |
+| **Starting credential** | `chief_command` (DA+EA, earned via Branch A) or forged `administrator@cadre.local` TGT from Phase 7 |
 | **What it earns** | Certificate as high-priv user → NT hash via `PKINIT` pfx → DA |
 | **RedStrike Intent** | — |
 | **State Output** | SET_STATE(<manual>) |
@@ -1041,6 +1048,7 @@ We have `nt authority\system` on mbr01 via GodPotato. `analyst_cloud` has an act
 | **WT#** | 050 |
 | **Status** | ✅ Active |
 | **Technique** | Request certificate with arbitrary SAN (`UPN=administrator`) from template with `CT_FLAG_ENROLLEE_SUPPLIES_SUBJECT` and no manager approval |
+| **Starting credential** | `chief_command` / `C0mm@nd_Ch1ef!` (DA earned via Branch A T015) or Golden Ticket |
 | **What it earns** | Certificate as `administrator` → NT hash |
 | **Command** | `certipy req -u analyst_t1@child.cadre.local -p 'T13r_An@lyst!' -target dc01.cadre.local -ca cadre-CA -template VulnerableWebEnrollment -upn administrator@cadre.local` |
 | **Script** | `T050-esc1-ws01.sh` |
@@ -1054,6 +1062,7 @@ We have `nt authority\system` on mbr01 via GodPotato. `analyst_cloud` has an act
 | **WT#** | 051 |
 | **Status** | ✅ Active |
 | **Technique** | Enrollment agent certificate → request cert on behalf of another user |
+| **Starting credential** | `chief_command` / `C0mm@nd_Ch1ef!` (DA earned via Branch A T015) or Golden Ticket |
 | **Script** | `T051-esc3-ws01.sh` |
 | **RedStrike Intent** | — |
 | **State Output** | SET_STATE(<manual>) |
@@ -1065,6 +1074,7 @@ We have `nt authority\system` on mbr01 via GodPotato. `analyst_cloud` has an act
 | **WT#** | 052 |
 | **Status** | ✅ Active |
 | **Technique** | Coerce dc01$ or other account to authenticate to attacker listener; relay NTLM to ADCS web enrollment → certificate |
+| **Starting credential** | `chief_command` / `C0mm@nd_Ch1ef!` (DA earned via Branch A T015) or Golden Ticket |
 | **Command** | `ntlmrelayx.py -t http://dc01.cadre.local/certsrv/certfnsh.asp ...` |
 | **Script** | `T052-esc8-ws01.sh` |
 | **RedStrike Intent** | — |
@@ -1077,6 +1087,7 @@ We have `nt authority\system` on mbr01 via GodPotato. `analyst_cloud` has an act
 | **WT#** | 053 |
 | **Status** | ✅ Active |
 | **Technique** | After obtaining certificate, use PKINIT to get TGT, then extract NT hash from PAC |
+| **Starting credential** | `chief_command` / `C0mm@nd_Ch1ef!` (DA earned via Branch A T015) or Golden Ticket |
 | **What it earns** | NT hash of target user |
 | **RedStrike Intent** | — |
 | **State Output** | SET_STATE(<manual>) |

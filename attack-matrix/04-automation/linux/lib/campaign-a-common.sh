@@ -18,8 +18,8 @@ cadre_export() {
 }
 
 ws01_exec_as() {
-  local user="$1" pass="$2" cmd="$3"
-  WS01_AD_USER="${user}" WS01_AD_PASS="${pass}" \
+  local user="$1" pass="$2" cmd="$3" domain="${4:-child.cadre.local}"
+  WS01_AD_USER="${user}" WS01_AD_PASS="${pass}" WS01_DOMAIN="${domain}" \
     bash "${CAMPAIGN_A_LIB}/ws01-exec.sh" "${cmd}"
 }
 

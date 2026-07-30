@@ -65,22 +65,24 @@ All core AD machines (dc01, dc02, dc03, mbr01, mbr02, linux01, ws01, provisionin
 
 ## Branch A-D Status
 
+> **Design flaw fixed 2026-07-30:** The original validation run used `analyst_t1` / `T13r_An@lyst!` for every Branch A and Branch B script. `analyst_t1` is a `child.cadre.local` user and cannot modify root-domain ACEs or authenticate to ADCS in `cadre.local`. The scripts and metadata have been corrected to use earned root-domain credentials: `hunter_dfir` (Branch A entry), `chief_command` (Branch A post-DA and Branch B entry), and `analyst_cloud` (Branch A GPO alternative).
+
 | Branch | WT# | Technique | Status | Credential | Notes |
 |--------|-----|-----------|--------|------------|-------|
 | A | WT015 | ForceChangePassword (ACE#7) | ✅ Verified live | `hunter_dfir` | `chief_command` password reset and restored; playbook fix committed. |
-| A | WT013 | WriteDacl self-escalate | ✅ Script executes | `analyst_t1` | PowerView path runs; actual GenericAll grant not deeply verified in this run. |
-| A | WT014 | GenericWrite → Shadow Credentials | ✅ Script executes | `analyst_t1` | PowerView path runs. |
-| A | WT016 | GenericAll on OU | ✅ Script executes | `analyst_t1` | PowerView path runs. |
-| A | WT023 | GPO abuse | ✅ Script executes | `analyst_t1` | GPO modify path runs. |
-| A | WT024 | gMSA extraction | ✅ Script executes | `analyst_t1` | GoldenGMSA/DSInternals path runs. |
-| A | WT008 | Shadow Credentials on dc01$ | ✅ Script executes | `analyst_t1` | Whisker/SharpShadow path runs. |
+| A | WT013 | WriteDacl self-escalate | ✅ Script corrected (not retested) | `chief_command` | PowerView path now runs as root DA after T015. |
+| A | WT014 | GenericWrite → Shadow Credentials | ✅ Script corrected (not retested) | `chief_command` | PowerView path now runs as root DA after T015. |
+| A | WT016 | GenericAll on OU | ✅ Script corrected (not retested) | `chief_command` | PowerView path now runs as root DA after T015. |
+| A | WT023 | GPO abuse | ✅ Script corrected (not retested) | `analyst_cloud` | GPO path uses Phase 3.5A extracted credential. |
+| A | WT024 | gMSA extraction | ✅ Script corrected (not retested) | `chief_command` | GoldenGMSA/DSInternals path now runs as root DA. |
+| A | WT008 | Shadow Credentials on dc01$ | ✅ Script corrected (not retested) | `chief_command` | Whisker/SharpShadow path now runs as root DA. |
 | A | GPP | Groups.xml password | ⏳ Not exercised | — | `Get-GPPPassword` not run. |
 | A | WT027 | SPN jacking | ⏳ Not exercised | — | Not run. |
 | A | WT025 | AdminSDHolder | ⏳ Not exercised | — | Not run. |
-| B | WT050 | ESC1 | ⚠️ BLOCKED | `analyst_t1` | Certify from ws01 fails with `DirectoryServices` operations error. Likely needs `cadre.local` domain-joined context or explicit credentials. |
-| B | WT051 | ESC3 | ⚠️ BLOCKED | `analyst_t1` | Same Certify error as ESC1. |
-| B | WT052 | ESC8 | ⚠️ BLOCKED | `analyst_t1` | Web enrollment 401 from ws01; also depends on coercion working. |
-| B | WT053 | UnPAC-the-Hash | ⚠️ BLOCKED | `analyst_t1` | Certify request fails before Rubeus step. |
+| B | WT050 | ESC1 | ✅ Script corrected (not retested) | `chief_command` | Certify now runs as `cadre.local` DA. |
+| B | WT051 | ESC3 | ✅ Script corrected (not retested) | `chief_command` | Certify now runs as `cadre.local` DA. |
+| B | WT052 | ESC8 | ✅ Script corrected (not retested) | `chief_command` | Web enrollment check now runs as `cadre.local` DA. |
+| B | WT053 | UnPAC-the-Hash | ✅ Script corrected (not retested) | `chief_command` | Certify request now runs as `cadre.local` DA. |
 | C | WT034 | NAA extraction | ✅ Verified | `svc_sccm` | `svc_naa` DA confirmed. |
 | C | WT035-039 | SCCM chain | ⏳ Not exercised from ws01 | `svc_sccm` / `svc_naa` | Need to run from SCCM client or mbr02 directly. |
 | D | WT044 | MSSQL linked-server pivot | ✅ Verified | `analyst_t1` | `SELECT name FROM LINUX01.master.sys.databases` returns linux01 databases. |
@@ -99,7 +101,8 @@ All core AD machines (dc01, dc02, dc03, mbr01, mbr02, linux01, ws01, provisionin
 |---|------|------------|------------|------------|
 | 1 | **Phase 5 T102 coercion** | Print Spooler on dc02 not producing capturable Kirbi tickets (0 Kirbi from Rubeus monitor). | Verify Print Spooler is running and exposed on dc02 via `04-vulnerabilities.yml` and `04-vulnerabilities-verifyOnly.yml`. Ensure `Spooler` service start + firewall. | `ansible/playbooks/04-vulnerabilities.yml` |
 | 2 | **Phase 5 WT007 RBCD** | PowerView `Get-DomainComputer` from ws01 returns LDAP "operations error occurred". | Fix script to use explicit `-Server` / `-Credential`, or run from a domain-joined context with `child\analyst_t1` properly resolved. | `attack-matrix/04-automation/linux/campaign-a/T007-rbcd-ws01.sh` |
-| 3 | **Branch B ADCS (ESC1/ESC3/ESC8/UnPAC)** | Certify on ws01 fails with `DirectoryServices` COM exception. `ws01` is in `child.cadre.local`; ADCS is in `cadre.local`. | Run from a `cadre.local` machine or use explicit `-u cadre\user` credentials with Certify. | `T050-esc1-ws01.sh`, `T051-esc3-ws01.sh`, `T052-esc8-ws01.sh`, `T053-unpac-thehash-ws01.sh` |
+| 3 | **Branch B ADCS (ESC1/ESC3/ESC8/UnPAC)** | Original scripts used `analyst_t1` (child domain) against ADCS in `cadre.local`. | Scripts corrected to use `chief_command@cadre.local`. Re-run to confirm Certify resolves DC context. | `T050-esc1-ws01.sh`, `T051-esc3-ws01.sh`, `T052-esc8-ws01.sh`, `T053-unpac-thehash-ws01.sh` |
+| 3b | **Branch A non-T015 paths** | Original scripts used `analyst_t1` for root-domain ACL abuse. | Scripts corrected to use `hunter_dfir` (T015) and `chief_command` (post-DA). Re-run after T015. | `T013/T014/T016/T008/T024-ws01.sh` |
 | 4 | **Branch C WT035-039** | Scripts execute from ws01, but ws01 has no SCCM client and no SCCM PowerShell module. | Execute from mbr02 (site server) or push SCCM console/PowerShell module to ws01. | `attack-matrix/04-automation/linux/campaign-a/T035*-ws01.sh` etc. |
 | 5 | **Branch D WT045-048** | No automation scripts exist for SSSD ticket, keytab, NFS krb5p, or Podman escape. | Write and test `T045-T048` scripts on linux01/mbr01. | `attack-matrix/04-automation/linux/campaign-d/` (to create) |
 | 6 | **Branch 3.5 alternatives** | DPAPI, ctfmon, WMI, WerFault, LAPS, AAD Connect not exercised. | Schedule dedicated Branch 3.5 run after main spine is stable. | `CAMPAIGNS-METADATA-v2.md` sections 3.5G-3.5M |

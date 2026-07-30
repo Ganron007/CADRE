@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
-# T050 — ADCS ESC1 enumeration from ws01 (analyst_t1) using Certify.exe
+# T050 — ADCS ESC1 enumeration from ws01 as chief_command (cadre.local DA)
+# Entry credential: chief_command (earned via Branch A T015 ForceChangePassword)
 set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 LIB="${SCRIPT_DIR}/../lib"
@@ -19,7 +20,7 @@ if (-not (Test-Path $c)) { throw "Certify.exe not found" }
 Write-Output "T050_OK: ESC1 enumeration complete"
 '
 
-ws01_exec_as analyst_t1 'T13r_An@lyst!' "$CMD"
+ws01_exec_as chief_command 'C0mm@nd_Ch1ef!' "$CMD" 'cadre.local'
 
 cadre_export "${CASE_ID}" T050 "${T0}" 192.168.77.62
 echo "T0=${T0}" | tee "/tmp/${CASE_ID}.t0"

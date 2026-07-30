@@ -135,14 +135,16 @@ PHASE 4 — DISCOVERY (BloodHound as analyst_cloud)
   ───────────────────────────────────────────────────────────────────────────
   │  BRANCH B — ADCS (diverges here, alternative to spine P5-P7)            │
   │  ─────────────────────────────────────────────────────────────────────   │
-  │  Entry: BloodHound reveals ADCS templates on dc01                        │
-  │  [CRED] analyst_cloud / Cl0ud_An@lyst! (from Phase 3.5A) — WORKS        │
-  │  [GAIN] Certificate as administrator → PKINIT → DA/EA without krbtgt     │
-  │  Key:   ESC1 = CADRE-ESC1 template, enrollee supplies subject            │
-  │         ESC8 = NTLM relay to CertSrv web enrollment                      │
-  │  Tools: certipy req, certipy auth, ntlmrelayx.py                         │
-  │  Converges: Skip Phase 5-6-7 — authenticate as administrator directly    │
-  │             then proceed to Phase 8 with EA-equivalent access            │
+  │  Entry: BloodHound reveals ADCS templates on dc01 (cadre.local)           │
+  │  [CRED] chief_command / C0mm@nd_Ch1ef! (DA+EA from Branch A T015)          │
+  │  [ALT]  Golden Ticket (administrator@cadre.local) from Phase 7             │
+  │  [GAIN] Certificate as administrator → PKINIT → DA/EA without krbtgt      │
+  │  Key:   ESC1 = CADRE-ESC1 template, enrollee supplies subject             │
+  │         ESC3 = Enrollment Agent certificate abuse                         │
+  │         ESC8 = NTLM relay to CertSrv web enrollment                       │
+  │  Tools: Certify.exe, certipy req, certipy auth, ntlmrelayx.py             │
+  │  Converges: Skip Phase 5-6-7 — authenticate as administrator directly   │
+  │             then proceed to Phase 8 with EA-equivalent access             │
   └──────────────────────────────────────────────────────────────────────────
 
 
@@ -255,20 +257,23 @@ STREAMS E / F / G — STANDALONE EXERCISES (Not part of campaign narrative)
 
   #  Credential        Domain              How Obtained              Phase  Used In
   ── ───────────────── ─────────────────── ───────────────────────── ────── ───────────────
-  1  analyst_t1        child.cadre.local   Phase 0.5 (assume breach)  0.5   ws01, mbr01 SQL
+  1  analyst_t1        child.cadre.local   Phase 0.5 (assume breach)  0.5   ws01, mbr01 SQL, Branch D
   2  intern_blue       child.cadre.local   Phase 1 (AS-REP roast)     1     ACE#18 bridge
   3  svc_mssql         child.cadre.local   Phase 2 (Kerberoast)       2     SQL auth, recon
-  4  analyst_cloud     cadre.local         Phase 3.5A (Winlogon reg)  3.5   BH, Branch B, GPO
+  4  analyst_cloud     cadre.local         Phase 3.5A (Winlogon reg)  3.5   BH, Branch A GPO (T023)
   5  dc02$             child.cadre.local   Phase 5 (coercion capture) 5     DCSync (BLOCKED)
   6  child krbtgt      child.cadre.local   Phase 6 (DCSync)           6     Golden Ticket (BLOCKED as written)
   7  cadre EA          cadre.local         Phase 7 (Golden+ExtraSids) 7     Cross-forest (BYPASSED via WT031 chief_command)
   8  svc_sccm          range.local         Phase 8 (X-forest roast)   8     Branch C (TGS hash cracked; NAA path verified)
   9  svc_naa           range.local         Phase 8 (SCCM NAA)         8     range DA, DCSync (verified via vault share)
-  F1 chief_command     cadre.local         WT031 password-spray       —     root DA+EA (fallback pivot)
+  F1 chief_command     cadre.local         Branch A T015 (WT031 seed)  —     root DA+EA, Branch B entry, Branch A post-ex
   ── ───────────────── ─────────────────── ───────────────────────── ────── ───────────────
-  S1 hunter_dfir       cadre.local         [SEED] WT031 password spray —     Branch A (ACE#7 verified)
+  S1 hunter_dfir       cadre.local         [SEED] WT031 password spray —     Branch A entry (ACE#7 → chief_command)
   S2 analyst_dfir      cadre.local         [SEED] WT031 password spray —     Branch A (ACE#5)
-  S3 eng_agentic       cadre.local         [SEED] WT031 password spray —     Branch A (ACE#13+14)
+  S3 eng_agentic       cadre.local         [SEED] WT031 password spray —     Branch A (ACE#13+14 DCSync)
+
+  IMPORTANT: analyst_t1 is a child.cadre.local user and MUST NOT be used
+             for Branch A or Branch B scripts. Both branches target cadre.local.
 
 
 ================================================================================
@@ -279,9 +284,12 @@ STREAMS E / F / G — STANDALONE EXERCISES (Not part of campaign narrative)
   ─────────────────────────────────────────────────────────────────────────────
   Full learning experience          Main Spine    (earned in-chain)     Nothing
   Fastest to cadre.local DA         Branch A      hunter_dfir [SEED]    P5, P6, P7
-  DA without krbtgt (cert-based)    Branch B      analyst_cloud         P5, P6, P7
+  DA without krbtgt (cert-based)    Branch B      chief_command         P5, P6, P7
   range.local DA (required)         Branch C      svc_sccm (from P8)    Nothing  ✅ WT034 NAA verified; WT035-039 not yet tested
   Linux post-exploitation           Branch D      analyst_t1 (SQL)      Nothing
+
+  NOTE: analyst_t1 is a child.cadre.local user and MUST NOT be used for
+        Branch A or Branch B — both operate against cadre.local root domain.
 
 
 ================================================================================
