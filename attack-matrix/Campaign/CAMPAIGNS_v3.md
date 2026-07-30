@@ -148,20 +148,20 @@ PHASE 4 — DISCOVERY (BloodHound as analyst_cloud)
   └──────────────────────────────────────────────────────────────────────────
 
 
-PHASE 5 — COERCION + DELEGATION (Capture dc02$ TGT) ⚠️ BLOCKED
+PHASE 5 — COERCION + DELEGATION (Capture dc02$ TGT) ⏳ TRIGGER VERIFIED / CAPTURE PENDING
 ═══════════════════════════════════════════════════════════════════════════════
   Source: ws01 → SYSTEM on mbr01
   Target: dc02 (.11) coerced to auth to mbr01 (.22)
   [CRED] analyst_t1 (to reach mbr01), SYSTEM on mbr01
-  [GAIN] dc02$ machine account TGT (captured by Rubeus monitor)
+  [GAIN] dc02$ machine account TGT (captured by Rubeus monitor/dump)
   Key:    mbr01$ has TrustedForDelegation=True (unconstrained delegation)
           SpoolSample triggers dc02$ to authenticate to mbr01
-  Tools:  SpoolSample.exe, Rubeus.exe monitor, MS-RPRN (PrinterBug)
+  Tools:  SpoolSample.exe, Rubeus.exe monitor/dump, MS-RPRN (PrinterBug)
   Detect: Suricata SID:1000050 (12 fires confirmed), Zeek dce_rpc.log
-  Status: ⚠️ BLOCKED — Rubeus `monitor` captures local Kerberos traffic, not
-          incoming coerced auth from dc02. Correct capture method (Rubeus dump
-          of LSASS after coercion) produced 0 Kirbi tickets for DC02$.
-          Marked for revisit; see T102-BLOCKED note below.
+  Status: ⏳ Trigger verified / capture pending — PrinterBug trigger from ws01→mbr01
+          successfully fires against dc02; Rubeus dump ran but did not yield
+          Kirbi markers for `DC02$`. dc02 prerequisites are now enforced in
+          `04-vulnerabilities.yml`; revisit capture path next.
   ───────────────────────────────────────────────────────────────────────────
   │  ALTERNATIVE: RBCD (WT007) — if unconstrained delegation not available   │
   │  [CRED] svc_mssql or any cred with GenericWrite on target computer       │
@@ -172,16 +172,12 @@ PHASE 5 — COERCION + DELEGATION (Capture dc02$ TGT) ⚠️ BLOCKED
   │  chief_command is DA+EA in cadre.local → fastest path to root DA.        │
   └──────────────────────────────────────────────────────────────────────────┘
 
-**T102-BLOCKED note:**
-The T102 automation script ran on mbr01 as SYSTEM, triggered PrinterBug, and
-executed `Rubeus dump /user:DC02$`. The dump completed (51789 bytes) but
-reported `Kirbi count: 0`, indicating the dc02$ TGT was not cached in mbr01
-LSASS. Possible causes: (1) coercion traffic did not authenticate back to mbr01
-in a way that populates a delegable TGT, (2) Server 2025 unconstrained
-delegation capture behavior differs from the assumed model, or (3) the
-SpoolSample trigger needs a different listener configuration. The script and
-metadata are preserved; revisit after verifying delegation settings and
-capture tooling.
+**T102-NOTE (2026-07-30):**
+The T102 path was tested from `ws01` to `dc02` via `mbr01`. `SpoolSample`
+triggered successfully, but the Rubeus capture path did not return Kirbi
+markers for `DC02$`. The playbook now explicitly ensures `dc02` Print Spooler
+and Spooler RPC/SMB firewall prerequisites; the attack remains preserved for
+revisit once those prerequisites are verified in a fresh run.
 
 **Validated fallback:** WT031 password spray against dc01 (cadre.local) yielded
 valid credentials for `chief_command`, `analyst_dfir`, and `analyst_cloud`.

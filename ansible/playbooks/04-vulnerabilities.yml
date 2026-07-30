@@ -37,6 +37,46 @@
         start_mode: auto
         state: started
 
+    - name: "[VULN][WT#17] File and Printer Sharing firewall group enabled (Spooler RPC/SMB)"
+      ansible.windows.win_shell: |
+        $ErrorActionPreference = "Stop"
+        try {
+          $group = Get-NetFirewallRule -DisplayGroup "File and Printer Sharing" -ErrorAction Stop
+          $enabled = $group | Where-Object { $_.Enabled -eq $true }
+          if ($enabled) { Write-Output "OK: File and Printer Sharing already enabled"; exit 0 }
+          Enable-NetFirewallRule -DisplayGroup "File and Printer Sharing"
+          $v = Get-NetFirewallRule -DisplayGroup "File and Printer Sharing" | Where-Object { $_.Enabled -eq $true }
+          if (-not $v) { throw "Firewall group not enabled" }
+          Write-Output "APPLIED: File and Printer Sharing firewall enabled"; exit 2
+        } catch { Write-Output "FAILED: $_"; exit 1 }
+      register: r
+      changed_when: r.rc == 2
+      failed_when: r.rc == 1
+
+    - name: "[VULN][WT#17] Explicit SMB/RPC firewall rules for Spooler coercion path"
+      ansible.windows.win_shell: |
+        $ErrorActionPreference = "Stop"
+        try {
+          $rules = @(
+            @{ name = "CADRE-Spooler-SMB-In"; proto = "TCP"; port = 445; dir = "Inbound" },
+            @{ name = "CADRE-Spooler-RPC-In"; proto = "TCP"; port = 135; dir = "Inbound" },
+            @{ name = "CADRE-Spooler-RPC-Dynamic-In"; proto = "TCP"; port = 49152-65535; dir = "Inbound" }
+          )
+          foreach ($r in $rules) {
+            $existing = Get-NetFirewallRule -DisplayName $r.name -ErrorAction SilentlyContinue
+            if (-not $existing) {
+              New-NetFirewallRule -DisplayName $r.name -Direction $r.dir -Protocol $r.proto -LocalPort $r.port -Action Allow -Profile Any -Enabled True | Out-Null
+              Write-Output ("APPLIED: " + $r.name)
+            } else {
+              Write-Output ("OK: " + $r.name + " exists")
+            }
+          }
+          exit 0
+        } catch { Write-Output "FAILED: $_"; exit 1 }
+      register: r
+      changed_when: r.rc == 2
+      failed_when: r.rc == 1
+
     - name: "[VULN][WT#18] WebClient enabled (auto)"
       ansible.windows.win_service:
         name: WebClient

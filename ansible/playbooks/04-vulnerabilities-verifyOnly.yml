@@ -33,18 +33,6 @@
     - name: "[VULN][WT#17] Verify Print-Services feature installed"
       ansible.windows.win_shell: |
         try {
-        $ErrorActionPreference = "Stop"
-          $feature = Get-WindowsFeature -Name Print-Services -ErrorAction Stop
-          if ($feature.Installed -eq $true) { Write-Output "PASS: Print-Services feature installed"; exit 0 }
-          Write-Output "FAIL: Print-Services feature not installed"; exit 1
-        } catch { Write-Output "FAIL: $_"; exit 1 }
-      register: r
-      changed_when: false
-      failed_when: r.rc == 1
-
-    - name: "[VULN][WT#17] Verify Print-Services feature installed"
-      ansible.windows.win_shell: |
-        try {
           $ErrorActionPreference = "Stop"
           $feat = Get-WindowsFeature -Name "Print-Services" -ErrorAction Stop
           if ($feat.InstallState -eq "Installed") { Write-Output "PASS: Print-Services feature installed"; exit 0 }
@@ -57,10 +45,39 @@
     - name: "[VULN][WT#17] Verify Print Spooler enabled (auto)"
       ansible.windows.win_shell: |
         try {
-        $ErrorActionPreference = "Stop"
+          $ErrorActionPreference = "Stop"
           $svc = Get-Service -Name "Spooler" -ErrorAction Stop
           if ($svc.StartType -eq "Automatic" -and $svc.Status -eq "Running") { Write-Output "PASS: Spooler is Automatic/Running"; exit 0 }
           Write-Output "FAIL: expected Spooler Automatic/Running got $($svc.StartType)/$($svc.Status)"; exit 1
+        } catch { Write-Output "FAIL: $_"; exit 1 }
+      register: r
+      changed_when: false
+      failed_when: r.rc == 1
+
+    - name: "[VULN][WT#17] Verify File and Printer Sharing firewall group enabled"
+      ansible.windows.win_shell: |
+        try {
+          $ErrorActionPreference = "Stop"
+          $rules = Get-NetFirewallRule -DisplayGroup "File and Printer Sharing" -ErrorAction Stop
+          $enabled = $rules | Where-Object { $_.Enabled -eq $true }
+          if ($enabled) { Write-Output "PASS: File and Printer Sharing firewall rules enabled"; exit 0 }
+          Write-Output "FAIL: File and Printer Sharing firewall rules not enabled"; exit 1
+        } catch { Write-Output "FAIL: $_"; exit 1 }
+      register: r
+      changed_when: false
+      failed_when: r.rc == 1
+
+    - name: "[VULN][WT#17] Verify Spooler SMB/RPC firewall rules present"
+      ansible.windows.win_shell: |
+        try {
+          $ErrorActionPreference = "Stop"
+          $names = @("CADRE-Spooler-SMB-In","CADRE-Spooler-RPC-In","CADRE-Spooler-RPC-Dynamic-In")
+          foreach ($name in $names) {
+            $rule = Get-NetFirewallRule -DisplayName $name -ErrorAction SilentlyContinue
+            if (-not $rule) { Write-Output "FAIL: missing firewall rule $name"; exit 1 }
+            if ($rule.Enabled -ne $true) { Write-Output "FAIL: firewall rule $name not enabled"; exit 1 }
+          }
+          Write-Output "PASS: Spooler SMB/RPC firewall rules present and enabled"; exit 0
         } catch { Write-Output "FAIL: $_"; exit 1 }
       register: r
       changed_when: false

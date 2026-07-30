@@ -131,7 +131,7 @@
 
 | ID | Attack | Source Machine | Credential | Status | Notes | Re-test Needed |
 |------|--------|----------------|------------|--------|-------|----------------|
-| T102 | Unconstrained delegation capture dc02$ TGT (T102) | SYSTEM on mbr01 | SYSTEM | ⚠️ BLOCKED | SpoolSample triggered but Rubeus monitor captures 0 Kirbi from dc02$; Print Spooler on dc02 must be running/exposed | Yes - fix 04-vulnerabilities.yml to enable Print Spooler on dc02 |
+| T102 | Unconstrained delegation capture dc02$ TGT (T102) | SYSTEM on mbr01 | SYSTEM | ⏳ Trigger verified / capture pending | SpoolSample trigger verified against dc02; Rubeus capture did not return Kirbi markers. Playbook updated with dc02 Spooler + RPC/SMB firewall prerequisites; re-test capture after verify-only run | Yes - re-run T102 after 04-vulnerabilities-verifyOnly.yml confirms dc02 spooler/RPC surface |
 
 ## Phase 6
 

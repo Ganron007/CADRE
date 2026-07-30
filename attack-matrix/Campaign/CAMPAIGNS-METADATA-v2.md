@@ -668,7 +668,7 @@ We have `nt authority\system` on mbr01 via GodPotato. `analyst_cloud` has an act
 
 | Field | Value |
 |-------|-------|
-| **Status** | ⚠️ BLOCKED — T102 unconstrained-delegation capture produced 0 Kirbi tickets for DC02$ (Rubeus dump size 51789, Kirbi count 0). Pivot used: WT031 password spray validated `chief_command` / `analyst_dfir` / `analyst_cloud` credentials on cadre.local. `chief_command` is DA+EA → campaign proceeds to Phase 7/8 without dc02$ TGT. |
+| **Status** | ⏳ Trigger verified / capture pending — `SpoolSample` coercion from ws01→mbr01 path triggers successfully against dc02, but Rubeus capture produced 0 Kirbi markers for `DC02$` in current test run. Playbook now ensures Print Spooler + SMB/RPC firewall prerequisites on dc02; revisit capture path next. |
 | **Stream** | Core AD |
 | **Att&ck** | T1187 (Forced Authentication) + T1550.002 (Use Alternate Authentication Material: Kerberos) |
 | **Technique** | Coerce `dc02$` to authenticate to `mbr01`, capture TGT via Rubeus monitor |
@@ -687,7 +687,7 @@ We have `nt authority\system` on mbr01 via GodPotato. `analyst_cloud` has an act
 | **Step 4** | Collect captured TGT from monitor output |
 | **Key telemetry** | WinSec 4662 (RPC); Zeek dce_rpc.log (opnum 1,65); Suri SID:1000050 (PrinterBug) |
 | **Script** | `attack-matrix/04-automation/linux/campaign-a/T102-coerce-dc02-ws01.sh` + `campaign-a-t102-coerce-dc02.ps1` |
-| **Status** | Script tested 2026-07-30 — still blocked; Rubeus monitor captures 0 Kirbi tickets from dc02$ coercion (dump size 51789, Kirbi count 0). Print Spooler service on dc02 needs to be running/exposed. |
+| **Status** | Tested 2026-07-30 — trigger verified, capture pending. `SpoolSample` runs and Rubeus dump is generated, but no Kirbi markers captured for `DC02$`. Re-test after playbook-enforced spooler/RPC prerequisites are verified on dc02. |
 
 #### Alternative Coercion Techniques
 

@@ -20,7 +20,7 @@
 
 **Key findings:**
 1. The biggest gap is **Phase 0.5 / H (initial access)**: no playbook configures the payloads/drop vectors on `ws01` or `Kali`. The surface is assumed by the campaign but not automated.
-2. **Phase 5 coercion / T102** is misconfigured: `Spooler` on `dc02` is not exposed/running, so `dc02$` coercion fails and the main-spine DCSync/Golden Ticket path is diverted to a `chief_command` fallback.
+2. **Phase 5 coercion / T102** trigger path is now configured: `dc02` Spooler + SMB/RPC firewall prerequisites are added to `04-vulnerabilities.yml`. Live test showed trigger works, but Rubeus capture still returned 0 Kirbi markers for `DC02$`; treat as **trigger verified / capture pending**.
 3. **Branch A** has a credential-design issue now fixed in scripts/docs, but relies on a password spray (WT031) that is not configured as an official playbook path.
 4. **Branch C** after WT034 is configured but WT035-039 require running from `mbr02` itself; the campaign scripts currently run from `ws01` and are not exercised.
 5. **Branch D** Linux pivot is mostly missing: SSSD/keytab/NFS/Podman surface is not configured in the Linux playbook.
@@ -131,11 +131,11 @@
 | WT094 | UnCanny Coerce | Developer Mode + loose AppX registration | Not configured. | 🔬 Deferred | Correctly not configured. |
 | WT095 | Onelogon Zero-Channel | Unpatched single-channel NRPC | No playbook can make a DC vulnerable; relies on patch state. | 🔬 Deferred | PoC not released. |
 | WT096 | `coerce_plus` consolidated | NetExec module + any working coercion | NetExec installed; but no target surface beyond WT017. | ⚠️ Partial | Same as WT017/WT018/WT019/WT020. |
-| T102 | Unconstrained delegation capture `dc02$` | `dc02` Spooler exposed, `mbr01` Rubeus monitor | **Spooler on `dc02` not running/exposed.** | ⚠️ Misconfigured | This is the single biggest main-spine blocker. |
+| T102 | Unconstrained delegation capture `dc02$` | `dc02` Spooler exposed, `mbr01` Rubeus monitor | **`dc02` Spooler prerequisites added to deploy/verify playbooks.** | ⏳ Trigger verified / capture pending | Trigger works; Rubeus capture still returns 0 Kirbi for `DC02$`. Re-test after fresh verify-only run. |
 
-**Verdict:** Phase 5 coercion is the main flaw. The campaign expects `dc02$` to be coerced via Spooler, but `04-vulnerabilities.yml` only enables Spooler on `mbr01` (and maybe not reliably on `dc02`). This cascades into Phase 6/7 requiring `chief_command` fallback instead of `dc02$` TGT.
+**Verdict:** Phase 5 coercion prerequisites are now aligned in playbooks. Live testing shows the trigger path works, but ticket capture is still unconfirmed. The remaining gap is likely the Rubeus capture method/format on `mbr01`, not `dc02` exposure.
 
-**Fix required:** Add a `04-vulnerabilities.yml` task (and matching verify) to ensure `Spooler` service is **Automatic/Running** and firewall allows SMB/RPC on `dc02` for the coercion target. Use only for lab; document it as vulnerable.
+**Next step:** Run `04-vulnerabilities-verifyOnly.yml` to confirm `dc02` spooler/RPC state, then re-test T102 capture path before treating it as fully verified.
 
 ---
 
