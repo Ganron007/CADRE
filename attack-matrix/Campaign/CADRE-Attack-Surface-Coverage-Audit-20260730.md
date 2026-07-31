@@ -185,7 +185,7 @@
 || WT027 | SPN jacking (CVE-2026-25177) | `analyst_cloud` self ValidatedWriteSPN, homoglyph SPN pre-staged | `05-ad-attack-surface.yml` pre-stages homoglyph SPN and self ACE. | ✅ Configured | Not exercised. |
 || WT025 | AdminSDHolder persistence | DA modifies AdminSDHolder template | No playbook pre-configures writable AdminSDHolder for a non-DA. | ❌ Missing | Requires a very specific ACL setup not in playbooks. |
 
-**Verdict:** Branch A now has one confirmed blocker (`WT015`) from retest evidence. Other ACE-based attacks are scripted and await rerun after ACE exposure or alternate routing is validated.
+**Verdict:** Branch A now has one confirmed blocker (`WT015`) from retest evidence. Other ACE-based attacks are scripted and await rerun after ACE exposure or alternate routing is validated. Current operator SSH path is also blocked: local `ssh-agent` is unavailable (`Error connecting to agent: No such file or directory`; service Stopped/Disabled) and direct `localhost -> ws01` SSH returns `Permission denied (publickey,keyboard-interactive)`; rerun requires ACE#7 verify-only pass **and** working SSH access to `ws01`.
 
 ---
 

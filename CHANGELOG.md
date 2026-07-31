@@ -4,7 +4,9 @@
 
 - Coverage audit: Branch A blocked count increased; WT015 marked blocked by missing ACE exposure in live retest.
 - Validation report: appended consolidated campaign re-test matrix for AD core + Branch A-D, plus E/F/G/H summary.
+- Validation report: recorded operator execution blocker — local `ssh-agent` unavailable and direct `localhost -> ws01` SSH returns `Permission denied (publickey,keyboard-interactive)`.
 - Checklist: added campaign re-test tracker with source machine, credentials, status, and retest notes.
+- Checklist: added EXEC-001 item to restore operator SSH access before campaign retest.
 - Gap report: recorded missing surfaces for GPP, AdminSDHolder, SSSD extraction, NFS Kerberos mount, and Podman escape.
 # Changelog
 

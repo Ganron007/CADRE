@@ -371,6 +371,7 @@
 | 025 | AdminSDHolder persistence (WT025) | ws01 | DA | 📝 Configured / pending re-test |
 
 - [ ] **T015** ACE#7 ForceChangePassword — surface check · attack run · telemetry captured · tracker updated
+- [ ] **EXEC-001** Restore operator SSH access to `ws01` — fix local `ssh-agent` service (`Stopped`/`Disabled`) and retry direct `localhost -> ws01` SSH, or rerun from `provisioning`/WSL/Git Bash instead.
 - [ ] **T013** WriteDacl self-escalate — surface check · attack run · telemetry captured · tracker updated
 - [ ] **T014** GenericWrite -> Shadow Credentials — surface check · attack run · telemetry captured · tracker updated
 - [ ] **T016** GenericAll on OU — surface check · attack run · telemetry captured · tracker updated
