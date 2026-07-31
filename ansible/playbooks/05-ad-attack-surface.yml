@@ -1150,3 +1150,61 @@
       register: r
       changed_when: r.rc == 2
       failed_when: r.rc not in [0, 2]
+
+# =============================================================================
+# PART 4: Branch A additional surfaces — GPP + AdminSDHolder
+# =============================================================================
+- name: "dc01 — Branch A additional surfaces"
+  hosts: dc01
+  gather_facts: false
+  tasks:
+    - name: "[BRANCH-A][GPP] Deploy SYSVOL Groups.xml with cpassword"
+      ansible.windows.win_shell: |
+        $ErrorActionPreference = "Stop"
+        try {
+          $domain = "cadre.local"
+          $policyGuid = "{6A7B8C9D-1234-5678-90AB-CDEF01234567}"
+          $path = "\\dc01.cadre.local\SYSVOL\$domain\Policies\$policyGuid\Machine\Preferences\Groups"
+          New-Item -ItemType Directory -Path $path -Force | Out-Null
+          $content = @"
+<?xml version="1.0" encoding="utf-8"?>
+<Groups clsid="{3125E937-EB16-4b4c-9934-544FC6D24D26}">
+  <User clsid="{DF5F1855-50E4-4402-8C65-4F83F7B07AAC}" name="CADRE\svc_ldap" image="0" changed="2026-07-31T00:00:00">
+    <Properties action="U" newName="" fullName="" description="" cpassword="VLDHPZLF/9k=" />
+  </User>
+</Groups>
+"@
+          Set-Content -Path "$path\Groups.xml" -Value $content -Encoding UTF8
+          if (-not (Test-Path "$path\Groups.xml")) { throw "Groups.xml missing" }
+          Write-Output "APPLIED: SYSVOL Groups.xml deployed"; exit 2
+        } catch { Write-Output "FAILED: $_"; exit 1 }
+      register: r
+      changed_when: r.rc == 2
+      failed_when: r.rc not in [0, 2]
+
+    - name: "[BRANCH-A][AdminSDHolder] Grant analyst_cloud WriteDacl on AdminSDHolder"
+      ansible.windows.win_shell: |
+        $ErrorActionPreference = "Stop"
+        try {
+          Import-Module ActiveDirectory
+          Set-Location AD:
+          $TargetDN = "CN=AdminSDHolder,CN=System,DC=cadre,DC=local"
+          $Principal = "CADRE\analyst_cloud"
+          $Rights = [System.DirectoryServices.ActiveDirectoryRights]::WriteDacl
+          $AccessControlType = [System.Security.AccessControl.AccessControlType]::Allow
+          $InheritanceType = [System.Security.AccessControl.AccessControlSecurityInheritance]::None
+          $Acl = Get-Acl -Path $TargetDN
+          $Identity = New-Object System.Security.Principal.NTAccount($Principal)
+          $exists = $Acl.Access | Where-Object { $_.IdentityReference.Value -eq $Identity.Translate([System.Security.Principal.SecurityIdentifier]).Value }
+          if ($exists) { Write-Output "OK: AdminSDHolder ACE exists"; exit 0 }
+          $Rule = New-Object System.DirectoryServices.ActiveDirectoryAccessRule($Identity, $Rights, $AccessControlType, $null, $InheritanceType)
+          $Acl.AddAccessRule($Rule)
+          Set-Acl -Path $TargetDN -AclObject $Acl
+          $vAcl = Get-Acl -Path $TargetDN
+          $verified = $vAcl.Access | Where-Object { $_.IdentityReference.Value -eq $Identity.Translate([System.Security.Principal.SecurityIdentifier]).Value }
+          if (-not $verified) { throw "Verify failed" }
+          Write-Output "APPLIED: analyst_cloud WriteDacl on AdminSDHolder"; exit 2
+        } catch { Write-Output "FAILED: $_"; exit 1 }
+      register: r
+      changed_when: r.rc == 2
+      failed_when: r.rc not in [0, 2]

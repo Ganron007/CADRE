@@ -209,6 +209,23 @@
         state: started
         enabled: true
 
+    - name: "[LINUX][WT#45] Ensure SSSD cache secrets directory exists"
+      ansible.builtin.file:
+        path: /var/lib/sss/secrets
+        state: directory
+        mode: "0755"
+
+    - name: "[LINUX][WT#45] Verify SSSD has cached Kerberos credentials"
+      ansible.builtin.shell: |
+        if [ -f /var/lib/sss/secrets/default.keytab ] || ls /var/lib/sss/secrets/* >/dev/null 2>&1; then
+          echo "PASS: SSSD secrets cache present"
+          exit 0
+        fi
+        echo "SKIP: No cached credentials found; run kinit for the campaign user before extraction"
+        exit 0
+      register: r_sssd_secrets
+      changed_when: false
+
     - name: "[LINUX][WT#48] Verify NFS services running"
       ansible.builtin.systemd:
         name: "{{ item }}"

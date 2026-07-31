@@ -210,6 +210,43 @@
       failed_when: r.rc == 1
 
 # =============================================================================
+# PART 4: Branch A additional surfaces — GPP + AdminSDHolder
+# =============================================================================
+- name: "dc01 — Branch A additional surfaces (VERIFY)"
+  hosts: dc01
+  gather_facts: false
+  tasks:
+    - name: "GPP — SYSVOL Groups.xml with cpassword present (VERIFY)"
+      ansible.windows.win_shell: |
+        try {
+          $ErrorActionPreference = "Stop"
+          $xml = Get-Content "\\dc01.cadre.local\SYSVOL\cadre.local\Policies\*\Machine\Preferences\Groups\Groups.xml" -ErrorAction SilentlyContinue
+          if (-not $xml) { Write-Output "FAIL: Groups.xml missing"; exit 1 }
+          $joined = $xml -join "`n"
+          if ($joined -notmatch 'cpassword=') { Write-Output "FAIL: cpassword not present"; exit 1 }
+          Write-Output "PASS: SYSVOL Groups.xml present with cpassword"; exit 0
+        } catch { Write-Output "FAIL: $_"; exit 1 }
+      register: r
+      changed_when: false
+      failed_when: r.rc == 1
+
+    - name: "AdminSDHolder — analyst_cloud WriteDacl present (VERIFY)"
+      ansible.windows.win_shell: |
+        try {
+          $ErrorActionPreference = "Stop"
+          Import-Module ActiveDirectory
+          Set-Location AD:
+          $desc = (Get-ADObject "CN=AdminSDHolder,CN=System,DC=cadre,DC=local" -Properties ntSecurityDescriptor).ntSecurityDescriptor
+          $sid = (Get-ADUser analyst_cloud).SID.Value
+          $exists = $desc.Access | Where-Object { try { $_.IdentityReference.Translate([System.Security.Principal.SecurityIdentifier]).Value -eq $sid } catch { $false } }
+          if ($exists) { Write-Output "PASS: AdminSDHolder ACE present"; exit 0 }
+          Write-Output "FAIL: AdminSDHolder ACE missing"; exit 1
+        } catch { Write-Output "FAIL: $_"; exit 1 }
+      register: r
+      changed_when: false
+      failed_when: r.rc == 1
+
+# =============================================================================
 # PART 2: ACEs — child.cadre.local (dc02, 6 entries)
 # =============================================================================
 - name: "dc02 — child domain ACEs"
