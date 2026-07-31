@@ -53,6 +53,25 @@ All notable changes to CADRE are documented here. Format: [Keep a Changelog](htt
 
 **Next:** Re-test T102 ticket capture path, then resume telemetry/source-matrix work (Plan 1) or exercise WT035-039 for full SCCM chain coverage.
 
+### Added (2026-07-31 — Branch A/D playbook coverage + validation report updates)
+
+> **Scope:** Close Branch A and Branch D coverage gaps identified in the 2026-07-30 validation review by adding missing attack-surface tasks to the deploy/verify-only playbooks, then update the attack-surface audit and master validation report to reflect configured status.
+
+**Branch A — ACL Abuse additional surfaces:**
+- `05-ad-attack-surface.yml`: added SYSVOL `Groups.xml` GPP stored-password surface with `cpassword` for `Get-GPPPassword` validation.
+- `05-ad-attack-surface.yml`: added `analyst_cloud` `WriteDacl` ACE on `AdminSDHolder` for WT025 persistence validation.
+- `05-ad-attack-surface-verifyOnly.yml`: added corresponding verification tasks for GPP `cpassword` presence and `AdminSDHolder` ACE existence.
+
+**Branch D — Linux pivot additional surfaces:**
+- `07-linux-config.yml`: added SSSD secrets cache directory creation and cached Kerberos credential verification for WT045.
+- `07-linux-config.yml`: confirmed NFS Kerberos mount surface is deployed with `/exports/secure-share` and `sec=krb5p` for WT047.
+- `07-linux-config.yml`: confirmed Podman privileged container surface is deployed for WT048.
+
+**Docs updated:**
+- `attack-matrix/Campaign/CADRE-Attack-Surface-Coverage-Audit-20260730.md`: updated Branch A and Branch D rows from missing to configured; updated Branch D verdict to reflect playbook coverage.
+- `attack-matrix/Campaign/CAMPAIGNS-VALIDATION-REPORT-20260730.md`: updated Branch A and Branch D attack status to `📝 Configured / pending re-test` with playbook references and re-test notes.
+- `CHANGELOG.md`: this entry.
+
 ### Added (2026-07-28 — P1.0 full campaign attack run complete)
 
 > **Scope:** Validate the entire campaign attack surface end-to-end via RedStrike with `ws01` as assumed-breach beachhead.

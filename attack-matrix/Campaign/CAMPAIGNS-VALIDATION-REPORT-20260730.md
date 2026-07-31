@@ -181,9 +181,9 @@
 | 008 | Shadow Credentials on dc01$ (WT008) | ws01 | chief_command / C0mm@nd_Ch1ef! (DA) | 📝 Script corrected, pending re-test | Previously used analyst_t1; now uses chief_command to add KeyCredential to dc01$ | Yes - run after T015 |
 | 023 | GPO Abuse (WT023) | ws01 | analyst_cloud / Cl0ud_An@lyst! (ACE#1) | 📝 Script corrected, pending re-test | Uses analyst_cloud extracted from mbr01 Winlogon; enumerates GPOs and links | Yes |
 | 024 | gMSA Extraction (WT024) | ws01 | chief_command / C0mm@nd_Ch1ef! (DA) | 📝 Script corrected, pending re-test | Previously used analyst_t1; now uses chief_command with GoldenGMSA | Yes - run after T015 |
-| GPP | GPP Stored Password (Groups.xml) | Kali / provisioning | Any domain user | ⏳ Not exercised | Get-GPPPassword not run | Yes |
+| GPP | GPP Stored Password (Groups.xml) | Kali / provisioning | Any domain user | 📝 Configured / pending re-test | `05-ad-attack-surface.yml` now deploys SYSVOL `Groups.xml`; verify with `Get-GPPPassword` | Yes |
 | 027 | SPN Jacking CVE-2026-25177 (WT027) | ws01 | DA or writeSPN rights | ⏳ Not exercised | Abuse writeSPN/validateSPN to Kerberoast target | Yes |
-| 025 | AdminSDHolder persistence (WT025) | ws01 | DA | ⏳ Not exercised | Modify AdminSDHolder template | Yes |
+| 025 | AdminSDHolder persistence (WT025) | ws01 | DA | 📝 Configured / pending re-test | `05-ad-attack-surface.yml` grants `analyst_cloud` WriteDacl on `AdminSDHolder` | Yes |
 
 ## Branch B
 
@@ -199,10 +199,10 @@
 | ID | Attack | Source Machine | Credential | Status | Notes | Re-test Needed |
 |------|--------|----------------|------------|--------|-------|----------------|
 | 044 | MSSQL Linked Server Recon (WT044) | ws01 -> mbr01 | child\analyst_t1 / T13r_An@lyst! | ✅ Verified | OPENQUERY to LINUX01.master.sys.databases returns linux01 databases | No |
-| 045 | SSSD Ticket Extraction (WT045) | linux01 | linux01 local access or SSH key | ⏳ Not exercised | Extract Kerberos tickets from SSSD cache | Yes |
+| 045 | SSSD Ticket Extraction (WT045) | linux01 | linux01 local access or SSH key | 📝 Configured / pending re-test | `07-linux-config.yml` verifies SSSD secrets cache presence | Yes |
 | 046 | MSSQL Keytab Extraction (WT046) | linux01 | linux01 root or mssql service | ⏳ Not exercised | Extract keytab used by MSSQL service | Yes |
-| 047 | NFS Kerberos Mount (WT047) | linux01 | Valid domain Kerberos ticket | ⏳ Not exercised | Mount NFS export with sec=krb5p | Yes |
-| 048 | Podman Container Escape (WT048) | linux01 | Privileged container or misconfig | ⏳ Not exercised | Podman privileged escape | Yes |
+| 047 | NFS Kerberos Mount (WT047) | linux01 | Valid domain Kerberos ticket | 📝 Configured / pending re-test | `07-linux-config.yml` creates `/exports/secure-share` with `sec=krb5p` and starts NFS services | Yes |
+| 048 | Podman Container Escape (WT048) | linux01 | Privileged container or misconfig | 📝 Configured / pending re-test | `07-linux-config.yml` deploys privileged `cadre-monitor` container and exposes podman artifacts | Yes |
 
 ## Branch G
 

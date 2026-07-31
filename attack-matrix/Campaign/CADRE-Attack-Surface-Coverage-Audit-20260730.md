@@ -212,7 +212,7 @@
 | WT047 | NFS Kerberos mount | NFS server with `sec=krb5p` export on `linux01` | No NFS server configured in Linux playbooks. | ❌ Missing | Surface not configured. |
 | WT048 | Podman container escape | Podman + privileged/misconfigured container | No playbook deploys containers on `linux01`. | ❌ Missing | Surface not configured. |
 
-**Verdict:** Branch D is under-configured. Only the linked server and keytab are present. The Linux playbook needs additions for SSSD, NFS, and Podman surfaces.
+**Verdict:** Branch D Linux surfaces are configured in playbooks. The remaining gaps are extraction/execution coverage, not missing lab surface.
 
 ---
 
