@@ -53,24 +53,60 @@
       changed_when: r.rc == 2
       failed_when: r.rc == 1
 
-    - name: "[VULN][WT#17] Explicit SMB/RPC firewall rules for Spooler coercion path"
+    - name: "[VULN][WT#17] Ensure TCP/445 inbound is allowed for Spooler path"
       ansible.windows.win_shell: |
         $ErrorActionPreference = "Stop"
         try {
-          $rules = @(
-            @{ name = "CADRE-Spooler-SMB-In"; proto = "TCP"; port = 445; dir = "Inbound" },
-            @{ name = "CADRE-Spooler-RPC-In"; proto = "TCP"; port = 135; dir = "Inbound" },
-            @{ name = "CADRE-Spooler-RPC-Dynamic-In"; proto = "TCP"; port = 49152-65535; dir = "Inbound" }
-          )
-          foreach ($r in $rules) {
-            $existing = Get-NetFirewallRule -DisplayName $r.name -ErrorAction SilentlyContinue
-            if (-not $existing) {
-              New-NetFirewallRule -DisplayName $r.name -Direction $r.dir -Protocol $r.proto -LocalPort $r.port -Action Allow -Profile Any -Enabled True | Out-Null
-              Write-Output ("APPLIED: " + $r.name)
-            } else {
-              Write-Output ("OK: " + $r.name + " exists")
-            }
+          $name = "CADRE-Spooler-SMB-In"
+          $existing = Get-NetFirewallRule -DisplayName $name -ErrorAction SilentlyContinue
+          if (-not $existing) {
+            New-NetFirewallRule -DisplayName $name -Direction Inbound -Protocol TCP -LocalPort 445 -Action Allow -Profile Any -Enabled True | Out-Null
+            Write-Output "APPLIED: $name"
+          } else {
+            Write-Output "OK: $name exists"
           }
+          $rule = Get-NetFirewallRule -DisplayName $name -ErrorAction Stop
+          if ($rule.Enabled -ne $true) { throw "$name exists but is disabled" }
+          exit 0
+        } catch { Write-Output "FAILED: $_"; exit 1 }
+      register: r
+      changed_when: r.rc == 2
+      failed_when: r.rc == 1
+
+    - name: "[VULN][WT#17] Ensure TCP/135 inbound is allowed for Spooler RPC"
+      ansible.windows.win_shell: |
+        $ErrorActionPreference = "Stop"
+        try {
+          $name = "CADRE-Spooler-RPC-In"
+          $existing = Get-NetFirewallRule -DisplayName $name -ErrorAction SilentlyContinue
+          if (-not $existing) {
+            New-NetFirewallRule -DisplayName $name -Direction Inbound -Protocol TCP -LocalPort 135 -Action Allow -Profile Any -Enabled True | Out-Null
+            Write-Output "APPLIED: $name"
+          } else {
+            Write-Output "OK: $name exists"
+          }
+          $rule = Get-NetFirewallRule -DisplayName $name -ErrorAction Stop
+          if ($rule.Enabled -ne $true) { throw "$name exists but is disabled" }
+          exit 0
+        } catch { Write-Output "FAILED: $_"; exit 1 }
+      register: r
+      changed_when: r.rc == 2
+      failed_when: r.rc == 1
+
+    - name: "[VULN][WT#17] Ensure dynamic RPC range inbound is allowed for Spooler"
+      ansible.windows.win_shell: |
+        $ErrorActionPreference = "Stop"
+        try {
+          $name = "CADRE-Spooler-RPC-Dynamic-In"
+          $existing = Get-NetFirewallRule -DisplayName $name -ErrorAction SilentlyContinue
+          if (-not $existing) {
+            New-NetFirewallRule -DisplayName $name -Direction Inbound -Protocol TCP -LocalPort 49152-65535 -Action Allow -Profile Any -Enabled True | Out-Null
+            Write-Output "APPLIED: $name"
+          } else {
+            Write-Output "OK: $name exists"
+          }
+          $rule = Get-NetFirewallRule -DisplayName $name -ErrorAction Stop
+          if ($rule.Enabled -ne $true) { throw "$name exists but is disabled" }
           exit 0
         } catch { Write-Output "FAILED: $_"; exit 1 }
       register: r

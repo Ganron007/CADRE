@@ -71,7 +71,25 @@
       ansible.windows.win_shell: |
         try {
           $ErrorActionPreference = "Stop"
-          $names = @("CADRE-Spooler-SMB-In","CADRE-Spooler-RPC-In","CADRE-Spooler-RPC-Dynamic-In")
+          function Test-SpoolerSmbRule {
+            $primary = Get-NetFirewallRule -DisplayName "CADRE-Spooler-SMB-In" -ErrorAction SilentlyContinue
+            if ($primary -and $primary.Enabled -eq $true) {
+              Write-Output "PASS: Spooler SMB firewall rule CADRE-Spooler-SMB-In present and enabled"
+              return
+            }
+            $fallback = Get-NetFirewallRule -DisplayName "CADRE-SMB-In" -ErrorAction SilentlyContinue
+            if (-not $fallback) { Write-Output "FAIL: missing firewall rule CADRE-Spooler-SMB-In"; exit 1 }
+            if ($fallback.Enabled -ne $true) { Write-Output "FAIL: CADRE-SMB-In exists but is disabled"; exit 1 }
+            $ports = Get-NetFirewallPortFilter -AssociatedNetFirewallRule $fallback -ErrorAction Stop
+            if ($ports.Protocol -ne "TCP") { Write-Output "FAIL: CADRE-SMB-In is not TCP"; exit 1 }
+            $local = $ports.LocalPort
+            if (-not ($local -contains "445" -or $local -eq "445" -or $local -eq "Any")) {
+              Write-Output "FAIL: CADRE-SMB-In does not cover TCP/445"; exit 1
+            }
+            Write-Output "PASS: Spooler SMB inbound allowed via CADRE-SMB-In TCP/445"
+          }
+          Test-SpoolerSmbRule
+          $names = @("CADRE-Spooler-RPC-In","CADRE-Spooler-RPC-Dynamic-In")
           foreach ($name in $names) {
             $rule = Get-NetFirewallRule -DisplayName $name -ErrorAction SilentlyContinue
             if (-not $rule) { Write-Output "FAIL: missing firewall rule $name"; exit 1 }
@@ -260,12 +278,13 @@
       changed_when: false
       failed_when: r.rc == 1
 
-    - name: "[VULN] Verify LSA Protection (RunAsPPL) removed"
+    - name: "[VULN] Verify LSA Protection (RunAsPPL) disabled"
       ansible.windows.win_shell: |
         try {
-        $ErrorActionPreference = "Stop"
+          $ErrorActionPreference = "Stop"
           $val = Get-ItemProperty -Path "HKLM:\SYSTEM\CurrentControlSet\Control\Lsa" -Name "RunAsPPL" -ErrorAction Stop
-          Write-Output "FAIL: RunAsPPL exists (value $($val.RunAsPPL))"; exit 1
+          if ($val.RunAsPPL -eq 0) { Write-Output "PASS: RunAsPPL disabled (0)"; exit 0 }
+          Write-Output "FAIL: expected RunAsPPL=0 got $($val.RunAsPPL)"; exit 1
         } catch {
           Write-Output "PASS: RunAsPPL does not exist"; exit 0
         }

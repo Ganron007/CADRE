@@ -27,22 +27,31 @@ All notable changes to CADRE are documented here. Format: [Keep a Changelog](htt
 - Executed 4-part linked-server query `EXECUTE('SELECT name FROM LINUX01.master.sys.databases')` and confirmed SQL execution context on `linux01`.
 - Subsequent SSSD ticket/keytab/NFS/Podman steps were not exercised; entry point is verified.
 
+**T102 — Print Spooler coercion prerequisites on `dc02`:**
+- `04-vulnerabilities-verifyOnly.yml` initially failed on `dc02` because `RunAsPPL=0` was treated as failure, and Spooler firewall verification missed the exact rule names.
+- Fixed `04-vulnerabilities-verifyOnly.yml`: `RunAsPPL` now passes when value is `0`; Spooler SMB/RPC verification accepts `CADRE-Spooler-SMB-In` as primary, with validated fallback to existing TCP/445 inbound coverage.
+- Updated `04-vulnerabilities.yml` to explicitly deploy Spooler firewall rules on `dc02`: `CADRE-Spooler-SMB-In` TCP/445, `CADRE-Spooler-RPC-In` TCP/135, `CADRE-Spooler-RPC-Dynamic-In` TCP/49152-65535.
+- Re-ran deploy + verify-only on `dc02`: deploy applied cleanly, verify-only passed `ok=30 changed=0 failed=0 skipped=0`.
+- Campaign/docs metadata moved T102 from hard `BLOCKED` to `Trigger verified / capture pending` pending Rubeus ticket capture validation.
+
 **Seed / wordlist updates:**
 - `attack-matrix/Campaign/automation/lab-seed-creds.json`: filled discovered passwords (`svc_mssql`, `analyst_cloud`, `chief_command`, `hunter_dfir`, `analyst_dfir`, `eng_agentic`, `svc_sccm`, `svc_naa`, `root_krbtgt`).
 - `ansible/files/cadre_passwords.txt`: added all real lab passwords used in WT031 spray and campaign branches.
 
 **Docs updated:**
-- `attack-matrix/Campaign/CAMPAIGNS-METADATA-v2.md`: updated Phase 8 status, WT034 verified details, WT035-039 status, Branch A/Path A verified details, Branch D verified details, credential map, and Branch A status.
-- `attack-matrix/Campaign/CAMPAIGNS_v3.md`: updated ASCII diagram (Branch A credential gap solved, Branch C WT034 verified, Branch D verified), Phase 8 status block, Branch A/C/D sections, credential flow table, branch decision matrix, and "Solving the Branch A credential gap" section.
+- `attack-matrix/Campaign/CAMPAIGNS-METADATA-v2.md`: updated Phase 8 status, WT034 verified details, WT035-039 status, Branch A/Path A verified details, Branch D verified details, T102 status, credential map, and Branch A status.
+- `attack-matrix/Campaign/CAMPAIGNS_v3.md`: updated ASCII diagram, Phase 8 status block, Branch A/C/D sections, credential flow table, branch decision matrix, Phase 5 coercion status, and T102 notes.
 - `ansible/playbooks/05-ad-attack-surface.yml`: fixed ACE#7 exact-right idempotency check.
+- `ansible/playbooks/04-vulnerabilities.yml`: added explicit Spooler firewall rules on `dc02`.
+- `ansible/playbooks/04-vulnerabilities-verifyOnly.yml`: fixed `RunAsPPL` check; hardened Spooler firewall verification with validated SMB fallback.
 - `AGENTS.md`: this entry.
 
 **Current blockers:**
-- Phase 5 T102 coercion to capture `dc02$` TGT remains ⚠️ BLOCKED (Rubeus dump produced 0 Kirbi tickets); bypass via WT031 `chief_command` DA+EA is verified and documented.
+- Phase 5 T102 coercion remains `Trigger verified / capture pending`; Rubeus ticket capture still needs re-test.
 - WT035-039 SCCM advanced chain ⏳ Not yet tested.
 - Skipjack ⏳ Pending custom PoC.
 
-**Next:** Resume telemetry/source-matrix work (Plan 1) now that the campaign attack surface is verified end-to-end, or exercise WT035-039 if user wants full SCCM chain coverage.
+**Next:** Re-test T102 ticket capture path, then resume telemetry/source-matrix work (Plan 1) or exercise WT035-039 for full SCCM chain coverage.
 
 ### Added (2026-07-28 — P1.0 full campaign attack run complete)
 
