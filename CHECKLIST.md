@@ -153,6 +153,351 @@
 
 ---
 
+## Campaign re-test tracker (2026-07-31)
+
+> Source of truth: [`attack-matrix/Campaign/CAMPAIGNS-VALIDATION-REPORT-20260730.md`](attack-matrix/Campaign/CAMPAIGNS-VALIDATION-REPORT-20260730.md) · [`attack-matrix/Campaign/CADRE-Attack-Surface-Coverage-Audit-20260730.md`](attack-matrix/Campaign/CADRE-Attack-Surface-Coverage-Audit-20260730.md) · [`attack-matrix/Campaign/CAMPAIGNS-METADATA-v2.md`](attack-matrix/Campaign/CAMPAIGNS-METADATA-v2.md)
+>
+> **Scope:** Phase 1–8 + Branch A–D + Streams E/F/G · **Excluded:** Phase 0.5 / H-01..H-06 initial access · **Legend:** ✅ verified / 📝 script corrected pending re-test / ⏳ not exercised / ⠿ blocked / ❌ non-functional or rejected / 🔬 deferred
+
+**How to use this tracker:**
+- Flip the main attack checkbox when the attack is re-tested end-to-end.
+- Use sub-items for pre-test setup, execution, and post-test evidence capture.
+- When a branch section grows, add sub-items per attack rather than collapsing them into one line.
+
+### Phase 0 Recon
+
+| ID | Attack | Source | Credential | Status |
+|----|--------|--------|------------|--------|
+| P0-Step1 | Kerberos user enumeration | Kali / provisioning | None | ✅ Verified |
+| P0-Step2 | Check DONT_REQUIRE_PREAUTH | Kali / provisioning | None | ✅ Verified |
+| P0-Step3 | NetExec authenticated recon (intern_blue) | provisioning | intern_blue / 1nt3rn_Blu3! | ✅ Verified |
+| WT028 | Null session / SAMR anonymous enumeration | Kali / provisioning | None | ❌ Rejected |
+
+- [x] **P0-Step1** Kerberos user enumeration — surface check · attack run · telemetry captured · tracker updated
+- [x] **P0-Step2** AS-REP roastable check — surface check · attack run · telemetry captured · tracker updated
+- [x] **P0-Step3** NetExec recon (intern_blue) — surface check · attack run · telemetry captured · tracker updated
+- [x] **WT028** Null session / SAMR — surface check · attack run · telemetry captured · tracker updated
+
+### Phase 0/1 Fallback
+
+| ID | Attack | Source | Credential | Status |
+|----|--------|--------|------------|--------|
+| WT031 | Password spray against dc01 | provisioning / Kali | cadre_passwords.txt | ✅ Verified |
+
+- [x] **WT031** Password spray — surface check · attack run · telemetry captured · tracker updated
+
+### Phase 1
+
+| ID | Attack | Source | Credential | Status |
+|----|--------|--------|------------|--------|
+| 003 | AS-REP Roast (WT003) | ws01 | child\analyst_t1 / T13r_An@lyst! | ✅ Verified |
+
+- [x] **T003** AS-REP Roast — surface check · attack run · telemetry captured · tracker updated
+
+### Phase 2
+
+| ID | Attack | Source | Credential | Status |
+|----|--------|--------|------------|--------|
+| 002 | Kerberoast via ACE#18 bridge (WT002) | ws01 | intern_blue / 1nt3rn_Blu3! | ✅ Verified |
+
+- [x] **T002** Kerberoast — surface check · attack run · telemetry captured · tracker updated
+
+### Phase 2 Alt
+
+| ID | Attack | Source | Credential | Status |
+|----|--------|--------|------------|--------|
+| NTLMv1 | NTLMv1 rainbow-table downgrade | Kali / provisioning | Coerced NTLMv1 responder | ⏳ Not tested |
+
+- [ ] **NTLMv1** rainbow-table downgrade — surface check · attack run · telemetry captured · tracker updated
+
+### Phase 3
+
+| ID | Attack | Source | Credential | Status |
+|----|--------|--------|------------|--------|
+| 041/043 | SQL xp_cmdshell + GodPotato (WT041/WT043) | ws01 -> mbr01 | child\analyst_t1 / T13r_An@lyst! | ✅ Verified |
+| 042 | CLR Assembly on mbr02 (WT042) | ws01 -> mbr02 | child\analyst_t1 / T13r_An@lyst! | 📝 Reachable |
+
+- [x] **T041/T043** SQL xp_cmdshell + GodPotato — surface check · attack run · telemetry captured · tracker updated
+- [ ] **T042** CLR Assembly — surface check · attack run · telemetry captured · tracker updated
+
+### Phase 3.5
+
+| ID | Attack | Source | Credential | Status |
+|----|--------|--------|------------|--------|
+| 101 | WinRS lateral pivot ws01 -> mbr01 (T101) | ws01 | child\analyst_t1 / T13r_An@lyst! | ✅ Verified |
+| 3.5F | LSASS/SAM credential dump via mimikatz | SYSTEM on mbr01 | SYSTEM | ✅ Verified |
+| 3.5A | Winlogon plaintext credential extraction | SYSTEM on mbr01 | SYSTEM | ✅ Verified |
+| 3.5G | DPAPI via Nemesis | SYSTEM on mbr01 | SYSTEM | ⏳ Not exercised |
+| 3.5H | ctfmon.exe password extraction | SYSTEM on mbr01 | SYSTEM | ⏳ Not exercised |
+| 3.5I | Token impersonation | mbr01 | SYSTEM | ❌ Rejected |
+| 3.5B | Scheduled Task as analyst_cloud | mbr01 | analyst_cloud | ❌ Rejected for attack chain |
+| 3.5C | RDP interactive session as analyst_cloud | ws01 -> mbr01 | analyst_cloud / Cl0ud_An@lyst! | ⏳ Not exercised |
+| 3.5D | File detonation / payload drop (WT063-068) | ws01 / mbr01 | analyst_t1 or analyst_cloud | ⏳ Not exercised |
+| 3.5J | WMI Event Subscriptions | SYSTEM on mbr01 | SYSTEM | ⏳ Not exercised |
+| 3.5K | LSASS dump via WerFault | SYSTEM on mbr01 | SYSTEM | ⏳ Not exercised |
+| 3.5L | LAPS extraction | dc01 | DA | ⏳ Not exercised |
+| 3.5M | Azure AD Connect DPAPI dump | dc01 | DA | ⏳ Not exercised |
+| 3.5N | UnCanny LPE via InstallService | ws01 | local user | 🔬 Deferred |
+
+- [x] **3.5F** mimikatz LSASS/SAM — surface check · attack run · telemetry captured · tracker updated
+- [x] **3.5A** Winlogon plaintext extraction — surface check · attack run · telemetry captured · tracker updated
+- [ ] **3.5G** DPAPI via Nemesis — surface check · attack run · telemetry captured · tracker updated
+- [ ] **3.5H** ctfmon.exe extraction — surface check · attack run · telemetry captured · tracker updated
+- [x] **3.5I** Token impersonation — surface check · attack run · telemetry captured · tracker updated
+- [x] **3.5B** Scheduled Task wrapper — surface check · attack run · telemetry captured · tracker updated
+- [ ] **3.5C** RDP interactive session — surface check · attack run · telemetry captured · tracker updated
+- [ ] **3.5D** File detonation / payload drop — surface check · attack run · telemetry captured · tracker updated
+- [ ] **3.5J** WMI Event Subscriptions — surface check · attack run · telemetry captured · tracker updated
+- [ ] **3.5K** WerFault LSASS dump — surface check · attack run · telemetry captured · tracker updated
+- [ ] **3.5L** LAPS extraction — surface check · attack run · telemetry captured · tracker updated
+- [ ] **3.5M** Azure AD Connect DPAPI dump — surface check · attack run · telemetry captured · tracker updated
+- [~] **3.5N** UnCanny LPE — surface check · attack run · telemetry captured · tracker updated
+
+### Phase 4
+
+| ID | Attack | Source | Credential | Status |
+|----|--------|--------|------------|--------|
+| 004 | BloodHound discovery (WT004) | mbr01 (SYSTEM) or ws01 | SYSTEM on mbr01 | ✅ Verified |
+
+- [x] **T004** BloodHound discovery — surface check · attack run · telemetry captured · tracker updated
+
+### Phase 5
+
+| ID | Attack | Source | Credential | Status |
+|----|--------|--------|------------|--------|
+| 007 | RBCD standalone (WT007) | ws01 | child\analyst_t1 / T13r_An@lyst! | ⠿ BLOCKED |
+
+- [ ] **T007** RBCD standalone — surface check · attack run · telemetry captured · tracker updated
+
+### Phase 5 Coercion
+
+| ID | Attack | Source | Credential | Status |
+|----|--------|--------|------------|--------|
+| 017 | MS-RPRN PrinterBug coercion (WT017) | ws01 -> SYSTEM on mbr01 | SYSTEM | ✅ Confirmed |
+| 018 | MS-EFSR PetitPotam (WT018) | ws01 | SYSTEM | ❌ Non-functional |
+| 019 | MS-DFSNM DFSCoerce (WT019) | ws01 | SYSTEM | ❌ Non-functional |
+| 020 | MS-FSRVP ShadowCoerce (WT020) | ws01 | SYSTEM | ❌ Non-functional |
+| 021 | NTLM relay to LDAP / ESC8 (WT021) | Kali / provisioning | Coerced dc02$ or other account | ✅ Active |
+| 022 | NTLM relay to ADCS / shadow credentials (WT022) | Kali / provisioning | Coerced account | ✅ Active |
+| 094 | UnCanny Coerce (WT094) | ws01 | local user | 🔬 Deferred |
+| 095 | Onelogon Zero-Channel (WT095) | Kali -> DC | DC machine account NTLMv2 | 🔬 Deferred |
+| 096 | coerce_plus consolidated check (WT096) | provisioning | SYSTEM context | ⏳ Not tested |
+
+- [x] **T017** PrinterBug coercion — surface check · attack run · telemetry captured · tracker updated
+- [x] **T018** PetitPotam — surface check · attack run · telemetry captured · tracker updated
+- [x] **T019** DFSCoerce — surface check · attack run · telemetry captured · tracker updated
+- [x] **T020** ShadowCoerce — surface check · attack run · telemetry captured · tracker updated
+- [x] **T021** NTLM relay to LDAP — surface check · attack run · telemetry captured · tracker updated
+- [x] **T022** NTLM relay to ADCS — surface check · attack run · telemetry captured · tracker updated
+- [~] **T094** UnCanny Coerce — surface check · attack run · telemetry captured · tracker updated
+- [~] **T095** Onelogon Zero-Channel — surface check · attack run · telemetry captured · tracker updated
+- [ ] **T096** coerce_plus — surface check · attack run · telemetry captured · tracker updated
+
+### Phase 5 T102
+
+| ID | Attack | Source | Credential | Status |
+|----|--------|--------|------------|--------|
+| T102 | Unconstrained delegation capture dc02$ TGT | SYSTEM on mbr01 | SYSTEM | ⏳ Trigger verified / capture pending |
+
+- [ ] **T102** dc02$ TGT capture — confirm dc02 Spooler/RPC surface · re-run capture · telemetry captured · tracker updated
+
+### Phase 6
+
+| ID | Attack | Source | Credential | Status |
+|----|--------|--------|------------|--------|
+| 009 | DCSync (WT009) | ws01 or Kali | chief_command / C0mm@nd_Ch1ef! (DA fallback) | ✅ Verified |
+
+- [x] **T009** DCSync — surface check · attack run · telemetry captured · tracker updated
+
+### Phase 7
+
+| ID | Attack | Source | Credential | Status |
+|----|--------|--------|------------|--------|
+| 010 | Golden Ticket (WT010) | ws01 | krbtgt hash or chief_command fallback | ✅ Script executes |
+| 011 | Silver Ticket (WT011) | ws01 | Service account hash | ✅ Script executes |
+| 012 | Diamond Ticket (WT012) | ws01 | krbtgt hash | ✅ Script executes |
+
+- [x] **T010** Golden Ticket — surface check · attack run · telemetry captured · tracker updated
+- [x] **T011** Silver Ticket — surface check · attack run · telemetry captured · tracker updated
+- [x] **T012** Diamond Ticket — surface check · attack run · telemetry captured · tracker updated
+
+### Phase 8
+
+| ID | Attack | Source | Credential | Status |
+|----|--------|--------|------------|--------|
+| 033 | Cross-forest Kerberoast (WT033) | ws01 | root EA / chief_command | ✅ Verified |
+| 034 | SCCM NAA extraction (WT034) | ws01 -> mbr02 | svc_sccm / s3rv1c3_SCCM! | ✅ Verified |
+
+- [x] **T033** Cross-forest Kerberoast — surface check · attack run · telemetry captured · tracker updated
+- [x] **T034** SCCM NAA extraction — surface check · attack run · telemetry captured · tracker updated
+
+### Phase 8 / Branch C
+
+| ID | Attack | Source | Credential | Status |
+|----|--------|--------|------------|--------|
+| 035 | SCCM PXE Boot abuse (WT035) | mbr02 | svc_sccm / svc_naa | ⏳ Not exercised |
+| 036 | SCCM Client Push install (WT036) | mbr02 | svc_sccm / svc_naa | ⏳ Not exercised |
+| 037 | SCCM CMPivot (WT037) | mbr02 | svc_sccm / svc_naa | ⏳ Not exercised |
+| 038 | SCCM Application Deployment (WT038) | mbr02 | svc_sccm / svc_naa | ⏳ Not exercised |
+| 039 | SCCM Site Takeover (WT039) | mbr02 | svc_sccm / svc_naa | ⏳ Not exercised |
+
+- [ ] **T035** SCCM PXE Boot — surface check · attack run · telemetry captured · tracker updated
+- [ ] **T036** SCCM Client Push — surface check · attack run · telemetry captured · tracker updated
+- [ ] **T037** SCCM CMPivot — surface check · attack run · telemetry captured · tracker updated
+- [ ] **T038** SCCM Application Deployment — surface check · attack run · telemetry captured · tracker updated
+- [ ] **T039** SCCM Site Takeover — surface check · attack run · telemetry captured · tracker updated
+
+### Phase 8 Alt
+
+| ID | Attack | Source | Credential | Status |
+|----|--------|--------|------------|--------|
+| Skipjack | Skipjack PAC signature corruption | ws01 | child domain user | 🔬 Deferred |
+
+- [~] **Skipjack** PAC signature corruption — surface check · attack run · telemetry captured · tracker updated
+
+### Branch A — ACL abuse
+
+| ID | Attack | Source | Credential | Status |
+|----|--------|--------|------------|--------|
+| 015 | ACL ForceChangePassword ACE#7 (WT015) | ws01 | hunter_dfir / DF1R_Hunt3r! | ✅ Verified live |
+| 013 | ACL WriteDacl self-escalate (WT013) | ws01 | chief_command / C0mm@nd_Ch1ef! (DA) | 📝 Script corrected, pending re-test |
+| 014 | ACL GenericWrite -> Shadow Credentials (WT014) | ws01 | chief_command / C0mm@nd_Ch1ef! (DA) | 📝 Script corrected, pending re-test |
+| 016 | ACL GenericAll on OU (WT016) | ws01 | chief_command / C0mm@nd_Ch1ef! (DA) | 📝 Script corrected, pending re-test |
+| 008 | Shadow Credentials on dc01$ (WT008) | ws01 | chief_command / C0mm@nd_Ch1ef! (DA) | 📝 Script corrected, pending re-test |
+| 023 | GPO Abuse (WT023) | ws01 | analyst_cloud / Cl0ud_An@lyst! (ACE#1) | 📝 Script corrected, pending re-test |
+| 024 | gMSA Extraction (WT024) | ws01 | chief_command / C0mm@nd_Ch1ef! (DA) | 📝 Script corrected, pending re-test |
+| GPP | GPP Stored Password (Groups.xml) | Kali / provisioning | Any domain user | 📝 Configured / pending re-test |
+| 027 | SPN Jacking CVE-2026-25177 (WT027) | ws01 | DA or writeSPN rights | ⏳ Not exercised |
+| 025 | AdminSDHolder persistence (WT025) | ws01 | DA | 📝 Configured / pending re-test |
+
+- [x] **T015** ACE#7 ForceChangePassword — surface check · attack run · telemetry captured · tracker updated
+- [ ] **T013** WriteDacl self-escalate — surface check · attack run · telemetry captured · tracker updated
+- [ ] **T014** GenericWrite -> Shadow Credentials — surface check · attack run · telemetry captured · tracker updated
+- [ ] **T016** GenericAll on OU — surface check · attack run · telemetry captured · tracker updated
+- [ ] **T008** Shadow Credentials on dc01$ — surface check · attack run · telemetry captured · tracker updated
+- [ ] **T023** GPO Abuse — surface check · attack run · telemetry captured · tracker updated
+- [ ] **T024** gMSA Extraction — surface check · attack run · telemetry captured · tracker updated
+- [ ] **GPP** Get-GPPPassword — surface check · attack run · telemetry captured · tracker updated
+- [ ] **T027** SPN Jacking — surface check · attack run · telemetry captured · tracker updated
+- [ ] **T025** AdminSDHolder persistence — surface check · attack run · telemetry captured · tracker updated
+
+### Branch B — ADCS
+
+| ID | Attack | Source | Credential | Status |
+|----|--------|--------|------------|--------|
+| 050 | ADCS ESC1 (WT050) | ws01 | chief_command / C0mm@nd_Ch1ef! (DA+EA) | 📝 Script corrected, pending re-test |
+| 051 | ADCS ESC3 (WT051) | ws01 | chief_command / C0mm@nd_Ch1ef! (DA+EA) | 📝 Script corrected, pending re-test |
+| 052 | ADCS ESC8 / NTLM relay web enrollment (WT052) | ws01 | chief_command / C0mm@nd_Ch1ef! (DA+EA) | 📝 Script corrected, pending re-test |
+| 053 | UnPAC-the-Hash (WT053) | ws01 | chief_command / C0mm@nd_Ch1ef! (DA+EA) | 📝 Script corrected, pending re-test |
+
+- [ ] **T050** ADCS ESC1 — surface check · attack run · telemetry captured · tracker updated
+- [ ] **T051** ADCS ESC3 — surface check · attack run · telemetry captured · tracker updated
+- [ ] **T052** ADCS ESC8 / NTLM relay web enrollment — surface check · attack run · telemetry captured · tracker updated
+- [ ] **T053** UnPAC-the-Hash — surface check · attack run · telemetry captured · tracker updated
+
+### Branch D — Linux pivot
+
+| ID | Attack | Source | Credential | Status |
+|----|--------|--------|------------|--------|
+| 044 | MSSQL Linked Server Recon (WT044) | ws01 -> mbr01 | child\analyst_t1 / T13r_An@lyst! | ✅ Verified |
+| 045 | SSSD Ticket Extraction (WT045) | linux01 | linux01 local access or SSH key | 📝 Configured / pending re-test |
+| 046 | MSSQL Keytab Extraction (WT046) | linux01 | linux01 root or mssql service | ⏳ Not exercised |
+| 047 | NFS Kerberos Mount (WT047) | linux01 | Valid domain Kerberos ticket | 📝 Configured / pending re-test |
+| 048 | Podman Container Escape (WT048) | linux01 | Privileged container or misconfig | 📝 Configured / pending re-test |
+
+- [x] **T044** MSSQL Linked Server Recon — surface check · attack run · telemetry captured · tracker updated
+- [ ] **T045** SSSD Ticket Extraction — surface check · attack run · telemetry captured · tracker updated
+- [ ] **T046** MSSQL Keytab Extraction — surface check · attack run · telemetry captured · tracker updated
+- [ ] **T047** NFS Kerberos Mount — surface check · attack run · telemetry captured · tracker updated
+- [ ] **T048** Podman Container Escape — surface check · attack run · telemetry captured · tracker updated
+
+### Branch G — Pre-auth DC CVE lab
+
+| ID | Attack | Source | Credential | Status |
+|----|--------|--------|------------|--------|
+| CVE-2026-41089 | Netlogon CLDAP Stack Buffer Overflow | Kali -> dc02 | None (unauthenticated UDP/389) | 🆕 Ready, untested |
+
+- [ ] **T007** CVE-2026-41089 — snapshot dc02 · attack run · telemetry captured · tracker updated
+
+### Stream E — Network defense
+
+| ID | Attack | Source | Credential | Status |
+|----|--------|--------|------------|--------|
+| E-01 | Kerberoast detection | monitor VM (192.168.77.55) | None / SIEM analyst | ⏳ Not exercised |
+| E-02 | DCSync detection | monitor VM (192.168.77.55) | None / SIEM analyst | ⏳ Not exercised |
+| E-03 | AS-REP roast detection | monitor VM (192.168.77.55) | None / SIEM analyst | ⏳ Not exercised |
+| E-04 | DGA detection | monitor VM (192.168.77.55) | None / SIEM analyst | ⏳ Not exercised |
+| E-05 | DNS TXT exfil | monitor VM (192.168.77.55) | None / SIEM analyst | ⏳ Not exercised |
+| E-06 | DNS NXDOMAIN burst | monitor VM (192.168.77.55) | None / SIEM analyst | ⏳ Not exercised |
+| E-07 | TLS 1.0 usage | monitor VM (192.168.77.55) | None / SIEM analyst | ⏳ Not exercised |
+| E-08 | SNI anomaly | monitor VM (192.168.77.55) | None / SIEM analyst | ⏳ Not exercised |
+| E-09 | Cipher suite anomaly | monitor VM (192.168.77.55) | None / SIEM analyst | ⏳ Not exercised |
+| E-10 | Self-signed cert chain | monitor VM (192.168.77.55) | None / SIEM analyst | ⏳ Not exercised |
+| E-11 | SMB admin share | monitor VM (192.168.77.55) | None / SIEM analyst | ⏳ Not exercised |
+| E-12 | SMBv1 attempt | monitor VM (192.168.77.55) | None / SIEM analyst | ⏳ Not exercised |
+| E-13 | HTTP user-agent anomaly | monitor VM (192.168.77.55) | None / SIEM analyst | ⏳ Not exercised |
+| E-14 | Exploit path telemetry | monitor VM (192.168.77.55) | None / SIEM analyst | ⏳ Not exercised |
+
+- [ ] **E-01** Kerberoast detection — rule validate · telemetry captured · tracker updated
+- [ ] **E-02** DCSync detection — rule validate · telemetry captured · tracker updated
+- [ ] **E-03** AS-REP roast detection — rule validate · telemetry captured · tracker updated
+- [ ] **E-04** DGA detection — rule validate · telemetry captured · tracker updated
+- [ ] **E-05** DNS TXT exfil — rule validate · telemetry captured · tracker updated
+- [ ] **E-06** DNS NXDOMAIN burst — rule validate · telemetry captured · tracker updated
+- [ ] **E-07** TLS 1.0 usage — rule validate · telemetry captured · tracker updated
+- [ ] **E-08** SNI anomaly — rule validate · telemetry captured · tracker updated
+- [ ] **E-09** Cipher suite anomaly — rule validate · telemetry captured · tracker updated
+- [ ] **E-10** Self-signed cert chain — rule validate · telemetry captured · tracker updated
+- [ ] **E-11** SMB admin share — rule validate · telemetry captured · tracker updated
+- [ ] **E-12** SMBv1 attempt — rule validate · telemetry captured · tracker updated
+- [ ] **E-13** HTTP user-agent anomaly — rule validate · telemetry captured · tracker updated
+- [ ] **E-14** Exploit path telemetry — rule validate · telemetry captured · tracker updated
+
+### Stream F — Supply chain
+
+| ID | Attack | Source | Credential | Status |
+|----|--------|--------|------------|--------|
+| F-01 | npm install lifecycle script exfil | linux01 / mbr01 | npm project context | ⏳ Not exercised |
+| F-02 | npm postinstall payload drop | linux01 / mbr01 | npm project context | ⏳ Not exercised |
+| F-03 | npm package name typosquat | linux01 / mbr01 | npm publish context | ⏳ Not exercised |
+| F-04 | npm manifest token leak | linux01 / mbr01 | npm project context | ⏳ Not exercised |
+| F-05 | npm CI cache poisoning | linux01 / mbr01 | CI context | ⏳ Not exercised |
+| F-06 | npm dist-tag pollution | linux01 / mbr01 | npm publish context | ⏳ Not exercised |
+| F-07 | npm shim/launcher hijack | linux01 / mbr01 | local user | ⏳ Not exercised |
+| F-08 | npm workspace cross-package script | linux01 / mbr01 | npm workspace context | ⏳ Not exercised |
+| F-09 | npm proxy / registry MITM | linux01 / mbr01 | network position | ⏳ Not exercised |
+| F-10 | npm audit ignore supply-chain risk | linux01 / mbr01 | npm project context | ⏳ Not exercised |
+| F-11 | GitHub Actions cache poisoning analog | linux01 / mbr01 | CI context | ⏳ Not exercised |
+| F-12 | npm tag pollution analog | linux01 / mbr01 | npm publish context | ⏳ Not exercised |
+| F-13 | prepare hook persistence | linux01 / mbr01 | npm publish context | ⏳ Not exercised |
+
+- [ ] **F-01** npm lifecycle script exfil — scenario run · telemetry captured · tracker updated
+- [ ] **F-02** npm postinstall payload drop — scenario run · telemetry captured · tracker updated
+- [ ] **F-03** npm typosquat — scenario run · telemetry captured · tracker updated
+- [ ] **F-04** npm manifest token leak — scenario run · telemetry captured · tracker updated
+- [ ] **F-05** npm CI cache poisoning — scenario run · telemetry captured · tracker updated
+- [ ] **F-06** npm dist-tag pollution — scenario run · telemetry captured · tracker updated
+- [ ] **F-07** npm shim/launcher hijack — scenario run · telemetry captured · tracker updated
+- [ ] **F-08** npm workspace cross-package script — scenario run · telemetry captured · tracker updated
+- [ ] **F-09** npm proxy / registry MITM — scenario run · telemetry captured · tracker updated
+- [ ] **F-10** npm audit ignore risk — scenario run · telemetry captured · tracker updated
+- [ ] **F-11** GitHub Actions cache poisoning analog — scenario run · telemetry captured · tracker updated
+- [ ] **F-12** npm tag pollution analog — scenario run · telemetry captured · tracker updated
+- [ ] **F-13** prepare hook persistence — scenario run · telemetry captured · tracker updated
+
+### Re-test priorities
+
+1. **T102** after `04-vulnerabilities-verifyOnly.yml` confirms dc02 spooler/RPC surface; capture is the current blocker.
+2. **Branch A** after T015 using `hunter_dfir` and `chief_command`; GPP/AdminSDHolder surfaces are now configured.
+3. **Branch B ADCS scripts** using `chief_command@cadre.local`.
+4. **Branch C SCCM chain** from mbr02 (WT035-039).
+5. **Branch D** extraction exercises (WT045-048); Linux surfaces are configured, pending execution.
+6. **Branch G** CVE-2026-41089 from Kali against dc02 with snapshot.
+7. **Stream E** exercises on monitor VM once elk/monitor are online.
+8. **Stream F** supply-chain scenarios on linux01/mbr02/npm registry.
+
+---
+
 ## P11 — Plan 1.1 campaign automation (RedStrike) — **NEXT**
 
 **Plan:** [`docs/internal/plan1.1-campaign-automation/`](docs/internal/plan1.1-campaign-automation/) · **Sister:** [`RedStrike/CAMPAIGN-AUTOMATION-PLAN.md`](../RedStrike/CAMPAIGN-AUTOMATION-PLAN.md) · **Routing:** [`WS01-ROUTING.md`](attack-matrix/04-automation/linux/lib/WS01-ROUTING.md)
