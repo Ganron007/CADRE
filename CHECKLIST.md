@@ -299,7 +299,7 @@
 |----|--------|--------|------------|--------|
 | T102 | Unconstrained delegation capture dc02$ TGT | SYSTEM on mbr01 | SYSTEM | ⏳ Trigger verified / capture pending |
 
-- [ ] **T102** dc02$ TGT capture — confirm dc02 Spooler/RPC surface · re-run capture · telemetry captured · tracker updated
+- [ ] **T102** dc02$ TGT capture — confirm dc02 Spooler/RPC surface · re-run capture from ws01 or Linux-side operator path · telemetry captured · tracker updated
 
 ### Phase 6
 

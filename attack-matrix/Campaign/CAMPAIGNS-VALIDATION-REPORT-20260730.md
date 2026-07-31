@@ -2,7 +2,9 @@
 
 > Scope: every attack, branch, and standalone exercise in Campaign v3.
 > Excluded from execution: Phase 0.5 / H-01..H-06 (initial access) per operator request, but they are listed.
-> Legend: ✅ verified / 📝 script corrected pending re-test / ⏳ not exercised / ⚠️ blocked / ❌ non-functional or rejected / 🔬 deferred.
+> Legend: ✅ verified / 📝 script corrected pending re-test / ⏳ not exercised / ⠿ blocked / ❌ non-functional or rejected / 🔬 deferred.
+>
+> **Execution environment blocker (2026-07-31):** The campaign scripts and verify-only playbooks are designed to run from the Linux-side operator path (`provisioning` VM / WSL / Git Bash). In this session the Windows-host shell hit blockers for `ansible-playbook` (`WinError 87`) and the Git Bash/WSL path translation for staged attack scripts. **Playbook and campaign coverage are already in place**, but execution is paused until the rerun is launched from the intended Linux environment. The blocked items are tracked in CHECKLIST.md.
 
 ## Summary Statistics
 
@@ -131,7 +133,7 @@
 
 | ID | Attack | Source Machine | Credential | Status | Notes | Re-test Needed |
 |------|--------|----------------|------------|--------|-------|----------------|
-| T102 | Unconstrained delegation capture dc02$ TGT (T102) | SYSTEM on mbr01 | SYSTEM | ⏳ Trigger verified / capture pending | SpoolSample trigger verified against dc02; Rubeus capture did not return Kirbi markers. Playbook updated with dc02 Spooler + RPC/SMB firewall prerequisites; re-test capture after verify-only run | Yes - re-run T102 after 04-vulnerabilities-verifyOnly.yml confirms dc02 spooler/RPC surface |
+|| T102 | Unconstrained delegation capture dc02$ TGT (T102) | SYSTEM on mbr01 | SYSTEM | ⠿ BLOCKED — execution environment | dc02 Spooler/RPC prerequisites are configured; rerun is blocked because the campaign harness must run from ws01 or the Linux-side operator path. Direct host→mbr01 WinRM failed in this session. | Yes — rerun from ws01/provisioning after verify-only confirms dc02 surface |
 
 ## Phase 6
 
@@ -175,7 +177,7 @@
 | ID | Attack | Source Machine | Credential | Status | Notes | Re-test Needed |
 |------|--------|----------------|------------|--------|-------|----------------|
 | 015 | ACL ForceChangePassword ACE#7 (WT015) | ws01 | hunter_dfir / DF1R_Hunt3r! | ✅ Verified live | hunter_dfir -> chief_command: ForceChangePassword; playbook fix committed | No |
-| 013 | ACL WriteDacl self-escalate (WT013) | ws01 | chief_command / C0mm@nd_Ch1ef! (DA) | 📝 Script corrected, pending re-test | Previously used analyst_t1; now uses chief_command to grant hunter_dfir GenericAll on Command-Cadre group | Yes - run after T015 |
+|| 013 | ACL WriteDacl self-escalate (WT013) | ws01 | chief_command / C0mm@nd_Ch1ef! (DA) | ⠿ BLOCKED — missing script | No corrected script found in `attack-matrix/04-automation/`; campaign docs reference WT013, but execution script is absent. | Yes — create/verify script and rerun after T015 |
 | 014 | ACL GenericWrite -> Shadow Credentials (WT014) | ws01 | chief_command / C0mm@nd_Ch1ef! (DA) | 📝 Script corrected, pending re-test | Previously used analyst_t1; now uses chief_command to grant hunter_dfir GenericWrite on analyst_cloud | Yes - run after T015 |
 | 016 | ACL GenericAll on OU (WT016) | ws01 | chief_command / C0mm@nd_Ch1ef! (DA) | 📝 Script corrected, pending re-test | Previously used analyst_t1; now uses chief_command to grant hunter_dfir GenericAll on OU=Command | Yes - run after T015 |
 | 008 | Shadow Credentials on dc01$ (WT008) | ws01 | chief_command / C0mm@nd_Ch1ef! (DA) | 📝 Script corrected, pending re-test | Previously used analyst_t1; now uses chief_command to add KeyCredential to dc01$ | Yes - run after T015 |
