@@ -1,3 +1,11 @@
+
+
+## [Unreleased] — 2026-07-31
+
+- Coverage audit: Branch A blocked count increased; WT015 marked blocked by missing ACE exposure in live retest.
+- Validation report: appended consolidated campaign re-test matrix for AD core + Branch A-D, plus E/F/G/H summary.
+- Checklist: added campaign re-test tracker with source machine, credentials, status, and retest notes.
+- Gap report: recorded missing surfaces for GPP, AdminSDHolder, SSSD extraction, NFS Kerberos mount, and Podman escape.
 # Changelog
 
 All notable changes to CADRE are documented here. Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).

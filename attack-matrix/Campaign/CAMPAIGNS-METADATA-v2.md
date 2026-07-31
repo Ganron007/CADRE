@@ -879,7 +879,7 @@ We have `nt authority\system` on mbr01 via GodPotato. `analyst_cloud` has an act
 
 | Field | Value |
 |-------|-------|
-| **Status** | ✅ Verified live — WT015 (ACE#7 ForceChangePassword) tested end-to-end. Credential gap solved via WT031 password spray: `chief_command` / `C0mm@nd_Ch1ef!` obtained and used to restore missing ACE#7. `hunter_dfir` / `DF1R_Hunt3r!` then reset `chief_command` password and restored it. |
+| **Status** | ⠿ BLOCKED — missing ACE#7 surface — direct ws01 execution via SSH works, but `chief_command` does not expose `ForceChangePassword` to `hunter_dfir`. Retest requires `05-ad-attack-surface.yml` ACE#7 deploy + verify-only pass. |
 | **Stream** | Branch A |
 | **Att&ck** | T1098 (Account Manipulation), T1484 (Domain Policy Modification), T1548 (Abuse Elevation Control Mechanism) |
 | **Technique** | Abuse over-permissive ACEs discovered by BloodHound to escalate to DA in `cadre.local` |
@@ -1050,7 +1050,7 @@ We have `nt authority\system` on mbr01 via GodPotato. `analyst_cloud` has an act
 | **Technique** | Request certificate with arbitrary SAN (`UPN=administrator`) from template with `CT_FLAG_ENROLLEE_SUPPLIES_SUBJECT` and no manager approval |
 | **Starting credential** | `chief_command` / `C0mm@nd_Ch1ef!` (DA earned via Branch A T015) or Golden Ticket |
 | **What it earns** | Certificate as `administrator` → NT hash |
-| **Command** | `certipy req -u analyst_t1@child.cadre.local -p 'T13r_An@lyst!' -target dc01.cadre.local -ca cadre-CA -template VulnerableWebEnrollment -upn administrator@cadre.local` |
+|| **Command** | `certipy req -u chief_command@cadre.local -p 'C0mm@nd_Ch1ef!' -target dc01.cadre.local -ca cadre-CA -template VulnerableWebEnrollment -upn administrator@cadre.local` |
 | **Script** | `T050-esc1-ws01.sh` |
 | **RedStrike Intent** | — |
 | **State Output** | SET_STATE(<manual>) |

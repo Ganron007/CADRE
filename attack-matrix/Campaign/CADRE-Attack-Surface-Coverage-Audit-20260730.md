@@ -8,8 +8,8 @@
 
 | Category | Configured | Partial / Misconfigured | Missing / Not Configured | Deferred |
 |---|---|---|---|---|
-| Main spine (Phases 0-8) | 23 | 4 | 2 | 1 |
-| Branch A (ACL abuse) | 5 | 4 | 1 | 0 |
+| Main spine (Phases 0-8) | 23 | 5 | 2 | 1 |
+| Branch A (ACL abuse) | 4 | 5 | 1 | 0 |
 | Branch B (ADCS) | 4 | 0 | 0 | 0 |
 | Branch C (SCCM) | 2 | 0 | 3 | 0 |
 | Branch D (Linux pivot) | 1 | 0 | 4 | 0 |
@@ -172,20 +172,20 @@
 
 ### 2.12 Branch A (ACL Abuse)
 
-| ID | Attack | Expected Surface | Coverage | Status | Notes |
+|| ID | Attack | Expected Surface | Coverage | Status | Notes |
 |---|---|---|---|---|---|
-| WT015 | ACE#7 ForceChangePassword | `hunter_dfir` → `chief_command` ForceChangePassword | `05-ad-attack-surface.yml` ACE#7; verified live. | ✅ Configured | Confirmed after playbook fix. |
-| WT013 | WriteDacl self-escalate | `chief_command` → `hunter_dfir` GenericAll on Command-Cadre group | `05-ad-attack-surface.yml` does not explicitly pre-configure this; relies on script. | ⚠️ Partial | Script corrected; re-test pending. |
-| WT014 | GenericWrite → Shadow Creds | `chief_command` → `hunter_dfir` GenericWrite on `analyst_cloud` | Same as above. | ⚠️ Partial | Script corrected; re-test pending. |
-| WT016 | GenericAll on OU | `chief_command` → `hunter_dfir` GenericAll on `OU=Command` | Same. | ⚠️ Partial | Script corrected; re-test pending. |
-| WT008 | Shadow Creds on `dc01$` | `chief_command` can write KeyCredential to `dc01$` | Same. | ⚠️ Partial | Script corrected; re-test pending. |
-| WT023 | GPO Abuse | `analyst_cloud` GPO edit rights, WMI-Filtered-GPO linked to OU=Agentic | `02-ad-objects.yml` creates GPO + link; `05-ad-attack-surface.yml` ACE#1 grants `analyst_cloud` rights. | ✅ Configured | Script corrected; re-test pending. |
-| WT024 | gMSA extraction | `gmsaTools` gMSA with SACL, `GoldenGMSA` tool | `05-ad-attack-surface.yml` creates gMSA + SACL; `06-member-services.yml` copies GoldenGMSA? | ✅ Configured | Script corrected; re-test pending. |
-| GPP | GPP stored password | `Groups.xml` in SYSVOL with cpassword | No playbook creates this. | ❌ Missing | Surface not configured. |
-| WT027 | SPN jacking (CVE-2026-25177) | `analyst_cloud` self ValidatedWriteSPN, homoglyph SPN pre-staged | `05-ad-attack-surface.yml` pre-stages homoglyph SPN and self ACE. | ✅ Configured | Not exercised. |
-| WT025 | AdminSDHolder persistence | DA modifies AdminSDHolder template | No playbook pre-configures writable AdminSDHolder for a non-DA. | ❌ Missing | Requires a very specific ACL setup not in playbooks. |
+|| WT015 | ACE#7 ForceChangePassword | `hunter_dfir` → `chief_command` ForceChangePassword | `05-ad-attack-surface.yml` ACE#7; not currently exposed to `hunter_dfir`. | ⠿ Blocked | Surface exists in design, but retest shows missing ACE exposure; rerun after ACE#7 verify-only pass. |
+|| WT013 | WriteDacl self-escalate | `chief_command` → `hunter_dfir` GenericAll on Command-Cadre group | `05-ad-attack-surface.yml` does not explicitly pre-configure this; relies on script. | ⚠️ Partial | Script corrected; re-test pending. |
+|| WT014 | GenericWrite → Shadow Creds | `chief_command` → `hunter_dfir` GenericWrite on `analyst_cloud` | Same as above. | ⚠️ Partial | Script corrected; re-test pending. |
+|| WT016 | GenericAll on OU | `chief_command` → `hunter_dfir` GenericAll on `OU=Command` | Same. | ⚠️ Partial | Script corrected; re-test pending. |
+|| WT008 | Shadow Creds on `dc01$` | `chief_command` can write KeyCredential to `dc01$` | Same. | ⚠️ Partial | Script corrected; re-test pending. |
+|| WT023 | GPO Abuse | `analyst_cloud` GPO edit rights, WMI-Filtered-GPO linked to OU=Agentic | `02-ad-objects.yml` creates GPO + link; `05-ad-attack-surface.yml` ACE#1 grants `analyst_cloud` rights. | ✅ Configured | Script corrected; re-test pending. |
+|| WT024 | gMSA extraction | `gmsaTools` gMSA with SACL, `GoldenGMSA` tool | `05-ad-attack-surface.yml` creates gMSA + SACL; `06-member-services.yml` copies GoldenGMSA? | ✅ Configured | Script corrected; re-test pending. |
+|| GPP | GPP stored password | `Groups.xml` in SYSVOL with cpassword | No playbook creates this. | ❌ Missing | Surface not configured. |
+|| WT027 | SPN jacking (CVE-2026-25177) | `analyst_cloud` self ValidatedWriteSPN, homoglyph SPN pre-staged | `05-ad-attack-surface.yml` pre-stages homoglyph SPN and self ACE. | ✅ Configured | Not exercised. |
+|| WT025 | AdminSDHolder persistence | DA modifies AdminSDHolder template | No playbook pre-configures writable AdminSDHolder for a non-DA. | ❌ Missing | Requires a very specific ACL setup not in playbooks. |
 
-**Verdict:** Branch A core ACEs are configured. The main issue is the credential bridge (using `chief_command` earned via WT015) — scripts were fixed. GPP and AdminSDHolder are missing surfaces.
+**Verdict:** Branch A now has one confirmed blocker (`WT015`) from retest evidence. Other ACE-based attacks are scripted and await rerun after ACE exposure or alternate routing is validated.
 
 ---
 
@@ -348,3 +348,32 @@ Once P0 items are fixed, the campaign can be re-run cleanly from Phase 0 through
 ---
 
 *Generated 2026-07-30 from playbook/guide review vs CAMPAIGNS-VALIDATION-REPORT-20260730.md.*
+## Appendix A — Consolidated Campaign Re-test Matrix
+
+> Updated: 2026-07-31
+
+| ID | Stream | Attack | Source Machine | Credentials | Status | Re-test / Fix Notes |
+|---|---|---|---|---|---|---|
+| WT015 | Branch A | ACE#7 ForceChangePassword | ws01 | hunter_dfir / DF1R_Hunt3r! | ⠿ Blocked | Missing ACE exposure; rerun after `05-ad-attack-surface.yml` ACE#7 verify-only pass. |
+| WT013 | Branch A | WriteDacl self-escalate | ws01 | chief_command / C0mm@nd_Ch1ef! | ⠿ Scripted | Script present; awaiting retest after ACE/routing fixes. |
+| WT014 | Branch A | GenericWrite → Shadow Creds | ws01 | chief_command / C0mm@nd_Ch1ef! | ⠿ Scripted | Script present; awaiting retest after ACE/routing fixes. |
+| WT016 | Branch A | GenericAll on OU | ws01 | chief_command / C0mm@nd_Ch1ef! | ⠿ Scripted | Script present; awaiting retest after ACE/routing fixes. |
+| WT008 | Branch A | Shadow Creds on dc01$ | ws01 | chief_command / C0mm@nd_Ch1ef! | ⠿ Scripted | Script present; awaiting retest after ACE/routing fixes. |
+| WT023 | Branch A | GPO Abuse | ws01 | analyst_cloud / ... | ⠿ Scripted | Script present; awaiting retest. |
+| WT024 | Branch A | gMSA extraction | ws01 | analyst_cloud / ... | ⠿ Scripted | Script present; awaiting retest. |
+| GPP | Branch A | GPP stored password | ws01 | analyst_cloud / ... | ❌ Missing | No playbook config; add `19-initial-access.yml` or gap-fix task. |
+| WT025 | Branch A | AdminSDHolder persistence | ws01 | chief_command / C0mm@nd_Ch1ef! | ❌ Missing | Missing AD surface; needs dedicated playbook/ACL work. |
+| WT050 | Branch B | ADCS ESC1 | ws01 | chief_command / C0mm@nd_Ch1ef! | ⠿ Scripted | Script present; awaiting retest. |
+| WT051 | Branch B | ADCS ESC3 | ws01 | chief_command / C0mm@nd_Ch1ef! | ⠿ Scripted | Script present; awaiting retest. |
+| WT052 | Branch B | ADCS ESC8 | ws01 | analyst_cloud / ... | ⠿ Scripted | Script present; awaiting retest. |
+| WT053 | Branch B | UnPAC-the-Hash | ws01 | chief_command / C0mm@nd_Ch1ef! | ⠿ Scripted | Script present; awaiting retest. |
+| WT044 | Branch D | MSSQL linked server recon | linux01 | analyst_t1 / ... | ✅ Configured | Confirmed configured; extraction exercise pending. |
+| WT045 | Branch D | SSSD ticket extraction | linux01 | analyst_t1 / ... | ❌ Missing | No playbook exposes SSSD cache for extraction. |
+| WT046 | Branch D | MSSQL keytab extraction | linux01 | analyst_t1 / ... | ⠿ Scripted | Configured; extraction script not exercised. |
+| WT047 | Branch D | NFS Kerberos mount | linux01 | analyst_t1 / ... | ❌ Missing | No NFS server export configured. |
+| WT048 | Branch D | Podman container escape | linux01 | analyst_t1 / ... | ❌ Missing | No container surface deployed. |
+| E-01..E-14 | E stream | Network defense exercises | monitor/elk | — | ⏳ Configured | Sensors configured; exercises pending. Keep offline until telemetry phase. |
+| F-01..F-13 | F stream | npm supply-chain scenarios | linux01/mbr01 | — | ⏳ Configured | Tooling configured; scenarios pending. |
+| G | Branch G | CVE-2026-41089 | Kali | — | 🔬 Deferred | PoC present; depends on dc02 patch state. |
+| H-01..H-06 | Phase 0.5 | Initial access payloads | Kali/ws01 | — | ❌ Missing | No playbook stages payloads; needs `19-initial-access.yml`. |
+

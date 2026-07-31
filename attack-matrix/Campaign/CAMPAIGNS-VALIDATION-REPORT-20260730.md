@@ -176,7 +176,7 @@
 
 | ID | Attack | Source Machine | Credential | Status | Notes | Re-test Needed |
 |------|--------|----------------|------------|--------|-------|----------------|
-| 015 | ACL ForceChangePassword ACE#7 (WT015) | ws01 | hunter_dfir / DF1R_Hunt3r! | ✅ Verified live | hunter_dfir -> chief_command: ForceChangePassword; playbook fix committed | No |
+| 015 | ACL ForceChangePassword ACE#7 (WT015) | ws01 | hunter_dfir / DF1R_Hunt3r! | ⠿ BLOCKED — missing ACE#7 surface | Direct ws01 execution now works via SSH; this run was blocked because chief_command does not expose ForceChangePassword to hunter_dfir. The script/routing path is valid; retest requires 05-ad-attack-surface.yml ACE#7 deploy + verify-only pass. | Yes — rerun after ACE#7 surface is restored |
 || 013 | ACL WriteDacl self-escalate (WT013) | ws01 | chief_command / C0mm@nd_Ch1ef! (DA) | ⠿ BLOCKED — missing script | No corrected script found in `attack-matrix/04-automation/`; campaign docs reference WT013, but execution script is absent. | Yes — create/verify script and rerun after T015 |
 | 014 | ACL GenericWrite -> Shadow Credentials (WT014) | ws01 | chief_command / C0mm@nd_Ch1ef! (DA) | 📝 Script corrected, pending re-test | Previously used analyst_t1; now uses chief_command to grant hunter_dfir GenericWrite on analyst_cloud | Yes - run after T015 |
 | 016 | ACL GenericAll on OU (WT016) | ws01 | chief_command / C0mm@nd_Ch1ef! (DA) | 📝 Script corrected, pending re-test | Previously used analyst_t1; now uses chief_command to grant hunter_dfir GenericAll on OU=Command | Yes - run after T015 |
@@ -295,3 +295,33 @@
 
 ---
 *Generated from CAMPAIGNS-METADATA-v2.md and 2026-07-30 validation run.*
+
+## Appendix A — Consolidated Campaign Re-test Matrix
+
+> Updated: 2026-07-31
+
+| ID | Stream | Attack | Source Machine | Credentials | Status | Re-test / Fix Notes |
+|---|---|---|---|---|---|---|
+| WT015 | Branch A | ACE#7 ForceChangePassword | ws01 | hunter_dfir / DF1R_Hunt3r! | ⠿ Blocked | Missing ACE exposure; rerun after `05-ad-attack-surface.yml` ACE#7 verify-only pass. |
+| WT013 | Branch A | WriteDacl self-escalate | ws01 | chief_command / C0mm@nd_Ch1ef! | ⠿ Scripted | Script present; awaiting retest after ACE/routing fixes. |
+| WT014 | Branch A | GenericWrite → Shadow Creds | ws01 | chief_command / C0mm@nd_Ch1ef! | ⠿ Scripted | Script present; awaiting retest after ACE/routing fixes. |
+| WT016 | Branch A | GenericAll on OU | ws01 | chief_command / C0mm@nd_Ch1ef! | ⠿ Scripted | Script present; awaiting retest after ACE/routing fixes. |
+| WT008 | Branch A | Shadow Creds on dc01$ | ws01 | chief_command / C0mm@nd_Ch1ef! | ⠿ Scripted | Script present; awaiting retest after ACE/routing fixes. |
+| WT023 | Branch A | GPO Abuse | ws01 | analyst_cloud / ... | ⠿ Scripted | Script present; awaiting retest. |
+| WT024 | Branch A | gMSA extraction | ws01 | analyst_cloud / ... | ⠿ Scripted | Script present; awaiting retest. |
+| GPP | Branch A | GPP stored password | ws01 | analyst_cloud / ... | ❌ Missing | No playbook config; add `19-initial-access.yml` or gap-fix task. |
+| WT025 | Branch A | AdminSDHolder persistence | ws01 | chief_command / C0mm@nd_Ch1ef! | ❌ Missing | Missing AD surface; needs dedicated playbook/ACL work. |
+| WT050 | Branch B | ADCS ESC1 | ws01 | chief_command / C0mm@nd_Ch1ef! | ⠿ Scripted | Script present; awaiting retest. |
+| WT051 | Branch B | ADCS ESC3 | ws01 | chief_command / C0mm@nd_Ch1ef! | ⠿ Scripted | Script present; awaiting retest. |
+| WT052 | Branch B | ADCS ESC8 | ws01 | analyst_cloud / ... | ⠿ Scripted | Script present; awaiting retest. |
+| WT053 | Branch B | UnPAC-the-Hash | ws01 | chief_command / C0mm@nd_Ch1ef! | ⠿ Scripted | Script present; awaiting retest. |
+| WT044 | Branch D | MSSQL linked server recon | linux01 | analyst_t1 / ... | ✅ Configured | Confirmed configured; extraction exercise pending. |
+| WT045 | Branch D | SSSD ticket extraction | linux01 | analyst_t1 / ... | ❌ Missing | No playbook exposes SSSD cache for extraction. |
+| WT046 | Branch D | MSSQL keytab extraction | linux01 | analyst_t1 / ... | ⠿ Scripted | Configured; extraction script not exercised. |
+| WT047 | Branch D | NFS Kerberos mount | linux01 | analyst_t1 / ... | ❌ Missing | No NFS server export configured. |
+| WT048 | Branch D | Podman container escape | linux01 | analyst_t1 / ... | ❌ Missing | No container surface deployed. |
+| E-01..E-14 | E stream | Network defense exercises | monitor/elk | — | ⏳ Configured | Sensors configured; exercises pending. Keep offline until telemetry phase. |
+| F-01..F-13 | F stream | npm supply-chain scenarios | linux01/mbr01 | — | ⏳ Configured | Tooling configured; scenarios pending. |
+| G | Branch G | CVE-2026-41089 | Kali | — | 🔬 Deferred | PoC present; depends on dc02 patch state. |
+| H-01..H-06 | Phase 0.5 | Initial access payloads | Kali/ws01 | — | ❌ Missing | No playbook stages payloads; needs `19-initial-access.yml`. |
+

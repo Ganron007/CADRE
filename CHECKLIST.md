@@ -359,7 +359,7 @@
 
 | ID | Attack | Source | Credential | Status |
 |----|--------|--------|------------|--------|
-| 015 | ACL ForceChangePassword ACE#7 (WT015) | ws01 | hunter_dfir / DF1R_Hunt3r! | ✅ Verified live |
+| 015 | ACL ForceChangePassword ACE#7 (WT015) | ws01 | hunter_dfir / DF1R_Hunt3r! | ⠿ BLOCKED — missing ACE#7 surface |
 | 013 | ACL WriteDacl self-escalate (WT013) | ws01 | chief_command / C0mm@nd_Ch1ef! (DA) | 📝 Script corrected, pending re-test |
 | 014 | ACL GenericWrite -> Shadow Credentials (WT014) | ws01 | chief_command / C0mm@nd_Ch1ef! (DA) | 📝 Script corrected, pending re-test |
 | 016 | ACL GenericAll on OU (WT016) | ws01 | chief_command / C0mm@nd_Ch1ef! (DA) | 📝 Script corrected, pending re-test |
@@ -370,7 +370,7 @@
 | 027 | SPN Jacking CVE-2026-25177 (WT027) | ws01 | DA or writeSPN rights | ⏳ Not exercised |
 | 025 | AdminSDHolder persistence (WT025) | ws01 | DA | 📝 Configured / pending re-test |
 
-- [x] **T015** ACE#7 ForceChangePassword — surface check · attack run · telemetry captured · tracker updated
+- [ ] **T015** ACE#7 ForceChangePassword — surface check · attack run · telemetry captured · tracker updated
 - [ ] **T013** WriteDacl self-escalate — surface check · attack run · telemetry captured · tracker updated
 - [ ] **T014** GenericWrite -> Shadow Credentials — surface check · attack run · telemetry captured · tracker updated
 - [ ] **T016** GenericAll on OU — surface check · attack run · telemetry captured · tracker updated
@@ -732,3 +732,26 @@ Bundle created: L.# path
 DFIR case: name / ingest Y/N
 Next: 
 ```
+
+
+## Campaign Re-test Tracker
+
+| ID | Attack | Source | Credential | Status | Notes |
+|---|---|---|---|---|---|
+| WT015 | ACE#7 ForceChangePassword | ws01 | hunter_dfir / DF1R_Hunt3r! | ⠿ BLOCKED | Missing ACE surface; retest after playbook fix. |
+| WT013 | WriteDacl self-escalate | ws01 | chief_command / C0mm@nd_Ch1ef! | ⠿ Scripted | Script present; retest pending. |
+| WT014 | GenericWrite → Shadow Creds | ws01 | chief_command / C0mm@nd_Ch1ef! | ⠿ Scripted | Script present; retest pending. |
+| WT016 | GenericAll on OU | ws01 | chief_command / C0mm@nd_Ch1ef! | ⠿ Scripted | Script present; retest pending. |
+| WT008 | Shadow Creds on dc01$ | ws01 | chief_command / C0mm@nd_Ch1ef! | ⠿ Scripted | Script present; retest pending. |
+| WT023 | GPO Abuse | ws01 | analyst_cloud | ⠿ Scripted | Script present; retest pending. |
+| WT024 | gMSA extraction | ws01 | analyst_cloud | ⠿ Scripted | Script present; retest pending. |
+| GPP | GPP stored password | ws01 | analyst_cloud | ❌ Missing | No surface configured. |
+| WT025 | AdminSDHolder persistence | ws01 | chief_command | ❌ Missing | No surface configured. |
+| WT050 | ESC1 | ws01 | chief_command | ⠿ Scripted | Script present; retest pending. |
+| WT051 | ESC3 | ws01 | chief_command | ⠿ Scripted | Script present; retest pending. |
+| WT052 | ESC8 | ws01 | analyst_cloud | ⠿ Scripted | Script present; retest pending. |
+| WT053 | UnPAC-the-Hash | ws01 | chief_command | ⠿ Scripted | Script present; retest pending. |
+| WT045 | SSSD ticket extraction | linux01 | analyst_t1 | ❌ Missing | No playbook surface. |
+| WT047 | NFS Kerberos mount | linux01 | analyst_t1 | ❌ Missing | No NFS surface. |
+| WT048 | Podman container escape | linux01 | analyst_t1 | ❌ Missing | No container surface. |
+

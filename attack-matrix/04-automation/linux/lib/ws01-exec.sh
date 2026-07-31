@@ -20,9 +20,9 @@ WS01_DOMAIN="${WS01_DOMAIN:-child.cadre.local}"
 
 CMD="${1:?usage: ws01-exec.sh '<powershell command>'}"
 
-export PATH="${HOME}/.local/bin:${PATH}"
+export PATH="${HOME}/campaign-venv/bin:${HOME}/.local/bin:${PATH}"
 if ! command -v nxc >/dev/null 2>&1; then
-  echo "nxc not found — run attack-matrix/04-automation/linux/lib/install-nxc-provisioning.sh" >&2
+  echo "nxc not found — run attack-matrix/04-automation/linux/lib/install-nxc-provisioning.sh or ensure ~/campaign-venv/bin/nxc exists" >&2
   exit 1
 fi
 

