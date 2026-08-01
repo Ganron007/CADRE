@@ -313,43 +313,40 @@
 
 ## Top Re-test Priorities
 
-1. **Run the ESC8 (WT052) v5 relay chain** from ws01: `ntlmrelayx.py --smb-port 8445 -t http://dc01.cadre.local/certsrv/certfnsh.asp --adcs --template Machine` + `coercer --smb-port 8445` coerce dc01$ MS-RPRN → obtain cert → UnPAC-the-Hash. Preconditions verified 2026-08-01.
-2. **Enable Print Spooler on dc02** (`04-vulnerabilities.yml`) and re-run T102 coercion. *(Spooler confirmed enabled on all 3 DCs 2026-08-01.)*
-3. **Re-run all Branch A scripts after T015** using `hunter_dfir` and `chief_command`.
-4. **Re-run all Branch B ADCS scripts** using `chief_command@cadre.local`.
-5. **Run Branch C SCCM chain from mbr02** (WT035-039).
-6. **Write and run Branch D scripts** (WT045-048).
-7. **Run Branch G CVE-2026-41089** from Kali against dc02 with snapshot.
-8. **Run E exercises** on monitor VM once elk/monitor are online.
-9. **Run F supply-chain scenarios** on linux01/mbr01/npm registry.
+> Updated 2026-08-01 — Branch A (013/014/015/016/023/024/025/008/GPP/**027**) and Branch D (044-048) and Branch B (050/051/053/ESC2/4/7/9) are all **VERIFIED**. Only the following remain open:
+
+1. **Branch C SCCM (WT035-039)** — pending operator confirmation; deploy AdminService on mbr02 per `docs/sccm-integration-guide.md` Phase 6A (app pool identity `RANGE\svc_sccm`), then Kerberoast → S4U2Proxy → HTTP/mbr02 → AdminService chain (closes WT037/039).
+2. **ESC8 (WT052) / ESC11** — deferred; revisit at end via Kerberos-relay (krbrelayx) or a restored SMB-coerce primitive (NTLM-relay path proven non-viable on Server 2025).
+3. **E exercises (E-01..14)** — run on monitor VM once elk/monitor are online (telemetry phase).
+4. **F supply-chain scenarios (F-01..13)** — run on linux01/mbr01/npm registry.
+5. **Branch G (CVE-2026-41089)** — snapshot DCs + verify dc02 patch level (UBR < 32772), then PoC from Kali.
+6. **H-01..06 (initial access)** — needs `19-initial-access.yml` (currently excluded per operator).
 
 ---
 *Generated from CAMPAIGNS-METADATA-v2.md and 2026-07-30 validation run.*
 
 ## Appendix A — Consolidated Campaign Re-test Matrix
 
-> Updated: 2026-08-01 (ESC8 v5 + Branch A verified status + corrected ws01 tooling)
+> Updated: 2026-08-01 (ESC8 v5 + Branch A verified status + corrected ws01 tooling + **WT027 verified / all stale rows synced**)
 
 | ID | Stream | Attack | Source Machine | Credentials | Status | Re-test / Fix Notes |
 |---|---|---|---|---|---|---|
-| WT015 | Branch A | ACE#7 ForceChangePassword | ws01 | hunter_dfir / DF1R_Hunt3r! | ⠿ Blocked | Missing ACE exposure; rerun after `05-ad-attack-surface.yml` ACE#7 verify-only pass. |
-| WT013 | Branch A | WriteDacl self-escalate | ws01 | chief_command / C0mm@nd_Ch1ef! | ⠿ Scripted | Script present; awaiting retest after ACE/routing fixes. |
-| WT014 | Branch A | GenericWrite → Shadow Creds | ws01 | chief_command / C0mm@nd_Ch1ef! | ⠿ Scripted | Script present; awaiting retest after ACE/routing fixes. |
-| WT016 | Branch A | GenericAll on OU | ws01 | chief_command / C0mm@nd_Ch1ef! | ⠿ Scripted | Script present; awaiting retest after ACE/routing fixes. |
-| WT008 | Branch A | Shadow Creds on dc01$ | ws01 | chief_command / C0mm@nd_Ch1ef! | ✅ Verified | pywhisker (explicit creds) → dc01$ KeyCredential; PKINIT TGT; NT hash recovered. |
+| WT015 | Branch A | ACE#7 ForceChangePassword | ws01 | hunter_dfir / DF1R_Hunt3r! | ✅ VERIFIED 2026-07-31 | ACE#7 deployed + verified (`05-ad-attack-surface-verifyOnly.yml` 18/18); hunter_dfir reset chief_command pw via bloodyAD; restored. |
+| WT013 | Branch A | WriteDacl self-escalate | ws01 | chief_command / C0mm@nd_Ch1ef! | ✅ VERIFIED 2026-07-31 | `T013` → hunter_dfir GenericAll on CN=Command-Cadre; ACE read-back verified. |
+| WT014 | Branch A | GenericWrite → Shadow Creds | ws01 | chief_command / C0mm@nd_Ch1ef! | ✅ VERIFIED 2026-07-31 | `T014` → hunter_dfir GenericWrite on analyst_cloud; ACE read-back verified. |
+| WT016 | Branch A | GenericAll on OU | ws01 | chief_command / C0mm@nd_Ch1ef! | ✅ VERIFIED 2026-07-31 | `T016` → hunter_dfir GenericAll on OU=Command; ACE read-back verified. |
+| WT008 | Branch A | Shadow Creds on dc01$ | ws01 | chief_command / C0mm@nd_Ch1ef! | ✅ Verified | pywhisker → dc01$ KeyCredential; PKINIT TGT; NT hash recovered. |
 | WT023 | Branch A | GPO Abuse | ws01 | analyst_cloud / Cl0ud_An@lyst! | ✅ Verified | WriteDacl/WriteOwner/GenericAll on Vulnerable-GPO; preference write confirmed. |
-| WT024 | Branch A | gMSA extraction | ws01 | analyst_cloud / ... | ⠿ Scripted | Script present; awaiting retest. |
-| GPP | Branch A | GPP stored password | ws01 | analyst_cloud / ... | ❌ Missing | No playbook config; add `19-initial-access.yml` or gap-fix task. |
-| WT025 | Branch A | AdminSDHolder persistence | ws01 | chief_command / C0mm@nd_Ch1ef! | ❌ Missing | Missing AD surface; needs dedicated playbook/ACL work. |
-| WT050 | Branch B | ADCS ESC1 | ws01 | chief_command / C0mm@nd_Ch1ef! | ⠿ Scripted | Script present; awaiting retest. |
-| WT051 | Branch B | ADCS ESC3 | ws01 | chief_command / C0mm@nd_Ch1ef! | ⠿ Scripted | Script present; awaiting retest. |
-| WT052 | Branch B | ADCS ESC8 | ws01 | chief_command / C0mm@nd_Ch1ef! | 📝 v5 designed | Preconditions verified 2026-08-01 (spooler all DCs, ADCS endpoint 401, chief bind OK, firewall rules, 8445 free, tools present). **v5 = custom SMB port 8445 relay** to avoid `srv2` reclaiming 445. Cert issuance run pending. |
-| WT053 | Branch B | UnPAC-the-Hash | ws01 | chief_command / C0mm@nd_Ch1ef! | ⠿ Scripted | Script present; awaiting retest. |
-| WT044 | Branch D | MSSQL linked server recon | linux01 | analyst_t1 / ... | ✅ Configured | Confirmed configured; extraction exercise pending. |
-| WT045 | Branch D | SSSD ticket extraction | linux01 | analyst_t1 / ... | ❌ Missing | No playbook exposes SSSD cache for extraction. |
-| WT046 | Branch D | MSSQL keytab extraction | linux01 | analyst_t1 / ... | ⠿ Scripted | Configured; extraction script not exercised. |
-| WT047 | Branch D | NFS Kerberos mount | linux01 | analyst_t1 / ... | ❌ Missing | No NFS server export configured. |
-| WT048 | Branch D | Podman container escape | linux01 | analyst_t1 / ... | ❌ Missing | No container surface deployed. |
+| WT024 | Branch A | gMSA extraction | ws01 | eng_cloud / Cl0ud_Eng! | ✅ Verified | msDS-ManagedPassword on gmsaTools$ → NT hash → SMB auth as gmsaTools$. |
+| GPP | Branch A | GPP stored password | ws01 | analyst_cloud / Cl0ud_An@lyst! | ✅ Verified | Groups.xml cpassword → svc_ldap / s3rv1c3_Ld@p!; SMB auth verified; surface fixed (`02-ad-objects.yml` + `05-ad-attack-surface.yml`). |
+| WT025 | Branch A | AdminSDHolder persistence | ws01 | analyst_cloud | ✅ VERIFIED 2026-07-31 | GenericAll backdoor ACE on AdminSDHolder; DACL restored to 23 ACEs (no rogue). |
+| WT027 | Branch A | SPN Jacking CVE-2026-25177 | ws01 | chief_command (writeSPN) → analyst_cloud | ✅ VERIFIED 2026-08-01 | Planted `MSSQLSvc/dc01.cadre.local:14333` on analyst_cloud → **KDC issued TGS (AES) encrypted with analyst_cloud's key** (attacker-known → offline crack) → cleaned. **Documented self-write command NOT viable** (SPN 1433 owned by `child\svc_mssql` → uniqueness; free cross-host SPN → self validated-write denies). `wt027-spn-jack.ps1` / `-cleanup.ps1` / `-lookup*.ps1`. |
+| WT050 | Branch B | ADCS ESC1 | ws01 | chief_command / C0mm@nd_Ch1ef! | ✅ VERIFIED 2026-08-01 | cert Req 39 → PKINIT TGT + UnPAC NT hash. |
+| WT051 | Branch B | ADCS ESC3 | ws01 | chief_command / C0mm@nd_Ch1ef! | ✅ VERIFIED 2026-08-01 | agent + `-on-behalf-of` → admin cert Req 44. |
+| WT052 | Branch B | ADCS ESC8 | ws01 | chief_command / C0mm@nd_Ch1ef! | 🔬 DEFERRED — revisit at end | Root cause: no SMB-authenticated coerce on Server 2025 (MS-RPRN = anonymous :135 only; `@8445` UNC false). Candidates: krbrelayx / restored SMB-coerce primitive. |
+| WT053 | Branch B | UnPAC-the-Hash | ws01 | chief_command / C0mm@nd_Ch1ef! | ✅ VERIFIED 2026-08-01 | `certipy auth` → administrator NT hash. |
+| ESC2/4/7/9 | Branch B | ADCS ESC2/4/7/9 | ws01 | hunter_dfir / lead_engineering | ✅ VERIFIED 2026-08-01 | All verified — see Branch B body table. |
+| WT044..048 | Branch D | MSSQL / SSSD / keytab / NFS / podman | linux01 | mssql-linux01 pivot → root | ✅ VERIFIED 2026-08-01 | All verified — see Branch D body table. |
 | E-01..E-14 | E stream | Network defense exercises | monitor/elk | — | ⏳ Configured | Sensors configured; exercises pending. Keep offline until telemetry phase. |
 | F-01..F-13 | F stream | npm supply-chain scenarios | linux01/mbr01 | — | ⏳ Configured | Tooling configured; scenarios pending. |
 | G | Branch G | CVE-2026-41089 | Kali | — | 🔬 Deferred | PoC present; depends on dc02 patch state. |

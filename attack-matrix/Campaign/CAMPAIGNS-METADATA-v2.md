@@ -1022,11 +1022,12 @@ We have `nt authority\system` on mbr01 via GodPotato. `analyst_cloud` has an act
 
 | Field | Value |
 |-------|-------|
-| **Status** | ⏳ Not tested |
+| **Status** | ✅ Verified 2026-08-01 |
 | **Technique** | Abuse writeSPN/validatesPSN to Kerberoast target account |
 | **What it earns** | Target account TGS → offline crack |
 | **RedStrike Intent** | — |
 | **State Output** | SET_STATE(<manual>) |
+| **Execution note** | Documented self-write command NOT viable — real AD behavior: (1) `MSSQLSvc/mbr01.child.cadre.local:1433` is owned by `child\svc_mssql` → forest-wide SPN uniqueness → constraint violation; (2) free cross-host service SPN via SELF-write → Access denied (default validated-write to servicePrincipalName only allows own-host). Verified path: `chief_command` (DA, writeSPN) plants `MSSQLSvc/dc01.cadre.local:14333` on analyst_cloud → KDC issued TGS (AES) encrypted with analyst_cloud's key → offline-crackable. Cleaned. Scripts: `wt027-spn-jack.ps1` / `-cleanup.ps1` / `-lookup*.ps1` (04-automation/windows). |
 
 #### Persistence — AdminSDHolder (WT025)
 

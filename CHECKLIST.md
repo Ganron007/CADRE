@@ -136,7 +136,7 @@
 | C.6 | Phase 6 — DCSync | P-DELEG | [ ] | [ ] | [ ] | [ ] | |
 | C.7 | Phase 7 — Golden / alt persistence | P-FOREST | [ ] | [ ] | [ ] | [ ] | |
 | C.8 | Phase 8 — Cross-forest | P-FOREST | [ ] | [ ] | [ ] | [ ] | |
-| C.A | Branch A — ACL abuse | P-DELEG | [x] | [x] | [x] | [~] | WT013/015/023/025/008 verified; WT014/016/024 pending |
+| C.A | Branch A — ACL abuse | P-DELEG | [x] | [x] | [x] | [~] | Branch A 013/014/015/016/023/024/025/008/GPP verified; WT027 SPN Jacking verified 2026-08-01 |
 | C.B | Branch B — ADCS | P-DELEG | [x] | [x] | [x] | [~] | ESC1/2/3/4/7/9 + UnPAC verified 2026-08-01; ESC8/11 🔬 deferred |
 | C.C | Branch C — SCCM | P-FOREST | [~] | [x] | [x] | [~] | Surface + primitives verified 2026-08-01; full exec gated on AdminService deploy (guide Phase 6A) |
 | C.D | Branch D — Linux pivot | P-LINUX | [x] | [x] | [x] | [~] | WT044-048 verified 2026-08-01 |
@@ -361,13 +361,13 @@
 |----|--------|--------|------------|--------|
 | 015 | ACL ForceChangePassword ACE#7 (WT015) | ws01 | hunter_dfir / DF1R_Hunt3r! | ✅ VERIFIED — ACE#7 deployed + verified (`05-ad-attack-surface-verifyOnly.yml` 18/18); hunter_dfir reset chief_command password via bloodyAD |
 | 013 | ACL WriteDacl self-escalate (WT013) | ws01 | chief_command / C0mm@nd_Ch1ef! (DA) | ✅ VERIFIED 2026-07-31 — T013 granted hunter_dfir GenericAll on CN=Command-Cadre; ACE read-back verified |
-| 014 | ACL GenericWrite -> Shadow Credentials (WT014) | ws01 | chief_command / C0mm@nd_Ch1ef! (DA) | 📝 Script corrected, pending re-test |
-| 016 | ACL GenericAll on OU (WT016) | ws01 | chief_command / C0mm@nd_Ch1ef! (DA) | 📝 Script corrected, pending re-test |
+| 014 | ACL GenericWrite -> Shadow Credentials (WT014) | ws01 | chief_command / C0mm@nd_Ch1ef! (DA) | ✅ VERIFIED 2026-07-31 — T014 granted hunter_dfir GenericWrite on analyst_cloud; ACE read-back verified |
+| 016 | ACL GenericAll on OU (WT016) | ws01 | chief_command / C0mm@nd_Ch1ef! (DA) | ✅ VERIFIED 2026-07-31 — T016 granted hunter_dfir GenericAll on OU=Command; ACE read-back verified |
 | 008 | Shadow Credentials on dc01$ (WT008) | ws01 | chief_command / C0mm@nd_Ch1ef! (DA) | ✅ VERIFIED — pywhisker (explicit creds, LDAPS) added KeyCredential to dc01$; PKINIT TGT as dc01$; NT hash 09493093db08c8afa99193779d401b34 recovered (= DCSync rights) |
 | 023 | GPO Abuse (WT023) | ws01 | analyst_cloud / Cl0ud_An@lyst! (ACE#1) | ✅ VERIFIED — analyst_cloud WriteDacl/WriteOwner/GenericAll on Vulnerable-GPO; ScheduledTasks.xml preference write + read-back confirmed |
-| 024 | gMSA Extraction (WT024) | ws01 | chief_command / C0mm@nd_Ch1ef! (DA) | 📝 Script corrected, pending re-test |
-| GPP | GPP Stored Password (Groups.xml) | Kali / provisioning | Any domain user | 📝 Configured / pending re-test |
-| 027 | SPN Jacking CVE-2026-25177 (WT027) | ws01 | DA or writeSPN rights | ⏳ Not exercised |
+| 024 | gMSA Extraction (WT024) | ws01 | eng_cloud / Cl0ud_Eng! | ✅ Verified — msDS-ManagedPassword on gmsaTools$ → NT hash → SMB auth as gmsaTools$ |
+| GPP | GPP Stored Password (Groups.xml) | ws01 | analyst_cloud / Cl0ud_An@lyst! | ✅ Verified — Groups.xml cpassword → svc_ldap; SMB auth verified; surface fixed 02/05 playbooks |
+| 027 | SPN Jacking CVE-2026-25177 (WT027) | ws01 | chief_command (writeSPN) → analyst_cloud | ✅ VERIFIED 2026-08-01 — planted MSSQLSvc/dc01.cadre.local:14333 → KDC TGS (AES) w/ analyst_cloud key; cleaned. Self-write command NOT viable (SPN 1433 owned by svc_mssql / validated-write) |
 | 025 | AdminSDHolder persistence (WT025) | ws01 | DA | ✅ VERIFIED 2026-07-31 — analyst_cloud WriteDacl on AdminSDHolder; ACE persisted; DACL restored to 23 ACEs |
 
 - [x] **T015** ACE#7 ForceChangePassword — surface check ✅ · attack run ✅ (bloodyAD reset, DA login confirmed, password restored) · tracker · telemetry
@@ -498,10 +498,10 @@
 ### Re-test priorities
 
 1. ~~**T102** dc02$ TGT capture~~ — **DONE 2026-07-31** (hostname listener → TGT → DCSync). 
-2. **Branch A** after T015 using `hunter_dfir` and `chief_command`; GPP/AdminSDHolder surfaces are now configured.
-3. **Branch B ADCS scripts** using `chief_command@cadre.local`.
-4. **Branch C SCCM chain** from mbr02 (WT035-039).
-5. **Branch D** extraction exercises (WT045-048); Linux surfaces are configured, pending execution.
+2. ~~**Branch A** after T015~~ — **DONE 2026-07-31/08-01** (013/014/015/016/023/024/025/008/GPP + **WT027 SPN Jacking** all verified).
+3. ~~**Branch B ADCS scripts**~~ — **DONE 2026-08-01** (ESC1/2/3/4/7/9 + UnPAC). ESC8/11 🔬 deferred (relay family — no SMB coerce on Server 2025).
+4. **Branch C SCCM chain** from mbr02 (WT035-039) — pending operator confirm; AdminService deploy per `docs/sccm-integration-guide.md` Phase 6A first.
+5. ~~**Branch D** extraction exercises (WT045-048)~~ — **DONE 2026-08-01** (all verified).
 6. **Branch G** CVE-2026-41089 from Kali against dc02 with snapshot.
 7. **Stream E** exercises on monitor VM once elk/monitor are online.
 8. **Stream F** supply-chain scenarios on linux01/mbr02/npm registry.
@@ -752,22 +752,15 @@ Next:
 
 ## Campaign Re-test Tracker
 
+> Branch A/B/D rows (013/014/015/016/023/024/025/008/GPP/050/051/053/ESC2-9/044-048) are all **VERIFIED** — see validation report body. Only open items below.
+
 | ID | Attack | Source | Credential | Status | Notes |
 |---|---|---|---|---|---|
-| WT015 | ACE#7 ForceChangePassword | ws01 | hunter_dfir / DF1R_Hunt3r! | ⠿ BLOCKED | Missing ACE surface; retest after playbook fix. |
-| WT013 | WriteDacl self-escalate | ws01 | chief_command / C0mm@nd_Ch1ef! | ⠿ Scripted | Script present; retest pending. |
-| WT014 | GenericWrite → Shadow Creds | ws01 | chief_command / C0mm@nd_Ch1ef! | ⠿ Scripted | Script present; retest pending. |
-| WT016 | GenericAll on OU | ws01 | chief_command / C0mm@nd_Ch1ef! | ⠿ Scripted | Script present; retest pending. |
-| WT008 | Shadow Creds on dc01$ | ws01 | chief_command / C0mm@nd_Ch1ef! | ✅ Verified | pywhisker → dc01$ KeyCredential; PKINIT TGT; NT hash recovered. |
-| WT023 | GPO Abuse | ws01 | analyst_cloud / Cl0ud_An@lyst! | ✅ Verified | WriteDacl/WriteOwner/GenericAll on Vulnerable-GPO; preference write confirmed. |
-| WT024 | gMSA extraction | ws01 | analyst_cloud | ⠿ Scripted | Script present; retest pending. |
-| GPP | GPP stored password | ws01 | analyst_cloud | ❌ Missing | No surface configured. |
-| WT025 | AdminSDHolder persistence | ws01 | chief_command | ❌ Missing | No surface configured. |
-| WT050 | ESC1 | ws01 | chief_command | ⠿ Scripted | Script present; retest pending. |
-| WT051 | ESC3 | ws01 | chief_command | ⠿ Scripted | Script present; retest pending. |
-| WT052 | ESC8 | ws01 | analyst_cloud | ⠿ Scripted | Script present; retest pending. |
-| WT053 | UnPAC-the-Hash | ws01 | chief_command | ⠿ Scripted | Script present; retest pending. |
-| WT045 | SSSD ticket extraction | linux01 | analyst_t1 | ❌ Missing | No playbook surface. |
-| WT047 | NFS Kerberos mount | linux01 | analyst_t1 | ❌ Missing | No NFS surface. |
-| WT048 | Podman container escape | linux01 | analyst_t1 | ❌ Missing | No container surface. |
+| WT027 | SPN Jacking (CVE-2026-25177) | ws01 | chief_command (writeSPN) → analyst_cloud | ✅ VERIFIED 2026-08-01 | Planted MSSQLSvc/dc01.cadre.local:14333 → KDC TGS (AES) w/ analyst_cloud key; cleaned. Self-write NOT viable (SPN 1433 owned by svc_mssql; validated-write on self). |
+| WT052 | ESC8 | ws01 | chief_command | 🔬 Deferred | No SMB-authenticated coerce on Server 2025; revisit at end (krbrelayx). |
+| ESC11 | ESC11 (ICPR) | ws01 | chief_command | 🔬 Deferred | Relay family — deferred with ESC8. |
+| E-01..14 | Network defense | monitor/elk | — | ⏳ Configured | Offline until telemetry phase. |
+| F-01..13 | npm supply-chain | linux01/mbr01 | — | ⏳ Configured | Scenarios pending. |
+| G | CVE-2026-41089 | Kali | — | 🔬 Deferred | PoC present; dc02 patch state + snapshot. |
+| H-01..06 | Initial access | Kali/ws01 | — | ❌ Missing | Needs `19-initial-access.yml`. |
 

