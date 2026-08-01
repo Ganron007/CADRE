@@ -245,3 +245,22 @@
       register: r
       changed_when: false
       failed_when: r.rc == 1
+
+    - name: 'H — Verify analyst_cloud has "Log on as a batch job" (scheduled-task persistence prerequisite)'
+      ansible.windows.win_shell: |
+        try {
+        $ErrorActionPreference = "Stop"
+          $tmp = Join-Path $env:TEMP "cadre-secbatch.inf"
+          secedit /export /cfg $tmp /areas USER_RIGHTS | Out-Null
+          $content = Get-Content $tmp -Raw
+          Remove-Item $tmp -Force -ErrorAction SilentlyContinue
+          $sid = (New-Object System.Security.Principal.NTAccount("CADRE\analyst_cloud")).Translate([System.Security.Principal.SecurityIdentifier]).Value
+          if ($content -match 'SeBatchLogonRight\s*=\s*[^\r\n]*\*' + [regex]::Escape($sid)) {
+            Write-Output "PASS: analyst_cloud has SeBatchLogonRight"; exit 0
+          }
+          Write-Output "FAIL: SeBatchLogonRight missing for analyst_cloud"; exit 1
+        } catch { Write-Output "FAIL: $_"; exit 1 }
+      register: r
+      changed_when: false
+      failed_when: r.rc == 1
+

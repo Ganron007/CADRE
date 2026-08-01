@@ -1,7 +1,7 @@
 # CADRE Main Lab — Canonical Checklist
 
 **Path:** `CHECKLIST.md` (repo root)  
-**Last updated:** 2026-07-26  
+**Last updated:** 2026-07-31  
 **Writer repo:** `C:\STUDY\Github\CADRE-Platform\CADRE\`  
 **Scope:** Lab operations, **Plan 1.1 campaign automation (RedStrike)**, **campaign execution**, **Plan 1 telemetry catalog**, **log corpus for DFIR-Nexus**, integrations — **not** per-exercise study progress (`plan1.7-exercises.md` / `plan1.8-exercises.md`).
 
@@ -114,6 +114,8 @@
 | A.4 | Document VM dir + `vagrant global-status` in vm-access | [x] | 2026-07-25 | `Tools/vm-access.md` | `C:\Users\Ganro\VMs\CADRE`; all core+ext running except legacy `kali` VM |
 | A.5 | Optional: `Host cadre-prov` in `~/.ssh/config` | [ ] | | operator | Snippet in vm-access |
 | A.6 | Automated boot-time log cleanup on `elk` + `monitor` VMs | [ ] | | `ansible/playbooks/` or `systemd` | Clear old ES GC logs, Suricata/Zeek archives, Arkime raw pcaps, journal vacuum; preserve current logs and ES data |
+| A.7 | Restore `ssh-agent` / working local SSH to `ws01` | [x] | 2026-07-31 | operator | `localhost -> ws01` now works via `cadre-ws01-key`; prior local agent issue no longer blocks execution |
+| A.8 | Stage `nxc`/`certipy` on `ws01` or resolve Rust/PyPI install path | [ ] | | operator/lab | `ws01` Python 3.12/pip 24.3.1 can reach PyPI, but `pip install NetExec/netexec` returns `No matching distribution found`; `git+https` install fails on `aardwolf` wheel build because Rust compiler is missing. Blocked until Rust toolchain is installed, prebuilt wheels are available, or tools are pre-staged on `ws01`. |
 
 ---
 
@@ -200,7 +202,7 @@
 |----|--------|--------|------------|--------|
 | 002 | Kerberoast via ACE#18 bridge (WT002) | ws01 | intern_blue / 1nt3rn_Blu3! | ✅ Verified |
 
-- [x] **T002** Kerberoast — surface check · attack run · telemetry captured · tracker updated
+- [ ] **T002** Kerberoast — surface check · attack run · telemetry captured · tracker updated
 
 ### Phase 2 Alt
 
@@ -214,10 +216,10 @@
 
 | ID | Attack | Source | Credential | Status |
 |----|--------|--------|------------|--------|
-| 041/043 | SQL xp_cmdshell + GodPotato (WT041/WT043) | ws01 -> mbr01 | child\analyst_t1 / T13r_An@lyst! | ✅ Verified |
+| 041/043 | SQL xp_cmdshell + GodPotato (WT041/WT043) | ws01 -> mbr01 | child\analyst_t1 / T13r_An@lyst! | ⠿ Partial — GodPotato **IS staged** on mbr01 (57,344 bytes); re-test `GodPotato.exe -cmd whoami` via SQL. Long-lived children (Rubeus monitor) hang SQL ExecuteReader@180s — use ws01 listener path instead |
 | 042 | CLR Assembly on mbr02 (WT042) | ws01 -> mbr02 | child\analyst_t1 / T13r_An@lyst! | 📝 Reachable |
 
-- [x] **T041/T043** SQL xp_cmdshell + GodPotato — surface check · attack run · telemetry captured · tracker updated
+- [ ] **T041/T043** SQL xp_cmdshell + GodPotato — surface check · attack run · telemetry captured · tracker updated
 - [ ] **T042** CLR Assembly — surface check · attack run · telemetry captured · tracker updated
 
 ### Phase 3.5
@@ -240,11 +242,11 @@
 | 3.5N | UnCanny LPE via InstallService | ws01 | local user | 🔬 Deferred |
 
 - [x] **3.5F** mimikatz LSASS/SAM — surface check · attack run · telemetry captured · tracker updated
-- [x] **3.5A** Winlogon plaintext extraction — surface check · attack run · telemetry captured · tracker updated
+- [ ] **3.5A** Winlogon plaintext extraction — surface check · attack run · telemetry captured · tracker updated
 - [ ] **3.5G** DPAPI via Nemesis — surface check · attack run · telemetry captured · tracker updated
 - [ ] **3.5H** ctfmon.exe extraction — surface check · attack run · telemetry captured · tracker updated
 - [x] **3.5I** Token impersonation — surface check · attack run · telemetry captured · tracker updated
-- [x] **3.5B** Scheduled Task wrapper — surface check · attack run · telemetry captured · tracker updated
+- [x] **3.5B** Scheduled Task — **REJECTED as execution wrapper (Rule 2: scheduled tasks are persistence-only).** Not a campaign attack. SeBatchLogonRight retained as persistence-prerequisite surface only.
 - [ ] **3.5C** RDP interactive session — surface check · attack run · telemetry captured · tracker updated
 - [ ] **3.5D** File detonation / payload drop — surface check · attack run · telemetry captured · tracker updated
 - [ ] **3.5J** WMI Event Subscriptions — surface check · attack run · telemetry captured · tracker updated
@@ -297,29 +299,27 @@
 
 | ID | Attack | Source | Credential | Status |
 |----|--------|--------|------------|--------|
-| T102 | Unconstrained delegation capture dc02$ TGT | SYSTEM on mbr01 | SYSTEM | ⏳ Trigger verified / capture pending |
+| T102 | Unconstrained delegation capture dc02$ TGT | SYSTEM on mbr01 | SYSTEM | ✅ VERIFIED 2026-07-31 |
 
-- [ ] **T102** dc02$ TGT capture — confirm dc02 Spooler/RPC surface · re-run capture from ws01 or Linux-side operator path · telemetry captured · tracker updated
+- [x] **T102** dc02$ TGT capture — **VERIFIED 2026-07-31**: hostname listener (Kerberos) → dc02$ TGT captured → kirbi→ccache → feeds Phase 6 DCSync
 
 ### Phase 6
 
 | ID | Attack | Source | Credential | Status |
 |----|--------|--------|------------|--------|
-| 009 | DCSync (WT009) | ws01 or Kali | chief_command / C0mm@nd_Ch1ef! (DA fallback) | ✅ Verified |
+| 009 | DCSync (WT009) | ws01 or Kali | child\krbtgt via dc02$ TGT (main path) or chief_command (fallback) | ✅ VERIFIED 2026-07-31 |
 
-- [x] **T009** DCSync — surface check · attack run · telemetry captured · tracker updated
+- [x] **T009** DCSync — **VERIFIED 2026-07-31 (main path)**: dc02$ TGT → kirbi→ccache → `secretsdump.py -k -no-pass` → child/krbtgt NT + AES256 extracted
 
 ### Phase 7
 
 | ID | Attack | Source | Credential | Status |
 |----|--------|--------|------------|--------|
-| 010 | Golden Ticket (WT010) | ws01 | krbtgt hash or chief_command fallback | ✅ Script executes |
+| 010 | Golden Ticket (WT010) | ws01 | krbtgt hash (child.cadre.local) | ✅ VERIFIED 2026-07-31 |
 | 011 | Silver Ticket (WT011) | ws01 | Service account hash | ✅ Script executes |
 | 012 | Diamond Ticket (WT012) | ws01 | krbtgt hash | ✅ Script executes |
 
-- [x] **T010** Golden Ticket — surface check · attack run · telemetry captured · tracker updated
-- [x] **T011** Silver Ticket — surface check · attack run · telemetry captured · tracker updated
-- [x] **T012** Diamond Ticket — surface check · attack run · telemetry captured · tracker updated
+- [x] **T010** Golden Ticket — **VERIFIED 2026-07-31**: mimikatz golden with extracted child krbtgt (NT+AES256) + `/sids:<root EA>` → forged + PTT + `EA-aes.kirbi`. Rubeus `golden` silent on ws01 (non-Defender quirk) — use mimikatz. Cross-realm DCSync of root via golden = PAC checksum quirk on dc01 DRSUAPI bind; root EA via chief_command fallback.
 
 ### Phase 8
 
@@ -363,8 +363,8 @@
 | 013 | ACL WriteDacl self-escalate (WT013) | ws01 | chief_command / C0mm@nd_Ch1ef! (DA) | 📝 Script corrected, pending re-test |
 | 014 | ACL GenericWrite -> Shadow Credentials (WT014) | ws01 | chief_command / C0mm@nd_Ch1ef! (DA) | 📝 Script corrected, pending re-test |
 | 016 | ACL GenericAll on OU (WT016) | ws01 | chief_command / C0mm@nd_Ch1ef! (DA) | 📝 Script corrected, pending re-test |
-| 008 | Shadow Credentials on dc01$ (WT008) | ws01 | chief_command / C0mm@nd_Ch1ef! (DA) | 📝 Script corrected, pending re-test |
-| 023 | GPO Abuse (WT023) | ws01 | analyst_cloud / Cl0ud_An@lyst! (ACE#1) | 📝 Script corrected, pending re-test |
+| 008 | Shadow Credentials on dc01$ (WT008) | ws01 | chief_command / C0mm@nd_Ch1ef! (DA) | ✅ VERIFIED — pywhisker (explicit creds, LDAPS) added KeyCredential to dc01$; PKINIT TGT as dc01$; NT hash 09493093db08c8afa99193779d401b34 recovered (= DCSync rights) |
+| 023 | GPO Abuse (WT023) | ws01 | analyst_cloud / Cl0ud_An@lyst! (ACE#1) | ✅ VERIFIED — analyst_cloud WriteDacl/WriteOwner/GenericAll on Vulnerable-GPO; ScheduledTasks.xml preference write + read-back confirmed |
 | 024 | gMSA Extraction (WT024) | ws01 | chief_command / C0mm@nd_Ch1ef! (DA) | 📝 Script corrected, pending re-test |
 | GPP | GPP Stored Password (Groups.xml) | Kali / provisioning | Any domain user | 📝 Configured / pending re-test |
 | 027 | SPN Jacking CVE-2026-25177 (WT027) | ws01 | DA or writeSPN rights | ⏳ Not exercised |
@@ -375,8 +375,8 @@
 - [ ] **T013** WriteDacl self-escalate — surface check · attack run · telemetry captured · tracker updated
 - [ ] **T014** GenericWrite -> Shadow Credentials — surface check · attack run · telemetry captured · tracker updated
 - [ ] **T016** GenericAll on OU — surface check · attack run · telemetry captured · tracker updated
-- [ ] **T008** Shadow Credentials on dc01$ — surface check · attack run · telemetry captured · tracker updated
-- [ ] **T023** GPO Abuse — surface check · attack run · telemetry captured · tracker updated
+- [x] **T008** Shadow Credentials on dc01$ — surface check ✅ · attack run ✅ (pywhisker + PKINIT TGT + NT hash recovered) · telemetry captured · tracker updated
+- [x] **T023** GPO Abuse — surface check ✅ · attack run ✅ (Vulnerable-GPO preference write) · telemetry captured · tracker updated
 - [ ] **T024** gMSA Extraction — surface check · attack run · telemetry captured · tracker updated
 - [ ] **GPP** Get-GPPPassword — surface check · attack run · telemetry captured · tracker updated
 - [ ] **T027** SPN Jacking — surface check · attack run · telemetry captured · tracker updated
@@ -388,12 +388,12 @@
 |----|--------|--------|------------|--------|
 | 050 | ADCS ESC1 (WT050) | ws01 | chief_command / C0mm@nd_Ch1ef! (DA+EA) | 📝 Script corrected, pending re-test |
 | 051 | ADCS ESC3 (WT051) | ws01 | chief_command / C0mm@nd_Ch1ef! (DA+EA) | 📝 Script corrected, pending re-test |
-| 052 | ADCS ESC8 / NTLM relay web enrollment (WT052) | ws01 | chief_command / C0mm@nd_Ch1ef! (DA+EA) | 📝 Script corrected, pending re-test |
+| 052 | ADCS ESC8 / NTLM relay web enrollment (WT052) | ws01 | chief_command / C0mm@nd_Ch1ef! (DA+EA) | 📝 v5 designed + preconditions verified 2026-08-01; cert issuance pending |
 | 053 | UnPAC-the-Hash (WT053) | ws01 | chief_command / C0mm@nd_Ch1ef! (DA+EA) | 📝 Script corrected, pending re-test |
 
 - [ ] **T050** ADCS ESC1 — surface check · attack run · telemetry captured · tracker updated
 - [ ] **T051** ADCS ESC3 — surface check · attack run · telemetry captured · tracker updated
-- [ ] **T052** ADCS ESC8 / NTLM relay web enrollment — surface check · attack run · telemetry captured · tracker updated
+- [ ] **T052** ADCS ESC8 / NTLM relay web enrollment — **v5 chain (custom SMB port 8445) designed + preconditions verified 2026-08-01**; cert issuance run pending · telemetry captured · tracker updated
 - [ ] **T053** UnPAC-the-Hash — surface check · attack run · telemetry captured · tracker updated
 
 ### Branch D — Linux pivot
@@ -488,7 +488,7 @@
 
 ### Re-test priorities
 
-1. **T102** after `04-vulnerabilities-verifyOnly.yml` confirms dc02 spooler/RPC surface; capture is the current blocker.
+1. ~~**T102** dc02$ TGT capture~~ — **DONE 2026-07-31** (hostname listener → TGT → DCSync). 
 2. **Branch A** after T015 using `hunter_dfir` and `chief_command`; GPP/AdminSDHolder surfaces are now configured.
 3. **Branch B ADCS scripts** using `chief_command@cadre.local`.
 4. **Branch C SCCM chain** from mbr02 (WT035-039).
@@ -496,6 +496,12 @@
 6. **Branch G** CVE-2026-41089 from Kali against dc02 with snapshot.
 7. **Stream E** exercises on monitor VM once elk/monitor are online.
 8. **Stream F** supply-chain scenarios on linux01/mbr02/npm registry.
+
+### Defender / Tamper Protection (re-verified 2026-07-31 11:20 UTC)
+
+- [x] **DEF-001** Defender OFF on all Windows VMs — dc01/dc02/dc03/mbr01/mbr02: WinDefend **Stopped** + `DisableAntiSpyware=1` (04-vulnerabilities kill) · ws01: RTP/TP `False` + `DisableAntiSpyware=1` + RTP/Behavior/IOAV/OnAccess policy blocks + SpyNet=0 + tooling excludes (`C:\Temp;C:\Tools;...` + mimikatz/Rubeus/etc.) · WinDefend service stays **Running** on ws01 by design — Win 11 Ent 26200 client SKU hard-protects the service: `Set/Stop-Service`, `sc.exe`, and a SYSTEM scheduled task all return `Access denied` (`OpenService FAILED 5`). Matches `17-ws01-deploy.yml` soft-disable design.
+- [x] **DEF-002** Root cause of Rubeus `golden` silent failure isolated — persists after full Defender kill → **Rubeus binary quirk**, not EDR. Use mimikatz `kerberos::golden` (verified).
+- [x] **DEF-003** MBR01 re-checked CIM-free (2026-07-31): `WinDefend=Stopped|DisableAntiSpyware=1|DisableRealtimeMonitoring=1` — earlier blank MPSTAT was a WMI/CIM access-denied quirk for `analyst_t1` on MBR01, not a Defender issue.
 
 ---
 
@@ -743,8 +749,8 @@ Next:
 | WT013 | WriteDacl self-escalate | ws01 | chief_command / C0mm@nd_Ch1ef! | ⠿ Scripted | Script present; retest pending. |
 | WT014 | GenericWrite → Shadow Creds | ws01 | chief_command / C0mm@nd_Ch1ef! | ⠿ Scripted | Script present; retest pending. |
 | WT016 | GenericAll on OU | ws01 | chief_command / C0mm@nd_Ch1ef! | ⠿ Scripted | Script present; retest pending. |
-| WT008 | Shadow Creds on dc01$ | ws01 | chief_command / C0mm@nd_Ch1ef! | ⠿ Scripted | Script present; retest pending. |
-| WT023 | GPO Abuse | ws01 | analyst_cloud | ⠿ Scripted | Script present; retest pending. |
+| WT008 | Shadow Creds on dc01$ | ws01 | chief_command / C0mm@nd_Ch1ef! | ✅ Verified | pywhisker → dc01$ KeyCredential; PKINIT TGT; NT hash recovered. |
+| WT023 | GPO Abuse | ws01 | analyst_cloud / Cl0ud_An@lyst! | ✅ Verified | WriteDacl/WriteOwner/GenericAll on Vulnerable-GPO; preference write confirmed. |
 | WT024 | gMSA extraction | ws01 | analyst_cloud | ⠿ Scripted | Script present; retest pending. |
 | GPP | GPP stored password | ws01 | analyst_cloud | ❌ Missing | No surface configured. |
 | WT025 | AdminSDHolder persistence | ws01 | chief_command | ❌ Missing | No surface configured. |

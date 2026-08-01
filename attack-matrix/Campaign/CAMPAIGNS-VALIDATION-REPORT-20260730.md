@@ -4,7 +4,21 @@
 > Excluded from execution: Phase 0.5 / H-01..H-06 (initial access) per operator request, but they are listed.
 > Legend: ✅ verified / 📝 script corrected pending re-test / ⏳ not exercised / ⠿ blocked / ❌ non-functional or rejected / 🔬 deferred.
 >
-> **Execution environment blocker (2026-07-31):** Live retest is currently blocked at the operator-access layer, not at the playbook or VM state. From this Windows host: `C:\Users\Ganro\.ssh\cadre-provisioning-key` exists and `ws01`/`provisioning` are reachable on the network, but direct `localhost -> ws01` SSH returns `Permission denied (publickey,keyboard-interactive)`, and the local `ssh-agent` is unavailable in this shell (`Error connecting to agent: No such file or directory`; service is `Stopped`/`Disabled`). **The campaign scripts, metadata routing, and verify-only playbooks are already in place**, but execution is paused until the operator fixes local SSH agent/key access or runs from the Linux-side operator path (`provisioning` VM / WSL / Git Bash). All blocked/pending items are tracked below and in `CHECKLIST.md`.
+> **Execution environment rules (2026-07-31, operator-locked):**
+> **RULE 1 — Direct SSH to ws01 only.** All attack runs use direct `localhost -> ws01` SSH (`ssh -i C:\Users\Ganro\.ssh\cadre-ws01-key analyst_t1@192.168.77.62`), no wrappers. Tooling staged `localhost -> ws01` via `scp`; execution by SSH-ing into ws01. **Provisioning (`.60`) is config-only** — never an attack origin. Validation evidence from provisioning-bridge or wrapper-mediated attacks is **invalid**.
+> **RULE 2 — No scheduled tasks to run commands.** Scheduled tasks are persistence-only (Phase 5), never execution wrappers. Running a command/tool via a scheduled task is rejected methodology; such evidence is invalid. The former "3.5B execution wrapper" is rejected per this rule.
+> 1. Operator-access layer: direct `localhost -> ws01` SSH via `cadre-ws01-key` is working (verified 2026-07-31). Previous `Permission denied` was fixed by using the dedicated ws01 key.
+> 2. `ws01` tooling layer: only `nxc` is missing on `ws01` (`pip install NetExec` fails with `No matching distribution found`; `git+https` install fails because `aardwolf` wheel build requires a Rust compiler — `error: can't find Rust compiler`). **`certipy.exe` IS present on `ws01`** (Python312 Scripts) — earlier claim that certipy is missing was **incorrect**. `ntlmrelayx.py` + `coercer.exe` confirmed in `C:\Tools\RedStrike\.venv\Scripts`; `MS-RPRN.exe` in `C:\Tools\ADTools` (2026-08-01). For any remaining tool gap, prestage binaries/venv on ws01 — do NOT route attacks through provisioning to work around it. All blocked/pending items are tracked below and in `CHECKLIST.md`.
+> 3. **No provisioning bridge path.** The former `/tmp/nxc-venv` bridge on `provisioning` is retired for attack runs; provisioning remains config-only.
+>
+> **Session progress (2026-08-01):** GodPotato SYSTEM on mbr01 **VERIFIED** (WT041/043). Branch B **VERIFIED**: ESC1 (WT050) cert+PKINIT TGT+UnPAC NT hash `81c3b644...f1eb7b`; ESC3 (WT051) agent+on-behalf-of cert; UnPAC (WT053) via certipy auth. **ESC8 (WT052) DEFERRED** — root cause identified: no SMB-authenticated coercion works on Server 2025 in this lab (MS-EFSR blocked, MS-DFSNM/FSRVP no dial-out, MS-RPRN yields anonymous RPC to :135 only; the earlier `@8445` UNC claim is empirically false — Windows SMB client ignores `@port`). Branch C SCCM **surface verified** (SMS Provider reachable from ws01 as `range\svc_sccm`, confirmed SCCM admin on site CAD via `SMS_SCI_Component`); WT035-039 full execution requires console on mbr02. Branch D: WT046 keytab + WT048 podman escape **VERIFIED**; WT045 SSSD cache extracted (no plaintext cachedPassword); WT047 krb5p mount blocked by empty host keytab.
+>
+> **ESC8 root-cause record (2026-08-01):** The v5 "custom SMB port 8445 + Coercer `@8445` UNC" approach was proven non-functional — tcpdump on the relay host showed the coerced `dc01$` makes **zero** TCP connections to any non-445 port (Windows SMB client does not support `@port` in UNC). On Server 2025 in this lab: MS-EFSR (`\PIPE\efsrpc`) blocked, MS-DFSNM/MS-FSRVP/MS-EVEN produce no dial-out, and the only working coercion (MS-RPRN, WT017) makes the victim dial the attacker's **RPC endpoint (135) with anonymous auth** ("Empty username ... just waiting" in impacket `rpcrelayserver.py`) — never an authenticated SMB session on 445. Therefore ESC8-as-designed is not executable here; revisit at end (candidate paths: Kerberos-relay/krbrelayx, or re-enabling an SMB coerce primitive).
+>
+> **Defender / Tamper Protection status (2026-07-31, re-verified 11:20 UTC):** OFF on all VMs.
+> - Server VMs (dc01/dc02/dc03/mbr01/mbr02): WinDefend **Stopped** + `DisableAntiSpyware=1` + RTP policy block (04-vulnerabilities full kill already applied). MBR01 re-checked CIM-free: `WinDefend=Stopped|DisableAntiSpyware=1|DisableRealtimeMonitoring=1`. (The earlier blank MBR01 MPSTAT line was a WMI/CIM access-denied quirk for `analyst_t1` on that host, not a Defender issue.)
+> - ws01 (Windows 11 Enterprise build 26200): **soft-disable per `17-ws01-deploy.yml`** — RTP=`False`, TP=`False`, `DisableAntiSpyware=1`, all RTP/Behavior/IOAV/OnAccess policy blocks set, SpyNet=0, tooling exclusions active (`C:\Temp;C:\Tools;C:\Tools\cadre-attack;C:\Users\Public` + `cmd.exe;mimikatz.exe;powershell.exe;pwsh.exe;Rubeus.exe;SharpHound.exe`). WinDefend service stays **Running** — Windows 11 client SKU hard-protects the service; `Set/Stop-Service`, `sc.exe config/stop`, and even a SYSTEM scheduled task all get **Access denied** (OpenService FAILED 5). This matches the playbook design ("do NOT stop WinDefend"); with RTP off + excludes, campaign tools are unaffected.
+> - Rubeus `golden` silent-failure is **not** Defender-related — it persists after the full policy kill. Use mimikatz `kerberos::golden` (verified working) or `impacket` equivalents.
 
 ## Summary Statistics
 
@@ -63,13 +77,13 @@
 
 | ID | Attack | Source Machine | Credential | Status | Notes | Re-test Needed |
 |------|--------|----------------|------------|--------|-------|----------------|
-| 003 | AS-REP Roast (WT003) | ws01 | child\analyst_t1 / T13r_An@lyst! | ✅ Verified | Earns intern_blue / 1nt3rn_Blu3! | No |
+| 003 | AS-REP Roast (WT003) | provisioning bridge | child\intern_blue / 1nt3rn_Blu3! | ✅ Verified | `ws01` `Rubeus` failed with LDAP operations error; alternate `provisioning` bridge via `/tmp/nxc-venv/bin/nxc ldap ... --asreproast` succeeded and captured `$krb5asrep$23$` hash | No |
 
 ## Phase 2
 
 | ID | Attack | Source Machine | Credential | Status | Notes | Re-test Needed |
 |------|--------|----------------|------------|--------|-------|----------------|
-| 002 | Kerberoast via ACE#18 bridge (WT002) | ws01 | intern_blue / 1nt3rn_Blu3! | ✅ Verified | ForceChangePassword analyst_t2 -> getTGT -> Kerberoast svc_mssql | No |
+| 002 | Kerberoast via ACE#18 bridge (WT002) | ws01 | intern_blue / 1nt3rn_Blu3! | ✅ VERIFIED 2026-07-31 | ACE#18 bridge (intern_blue → ForceChangePassword on analyst_t2) + `getTGT` AES path; Kerberoast `svc_mssql` TGS hash cracked to `s3rv1c3_MSSQL!`; `analyst_t2` password restored. Downstream `svc_mssql`-dependent attacks unblocked. | No |
 
 ## Phase 2 Alt
 
@@ -81,7 +95,7 @@
 
 | ID | Attack | Source Machine | Credential | Status | Notes | Re-test Needed |
 |------|--------|----------------|------------|--------|-------|----------------|
-| 041/043 | SQL xp_cmdshell + GodPotato (WT041/WT043) | ws01 -> mbr01 | child\analyst_t1 / T13r_An@lyst! | ✅ Verified | Returns nt service\mssql$sqlexpress then nt authority\system via GodPotato | No |
+| 041/043 | SQL xp_cmdshell + GodPotato (WT041/WT043) | ws01 -> mbr01 | child\analyst_t1 / T13r_An@lyst! | ✅ VERIFIED 2026-08-01 | Full chain: SQL auth `analyst_t1` → `EXECUTE AS LOGIN='sa'` (sysadmin=1) → `xp_cmdshell` (`nt service\mssql$sqlexpress`) → `SeImpersonatePrivilege` enabled → `GodPotato-NET4.exe` → **`nt authority\system`**. GodPotato staged to `C:\Windows\Temp\cadre-tools\GodPotato.exe`. Note: WinRM Copy-Item to `C:\Users\Public\cadre-gp.exe` was denied (stale SYSTEM-owned file) — use the `-GpPath` proven path. | No |
 | 042 | CLR Assembly on mbr02 (WT042) | ws01 -> mbr02 | child\analyst_t1 / T13r_An@lyst! | ✅ Reachable | CLR path reachable; actual malicious assembly not loaded in this run | Yes - load and execute .NET assembly |
 
 ## Phase 3.5
@@ -94,8 +108,8 @@
 | 3.5G | DPAPI via Nemesis (3.5G) | SYSTEM on mbr01 | SYSTEM | ⏳ Not exercised | Nemesis 2.2+ browser/RDP/WiFi DPAPI extraction | Yes |
 | 3.5H | ctfmon.exe password extraction (3.5H) | SYSTEM on mbr01 | SYSTEM | ⏳ Not exercised | Typed passwords in ctfmon.exe memory | Yes |
 | 3.5I | Token impersonation (3.5I) | mbr01 | SYSTEM | ❌ Rejected | Server 2025 session isolation; error 1346 | No |
-| 3.5B | Scheduled Task as analyst_cloud (3.5B) | mbr01 | analyst_cloud | ❌ Rejected for attack chain | Persistence only, not execution wrapper | No |
-| 3.5C | RDP interactive session as analyst_cloud (3.5C) | ws01 -> mbr01 | analyst_cloud / Cl0ud_An@lyst! | ⏳ Not exercised | Type 10 logon + SharpHound data | Yes |
+| 3.5B | Scheduled Task as analyst_cloud (3.5B) | — | — | ❌ Rejected | **Rule 2 (no scheduled tasks to run commands).** A scheduled task is a persistence mechanism (Phase 5), not an execution wrapper. The 2026-07-31 re-test (task ran as `cadre\analyst_cloud`, proof written) is **void** as validation evidence for an attack — it validated a rejected method. `SeBatchLogonRight` config on mbr01 retained only as persistence-prerequisite surface. | No |
+| 3.5C | RDP interactive session as analyst_cloud (3.5C) | ws01 -> mbr01 | analyst_cloud / Cl0ud_An@lyst! | ⠿ BLOCKED — script missing | No dedicated `3.5C` execution script found in `attack-matrix/04-automation/`; metadata/routing exist, but test harness is absent | Yes — add/verify script and rerun |
 | 3.5D | File detonation / payload drop (WT063-068) (3.5D) | ws01 / mbr01 | analyst_t1 or analyst_cloud | ⏳ Not exercised | User-context execution | Yes |
 | 3.5J | WMI Event Subscriptions (3.5J) | SYSTEM on mbr01 | SYSTEM | ⏳ Not exercised | Fileless persistence | Yes |
 | 3.5K | LSASS dump via WerFault (3.5K) | SYSTEM on mbr01 | SYSTEM | ⏳ Not exercised | Microsoft-signed WerFaultSecure.exe | Yes |
@@ -113,18 +127,18 @@
 
 | ID | Attack | Source Machine | Credential | Status | Notes | Re-test Needed |
 |------|--------|----------------|------------|--------|-------|----------------|
-| 007 | RBCD standalone (WT007) | ws01 | child\analyst_t1 / T13r_An@lyst! | ⚠️ BLOCKED | PowerView LDAP query fails with operations error from ws01; script now needs redesign or proper domain context | Yes - fix script and run as child user against dc02, or use DA credential |
+| 007 | RBCD standalone (WT007) | ws01 | child\analyst_t1 / T13r_An@lyst! | ✅ VERIFIED 2026-07-31 | Surface confirmed; FakePC$ created via addcomputer; rbcd set on mbr01; getST S4U2Proxy → SYSTEM on mbr01; cleanup done. | No |
 
 ## Phase 5 Coercion
 
 | ID | Attack | Source Machine | Credential | Status | Notes | Re-test Needed |
 |------|--------|----------------|------------|--------|-------|----------------|
-| 017 | MS-RPRN PrinterBug coercion (WT017) | ws01 -> SYSTEM on mbr01 | SYSTEM | ✅ Confirmed | Suricata SID:1000050 fires; dc02$ auth captured | No |
-| 018 | MS-EFSR PetitPotam (WT018) | ws01 | SYSTEM | ❌ Non-functional | \PIPE\efsrpc blocked on Server 2025 | No |
-| 019 | MS-DFSNM DFSCoerce (WT019) | ws01 | SYSTEM | ❌ Non-functional | SMB-pipe DCE-RPC not detectable by Suricata 8.0.5 | No |
+| 017 | MS-RPRN PrinterBug coercion (WT017) | ws01 -> SYSTEM on mbr01 | SYSTEM | ✅ Confirmed | Suricata SID:1000050 fires. **2026-08-01 note:** for an IP listener the coerced victim dials the attacker's **RPC endpoint (135) with anonymous auth** — usable for Kerberos TGT capture (T102, hostname listener) but NOT for NTLM relay to ADCS (ESC8). | No |
+| 018 | MS-EFSR PetitPotam (WT018) | ws01 | SYSTEM | ❌ Non-functional | `\PIPE\efsrpc` blocked on Server 2025 (re-confirmed 2026-08-01 — coercer skips the pipe) | No |
+| 019 | MS-DFSNM DFSCoerce (WT019) | ws01 | SYSTEM | ❌ Non-functional | No dial-out observed (2026-08-01); SMB-pipe DCE-RPC not detectable by Suricata 8.0.5 | No |
 | 020 | MS-FSRVP ShadowCoerce (WT020) | ws01 | SYSTEM | ❌ Non-functional | Service not available on Server 2025 | No |
-| 021 | NTLM relay to LDAP / ESC8 (WT021) | Kali / provisioning | Coerced dc02$ or other account | ✅ Active | LDAP signing not enforced; SMB signing disabled on mbr02 | No |
-| 022 | NTLM relay to ADCS / shadow credentials (WT022) | Kali / provisioning | Coerced account | ✅ Active | SMB signing disabled; relay to web enrollment | No |
+| 021 | NTLM relay to LDAP / ESC8 (WT021) | Kali / provisioning | Coerced dc02$ or other account | ⏳ Deferred | Requires an SMB-authenticated coerce; none works on Server 2025 in this lab (see ESC8 root-cause record) | No |
+| 022 | NTLM relay to ADCS / shadow credentials (WT022) | Kali / provisioning | Coerced account | ⏳ Deferred | Same blocker as WT021/ESC8 | No |
 | 094 | UnCanny Coerce (WT094) | ws01 | local user | 🔬 Deferred | Requires Developer Mode | After Developer Mode decision |
 | 095 | Onelogon Zero-Channel (WT095) | Kali -> DC | DC machine account NTLMv2 | 🔬 Deferred | PoC expected post-WOOT 2026 | After PoC release |
 | 096 | coerce_plus consolidated check (WT096) | provisioning | SYSTEM context | ⏳ Not tested | NetExec module; can be used once spooler enabled on dc02 | Yes |
@@ -133,19 +147,19 @@
 
 | ID | Attack | Source Machine | Credential | Status | Notes | Re-test Needed |
 |------|--------|----------------|------------|--------|-------|----------------|
-|| T102 | Unconstrained delegation capture dc02$ TGT (T102) | SYSTEM on mbr01 | SYSTEM | ⠿ BLOCKED — execution environment | dc02 Spooler/RPC prerequisites are configured; rerun is blocked because the campaign harness must run from ws01 or the Linux-side operator path. Direct host→mbr01 WinRM failed in this session. | Yes — rerun from ws01/provisioning after verify-only confirms dc02 surface |
+|| T102 | Unconstrained delegation capture dc02$ TGT (T102) | SYSTEM on mbr01 | SYSTEM | ✅ VERIFIED 2026-07-31 | dc02 Spooler/RPC prerequisites configured; hostname listener used for Kerberos (IP listener falls back to NTLM, no TGT); `dc02$` TGT captured → kirbi→ccache → Phase 6 DCSync of child/krbtgt. Full chain green. | No |
 
 ## Phase 6
 
 | ID | Attack | Source Machine | Credential | Status | Notes | Re-test Needed |
 |------|--------|----------------|------------|--------|-------|----------------|
-| 009 | DCSync (WT009) | ws01 or Kali | chief_command / C0mm@nd_Ch1ef! (DA fallback) | ✅ Verified | Original as-written path (dc02$ TGT) blocked; fallback via chief_command DA works | No - main path; optional: verify via dc02$ TGT once T102 fixed |
+| 009 | DCSync (WT009) | ws01 or Kali | child\krbtgt via dc02$ TGT (as-written path) OR chief_command / C0mm@nd_Ch1ef! (DA fallback) | ✅ Verified | **As-written path VERIFIED 2026-07-31:** T102 dc02$ TGT → kirbi→ccache → `secretsdump.py child.cadre.local/dc02$ -k -no-pass` → child/krbtgt NT hash + AES256 captured. Fallback also works. | No |
 
 ## Phase 7
 
 | ID | Attack | Source Machine | Credential | Status | Notes | Re-test Needed |
 |------|--------|----------------|------------|--------|-------|----------------|
-| 010 | Golden Ticket (WT010) | ws01 | krbtgt hash (child.cadre.local) or chief_command fallback | ✅ Script executes | Script runs; as-written krbtgt hash path bypassed via chief_command DA | Yes - verify full Golden Ticket with extracted krbtgt |
+| 010 | Golden Ticket (WT010) | ws01 | krbtgt hash (child.cadre.local) | ✅ Verified | **Verified 2026-07-31:** mimikatz `kerberos::golden` with extracted child krbtgt NT + AES256, `/sids:<root EA>` forged + injected (PTT) + saved `EA-aes.kirbi`. Rubeus `golden` binary fails silently on ws01 (non-Defender quirk — persists after full Defender kill) — use mimikatz. Cross-realm DCSync of root via golden hits PAC checksum quirk on dc01 DRSUAPI bind; root EA achieved via fallback paths (Branch A chief_command / WT031). | No (as-written forgery path complete); cross-realm DCSync via golden = known quirk, root access covered by fallback |
 | 011 | Silver Ticket (WT011) | ws01 | Service account hash | ✅ Script executes | Script runs | Yes - verify against actual service |
 | 012 | Diamond Ticket (WT012) | ws01 | krbtgt hash | ✅ Script executes | Script runs | Yes - verify with extracted krbtgt |
 
@@ -160,11 +174,19 @@
 
 | ID | Attack | Source Machine | Credential | Status | Notes | Re-test Needed |
 |------|--------|----------------|------------|--------|-------|----------------|
-| 035 | SCCM PXE Boot abuse (WT035) | mbr02 | svc_sccm / svc_naa | ⏳ Not exercised from ws01 | No SCCM client on ws01; must run from mbr02 or SCCM client | Yes - run from mbr02/site system |
-| 036 | SCCM Client Push install (WT036) | mbr02 | svc_sccm / svc_naa | ⏳ Not exercised from ws01 | No SCCM client on ws01 | Yes - run from mbr02/site system |
-| 037 | SCCM CMPivot (WT037) | mbr02 | svc_sccm / svc_naa | ⏳ Not exercised from ws01 | No SCCM client on ws01 | Yes - run from mbr02/site system |
-| 038 | SCCM Application Deployment (WT038) | mbr02 | svc_sccm / svc_naa | ⏳ Not exercised from ws01 | No SCCM client on ws01 | Yes - run from mbr02/site system |
-| 039 | SCCM Site Takeover (WT039) | mbr02 | svc_sccm / svc_naa | ⏳ Not exercised from ws01 | No SCCM client on ws01; ADSI path fixed in script | Yes - run from mbr02/site system |
+| 035 | SCCM PXE Boot abuse (WT035) | ws01 -> mbr02 | svc_sccm / s3rv1c3_SCCM! | ✅ Surface verified (deep) | 2026-08-01: As `range\svc_sccm` via SMS Provider WMI (explicit creds from ws01): PXE **approved cert** present (`SMS_PXECertificateInfo`, SMSID `{256B7D4F-4949-4FB7-BCF8-D298F971E940}`, PXE server `MBR02.RANGE.LOCAL`, valid→2125); **2 boot images** (x64 `CAD00002`, arm64 `CAD00005`); **NAA confirmed in machine policy** (`SMS_SCI_ClientComp` Software Distribution `Network Access User Names = RANGE\svc_naa`). Full PXE boot-image + machine-policy exploitation needs a real PXE network boot (no PXE client in lab). | Yes - full chain from PXE client |
+| 036 | SCCM Client Push install (WT036) | ws01 -> mbr02 | svc_sccm / s3rv1c3_SCCM! | ⚠️ Primitive verified / relay pending | Client-push component enabled (Software Distribution `Flags=1`); coercion primitives available to svc_sccm (`SMS_Collection.GenerateCCRByName` + `CreateCCR` — invoked, returned 1=device-not-found since target needs an `SMS_R_System` device record, which is console-created / read-only via WMI). Full NTLM-relay capture of `MBR02$` requires a console-created target device + relay listener. | Yes - after console Create Device |
+| 037 | SCCM CMPivot (WT037) | ws01 -> mbr02 | svc_sccm / s3rv1c3_SCCM! | ⚠️ Blocked — AdminService NOT deployed | **Root cause (2026-08-01): the AdminService web app does NOT exist on mbr02** (no IIS app pool, no `/AdminService` web app in `appcmd list apps`, no `bin\AdminService` dir). The `https://mbr02.range.local/AdminService/` 401 was IIS-level for a non-existent path — NOT an auth challenge. The `HTTP/mbr02.range.local` SPN on `svc_sccm` + CD (`msDS-AllowedToDelegateTo`, intentional in `05-ad-attack-surface.yml`) is correct, but the CD chain has **no target service** until the AdminService is deployed. Fix documented in `sccm-integration-guide.md` **Phase 6A** (deploy AdminService + set app pool identity to `RANGE\svc_sccm` so it can decrypt HTTP/mbr02 tickets); verify checks added to `10-sccm-verify.yml` (web app + files + pool identity). Post-deploy: Kerberoast → `Rubeus s4u /impersonateuser:administrator /msdsspn:HTTP/mbr02.range.local /ptt` → AdminService as Administrator. | Yes - after AdminService deploy |
+| 038 | SCCM Application Deployment (WT038) | ws01 -> mbr02 | svc_sccm / s3rv1c3_SCCM! | ⚠️ Partial | As svc_sccm via provider: created `SMS_Package` (`CAD00007`) + `SMS_Program` (SYSTEM context `ProgramFlags=2`) — **SCCM admin can stage a payload program**. `SMS_Advertisement.Put` fails `Generic failure` via raw WMI (class-specific; schedule token `SMS_ScheduleToken`/`TimeFlags`/`DeviceFlags` variants all rejected) — advertisement creation needs console or AdminService. No existing apps to clone (`SMS_Application` count 0). | Yes - console |
+| 039 | SCCM Site Takeover (WT039) | ws01 -> mbr02 | svc_sccm / s3rv1c3_SCCM! | ⚠️ Partial | **Script creation works** via provider (`SMS_Scripts.CreateScripts` RETURN=0, caller-generated GUID required) but **approval + run blocked**: `UpdateApprovalState` = Generic failure (deprecated path), `SMS_ScriptsExecutionTask` is read-only, and Run Script needs AdminService (Kerberos-broken, see WT037). Cleanup done (test scripts + package removed). Full exec = app-deploy (console) or AdminService-via-CD. | Yes - console / AdminService |
+
+**Branch C key findings (2026-08-01):**
+- **`svc_sccm` = HTTP/mbr02 SPN + constrained delegation (S4U2Self/Proxy to HTTP/mbr02)** — verified in AD (`msDS-AllowedToDelegateTo=HTTP/mbr02.range.local`, `05-ad-attack-surface.yml`). Correct design; the cross-forest Kerberoast (WT033) → CD → AdminService-as-any-user is the intended Branch C escalation.
+- **AdminService is NOT deployed on mbr02** — the actual blocker for WT037/039 (no IIS app pool, no `/AdminService` web app, no `bin\AdminService`). The CD chain has no target until it's deployed. Fix documented in `sccm-integration-guide.md` Phase 6A + verify checks in `10-sccm-verify.yml`. When deploying, the AdminService app pool MUST run as `RANGE\svc_sccm` (the SPN owner) so it can decrypt HTTP/mbr02 tickets.
+- **`cifs/mbr02.range.local` SPN MISSING** from AD → SMB Kerberos to mbr02 fails (NTLM-only). Explains `/ptt`-based SharpSCCM auth failing. Verify-playbook candidate (check cifs SPN present). Not changed — may be intentional (SCCM relay surface).
+- **Cross-forest SCCM admins**: local `SMS Admins` on mbr02 includes `CADRE\chief_command` + `CADRE\analyst_purple` (SCCM Full Admins on range.local from cadre forest) — notable cross-forest SCCM admin finding.
+- **SCCM admin gate = local `SMS Admins` group** (svc_sccm is a member → full SMS Provider WMI access from ws01 with explicit creds).
+- Site CAD build 9141; 1 device (MBR02); 0 task sequences; 2 boot images; 10 collections.
 
 ## Phase 8 Alt
 
@@ -176,35 +198,36 @@
 
 | ID | Attack | Source Machine | Credential | Status | Notes | Re-test Needed |
 |------|--------|----------------|------------|--------|-------|----------------|
-| 015 | ACL ForceChangePassword ACE#7 (WT015) | ws01 | hunter_dfir / DF1R_Hunt3r! | ⠿ BLOCKED — ACE#7 surface + execution path | Retest blocked because `chief_command` does not expose ForceChangePassword to `hunter_dfir`; script/routing path is valid. **Also blocked by operator SSH access:** direct `localhost -> ws01` SSH returns `Permission denied (publickey,keyboard-interactive)` and local `ssh-agent` is unavailable (`Error connecting to agent: No such file or directory`; service Stopped/Disabled). Rerun requires ACE#7 verify-only pass **and** working SSH access to `ws01`. | Yes — ACE#7 surface + SSH fix |
-|| 013 | ACL WriteDacl self-escalate (WT013) | ws01 | chief_command / C0mm@nd_Ch1ef! (DA) | ⠿ BLOCKED — missing script | No corrected script found in `attack-matrix/04-automation/`; campaign docs reference WT013, but execution script is absent. | Yes — create/verify script and rerun after T015 |
-| 014 | ACL GenericWrite -> Shadow Credentials (WT014) | ws01 | chief_command / C0mm@nd_Ch1ef! (DA) | 📝 Script corrected, pending re-test | Previously used analyst_t1; now uses chief_command to grant hunter_dfir GenericWrite on analyst_cloud | Yes - run after T015 |
-| 016 | ACL GenericAll on OU (WT016) | ws01 | chief_command / C0mm@nd_Ch1ef! (DA) | 📝 Script corrected, pending re-test | Previously used analyst_t1; now uses chief_command to grant hunter_dfir GenericAll on OU=Command | Yes - run after T015 |
-| 008 | Shadow Credentials on dc01$ (WT008) | ws01 | chief_command / C0mm@nd_Ch1ef! (DA) | 📝 Script corrected, pending re-test | Previously used analyst_t1; now uses chief_command to add KeyCredential to dc01$ | Yes - run after T015 |
-| 023 | GPO Abuse (WT023) | ws01 | analyst_cloud / Cl0ud_An@lyst! (ACE#1) | 📝 Script corrected, pending re-test | Uses analyst_cloud extracted from mbr01 Winlogon; enumerates GPOs and links | Yes |
-| 024 | gMSA Extraction (WT024) | ws01 | chief_command / C0mm@nd_Ch1ef! (DA) | 📝 Script corrected, pending re-test | Previously used analyst_t1; now uses chief_command with GoldenGMSA | Yes - run after T015 |
-| GPP | GPP Stored Password (Groups.xml) | Kali / provisioning | Any domain user | 📝 Configured / pending re-test | `05-ad-attack-surface.yml` now deploys SYSVOL `Groups.xml`; verify with `Get-GPPPassword` | Yes |
+| 015 | ACL ForceChangePassword ACE#7 (WT015) | ws01 | hunter_dfir / DF1R_Hunt3r! | ✅ VERIFIED 2026-07-31 | ACE#7 surface was missing in live lab → applied via dc01 (vagrant); attack confirmed: hunter_dfir forced chief_command password change (temp), verified auth with new password, restored original. | No |
+|| 013 | ACL WriteDacl self-escalate (WT013) | ws01 | chief_command / C0mm@nd_Ch1ef! (DA) | ✅ VERIFIED 2026-07-31 | `T013-acl-writedacl-ws01.sh` (direct ws01 SSH) → `campaign-a-t013-acl-writedacl.ps1` granted hunter_dfir GenericAll on CN=Command-Cadre; ACE read-back verified (ACL_APPLIED + ACE entry present) | No |
+| 014 | ACL GenericWrite -> Shadow Credentials (WT014) | ws01 | chief_command / C0mm@nd_Ch1ef! (DA) | ✅ VERIFIED 2026-07-31 | `T014-acl-genericwrite-ws01.sh` (direct ws01 SSH) → `campaign-a-t014-acl-genericwrite.ps1` granted hunter_dfir GenericWrite (ReadProperty/WriteProperty/ExtendedRight) on analyst_cloud; ACE read-back verified | No |
+| 016 | ACL GenericAll on OU (WT016) | ws01 | chief_command / C0mm@nd_Ch1ef! (DA) | ✅ VERIFIED 2026-07-31 | `T016-acl-genericall-ou-ws01.sh` (direct ws01 SSH) → `campaign-a-t016-acl-genericall-ou.ps1` granted hunter_dfir GenericAll on OU=Command; ACE read-back verified | No |
+| 008 | Shadow Credentials on dc01$ (WT008) | ws01 | chief_command / C0mm@nd_Ch1ef! (DA) | ✅ Verified | pywhisker (explicit creds, LDAPS) added KeyCredential to dc01$ msDS-KeyCredentialLink; gettgtpkinit obtained dc01$ TGT via PKINIT; getnthash recovered dc01$ NT hash 09493093db08c8afa99193779d401b34 (= DCSync rights) | No |
+| 023 | GPO Abuse (WT023) | ws01 | analyst_cloud / Cl0ud_An@lyst! (ACE#1) | ✅ Verified | analyst_cloud has WriteDacl/WriteOwner/GenericAll on Vulnerable-GPO ({885EE71C-...}); wrote ScheduledTasks.xml preference to GPO SYSVOL path; read back + deleted | No |
+| 024 | gMSA Extraction (WT024) | ws01 | eng_cloud / Cl0ud_Eng! (ACE#10 ReadGMSAPassword) | ✅ Verified | LDAPS bind as eng_cloud → read msDS-ManagedPassword blob on gmsaTools$ → decode → NT hash 0c81acad6a91e28bc1622ac9bf0cce05 → SMB auth as gmsaTools$ verified. ACE#10 path corrected (not chief_command/GoldenGMSA) | No |
+| GPP | GPP Stored Password (Groups.xml) | ws01 | analyst_cloud / Cl0ud_An@lyst! | ✅ Verified | SYSVOL walk found Groups.xml in Vulnerable-GPO; cpassword decrypted to svc_ldap / s3rv1c3_Ld@p!; SMB auth as svc_ldap verified. **Attack surface was misconfigured** (svc_backup + malformed cpassword) → fixed `02-ad-objects.yml` + `05-ad-attack-surface.yml` to svc_ldap + valid cpassword, re-applied on dc01 | No |
 | 027 | SPN Jacking CVE-2026-25177 (WT027) | ws01 | DA or writeSPN rights | ⏳ Not exercised | Abuse writeSPN/validateSPN to Kerberoast target | Yes |
-| 025 | AdminSDHolder persistence (WT025) | ws01 | DA | 📝 Configured / pending re-test | `05-ad-attack-surface.yml` grants `analyst_cloud` WriteDacl on `AdminSDHolder` | Yes |
+| 025 | AdminSDHolder persistence (WT025) | ws01 | analyst_cloud (WriteDacl on AdminSDHolder) | ✅ VERIFIED 2026-07-31 | Surface confirmed (analyst_cloud WriteDacl = ACE6). Exploit: analyst_cloud added GenericAll backdoor ACE on AdminSDHolder via `PsBase.Options.SecurityMasks=Dacl`; ACE persisted. **DACL had been polluted to 99 ACEs during earlier PowerView attempt → restored from pristine range.local template (SID-translated) + re-added surface ACE → now 23 ACEs, protected, no rogue GenericAll.** Exploit: `t025-adminsdholder-exploit.ps1`; restore: `t025-restore.ps1` + `t025-readd-aces.ps1` | No |
 
 ## Branch B
 
 | ID | Attack | Source Machine | Credential | Status | Notes | Re-test Needed |
 |------|--------|----------------|------------|--------|-------|----------------|
-| 050 | ADCS ESC1 (WT050) | ws01 | chief_command / C0mm@nd_Ch1ef! (DA+EA) | 📝 Script corrected, pending re-test | Previously used analyst_t1 and failed DirectoryServices error; now uses chief_command@cadre.local | Yes - run after T015 |
-| 051 | ADCS ESC3 (WT051) | ws01 | chief_command / C0mm@nd_Ch1ef! (DA+EA) | 📝 Script corrected, pending re-test | Enrollment Agent abuse; now uses chief_command | Yes - run after T015 |
-| 052 | ADCS ESC8 / NTLM relay web enrollment (WT052) | ws01 | chief_command / C0mm@nd_Ch1ef! (DA+EA) | 📝 Script corrected, pending re-test | Web enrollment reachable check; now uses chief_command | Yes - run after T015 |
-| 053 | UnPAC-the-Hash (WT053) | ws01 | chief_command / C0mm@nd_Ch1ef! (DA+EA) | 📝 Script corrected, pending re-test | Certify request then Rubeus /unpac-thehash; now uses chief_command | Yes - run after T015 |
+| 050 | ADCS ESC1 (WT050) | ws01 | chief_command / C0mm@nd_Ch1ef! (DA+EA) | ✅ VERIFIED 2026-08-01 | `certipy req -template CADRE-ESC1 -upn administrator@cadre.local -sid <admin-SID> -dynamic-endpoint` → cert issued (Req ID 39, SID embedded) → `certipy auth` PKINIT TGT + **UnPAC NT hash `aad3b435b51404eeaad3b435b51404ee:81c3b6443f148bf73bb3499791f1eb7b`**. Required `-sid` (SID mismatch otherwise) and `-dynamic-endpoint` (default RPC endpoint times out). | No |
+| 051 | ADCS ESC3 (WT051) | ws01 | chief_command / C0mm@nd_Ch1ef! (DA+EA) | ✅ VERIFIED 2026-08-01 | ESC3-Agent cert (Req ID 40/41) + `-on-behalf-of "cadre\administrator"` (NetBIOS — FQDN form is denied by policy module `0x80070547`) → admin cert issued (Req ID 44, UPN+SID). PKINIT TGT OK. UnPAC of ESC3 cert hit impacket `InvalidChecksum` quirk (UnPAC proven via ESC1 cert instead). | No |
+| 052 | ADCS ESC8 / NTLM relay web enrollment (WT052) | ws01 | chief_command / C0mm@nd_Ch1ef! (DA+EA) | 🔬 DEFERRED — revisit at end | **Root cause (2026-08-01):** no SMB-authenticated coercion works on Server 2025 here; MS-RPRN dials attacker RPC :135 anonymously; `@8445` UNC is not honored by Windows SMB client (tcpdump zero packets). Surface (web enrollment 401) remains configured. See root-cause record at top of report. | Revisit at end |
+| 053 | UnPAC-the-Hash (WT053) | ws01 | chief_command / C0mm@nd_Ch1ef! (DA+EA) | ✅ VERIFIED 2026-08-01 | `certipy auth -pfx` on ESC1 admin cert → PKINIT TGT + U2U → **administrator NT hash extracted**. (certipy auth hangs when orphaned certipy procs hold the ccache lock — kill first.) | No |
 
 ## Branch D
 
 | ID | Attack | Source Machine | Credential | Status | Notes | Re-test Needed |
 |------|--------|----------------|------------|--------|-------|----------------|
 | 044 | MSSQL Linked Server Recon (WT044) | ws01 -> mbr01 | child\analyst_t1 / T13r_An@lyst! | ✅ Verified | OPENQUERY to LINUX01.master.sys.databases returns linux01 databases | No |
-| 045 | SSSD Ticket Extraction (WT045) | linux01 | linux01 local access or SSH key | 📝 Configured / pending re-test | `07-linux-config.yml` verifies SSSD secrets cache presence | Yes |
-| 046 | MSSQL Keytab Extraction (WT046) | linux01 | linux01 root or mssql service | ⏳ Not exercised | Extract keytab used by MSSQL service | Yes |
-| 047 | NFS Kerberos Mount (WT047) | linux01 | Valid domain Kerberos ticket | 📝 Configured / pending re-test | `07-linux-config.yml` creates `/exports/secure-share` with `sec=krb5p` and starts NFS services | Yes |
-| 048 | Podman Container Escape (WT048) | linux01 | Privileged container or misconfig | 📝 Configured / pending re-test | `07-linux-config.yml` deploys privileged `cadre-monitor` container and exposes podman artifacts | Yes |
+| 045 | SSSD Ticket Extraction (WT045) | linux01 | mssql-linux01 pivot → sudo root | ✅ VERIFIED 2026-08-01 | **Config gap fixed:** `/etc/krb5.keytab` was corrupt/empty → SSSD failed → no domain resolution. Recreated via `adcli join` (chief_command) → SSSD active → domain users resolve → SSH pivot as `mssql-linux01` works. From pivot root: SSSD cache `cache_cadre.local.ldb` active (2.9MB, fresh). Fix propagated to `07-linux-config.yml` (+verifyOnly) and `sql-integration-guide.md` §3.4. | No |
+| 046 | MSSQL Keytab Extraction (WT046) | linux01 | mssql-linux01 pivot → sudo root | ✅ VERIFIED 2026-08-01 | Keytab `/var/opt/mssql/secrets/mssql.keytab` (MSSQLSvc/linux01:1433, aes256) read via pivot root (`klist -ket`). Also obtainable via SQL-sa `BULK` read (mssql-owned file) without a shell. | No |
+| 047 | NFS Kerberos Mount (WT047) | linux01 | mssql-linux01 pivot → root | ✅ VERIFIED 2026-08-01 | **Fixes applied (live + playbooks + guide):** (1) `nfs/linux01` + `nfs/linux01.cadre.local` SPNs registered in AD + keytab entries via `adcli update --add-service-principal`; (2) `rpc-svcgssd` (server GSS) was FAILED — started+enabled; (3) `/etc/idmapd.conf` Domain was `localdomain` → set `cadre.local`; (4) mount **by FQDN** (`linux01.cadre.local`) not `localhost`. Result: `mount -t nfs4 -o sec=krb5p linux01.cadre.local:/exports/secure-share /mnt/cadre-nfs` → **MOUNT_OK (sec=krb5p, rw)** + share readable. Write denied while share is root-owned 0755 (mapped uid = mssql-linux01). Fixes in `07-linux-config.yml` (+verifyOnly) + `sql-integration-guide.md` §3.5. | No |
+| 048 | Podman Container Escape (WT048) | linux01 | mssql-linux01 pivot → sudo root | ✅ VERIFIED 2026-08-01 | **Config gap fixed:** no user (other than vagrant) had sudo/podman → privileged `cadre-monitor` unreachable. Added sudo misconfig `/etc/sudoers.d/cadre-domain-users` (`mssql-linux01 ALL=(ALL) NOPASSWD:ALL`). Full chain: SSH `mssql-linux01` → `sudo podman start cadre-monitor` → `sudo podman exec cadre-monitor unshare -r id` → **root** + host shadow read + host file write (`/tmp/cadre-d-escape`, cleaned). | No |
+| — | Branch D entry (linked-server → linux01 SQL) | ws01 -> mbr01 -> linux01 | child\analyst_t1 (SQL, EXECUTE AS sa) | ✅ VERIFIED 2026-08-01 | Proper chain: `EXECUTE AS sa` on mbr01 → `EXEC (...) AT LINUX01` → **sa / sysadmin on linux01** (Developer 16.0). xp_cmdshell unsupported on SQL-on-Linux (by design, `sql-integration-guide.md`). | No |
 
 ## Branch G
 
@@ -262,9 +285,9 @@
 | `analyst_dfir` | `cadre.local` | `An@lyst_DF1R!` | Branch A ACE#5 | WT031 password spray |
 | `eng_agentic` | `cadre.local` | `Ag3nt1c_Eng!` | Branch A ACE#13+14 (DCSync) | WT031 password spray |
 | `chief_command` | `cadre.local` | `C0mm@nd_Ch1ef!` | Root DA+EA, Branch A post-T015, Branch B entry | Branch A T015 / WT031 spray |
-| `dc02$` | `child.cadre.local` | TGT | Phase 6 DCSync | Phase 5 coercion + Rubeus monitor (BLOCKED) |
-| `child\krbtgt` | `child.cadre.local` | hash | Phase 7 Golden Ticket | Phase 6 DCSync (fallback used) |
-| `root EA` | `cadre.local` | TGT | Phase 8 cross-forest | Phase 7 Golden Ticket + ExtraSids (fallback via chief_command) |
+| `dc02$` | `child.cadre.local` | TGT | Phase 6 DCSync | Phase 5 T102 coercion + Rubeus monitor — **VERIFIED 2026-07-31** (TGT captured, kirbi→ccache) |
+| `child\krbtgt` | `child.cadre.local` | NT hash `b6c370f2...82ec1` + AES256 `d64da42f...9d2` | Phase 7 Golden Ticket | Phase 6 DCSync via dc02$ TGT — **VERIFIED 2026-07-31** |
+| `root EA` | `cadre.local` | TGT | Phase 8 cross-forest | Phase 7 Golden Ticket + ExtraSids — **VERIFIED** (mimikatz `/sids:<root EA>` PTT); cross-realm DCSync via golden = PAC checksum quirk, root DA+EA via chief_command fallback |
 | `svc_sccm` | `range.local` | `s3rv1c3_SCCM!` | Branch C SCCM | Phase 8 cross-forest Kerberoast (WT033) |
 | `svc_naa` | `range.local` | `N@A_s3rv1c3!` | range.local DA | Branch C NAA extraction (WT034) |
 
@@ -284,21 +307,22 @@
 
 ## Top Re-test Priorities
 
-1. **Enable Print Spooler on dc02** (`04-vulnerabilities.yml`) and re-run T102 coercion.
-2. **Re-run all Branch A scripts after T015** using `hunter_dfir` and `chief_command`.
-3. **Re-run all Branch B ADCS scripts** using `chief_command@cadre.local`.
-4. **Run Branch C SCCM chain from mbr02** (WT035-039).
-5. **Write and run Branch D scripts** (WT045-048).
-6. **Run Branch G CVE-2026-41089** from Kali against dc02 with snapshot.
-7. **Run E exercises** on monitor VM once elk/monitor are online.
-8. **Run F supply-chain scenarios** on linux01/mbr01/npm registry.
+1. **Run the ESC8 (WT052) v5 relay chain** from ws01: `ntlmrelayx.py --smb-port 8445 -t http://dc01.cadre.local/certsrv/certfnsh.asp --adcs --template Machine` + `coercer --smb-port 8445` coerce dc01$ MS-RPRN → obtain cert → UnPAC-the-Hash. Preconditions verified 2026-08-01.
+2. **Enable Print Spooler on dc02** (`04-vulnerabilities.yml`) and re-run T102 coercion. *(Spooler confirmed enabled on all 3 DCs 2026-08-01.)*
+3. **Re-run all Branch A scripts after T015** using `hunter_dfir` and `chief_command`.
+4. **Re-run all Branch B ADCS scripts** using `chief_command@cadre.local`.
+5. **Run Branch C SCCM chain from mbr02** (WT035-039).
+6. **Write and run Branch D scripts** (WT045-048).
+7. **Run Branch G CVE-2026-41089** from Kali against dc02 with snapshot.
+8. **Run E exercises** on monitor VM once elk/monitor are online.
+9. **Run F supply-chain scenarios** on linux01/mbr01/npm registry.
 
 ---
 *Generated from CAMPAIGNS-METADATA-v2.md and 2026-07-30 validation run.*
 
 ## Appendix A — Consolidated Campaign Re-test Matrix
 
-> Updated: 2026-07-31
+> Updated: 2026-08-01 (ESC8 v5 + Branch A verified status + corrected ws01 tooling)
 
 | ID | Stream | Attack | Source Machine | Credentials | Status | Re-test / Fix Notes |
 |---|---|---|---|---|---|---|
@@ -306,14 +330,14 @@
 | WT013 | Branch A | WriteDacl self-escalate | ws01 | chief_command / C0mm@nd_Ch1ef! | ⠿ Scripted | Script present; awaiting retest after ACE/routing fixes. |
 | WT014 | Branch A | GenericWrite → Shadow Creds | ws01 | chief_command / C0mm@nd_Ch1ef! | ⠿ Scripted | Script present; awaiting retest after ACE/routing fixes. |
 | WT016 | Branch A | GenericAll on OU | ws01 | chief_command / C0mm@nd_Ch1ef! | ⠿ Scripted | Script present; awaiting retest after ACE/routing fixes. |
-| WT008 | Branch A | Shadow Creds on dc01$ | ws01 | chief_command / C0mm@nd_Ch1ef! | ⠿ Scripted | Script present; awaiting retest after ACE/routing fixes. |
-| WT023 | Branch A | GPO Abuse | ws01 | analyst_cloud / ... | ⠿ Scripted | Script present; awaiting retest. |
+| WT008 | Branch A | Shadow Creds on dc01$ | ws01 | chief_command / C0mm@nd_Ch1ef! | ✅ Verified | pywhisker (explicit creds) → dc01$ KeyCredential; PKINIT TGT; NT hash recovered. |
+| WT023 | Branch A | GPO Abuse | ws01 | analyst_cloud / Cl0ud_An@lyst! | ✅ Verified | WriteDacl/WriteOwner/GenericAll on Vulnerable-GPO; preference write confirmed. |
 | WT024 | Branch A | gMSA extraction | ws01 | analyst_cloud / ... | ⠿ Scripted | Script present; awaiting retest. |
 | GPP | Branch A | GPP stored password | ws01 | analyst_cloud / ... | ❌ Missing | No playbook config; add `19-initial-access.yml` or gap-fix task. |
 | WT025 | Branch A | AdminSDHolder persistence | ws01 | chief_command / C0mm@nd_Ch1ef! | ❌ Missing | Missing AD surface; needs dedicated playbook/ACL work. |
 | WT050 | Branch B | ADCS ESC1 | ws01 | chief_command / C0mm@nd_Ch1ef! | ⠿ Scripted | Script present; awaiting retest. |
 | WT051 | Branch B | ADCS ESC3 | ws01 | chief_command / C0mm@nd_Ch1ef! | ⠿ Scripted | Script present; awaiting retest. |
-| WT052 | Branch B | ADCS ESC8 | ws01 | analyst_cloud / ... | ⠿ Scripted | Script present; awaiting retest. |
+| WT052 | Branch B | ADCS ESC8 | ws01 | chief_command / C0mm@nd_Ch1ef! | 📝 v5 designed | Preconditions verified 2026-08-01 (spooler all DCs, ADCS endpoint 401, chief bind OK, firewall rules, 8445 free, tools present). **v5 = custom SMB port 8445 relay** to avoid `srv2` reclaiming 445. Cert issuance run pending. |
 | WT053 | Branch B | UnPAC-the-Hash | ws01 | chief_command / C0mm@nd_Ch1ef! | ⠿ Scripted | Script present; awaiting retest. |
 | WT044 | Branch D | MSSQL linked server recon | linux01 | analyst_t1 / ... | ✅ Configured | Confirmed configured; extraction exercise pending. |
 | WT045 | Branch D | SSSD ticket extraction | linux01 | analyst_t1 / ... | ❌ Missing | No playbook exposes SSSD cache for extraction. |

@@ -1,0 +1,2980 @@
+{
+  "Certificate Authorities": {
+    "0": {
+      "CA Name": "cadre-CA",
+      "DNS Name": "dc01.cadre.local",
+      "Certificate Subject": "CN=cadre-CA, DC=cadre, DC=local",
+      "Certificate Serial Number": "1FEEFE6E43742CB5428BA2518E568E75",
+      "Certificate Validity Start": "2026-05-20 11:31:25+00:00",
+      "Certificate Validity End": "2031-05-20 11:41:24+00:00",
+      "Web Enrollment": {
+        "http": {
+          "enabled": true
+        },
+        "https": {
+          "enabled": false,
+          "channel_binding": null
+        }
+      },
+      "User Specified SAN": "Disabled",
+      "Request Disposition": "Issue",
+      "Enforce Encryption for Requests": "Disabled",
+      "Active Policy": "CertificateAuthority_MicrosoftDefault.Policy",
+      "Permissions": {
+        "Owner": "CADRE.LOCAL\\Administrators",
+        "Access Rights": {
+          "512": [
+            "CADRE.LOCAL\\Authenticated Users",
+            "CADRE.LOCAL\\lead_engineering"
+          ],
+          "1": [
+            "CADRE.LOCAL\\Domain Admins",
+            "CADRE.LOCAL\\Enterprise Admins",
+            "CADRE.LOCAL\\Administrators",
+            "CADRE.LOCAL\\lead_engineering"
+          ],
+          "2": [
+            "CADRE.LOCAL\\Domain Admins",
+            "CADRE.LOCAL\\Enterprise Admins",
+            "CADRE.LOCAL\\Administrators",
+            "CADRE.LOCAL\\lead_engineering"
+          ],
+          "256": [
+            "CADRE.LOCAL\\lead_engineering"
+          ]
+        }
+      },
+      "[+] User Enrollable Principals": [
+        "CADRE.LOCAL\\Authenticated Users"
+      ],
+      "[+] User ACL Principals": [
+        "CADRE.LOCAL\\Administrators",
+        "CADRE.LOCAL\\Enterprise Admins",
+        "CADRE.LOCAL\\Domain Admins"
+      ],
+      "[!] Vulnerabilities": {
+        "ESC7": "User has dangerous permissions.",
+        "ESC8": "Web Enrollment is enabled over HTTP.",
+        "ESC11": "Encryption is not enforced for ICPR (RPC) requests."
+      }
+    }
+  },
+  "Certificate Templates": {
+    "0": {
+      "Template Name": "KerberosAuthentication",
+      "Display Name": "Kerberos Authentication",
+      "Certificate Authorities": [
+        "cadre-CA"
+      ],
+      "Enabled": true,
+      "Client Authentication": true,
+      "Enrollment Agent": false,
+      "Any Purpose": false,
+      "Enrollee Supplies Subject": false,
+      "Certificate Name Flag": [
+        4194304,
+        134217728
+      ],
+      "Enrollment Flag": [
+        32
+      ],
+      "Extended Key Usage": [
+        "Client Authentication",
+        "Server Authentication",
+        "Smart Card Logon",
+        "KDC Authentication"
+      ],
+      "Requires Manager Approval": false,
+      "Requires Key Archival": false,
+      "Authorized Signatures Required": 0,
+      "Schema Version": 2,
+      "Validity Period": "1 year",
+      "Renewal Period": "6 weeks",
+      "Minimum RSA Key Length": 2048,
+      "Template Created": "2026-05-20 11:41:25+00:00",
+      "Template Last Modified": "2026-05-20 11:41:25+00:00",
+      "Permissions": {
+        "Enrollment Permissions": {
+          "Enrollment Rights": [
+            "CADRE.LOCAL\\Enterprise Read-only Domain Controllers",
+            "CADRE.LOCAL\\Domain Admins",
+            "CADRE.LOCAL\\Domain Controllers",
+            "CADRE.LOCAL\\Enterprise Admins",
+            "CADRE.LOCAL\\Enterprise Domain Controllers"
+          ]
+        },
+        "Object Control Permissions": {
+          "Owner": "CADRE.LOCAL\\Enterprise Admins",
+          "Full Control Principals": [
+            "CADRE.LOCAL\\Domain Admins",
+            "CADRE.LOCAL\\Enterprise Admins"
+          ],
+          "Write Owner Principals": [
+            "CADRE.LOCAL\\Domain Admins",
+            "CADRE.LOCAL\\Enterprise Admins"
+          ],
+          "Write Dacl Principals": [
+            "CADRE.LOCAL\\Domain Admins",
+            "CADRE.LOCAL\\Enterprise Admins"
+          ],
+          "Write Property Enroll": [
+            "CADRE.LOCAL\\Domain Admins",
+            "CADRE.LOCAL\\Domain Controllers",
+            "CADRE.LOCAL\\Enterprise Admins",
+            "CADRE.LOCAL\\Enterprise Domain Controllers"
+          ],
+          "Write Property AutoEnroll": [
+            "CADRE.LOCAL\\Domain Controllers",
+            "CADRE.LOCAL\\Enterprise Domain Controllers"
+          ]
+        }
+      },
+      "[+] User Enrollable Principals": [
+        "CADRE.LOCAL\\Enterprise Admins",
+        "CADRE.LOCAL\\Domain Admins"
+      ],
+      "[+] User ACL Principals": [
+        "CADRE.LOCAL\\Enterprise Admins"
+      ],
+      "[!] Vulnerabilities": {
+        "ESC4": "Template is owned by user."
+      }
+    },
+    "1": {
+      "Template Name": "OCSPResponseSigning",
+      "Display Name": "OCSP Response Signing",
+      "Enabled": false,
+      "Client Authentication": false,
+      "Enrollment Agent": false,
+      "Any Purpose": false,
+      "Enrollee Supplies Subject": false,
+      "Certificate Name Flag": [
+        134217728,
+        268435456
+      ],
+      "Enrollment Flag": [
+        4096,
+        16384
+      ],
+      "Extended Key Usage": [
+        "OCSP Signing"
+      ],
+      "Requires Manager Approval": false,
+      "Requires Key Archival": false,
+      "RA Application Policies": [
+        "msPKI-Asymmetric-Algorithm`PZPWSTR`RSA`msPKI-Hash-Algorithm`PZPWSTR`SHA1`msPKI-Key-Security-Descriptor`PZPWSTR`D:P(A;;FA;;;BA)(A;;FA;;;SY)(A;;GR;;;S-1-5-80-3804348527-3718992918-2141599610-3686422417-2726379419)`msPKI-Key-Usage`DWORD`2`"
+      ],
+      "Authorized Signatures Required": 0,
+      "Schema Version": 3,
+      "Validity Period": "2 weeks",
+      "Renewal Period": "2 days",
+      "Minimum RSA Key Length": 2048,
+      "Template Created": "2026-05-20 11:41:25+00:00",
+      "Template Last Modified": "2026-05-20 11:41:25+00:00",
+      "Permissions": {
+        "Enrollment Permissions": {
+          "Enrollment Rights": [
+            "CADRE.LOCAL\\Domain Admins",
+            "CADRE.LOCAL\\Enterprise Admins"
+          ]
+        },
+        "Object Control Permissions": {
+          "Owner": "CADRE.LOCAL\\Enterprise Admins",
+          "Full Control Principals": [
+            "CADRE.LOCAL\\Domain Admins",
+            "CADRE.LOCAL\\Enterprise Admins"
+          ],
+          "Write Owner Principals": [
+            "CADRE.LOCAL\\Domain Admins",
+            "CADRE.LOCAL\\Enterprise Admins"
+          ],
+          "Write Dacl Principals": [
+            "CADRE.LOCAL\\Domain Admins",
+            "CADRE.LOCAL\\Enterprise Admins"
+          ],
+          "Write Property Enroll": [
+            "CADRE.LOCAL\\Domain Admins",
+            "CADRE.LOCAL\\Enterprise Admins"
+          ]
+        }
+      },
+      "[+] User ACL Principals": [
+        "CADRE.LOCAL\\Enterprise Admins"
+      ],
+      "[!] Vulnerabilities": {
+        "ESC4": "Template is owned by user."
+      }
+    },
+    "2": {
+      "Template Name": "RASAndIASServer",
+      "Display Name": "RAS and IAS Server",
+      "Enabled": false,
+      "Client Authentication": true,
+      "Enrollment Agent": false,
+      "Any Purpose": false,
+      "Enrollee Supplies Subject": false,
+      "Certificate Name Flag": [
+        134217728,
+        1073741824
+      ],
+      "Enrollment Flag": [
+        32
+      ],
+      "Extended Key Usage": [
+        "Client Authentication",
+        "Server Authentication"
+      ],
+      "Requires Manager Approval": false,
+      "Requires Key Archival": false,
+      "Authorized Signatures Required": 0,
+      "Schema Version": 2,
+      "Validity Period": "1 year",
+      "Renewal Period": "6 weeks",
+      "Minimum RSA Key Length": 2048,
+      "Template Created": "2026-05-20 11:41:25+00:00",
+      "Template Last Modified": "2026-05-20 11:41:25+00:00",
+      "Permissions": {
+        "Enrollment Permissions": {
+          "Enrollment Rights": [
+            "CADRE.LOCAL\\Domain Admins",
+            "CADRE.LOCAL\\Enterprise Admins",
+            "CADRE.LOCAL\\RAS and IAS Servers"
+          ]
+        },
+        "Object Control Permissions": {
+          "Owner": "CADRE.LOCAL\\Enterprise Admins",
+          "Full Control Principals": [
+            "CADRE.LOCAL\\Domain Admins",
+            "CADRE.LOCAL\\Enterprise Admins"
+          ],
+          "Write Owner Principals": [
+            "CADRE.LOCAL\\Domain Admins",
+            "CADRE.LOCAL\\Enterprise Admins"
+          ],
+          "Write Dacl Principals": [
+            "CADRE.LOCAL\\Domain Admins",
+            "CADRE.LOCAL\\Enterprise Admins"
+          ],
+          "Write Property Enroll": [
+            "CADRE.LOCAL\\Domain Admins",
+            "CADRE.LOCAL\\Enterprise Admins",
+            "CADRE.LOCAL\\RAS and IAS Servers"
+          ]
+        }
+      },
+      "[+] User ACL Principals": [
+        "CADRE.LOCAL\\Enterprise Admins"
+      ],
+      "[!] Vulnerabilities": {
+        "ESC4": "Template is owned by user."
+      }
+    },
+    "3": {
+      "Template Name": "Workstation",
+      "Display Name": "Workstation Authentication",
+      "Enabled": false,
+      "Client Authentication": true,
+      "Enrollment Agent": false,
+      "Any Purpose": false,
+      "Enrollee Supplies Subject": false,
+      "Certificate Name Flag": [
+        134217728
+      ],
+      "Enrollment Flag": [
+        32
+      ],
+      "Extended Key Usage": [
+        "Client Authentication"
+      ],
+      "Requires Manager Approval": false,
+      "Requires Key Archival": false,
+      "Authorized Signatures Required": 0,
+      "Schema Version": 2,
+      "Validity Period": "1 year",
+      "Renewal Period": "6 weeks",
+      "Minimum RSA Key Length": 2048,
+      "Template Created": "2026-05-20 11:41:25+00:00",
+      "Template Last Modified": "2026-05-20 11:41:25+00:00",
+      "Permissions": {
+        "Enrollment Permissions": {
+          "Enrollment Rights": [
+            "CADRE.LOCAL\\Domain Admins",
+            "CADRE.LOCAL\\Domain Computers",
+            "CADRE.LOCAL\\Enterprise Admins"
+          ]
+        },
+        "Object Control Permissions": {
+          "Owner": "CADRE.LOCAL\\Enterprise Admins",
+          "Full Control Principals": [
+            "CADRE.LOCAL\\Domain Admins",
+            "CADRE.LOCAL\\Enterprise Admins"
+          ],
+          "Write Owner Principals": [
+            "CADRE.LOCAL\\Domain Admins",
+            "CADRE.LOCAL\\Enterprise Admins"
+          ],
+          "Write Dacl Principals": [
+            "CADRE.LOCAL\\Domain Admins",
+            "CADRE.LOCAL\\Enterprise Admins"
+          ],
+          "Write Property Enroll": [
+            "CADRE.LOCAL\\Domain Admins",
+            "CADRE.LOCAL\\Domain Computers",
+            "CADRE.LOCAL\\Enterprise Admins"
+          ]
+        }
+      },
+      "[+] User ACL Principals": [
+        "CADRE.LOCAL\\Enterprise Admins"
+      ],
+      "[!] Vulnerabilities": {
+        "ESC4": "Template is owned by user."
+      }
+    },
+    "4": {
+      "Template Name": "DirectoryEmailReplication",
+      "Display Name": "Directory Email Replication",
+      "Certificate Authorities": [
+        "cadre-CA"
+      ],
+      "Enabled": true,
+      "Client Authentication": false,
+      "Enrollment Agent": false,
+      "Any Purpose": false,
+      "Enrollee Supplies Subject": false,
+      "Certificate Name Flag": [
+        16777216,
+        134217728
+      ],
+      "Enrollment Flag": [
+        1,
+        8,
+        32
+      ],
+      "Extended Key Usage": [
+        "Directory Service Email Replication"
+      ],
+      "Requires Manager Approval": false,
+      "Requires Key Archival": false,
+      "Authorized Signatures Required": 0,
+      "Schema Version": 2,
+      "Validity Period": "1 year",
+      "Renewal Period": "6 weeks",
+      "Minimum RSA Key Length": 2048,
+      "Template Created": "2026-05-20 11:41:25+00:00",
+      "Template Last Modified": "2026-05-20 11:41:25+00:00",
+      "Permissions": {
+        "Enrollment Permissions": {
+          "Enrollment Rights": [
+            "CADRE.LOCAL\\Enterprise Read-only Domain Controllers",
+            "CADRE.LOCAL\\Domain Admins",
+            "CADRE.LOCAL\\Domain Controllers",
+            "CADRE.LOCAL\\Enterprise Admins",
+            "CADRE.LOCAL\\Enterprise Domain Controllers"
+          ]
+        },
+        "Object Control Permissions": {
+          "Owner": "CADRE.LOCAL\\Enterprise Admins",
+          "Full Control Principals": [
+            "CADRE.LOCAL\\Domain Admins",
+            "CADRE.LOCAL\\Enterprise Admins"
+          ],
+          "Write Owner Principals": [
+            "CADRE.LOCAL\\Domain Admins",
+            "CADRE.LOCAL\\Enterprise Admins"
+          ],
+          "Write Dacl Principals": [
+            "CADRE.LOCAL\\Domain Admins",
+            "CADRE.LOCAL\\Enterprise Admins"
+          ],
+          "Write Property Enroll": [
+            "CADRE.LOCAL\\Domain Admins",
+            "CADRE.LOCAL\\Domain Controllers",
+            "CADRE.LOCAL\\Enterprise Admins",
+            "CADRE.LOCAL\\Enterprise Domain Controllers"
+          ],
+          "Write Property AutoEnroll": [
+            "CADRE.LOCAL\\Domain Controllers",
+            "CADRE.LOCAL\\Enterprise Domain Controllers"
+          ]
+        }
+      },
+      "[+] User Enrollable Principals": [
+        "CADRE.LOCAL\\Enterprise Admins",
+        "CADRE.LOCAL\\Domain Admins"
+      ],
+      "[+] User ACL Principals": [
+        "CADRE.LOCAL\\Enterprise Admins"
+      ],
+      "[!] Vulnerabilities": {
+        "ESC4": "Template is owned by user."
+      }
+    },
+    "5": {
+      "Template Name": "DomainControllerAuthentication",
+      "Display Name": "Domain Controller Authentication",
+      "Certificate Authorities": [
+        "cadre-CA"
+      ],
+      "Enabled": true,
+      "Client Authentication": true,
+      "Enrollment Agent": false,
+      "Any Purpose": false,
+      "Enrollee Supplies Subject": false,
+      "Certificate Name Flag": [
+        134217728
+      ],
+      "Enrollment Flag": [
+        32
+      ],
+      "Extended Key Usage": [
+        "Client Authentication",
+        "Server Authentication",
+        "Smart Card Logon"
+      ],
+      "Requires Manager Approval": false,
+      "Requires Key Archival": false,
+      "Authorized Signatures Required": 0,
+      "Schema Version": 2,
+      "Validity Period": "1 year",
+      "Renewal Period": "6 weeks",
+      "Minimum RSA Key Length": 2048,
+      "Template Created": "2026-05-20 11:41:25+00:00",
+      "Template Last Modified": "2026-05-20 11:41:25+00:00",
+      "Permissions": {
+        "Enrollment Permissions": {
+          "Enrollment Rights": [
+            "CADRE.LOCAL\\Enterprise Read-only Domain Controllers",
+            "CADRE.LOCAL\\Domain Admins",
+            "CADRE.LOCAL\\Domain Controllers",
+            "CADRE.LOCAL\\Enterprise Admins",
+            "CADRE.LOCAL\\Enterprise Domain Controllers"
+          ]
+        },
+        "Object Control Permissions": {
+          "Owner": "CADRE.LOCAL\\Enterprise Admins",
+          "Full Control Principals": [
+            "CADRE.LOCAL\\Domain Admins",
+            "CADRE.LOCAL\\Enterprise Admins"
+          ],
+          "Write Owner Principals": [
+            "CADRE.LOCAL\\Domain Admins",
+            "CADRE.LOCAL\\Enterprise Admins"
+          ],
+          "Write Dacl Principals": [
+            "CADRE.LOCAL\\Domain Admins",
+            "CADRE.LOCAL\\Enterprise Admins"
+          ],
+          "Write Property Enroll": [
+            "CADRE.LOCAL\\Domain Admins",
+            "CADRE.LOCAL\\Domain Controllers",
+            "CADRE.LOCAL\\Enterprise Admins",
+            "CADRE.LOCAL\\Enterprise Domain Controllers"
+          ],
+          "Write Property AutoEnroll": [
+            "CADRE.LOCAL\\Domain Controllers",
+            "CADRE.LOCAL\\Enterprise Domain Controllers"
+          ]
+        }
+      },
+      "[+] User Enrollable Principals": [
+        "CADRE.LOCAL\\Enterprise Admins",
+        "CADRE.LOCAL\\Domain Admins"
+      ],
+      "[+] User ACL Principals": [
+        "CADRE.LOCAL\\Enterprise Admins"
+      ],
+      "[!] Vulnerabilities": {
+        "ESC4": "Template is owned by user."
+      }
+    },
+    "6": {
+      "Template Name": "KeyRecoveryAgent",
+      "Display Name": "Key Recovery Agent",
+      "Enabled": false,
+      "Client Authentication": false,
+      "Enrollment Agent": false,
+      "Any Purpose": false,
+      "Enrollee Supplies Subject": false,
+      "Certificate Name Flag": [
+        33554432,
+        2147483648
+      ],
+      "Enrollment Flag": [
+        1,
+        2,
+        4,
+        32
+      ],
+      "Private Key Flag": [
+        16
+      ],
+      "Extended Key Usage": [
+        "Key Recovery Agent"
+      ],
+      "Requires Manager Approval": true,
+      "Requires Key Archival": false,
+      "Authorized Signatures Required": 0,
+      "Schema Version": 2,
+      "Validity Period": "2 years",
+      "Renewal Period": "6 weeks",
+      "Minimum RSA Key Length": 2048,
+      "Template Created": "2026-05-20 11:41:25+00:00",
+      "Template Last Modified": "2026-05-20 11:41:25+00:00",
+      "Permissions": {
+        "Enrollment Permissions": {
+          "Enrollment Rights": [
+            "CADRE.LOCAL\\Domain Admins",
+            "CADRE.LOCAL\\Enterprise Admins"
+          ]
+        },
+        "Object Control Permissions": {
+          "Owner": "CADRE.LOCAL\\Enterprise Admins",
+          "Full Control Principals": [
+            "CADRE.LOCAL\\Domain Admins",
+            "CADRE.LOCAL\\Enterprise Admins"
+          ],
+          "Write Owner Principals": [
+            "CADRE.LOCAL\\Domain Admins",
+            "CADRE.LOCAL\\Enterprise Admins"
+          ],
+          "Write Dacl Principals": [
+            "CADRE.LOCAL\\Domain Admins",
+            "CADRE.LOCAL\\Enterprise Admins"
+          ],
+          "Write Property Enroll": [
+            "CADRE.LOCAL\\Domain Admins",
+            "CADRE.LOCAL\\Enterprise Admins"
+          ]
+        }
+      },
+      "[+] User ACL Principals": [
+        "CADRE.LOCAL\\Enterprise Admins"
+      ],
+      "[!] Vulnerabilities": {
+        "ESC4": "Template is owned by user."
+      }
+    },
+    "7": {
+      "Template Name": "CAExchange",
+      "Display Name": "CA Exchange",
+      "Enabled": false,
+      "Client Authentication": false,
+      "Enrollment Agent": false,
+      "Any Purpose": false,
+      "Enrollee Supplies Subject": true,
+      "Certificate Name Flag": [
+        1
+      ],
+      "Enrollment Flag": [
+        1
+      ],
+      "Extended Key Usage": [
+        "Private Key Archival"
+      ],
+      "Requires Manager Approval": false,
+      "Requires Key Archival": false,
+      "Authorized Signatures Required": 0,
+      "Schema Version": 2,
+      "Validity Period": "1 week",
+      "Renewal Period": "1 day",
+      "Minimum RSA Key Length": 2048,
+      "Template Created": "2026-05-20 11:41:25+00:00",
+      "Template Last Modified": "2026-05-20 11:41:25+00:00",
+      "Permissions": {
+        "Enrollment Permissions": {
+          "Enrollment Rights": [
+            "CADRE.LOCAL\\Domain Admins",
+            "CADRE.LOCAL\\Enterprise Admins"
+          ]
+        },
+        "Object Control Permissions": {
+          "Owner": "CADRE.LOCAL\\Enterprise Admins",
+          "Full Control Principals": [
+            "CADRE.LOCAL\\Domain Admins",
+            "CADRE.LOCAL\\Enterprise Admins"
+          ],
+          "Write Owner Principals": [
+            "CADRE.LOCAL\\Domain Admins",
+            "CADRE.LOCAL\\Enterprise Admins"
+          ],
+          "Write Dacl Principals": [
+            "CADRE.LOCAL\\Domain Admins",
+            "CADRE.LOCAL\\Enterprise Admins"
+          ],
+          "Write Property Enroll": [
+            "CADRE.LOCAL\\Domain Admins",
+            "CADRE.LOCAL\\Enterprise Admins"
+          ]
+        }
+      },
+      "[+] User ACL Principals": [
+        "CADRE.LOCAL\\Enterprise Admins"
+      ],
+      "[!] Vulnerabilities": {
+        "ESC4": "Template is owned by user."
+      }
+    },
+    "8": {
+      "Template Name": "CrossCA",
+      "Display Name": "Cross Certification Authority",
+      "Enabled": false,
+      "Client Authentication": true,
+      "Enrollment Agent": true,
+      "Any Purpose": true,
+      "Enrollee Supplies Subject": true,
+      "Certificate Name Flag": [
+        1
+      ],
+      "Enrollment Flag": [
+        8
+      ],
+      "Private Key Flag": [
+        16
+      ],
+      "Requires Manager Approval": false,
+      "Requires Key Archival": false,
+      "RA Application Policies": [
+        "Qualified Subordination"
+      ],
+      "Authorized Signatures Required": 1,
+      "Schema Version": 2,
+      "Validity Period": "5 years",
+      "Renewal Period": "6 weeks",
+      "Minimum RSA Key Length": 2048,
+      "Template Created": "2026-05-20 11:41:25+00:00",
+      "Template Last Modified": "2026-05-20 11:41:25+00:00",
+      "Permissions": {
+        "Enrollment Permissions": {
+          "Enrollment Rights": [
+            "CADRE.LOCAL\\Domain Admins",
+            "CADRE.LOCAL\\Enterprise Admins"
+          ]
+        },
+        "Object Control Permissions": {
+          "Owner": "CADRE.LOCAL\\Enterprise Admins",
+          "Full Control Principals": [
+            "CADRE.LOCAL\\Domain Admins",
+            "CADRE.LOCAL\\Enterprise Admins"
+          ],
+          "Write Owner Principals": [
+            "CADRE.LOCAL\\Domain Admins",
+            "CADRE.LOCAL\\Enterprise Admins"
+          ],
+          "Write Dacl Principals": [
+            "CADRE.LOCAL\\Domain Admins",
+            "CADRE.LOCAL\\Enterprise Admins"
+          ],
+          "Write Property Enroll": [
+            "CADRE.LOCAL\\Domain Admins",
+            "CADRE.LOCAL\\Enterprise Admins"
+          ]
+        }
+      },
+      "[+] User ACL Principals": [
+        "CADRE.LOCAL\\Enterprise Admins"
+      ],
+      "[!] Vulnerabilities": {
+        "ESC4": "Template is owned by user."
+      }
+    },
+    "9": {
+      "Template Name": "ExchangeUserSignature",
+      "Display Name": "Exchange Signature Only",
+      "Enabled": false,
+      "Client Authentication": false,
+      "Enrollment Agent": false,
+      "Any Purpose": false,
+      "Enrollee Supplies Subject": true,
+      "Certificate Name Flag": [
+        1
+      ],
+      "Extended Key Usage": [
+        "Secure Email"
+      ],
+      "Requires Manager Approval": false,
+      "Requires Key Archival": false,
+      "Authorized Signatures Required": 0,
+      "Schema Version": 1,
+      "Validity Period": "1 year",
+      "Renewal Period": "6 weeks",
+      "Minimum RSA Key Length": 2048,
+      "Template Created": "2026-05-20 11:41:25+00:00",
+      "Template Last Modified": "2026-05-20 11:41:25+00:00",
+      "Permissions": {
+        "Enrollment Permissions": {
+          "Enrollment Rights": [
+            "CADRE.LOCAL\\Domain Admins",
+            "CADRE.LOCAL\\Enterprise Admins"
+          ]
+        },
+        "Object Control Permissions": {
+          "Owner": "CADRE.LOCAL\\Enterprise Admins",
+          "Full Control Principals": [
+            "CADRE.LOCAL\\Domain Admins",
+            "CADRE.LOCAL\\Enterprise Admins"
+          ],
+          "Write Owner Principals": [
+            "CADRE.LOCAL\\Domain Admins",
+            "CADRE.LOCAL\\Enterprise Admins"
+          ],
+          "Write Dacl Principals": [
+            "CADRE.LOCAL\\Domain Admins",
+            "CADRE.LOCAL\\Enterprise Admins"
+          ],
+          "Write Property Enroll": [
+            "CADRE.LOCAL\\Domain Admins",
+            "CADRE.LOCAL\\Enterprise Admins"
+          ]
+        }
+      },
+      "[+] User ACL Principals": [
+        "CADRE.LOCAL\\Enterprise Admins"
+      ],
+      "[!] Vulnerabilities": {
+        "ESC4": "Template is owned by user."
+      }
+    },
+    "10": {
+      "Template Name": "ExchangeUser",
+      "Display Name": "Exchange User",
+      "Enabled": false,
+      "Client Authentication": false,
+      "Enrollment Agent": false,
+      "Any Purpose": false,
+      "Enrollee Supplies Subject": true,
+      "Certificate Name Flag": [
+        1
+      ],
+      "Enrollment Flag": [
+        1
+      ],
+      "Private Key Flag": [
+        16
+      ],
+      "Extended Key Usage": [
+        "Secure Email"
+      ],
+      "Requires Manager Approval": false,
+      "Requires Key Archival": false,
+      "Authorized Signatures Required": 0,
+      "Schema Version": 1,
+      "Validity Period": "1 year",
+      "Renewal Period": "6 weeks",
+      "Minimum RSA Key Length": 2048,
+      "Template Created": "2026-05-20 11:41:25+00:00",
+      "Template Last Modified": "2026-05-20 11:41:25+00:00",
+      "Permissions": {
+        "Enrollment Permissions": {
+          "Enrollment Rights": [
+            "CADRE.LOCAL\\Domain Admins",
+            "CADRE.LOCAL\\Enterprise Admins"
+          ]
+        },
+        "Object Control Permissions": {
+          "Owner": "CADRE.LOCAL\\Enterprise Admins",
+          "Full Control Principals": [
+            "CADRE.LOCAL\\Domain Admins",
+            "CADRE.LOCAL\\Enterprise Admins"
+          ],
+          "Write Owner Principals": [
+            "CADRE.LOCAL\\Domain Admins",
+            "CADRE.LOCAL\\Enterprise Admins"
+          ],
+          "Write Dacl Principals": [
+            "CADRE.LOCAL\\Domain Admins",
+            "CADRE.LOCAL\\Enterprise Admins"
+          ],
+          "Write Property Enroll": [
+            "CADRE.LOCAL\\Domain Admins",
+            "CADRE.LOCAL\\Enterprise Admins"
+          ]
+        }
+      },
+      "[+] User ACL Principals": [
+        "CADRE.LOCAL\\Enterprise Admins"
+      ],
+      "[!] Vulnerabilities": {
+        "ESC4": "Template is owned by user."
+      }
+    },
+    "11": {
+      "Template Name": "CEPEncryption",
+      "Display Name": "CEP Encryption",
+      "Enabled": false,
+      "Client Authentication": false,
+      "Enrollment Agent": true,
+      "Any Purpose": false,
+      "Enrollee Supplies Subject": true,
+      "Certificate Name Flag": [
+        1
+      ],
+      "Extended Key Usage": [
+        "Certificate Request Agent"
+      ],
+      "Requires Manager Approval": false,
+      "Requires Key Archival": false,
+      "Authorized Signatures Required": 0,
+      "Schema Version": 1,
+      "Validity Period": "2 years",
+      "Renewal Period": "6 weeks",
+      "Minimum RSA Key Length": 2048,
+      "Template Created": "2026-05-20 11:41:25+00:00",
+      "Template Last Modified": "2026-05-20 11:41:25+00:00",
+      "Permissions": {
+        "Enrollment Permissions": {
+          "Enrollment Rights": [
+            "CADRE.LOCAL\\Domain Admins",
+            "CADRE.LOCAL\\Enterprise Admins"
+          ]
+        },
+        "Object Control Permissions": {
+          "Owner": "CADRE.LOCAL\\Enterprise Admins",
+          "Full Control Principals": [
+            "CADRE.LOCAL\\Domain Admins",
+            "CADRE.LOCAL\\Enterprise Admins"
+          ],
+          "Write Owner Principals": [
+            "CADRE.LOCAL\\Domain Admins",
+            "CADRE.LOCAL\\Enterprise Admins"
+          ],
+          "Write Dacl Principals": [
+            "CADRE.LOCAL\\Domain Admins",
+            "CADRE.LOCAL\\Enterprise Admins"
+          ],
+          "Write Property Enroll": [
+            "CADRE.LOCAL\\Domain Admins",
+            "CADRE.LOCAL\\Enterprise Admins"
+          ]
+        }
+      },
+      "[+] User ACL Principals": [
+        "CADRE.LOCAL\\Enterprise Admins"
+      ],
+      "[!] Vulnerabilities": {
+        "ESC4": "Template is owned by user."
+      }
+    },
+    "12": {
+      "Template Name": "OfflineRouter",
+      "Display Name": "Router (Offline request)",
+      "Enabled": false,
+      "Client Authentication": true,
+      "Enrollment Agent": false,
+      "Any Purpose": false,
+      "Enrollee Supplies Subject": true,
+      "Certificate Name Flag": [
+        1
+      ],
+      "Extended Key Usage": [
+        "Client Authentication"
+      ],
+      "Requires Manager Approval": false,
+      "Requires Key Archival": false,
+      "Authorized Signatures Required": 0,
+      "Schema Version": 1,
+      "Validity Period": "2 years",
+      "Renewal Period": "6 weeks",
+      "Minimum RSA Key Length": 2048,
+      "Template Created": "2026-05-20 11:41:25+00:00",
+      "Template Last Modified": "2026-05-20 11:41:25+00:00",
+      "Permissions": {
+        "Enrollment Permissions": {
+          "Enrollment Rights": [
+            "CADRE.LOCAL\\Domain Admins",
+            "CADRE.LOCAL\\Enterprise Admins"
+          ]
+        },
+        "Object Control Permissions": {
+          "Owner": "CADRE.LOCAL\\Enterprise Admins",
+          "Full Control Principals": [
+            "CADRE.LOCAL\\Domain Admins",
+            "CADRE.LOCAL\\Enterprise Admins"
+          ],
+          "Write Owner Principals": [
+            "CADRE.LOCAL\\Domain Admins",
+            "CADRE.LOCAL\\Enterprise Admins"
+          ],
+          "Write Dacl Principals": [
+            "CADRE.LOCAL\\Domain Admins",
+            "CADRE.LOCAL\\Enterprise Admins"
+          ],
+          "Write Property Enroll": [
+            "CADRE.LOCAL\\Domain Admins",
+            "CADRE.LOCAL\\Enterprise Admins"
+          ]
+        }
+      },
+      "[+] User ACL Principals": [
+        "CADRE.LOCAL\\Enterprise Admins"
+      ],
+      "[!] Vulnerabilities": {
+        "ESC4": "Template is owned by user."
+      }
+    },
+    "13": {
+      "Template Name": "IPSECIntermediateOffline",
+      "Display Name": "IPSec (Offline request)",
+      "Enabled": false,
+      "Client Authentication": false,
+      "Enrollment Agent": false,
+      "Any Purpose": false,
+      "Enrollee Supplies Subject": true,
+      "Certificate Name Flag": [
+        1
+      ],
+      "Extended Key Usage": [
+        "IP security IKE intermediate"
+      ],
+      "Requires Manager Approval": false,
+      "Requires Key Archival": false,
+      "Authorized Signatures Required": 0,
+      "Schema Version": 1,
+      "Validity Period": "2 years",
+      "Renewal Period": "6 weeks",
+      "Minimum RSA Key Length": 2048,
+      "Template Created": "2026-05-20 11:41:25+00:00",
+      "Template Last Modified": "2026-05-20 11:41:25+00:00",
+      "Permissions": {
+        "Enrollment Permissions": {
+          "Enrollment Rights": [
+            "CADRE.LOCAL\\Domain Admins",
+            "CADRE.LOCAL\\Enterprise Admins"
+          ]
+        },
+        "Object Control Permissions": {
+          "Owner": "CADRE.LOCAL\\Enterprise Admins",
+          "Full Control Principals": [
+            "CADRE.LOCAL\\Domain Admins",
+            "CADRE.LOCAL\\Enterprise Admins"
+          ],
+          "Write Owner Principals": [
+            "CADRE.LOCAL\\Domain Admins",
+            "CADRE.LOCAL\\Enterprise Admins"
+          ],
+          "Write Dacl Principals": [
+            "CADRE.LOCAL\\Domain Admins",
+            "CADRE.LOCAL\\Enterprise Admins"
+          ],
+          "Write Property Enroll": [
+            "CADRE.LOCAL\\Domain Admins",
+            "CADRE.LOCAL\\Enterprise Admins"
+          ]
+        }
+      },
+      "[+] User ACL Principals": [
+        "CADRE.LOCAL\\Enterprise Admins"
+      ],
+      "[!] Vulnerabilities": {
+        "ESC4": "Template is owned by user."
+      }
+    },
+    "14": {
+      "Template Name": "IPSECIntermediateOnline",
+      "Display Name": "IPSec",
+      "Enabled": false,
+      "Client Authentication": false,
+      "Enrollment Agent": false,
+      "Any Purpose": false,
+      "Enrollee Supplies Subject": false,
+      "Certificate Name Flag": [
+        134217728,
+        268435456
+      ],
+      "Enrollment Flag": [
+        32
+      ],
+      "Extended Key Usage": [
+        "IP security IKE intermediate"
+      ],
+      "Requires Manager Approval": false,
+      "Requires Key Archival": false,
+      "Authorized Signatures Required": 0,
+      "Schema Version": 1,
+      "Validity Period": "2 years",
+      "Renewal Period": "6 weeks",
+      "Minimum RSA Key Length": 2048,
+      "Template Created": "2026-05-20 11:41:25+00:00",
+      "Template Last Modified": "2026-05-20 11:41:25+00:00",
+      "Permissions": {
+        "Enrollment Permissions": {
+          "Enrollment Rights": [
+            "CADRE.LOCAL\\Domain Admins",
+            "CADRE.LOCAL\\Domain Computers",
+            "CADRE.LOCAL\\Domain Controllers",
+            "CADRE.LOCAL\\Enterprise Admins"
+          ]
+        },
+        "Object Control Permissions": {
+          "Owner": "CADRE.LOCAL\\Enterprise Admins",
+          "Full Control Principals": [
+            "CADRE.LOCAL\\Domain Admins",
+            "CADRE.LOCAL\\Enterprise Admins"
+          ],
+          "Write Owner Principals": [
+            "CADRE.LOCAL\\Domain Admins",
+            "CADRE.LOCAL\\Enterprise Admins"
+          ],
+          "Write Dacl Principals": [
+            "CADRE.LOCAL\\Domain Admins",
+            "CADRE.LOCAL\\Enterprise Admins"
+          ],
+          "Write Property Enroll": [
+            "CADRE.LOCAL\\Domain Admins",
+            "CADRE.LOCAL\\Domain Computers",
+            "CADRE.LOCAL\\Domain Controllers",
+            "CADRE.LOCAL\\Enterprise Admins"
+          ]
+        }
+      },
+      "[+] User ACL Principals": [
+        "CADRE.LOCAL\\Enterprise Admins"
+      ],
+      "[!] Vulnerabilities": {
+        "ESC4": "Template is owned by user."
+      }
+    },
+    "15": {
+      "Template Name": "SubCA",
+      "Display Name": "Subordinate Certification Authority",
+      "Certificate Authorities": [
+        "cadre-CA"
+      ],
+      "Enabled": true,
+      "Client Authentication": true,
+      "Enrollment Agent": true,
+      "Any Purpose": true,
+      "Enrollee Supplies Subject": true,
+      "Certificate Name Flag": [
+        1
+      ],
+      "Private Key Flag": [
+        16
+      ],
+      "Requires Manager Approval": false,
+      "Requires Key Archival": false,
+      "Authorized Signatures Required": 0,
+      "Schema Version": 1,
+      "Validity Period": "5 years",
+      "Renewal Period": "6 weeks",
+      "Minimum RSA Key Length": 2048,
+      "Template Created": "2026-05-20 11:41:25+00:00",
+      "Template Last Modified": "2026-05-20 11:41:25+00:00",
+      "Permissions": {
+        "Enrollment Permissions": {
+          "Enrollment Rights": [
+            "CADRE.LOCAL\\Domain Admins",
+            "CADRE.LOCAL\\Enterprise Admins"
+          ]
+        },
+        "Object Control Permissions": {
+          "Owner": "CADRE.LOCAL\\Enterprise Admins",
+          "Full Control Principals": [
+            "CADRE.LOCAL\\Domain Admins",
+            "CADRE.LOCAL\\Enterprise Admins"
+          ],
+          "Write Owner Principals": [
+            "CADRE.LOCAL\\Domain Admins",
+            "CADRE.LOCAL\\Enterprise Admins"
+          ],
+          "Write Dacl Principals": [
+            "CADRE.LOCAL\\Domain Admins",
+            "CADRE.LOCAL\\Enterprise Admins"
+          ],
+          "Write Property Enroll": [
+            "CADRE.LOCAL\\Domain Admins",
+            "CADRE.LOCAL\\Enterprise Admins"
+          ]
+        }
+      },
+      "[+] User Enrollable Principals": [
+        "CADRE.LOCAL\\Enterprise Admins",
+        "CADRE.LOCAL\\Domain Admins"
+      ],
+      "[+] User ACL Principals": [
+        "CADRE.LOCAL\\Enterprise Admins"
+      ],
+      "[!] Vulnerabilities": {
+        "ESC1": "Enrollee supplies subject and template allows client authentication.",
+        "ESC2": "Template can be used for any purpose.",
+        "ESC3": "Template has Certificate Request Agent EKU set.",
+        "ESC15": "Enrollee supplies subject and schema version is 1.",
+        "ESC17": "Enrollee supplies subject and template allows server authentication.",
+        "ESC4": "Template is owned by user."
+      },
+      "[*] Remarks": {
+        "ESC15": "Only applicable if the environment has not been patched. See CVE-2024-49019 or the wiki for more details.",
+        "ESC17": "Other prerequisites may be required for this to be exploitable. See the wiki for more details.",
+        "ESC2 Target Template": "Template can be targeted as part of ESC2 exploitation. This is not a vulnerability by itself. See the wiki for more details. Template has schema version 1.",
+        "ESC3 Target Template": "Template can be targeted as part of ESC3 exploitation. This is not a vulnerability by itself. See the wiki for more details. Template has schema version 1."
+      }
+    },
+    "16": {
+      "Template Name": "CA",
+      "Display Name": "Root Certification Authority",
+      "Enabled": false,
+      "Client Authentication": true,
+      "Enrollment Agent": true,
+      "Any Purpose": true,
+      "Enrollee Supplies Subject": true,
+      "Certificate Name Flag": [
+        1
+      ],
+      "Private Key Flag": [
+        16
+      ],
+      "Requires Manager Approval": false,
+      "Requires Key Archival": false,
+      "Authorized Signatures Required": 0,
+      "Schema Version": 1,
+      "Validity Period": "5 years",
+      "Renewal Period": "6 weeks",
+      "Minimum RSA Key Length": 2048,
+      "Template Created": "2026-05-20 11:41:25+00:00",
+      "Template Last Modified": "2026-05-20 11:41:25+00:00",
+      "Permissions": {
+        "Enrollment Permissions": {
+          "Enrollment Rights": [
+            "CADRE.LOCAL\\Domain Admins",
+            "CADRE.LOCAL\\Enterprise Admins"
+          ]
+        },
+        "Object Control Permissions": {
+          "Owner": "CADRE.LOCAL\\Enterprise Admins",
+          "Full Control Principals": [
+            "CADRE.LOCAL\\Domain Admins",
+            "CADRE.LOCAL\\Enterprise Admins"
+          ],
+          "Write Owner Principals": [
+            "CADRE.LOCAL\\Domain Admins",
+            "CADRE.LOCAL\\Enterprise Admins"
+          ],
+          "Write Dacl Principals": [
+            "CADRE.LOCAL\\Domain Admins",
+            "CADRE.LOCAL\\Enterprise Admins"
+          ],
+          "Write Property Enroll": [
+            "CADRE.LOCAL\\Domain Admins",
+            "CADRE.LOCAL\\Enterprise Admins"
+          ]
+        }
+      },
+      "[+] User ACL Principals": [
+        "CADRE.LOCAL\\Enterprise Admins"
+      ],
+      "[!] Vulnerabilities": {
+        "ESC4": "Template is owned by user."
+      }
+    },
+    "17": {
+      "Template Name": "WebServer",
+      "Display Name": "Web Server",
+      "Certificate Authorities": [
+        "cadre-CA"
+      ],
+      "Enabled": true,
+      "Client Authentication": false,
+      "Enrollment Agent": false,
+      "Any Purpose": false,
+      "Enrollee Supplies Subject": true,
+      "Certificate Name Flag": [
+        1
+      ],
+      "Extended Key Usage": [
+        "Server Authentication"
+      ],
+      "Requires Manager Approval": false,
+      "Requires Key Archival": false,
+      "Authorized Signatures Required": 0,
+      "Schema Version": 1,
+      "Validity Period": "2 years",
+      "Renewal Period": "6 weeks",
+      "Minimum RSA Key Length": 2048,
+      "Template Created": "2026-05-20 11:41:25+00:00",
+      "Template Last Modified": "2026-05-20 11:41:25+00:00",
+      "Permissions": {
+        "Enrollment Permissions": {
+          "Enrollment Rights": [
+            "CADRE.LOCAL\\Domain Admins",
+            "CADRE.LOCAL\\Enterprise Admins"
+          ]
+        },
+        "Object Control Permissions": {
+          "Owner": "CADRE.LOCAL\\Enterprise Admins",
+          "Full Control Principals": [
+            "CADRE.LOCAL\\Domain Admins",
+            "CADRE.LOCAL\\Enterprise Admins"
+          ],
+          "Write Owner Principals": [
+            "CADRE.LOCAL\\Domain Admins",
+            "CADRE.LOCAL\\Enterprise Admins"
+          ],
+          "Write Dacl Principals": [
+            "CADRE.LOCAL\\Domain Admins",
+            "CADRE.LOCAL\\Enterprise Admins"
+          ],
+          "Write Property Enroll": [
+            "CADRE.LOCAL\\Domain Admins",
+            "CADRE.LOCAL\\Enterprise Admins"
+          ]
+        }
+      },
+      "[+] User Enrollable Principals": [
+        "CADRE.LOCAL\\Enterprise Admins",
+        "CADRE.LOCAL\\Domain Admins"
+      ],
+      "[+] User ACL Principals": [
+        "CADRE.LOCAL\\Enterprise Admins"
+      ],
+      "[!] Vulnerabilities": {
+        "ESC15": "Enrollee supplies subject and schema version is 1.",
+        "ESC17": "Enrollee supplies subject and template allows server authentication.",
+        "ESC4": "Template is owned by user."
+      },
+      "[*] Remarks": {
+        "ESC15": "Only applicable if the environment has not been patched. See CVE-2024-49019 or the wiki for more details.",
+        "ESC17": "Other prerequisites may be required for this to be exploitable. See the wiki for more details."
+      }
+    },
+    "18": {
+      "Template Name": "DomainController",
+      "Display Name": "Domain Controller",
+      "Certificate Authorities": [
+        "cadre-CA"
+      ],
+      "Enabled": true,
+      "Client Authentication": true,
+      "Enrollment Agent": false,
+      "Any Purpose": false,
+      "Enrollee Supplies Subject": false,
+      "Certificate Name Flag": [
+        16777216,
+        134217728,
+        268435456
+      ],
+      "Enrollment Flag": [
+        1,
+        8,
+        32
+      ],
+      "Extended Key Usage": [
+        "Client Authentication",
+        "Server Authentication"
+      ],
+      "Requires Manager Approval": false,
+      "Requires Key Archival": false,
+      "Authorized Signatures Required": 0,
+      "Schema Version": 1,
+      "Validity Period": "1 year",
+      "Renewal Period": "6 weeks",
+      "Minimum RSA Key Length": 2048,
+      "Template Created": "2026-05-20 11:41:25+00:00",
+      "Template Last Modified": "2026-05-20 11:41:25+00:00",
+      "Permissions": {
+        "Enrollment Permissions": {
+          "Enrollment Rights": [
+            "CADRE.LOCAL\\Enterprise Read-only Domain Controllers",
+            "CADRE.LOCAL\\Domain Admins",
+            "CADRE.LOCAL\\Domain Controllers",
+            "CADRE.LOCAL\\Enterprise Admins",
+            "CADRE.LOCAL\\Enterprise Domain Controllers"
+          ]
+        },
+        "Object Control Permissions": {
+          "Owner": "CADRE.LOCAL\\Enterprise Admins",
+          "Full Control Principals": [
+            "CADRE.LOCAL\\Domain Admins",
+            "CADRE.LOCAL\\Enterprise Admins"
+          ],
+          "Write Owner Principals": [
+            "CADRE.LOCAL\\Domain Admins",
+            "CADRE.LOCAL\\Enterprise Admins"
+          ],
+          "Write Dacl Principals": [
+            "CADRE.LOCAL\\Domain Admins",
+            "CADRE.LOCAL\\Enterprise Admins"
+          ],
+          "Write Property Enroll": [
+            "CADRE.LOCAL\\Domain Admins",
+            "CADRE.LOCAL\\Domain Controllers",
+            "CADRE.LOCAL\\Enterprise Admins",
+            "CADRE.LOCAL\\Enterprise Domain Controllers"
+          ]
+        }
+      },
+      "[+] User Enrollable Principals": [
+        "CADRE.LOCAL\\Enterprise Admins",
+        "CADRE.LOCAL\\Domain Admins"
+      ],
+      "[+] User ACL Principals": [
+        "CADRE.LOCAL\\Enterprise Admins"
+      ],
+      "[!] Vulnerabilities": {
+        "ESC4": "Template is owned by user."
+      },
+      "[*] Remarks": {
+        "ESC2 Target Template": "Template can be targeted as part of ESC2 exploitation. This is not a vulnerability by itself. See the wiki for more details. Template has schema version 1.",
+        "ESC3 Target Template": "Template can be targeted as part of ESC3 exploitation. This is not a vulnerability by itself. See the wiki for more details. Template has schema version 1."
+      }
+    },
+    "19": {
+      "Template Name": "Machine",
+      "Display Name": "Computer",
+      "Certificate Authorities": [
+        "cadre-CA"
+      ],
+      "Enabled": true,
+      "Client Authentication": true,
+      "Enrollment Agent": false,
+      "Any Purpose": false,
+      "Enrollee Supplies Subject": false,
+      "Certificate Name Flag": [
+        134217728,
+        268435456
+      ],
+      "Enrollment Flag": [
+        32
+      ],
+      "Extended Key Usage": [
+        "Client Authentication",
+        "Server Authentication"
+      ],
+      "Requires Manager Approval": false,
+      "Requires Key Archival": false,
+      "Authorized Signatures Required": 0,
+      "Schema Version": 1,
+      "Validity Period": "1 year",
+      "Renewal Period": "6 weeks",
+      "Minimum RSA Key Length": 2048,
+      "Template Created": "2026-05-20 11:41:25+00:00",
+      "Template Last Modified": "2026-05-20 11:41:25+00:00",
+      "Permissions": {
+        "Enrollment Permissions": {
+          "Enrollment Rights": [
+            "CADRE.LOCAL\\Domain Admins",
+            "CADRE.LOCAL\\Domain Computers",
+            "CADRE.LOCAL\\Enterprise Admins"
+          ]
+        },
+        "Object Control Permissions": {
+          "Owner": "CADRE.LOCAL\\Enterprise Admins",
+          "Full Control Principals": [
+            "CADRE.LOCAL\\Domain Admins",
+            "CADRE.LOCAL\\Enterprise Admins"
+          ],
+          "Write Owner Principals": [
+            "CADRE.LOCAL\\Domain Admins",
+            "CADRE.LOCAL\\Enterprise Admins"
+          ],
+          "Write Dacl Principals": [
+            "CADRE.LOCAL\\Domain Admins",
+            "CADRE.LOCAL\\Enterprise Admins"
+          ],
+          "Write Property Enroll": [
+            "CADRE.LOCAL\\Domain Admins",
+            "CADRE.LOCAL\\Domain Computers",
+            "CADRE.LOCAL\\Enterprise Admins"
+          ]
+        }
+      },
+      "[+] User Enrollable Principals": [
+        "CADRE.LOCAL\\Enterprise Admins",
+        "CADRE.LOCAL\\Domain Computers",
+        "CADRE.LOCAL\\Domain Admins"
+      ],
+      "[+] User ACL Principals": [
+        "CADRE.LOCAL\\Enterprise Admins"
+      ],
+      "[!] Vulnerabilities": {
+        "ESC4": "Template is owned by user."
+      },
+      "[*] Remarks": {
+        "ESC2 Target Template": "Template can be targeted as part of ESC2 exploitation. This is not a vulnerability by itself. See the wiki for more details. Template has schema version 1.",
+        "ESC3 Target Template": "Template can be targeted as part of ESC3 exploitation. This is not a vulnerability by itself. See the wiki for more details. Template has schema version 1."
+      }
+    },
+    "20": {
+      "Template Name": "MachineEnrollmentAgent",
+      "Display Name": "Enrollment Agent (Computer)",
+      "Enabled": false,
+      "Client Authentication": false,
+      "Enrollment Agent": true,
+      "Any Purpose": false,
+      "Enrollee Supplies Subject": false,
+      "Certificate Name Flag": [
+        134217728,
+        268435456
+      ],
+      "Enrollment Flag": [
+        32
+      ],
+      "Extended Key Usage": [
+        "Certificate Request Agent"
+      ],
+      "Requires Manager Approval": false,
+      "Requires Key Archival": false,
+      "Authorized Signatures Required": 0,
+      "Schema Version": 1,
+      "Validity Period": "2 years",
+      "Renewal Period": "6 weeks",
+      "Minimum RSA Key Length": 2048,
+      "Template Created": "2026-05-20 11:41:25+00:00",
+      "Template Last Modified": "2026-05-20 11:41:25+00:00",
+      "Permissions": {
+        "Enrollment Permissions": {
+          "Enrollment Rights": [
+            "CADRE.LOCAL\\Domain Admins",
+            "CADRE.LOCAL\\Enterprise Admins"
+          ]
+        },
+        "Object Control Permissions": {
+          "Owner": "CADRE.LOCAL\\Enterprise Admins",
+          "Full Control Principals": [
+            "CADRE.LOCAL\\Domain Admins",
+            "CADRE.LOCAL\\Enterprise Admins"
+          ],
+          "Write Owner Principals": [
+            "CADRE.LOCAL\\Domain Admins",
+            "CADRE.LOCAL\\Enterprise Admins"
+          ],
+          "Write Dacl Principals": [
+            "CADRE.LOCAL\\Domain Admins",
+            "CADRE.LOCAL\\Enterprise Admins"
+          ],
+          "Write Property Enroll": [
+            "CADRE.LOCAL\\Domain Admins",
+            "CADRE.LOCAL\\Enterprise Admins"
+          ]
+        }
+      },
+      "[+] User ACL Principals": [
+        "CADRE.LOCAL\\Enterprise Admins"
+      ],
+      "[!] Vulnerabilities": {
+        "ESC4": "Template is owned by user."
+      }
+    },
+    "21": {
+      "Template Name": "EnrollmentAgentOffline",
+      "Display Name": "Exchange Enrollment Agent (Offline request)",
+      "Enabled": false,
+      "Client Authentication": false,
+      "Enrollment Agent": true,
+      "Any Purpose": false,
+      "Enrollee Supplies Subject": true,
+      "Certificate Name Flag": [
+        1
+      ],
+      "Extended Key Usage": [
+        "Certificate Request Agent"
+      ],
+      "Requires Manager Approval": false,
+      "Requires Key Archival": false,
+      "Authorized Signatures Required": 0,
+      "Schema Version": 1,
+      "Validity Period": "2 years",
+      "Renewal Period": "6 weeks",
+      "Minimum RSA Key Length": 2048,
+      "Template Created": "2026-05-20 11:41:25+00:00",
+      "Template Last Modified": "2026-05-20 11:41:25+00:00",
+      "Permissions": {
+        "Enrollment Permissions": {
+          "Enrollment Rights": [
+            "CADRE.LOCAL\\Domain Admins",
+            "CADRE.LOCAL\\Enterprise Admins"
+          ]
+        },
+        "Object Control Permissions": {
+          "Owner": "CADRE.LOCAL\\Enterprise Admins",
+          "Full Control Principals": [
+            "CADRE.LOCAL\\Domain Admins",
+            "CADRE.LOCAL\\Enterprise Admins"
+          ],
+          "Write Owner Principals": [
+            "CADRE.LOCAL\\Domain Admins",
+            "CADRE.LOCAL\\Enterprise Admins"
+          ],
+          "Write Dacl Principals": [
+            "CADRE.LOCAL\\Domain Admins",
+            "CADRE.LOCAL\\Enterprise Admins"
+          ],
+          "Write Property Enroll": [
+            "CADRE.LOCAL\\Domain Admins",
+            "CADRE.LOCAL\\Enterprise Admins"
+          ]
+        }
+      },
+      "[+] User ACL Principals": [
+        "CADRE.LOCAL\\Enterprise Admins"
+      ],
+      "[!] Vulnerabilities": {
+        "ESC4": "Template is owned by user."
+      }
+    },
+    "22": {
+      "Template Name": "EnrollmentAgent",
+      "Display Name": "Enrollment Agent",
+      "Enabled": false,
+      "Client Authentication": false,
+      "Enrollment Agent": true,
+      "Any Purpose": false,
+      "Enrollee Supplies Subject": false,
+      "Certificate Name Flag": [
+        33554432,
+        2147483648
+      ],
+      "Enrollment Flag": [
+        32
+      ],
+      "Extended Key Usage": [
+        "Certificate Request Agent"
+      ],
+      "Requires Manager Approval": false,
+      "Requires Key Archival": false,
+      "Authorized Signatures Required": 0,
+      "Schema Version": 1,
+      "Validity Period": "2 years",
+      "Renewal Period": "6 weeks",
+      "Minimum RSA Key Length": 2048,
+      "Template Created": "2026-05-20 11:41:25+00:00",
+      "Template Last Modified": "2026-05-20 11:41:25+00:00",
+      "Permissions": {
+        "Enrollment Permissions": {
+          "Enrollment Rights": [
+            "CADRE.LOCAL\\Domain Admins",
+            "CADRE.LOCAL\\Enterprise Admins"
+          ]
+        },
+        "Object Control Permissions": {
+          "Owner": "CADRE.LOCAL\\Enterprise Admins",
+          "Full Control Principals": [
+            "CADRE.LOCAL\\Domain Admins",
+            "CADRE.LOCAL\\Enterprise Admins"
+          ],
+          "Write Owner Principals": [
+            "CADRE.LOCAL\\Domain Admins",
+            "CADRE.LOCAL\\Enterprise Admins"
+          ],
+          "Write Dacl Principals": [
+            "CADRE.LOCAL\\Domain Admins",
+            "CADRE.LOCAL\\Enterprise Admins"
+          ],
+          "Write Property Enroll": [
+            "CADRE.LOCAL\\Domain Admins",
+            "CADRE.LOCAL\\Enterprise Admins"
+          ]
+        }
+      },
+      "[+] User ACL Principals": [
+        "CADRE.LOCAL\\Enterprise Admins"
+      ],
+      "[!] Vulnerabilities": {
+        "ESC4": "Template is owned by user."
+      }
+    },
+    "23": {
+      "Template Name": "CTLSigning",
+      "Display Name": "Trust List Signing",
+      "Enabled": false,
+      "Client Authentication": false,
+      "Enrollment Agent": false,
+      "Any Purpose": false,
+      "Enrollee Supplies Subject": false,
+      "Certificate Name Flag": [
+        33554432,
+        2147483648
+      ],
+      "Enrollment Flag": [
+        32
+      ],
+      "Extended Key Usage": [
+        "Microsoft Trust List Signing"
+      ],
+      "Requires Manager Approval": false,
+      "Requires Key Archival": false,
+      "Authorized Signatures Required": 0,
+      "Schema Version": 1,
+      "Validity Period": "1 year",
+      "Renewal Period": "6 weeks",
+      "Minimum RSA Key Length": 2048,
+      "Template Created": "2026-05-20 11:41:25+00:00",
+      "Template Last Modified": "2026-05-20 11:41:25+00:00",
+      "Permissions": {
+        "Enrollment Permissions": {
+          "Enrollment Rights": [
+            "CADRE.LOCAL\\Domain Admins",
+            "CADRE.LOCAL\\Enterprise Admins"
+          ]
+        },
+        "Object Control Permissions": {
+          "Owner": "CADRE.LOCAL\\Enterprise Admins",
+          "Full Control Principals": [
+            "CADRE.LOCAL\\Domain Admins",
+            "CADRE.LOCAL\\Enterprise Admins"
+          ],
+          "Write Owner Principals": [
+            "CADRE.LOCAL\\Domain Admins",
+            "CADRE.LOCAL\\Enterprise Admins"
+          ],
+          "Write Dacl Principals": [
+            "CADRE.LOCAL\\Domain Admins",
+            "CADRE.LOCAL\\Enterprise Admins"
+          ],
+          "Write Property Enroll": [
+            "CADRE.LOCAL\\Domain Admins",
+            "CADRE.LOCAL\\Enterprise Admins"
+          ]
+        }
+      },
+      "[+] User ACL Principals": [
+        "CADRE.LOCAL\\Enterprise Admins"
+      ],
+      "[!] Vulnerabilities": {
+        "ESC4": "Template is owned by user."
+      }
+    },
+    "24": {
+      "Template Name": "CodeSigning",
+      "Display Name": "Code Signing",
+      "Enabled": false,
+      "Client Authentication": false,
+      "Enrollment Agent": false,
+      "Any Purpose": false,
+      "Enrollee Supplies Subject": false,
+      "Certificate Name Flag": [
+        33554432,
+        2147483648
+      ],
+      "Enrollment Flag": [
+        32
+      ],
+      "Extended Key Usage": [
+        "Code Signing"
+      ],
+      "Requires Manager Approval": false,
+      "Requires Key Archival": false,
+      "Authorized Signatures Required": 0,
+      "Schema Version": 1,
+      "Validity Period": "1 year",
+      "Renewal Period": "6 weeks",
+      "Minimum RSA Key Length": 2048,
+      "Template Created": "2026-05-20 11:41:25+00:00",
+      "Template Last Modified": "2026-05-20 11:41:25+00:00",
+      "Permissions": {
+        "Enrollment Permissions": {
+          "Enrollment Rights": [
+            "CADRE.LOCAL\\Domain Admins",
+            "CADRE.LOCAL\\Enterprise Admins"
+          ]
+        },
+        "Object Control Permissions": {
+          "Owner": "CADRE.LOCAL\\Enterprise Admins",
+          "Full Control Principals": [
+            "CADRE.LOCAL\\Domain Admins",
+            "CADRE.LOCAL\\Enterprise Admins"
+          ],
+          "Write Owner Principals": [
+            "CADRE.LOCAL\\Domain Admins",
+            "CADRE.LOCAL\\Enterprise Admins"
+          ],
+          "Write Dacl Principals": [
+            "CADRE.LOCAL\\Domain Admins",
+            "CADRE.LOCAL\\Enterprise Admins"
+          ],
+          "Write Property Enroll": [
+            "CADRE.LOCAL\\Domain Admins",
+            "CADRE.LOCAL\\Enterprise Admins"
+          ]
+        }
+      },
+      "[+] User ACL Principals": [
+        "CADRE.LOCAL\\Enterprise Admins"
+      ],
+      "[!] Vulnerabilities": {
+        "ESC4": "Template is owned by user."
+      }
+    },
+    "25": {
+      "Template Name": "EFSRecovery",
+      "Display Name": "EFS Recovery Agent",
+      "Certificate Authorities": [
+        "cadre-CA"
+      ],
+      "Enabled": true,
+      "Client Authentication": false,
+      "Enrollment Agent": false,
+      "Any Purpose": false,
+      "Enrollee Supplies Subject": false,
+      "Certificate Name Flag": [
+        33554432,
+        2147483648
+      ],
+      "Enrollment Flag": [
+        1,
+        32
+      ],
+      "Private Key Flag": [
+        16
+      ],
+      "Extended Key Usage": [
+        "File Recovery"
+      ],
+      "Requires Manager Approval": false,
+      "Requires Key Archival": false,
+      "Authorized Signatures Required": 0,
+      "Schema Version": 1,
+      "Validity Period": "5 years",
+      "Renewal Period": "6 weeks",
+      "Minimum RSA Key Length": 2048,
+      "Template Created": "2026-05-20 11:41:25+00:00",
+      "Template Last Modified": "2026-05-20 11:41:25+00:00",
+      "Permissions": {
+        "Enrollment Permissions": {
+          "Enrollment Rights": [
+            "CADRE.LOCAL\\Domain Admins",
+            "CADRE.LOCAL\\Enterprise Admins"
+          ]
+        },
+        "Object Control Permissions": {
+          "Owner": "CADRE.LOCAL\\Enterprise Admins",
+          "Full Control Principals": [
+            "CADRE.LOCAL\\Domain Admins",
+            "CADRE.LOCAL\\Enterprise Admins"
+          ],
+          "Write Owner Principals": [
+            "CADRE.LOCAL\\Domain Admins",
+            "CADRE.LOCAL\\Enterprise Admins"
+          ],
+          "Write Dacl Principals": [
+            "CADRE.LOCAL\\Domain Admins",
+            "CADRE.LOCAL\\Enterprise Admins"
+          ],
+          "Write Property Enroll": [
+            "CADRE.LOCAL\\Domain Admins",
+            "CADRE.LOCAL\\Enterprise Admins"
+          ]
+        }
+      },
+      "[+] User Enrollable Principals": [
+        "CADRE.LOCAL\\Enterprise Admins",
+        "CADRE.LOCAL\\Domain Admins"
+      ],
+      "[+] User ACL Principals": [
+        "CADRE.LOCAL\\Enterprise Admins"
+      ],
+      "[!] Vulnerabilities": {
+        "ESC4": "Template is owned by user."
+      }
+    },
+    "26": {
+      "Template Name": "Administrator",
+      "Display Name": "Administrator",
+      "Certificate Authorities": [
+        "cadre-CA"
+      ],
+      "Enabled": true,
+      "Client Authentication": true,
+      "Enrollment Agent": false,
+      "Any Purpose": false,
+      "Enrollee Supplies Subject": false,
+      "Certificate Name Flag": [
+        33554432,
+        67108864,
+        536870912,
+        2147483648
+      ],
+      "Enrollment Flag": [
+        1,
+        8,
+        32
+      ],
+      "Private Key Flag": [
+        16
+      ],
+      "Extended Key Usage": [
+        "Microsoft Trust List Signing",
+        "Encrypting File System",
+        "Secure Email",
+        "Client Authentication"
+      ],
+      "Requires Manager Approval": false,
+      "Requires Key Archival": false,
+      "Authorized Signatures Required": 0,
+      "Schema Version": 1,
+      "Validity Period": "1 year",
+      "Renewal Period": "6 weeks",
+      "Minimum RSA Key Length": 2048,
+      "Template Created": "2026-05-20 11:41:25+00:00",
+      "Template Last Modified": "2026-05-20 11:41:25+00:00",
+      "Permissions": {
+        "Enrollment Permissions": {
+          "Enrollment Rights": [
+            "CADRE.LOCAL\\Domain Admins",
+            "CADRE.LOCAL\\Enterprise Admins"
+          ]
+        },
+        "Object Control Permissions": {
+          "Owner": "CADRE.LOCAL\\Enterprise Admins",
+          "Full Control Principals": [
+            "CADRE.LOCAL\\Domain Admins",
+            "CADRE.LOCAL\\Enterprise Admins"
+          ],
+          "Write Owner Principals": [
+            "CADRE.LOCAL\\Domain Admins",
+            "CADRE.LOCAL\\Enterprise Admins"
+          ],
+          "Write Dacl Principals": [
+            "CADRE.LOCAL\\Domain Admins",
+            "CADRE.LOCAL\\Enterprise Admins"
+          ],
+          "Write Property Enroll": [
+            "CADRE.LOCAL\\Domain Admins",
+            "CADRE.LOCAL\\Enterprise Admins"
+          ]
+        }
+      },
+      "[+] User Enrollable Principals": [
+        "CADRE.LOCAL\\Enterprise Admins",
+        "CADRE.LOCAL\\Domain Admins"
+      ],
+      "[+] User ACL Principals": [
+        "CADRE.LOCAL\\Enterprise Admins"
+      ],
+      "[!] Vulnerabilities": {
+        "ESC4": "Template is owned by user."
+      },
+      "[*] Remarks": {
+        "ESC2 Target Template": "Template can be targeted as part of ESC2 exploitation. This is not a vulnerability by itself. See the wiki for more details. Template has schema version 1.",
+        "ESC3 Target Template": "Template can be targeted as part of ESC3 exploitation. This is not a vulnerability by itself. See the wiki for more details. Template has schema version 1."
+      }
+    },
+    "27": {
+      "Template Name": "EFS",
+      "Display Name": "Basic EFS",
+      "Certificate Authorities": [
+        "cadre-CA"
+      ],
+      "Enabled": true,
+      "Client Authentication": false,
+      "Enrollment Agent": false,
+      "Any Purpose": false,
+      "Enrollee Supplies Subject": false,
+      "Certificate Name Flag": [
+        33554432,
+        2147483648
+      ],
+      "Enrollment Flag": [
+        1,
+        8,
+        32
+      ],
+      "Private Key Flag": [
+        16
+      ],
+      "Extended Key Usage": [
+        "Encrypting File System"
+      ],
+      "Requires Manager Approval": false,
+      "Requires Key Archival": false,
+      "Authorized Signatures Required": 0,
+      "Schema Version": 1,
+      "Validity Period": "1 year",
+      "Renewal Period": "6 weeks",
+      "Minimum RSA Key Length": 2048,
+      "Template Created": "2026-05-20 11:41:25+00:00",
+      "Template Last Modified": "2026-05-20 11:41:25+00:00",
+      "Permissions": {
+        "Enrollment Permissions": {
+          "Enrollment Rights": [
+            "CADRE.LOCAL\\Domain Admins",
+            "CADRE.LOCAL\\Domain Users",
+            "CADRE.LOCAL\\Enterprise Admins"
+          ]
+        },
+        "Object Control Permissions": {
+          "Owner": "CADRE.LOCAL\\Enterprise Admins",
+          "Full Control Principals": [
+            "CADRE.LOCAL\\Domain Admins",
+            "CADRE.LOCAL\\Enterprise Admins"
+          ],
+          "Write Owner Principals": [
+            "CADRE.LOCAL\\Domain Admins",
+            "CADRE.LOCAL\\Enterprise Admins"
+          ],
+          "Write Dacl Principals": [
+            "CADRE.LOCAL\\Domain Admins",
+            "CADRE.LOCAL\\Enterprise Admins"
+          ],
+          "Write Property Enroll": [
+            "CADRE.LOCAL\\Domain Admins",
+            "CADRE.LOCAL\\Domain Users",
+            "CADRE.LOCAL\\Enterprise Admins"
+          ]
+        }
+      },
+      "[+] User Enrollable Principals": [
+        "CADRE.LOCAL\\Domain Users",
+        "CADRE.LOCAL\\Enterprise Admins",
+        "CADRE.LOCAL\\Domain Admins"
+      ],
+      "[+] User ACL Principals": [
+        "CADRE.LOCAL\\Enterprise Admins"
+      ],
+      "[!] Vulnerabilities": {
+        "ESC4": "Template is owned by user."
+      }
+    },
+    "28": {
+      "Template Name": "SmartcardLogon",
+      "Display Name": "Smartcard Logon",
+      "Enabled": false,
+      "Client Authentication": true,
+      "Enrollment Agent": false,
+      "Any Purpose": false,
+      "Enrollee Supplies Subject": false,
+      "Certificate Name Flag": [
+        33554432,
+        2147483648
+      ],
+      "Extended Key Usage": [
+        "Client Authentication",
+        "Smart Card Logon"
+      ],
+      "Requires Manager Approval": false,
+      "Requires Key Archival": false,
+      "Authorized Signatures Required": 0,
+      "Schema Version": 1,
+      "Validity Period": "1 year",
+      "Renewal Period": "6 weeks",
+      "Minimum RSA Key Length": 2048,
+      "Template Created": "2026-05-20 11:41:25+00:00",
+      "Template Last Modified": "2026-05-20 11:41:25+00:00",
+      "Permissions": {
+        "Enrollment Permissions": {
+          "Enrollment Rights": [
+            "CADRE.LOCAL\\Domain Admins",
+            "CADRE.LOCAL\\Enterprise Admins"
+          ]
+        },
+        "Object Control Permissions": {
+          "Owner": "CADRE.LOCAL\\Enterprise Admins",
+          "Full Control Principals": [
+            "CADRE.LOCAL\\Domain Admins",
+            "CADRE.LOCAL\\Enterprise Admins"
+          ],
+          "Write Owner Principals": [
+            "CADRE.LOCAL\\Domain Admins",
+            "CADRE.LOCAL\\Enterprise Admins"
+          ],
+          "Write Dacl Principals": [
+            "CADRE.LOCAL\\Domain Admins",
+            "CADRE.LOCAL\\Enterprise Admins"
+          ],
+          "Write Property Enroll": [
+            "CADRE.LOCAL\\Domain Admins",
+            "CADRE.LOCAL\\Enterprise Admins"
+          ]
+        }
+      },
+      "[+] User ACL Principals": [
+        "CADRE.LOCAL\\Enterprise Admins"
+      ],
+      "[!] Vulnerabilities": {
+        "ESC4": "Template is owned by user."
+      }
+    },
+    "29": {
+      "Template Name": "ClientAuth",
+      "Display Name": "Authenticated Session",
+      "Enabled": false,
+      "Client Authentication": true,
+      "Enrollment Agent": false,
+      "Any Purpose": false,
+      "Enrollee Supplies Subject": false,
+      "Certificate Name Flag": [
+        33554432,
+        2147483648
+      ],
+      "Enrollment Flag": [
+        32
+      ],
+      "Extended Key Usage": [
+        "Client Authentication"
+      ],
+      "Requires Manager Approval": false,
+      "Requires Key Archival": false,
+      "Authorized Signatures Required": 0,
+      "Schema Version": 1,
+      "Validity Period": "1 year",
+      "Renewal Period": "6 weeks",
+      "Minimum RSA Key Length": 2048,
+      "Template Created": "2026-05-20 11:41:25+00:00",
+      "Template Last Modified": "2026-05-20 11:41:25+00:00",
+      "Permissions": {
+        "Enrollment Permissions": {
+          "Enrollment Rights": [
+            "CADRE.LOCAL\\Domain Admins",
+            "CADRE.LOCAL\\Domain Users",
+            "CADRE.LOCAL\\Enterprise Admins"
+          ]
+        },
+        "Object Control Permissions": {
+          "Owner": "CADRE.LOCAL\\Enterprise Admins",
+          "Full Control Principals": [
+            "CADRE.LOCAL\\Domain Admins",
+            "CADRE.LOCAL\\Enterprise Admins"
+          ],
+          "Write Owner Principals": [
+            "CADRE.LOCAL\\Domain Admins",
+            "CADRE.LOCAL\\Enterprise Admins"
+          ],
+          "Write Dacl Principals": [
+            "CADRE.LOCAL\\Domain Admins",
+            "CADRE.LOCAL\\Enterprise Admins"
+          ],
+          "Write Property Enroll": [
+            "CADRE.LOCAL\\Domain Admins",
+            "CADRE.LOCAL\\Domain Users",
+            "CADRE.LOCAL\\Enterprise Admins"
+          ]
+        }
+      },
+      "[+] User ACL Principals": [
+        "CADRE.LOCAL\\Enterprise Admins"
+      ],
+      "[!] Vulnerabilities": {
+        "ESC4": "Template is owned by user."
+      }
+    },
+    "30": {
+      "Template Name": "SmartcardUser",
+      "Display Name": "Smartcard User",
+      "Enabled": false,
+      "Client Authentication": true,
+      "Enrollment Agent": false,
+      "Any Purpose": false,
+      "Enrollee Supplies Subject": false,
+      "Certificate Name Flag": [
+        33554432,
+        67108864,
+        536870912,
+        2147483648
+      ],
+      "Enrollment Flag": [
+        1,
+        8
+      ],
+      "Extended Key Usage": [
+        "Secure Email",
+        "Client Authentication",
+        "Smart Card Logon"
+      ],
+      "Requires Manager Approval": false,
+      "Requires Key Archival": false,
+      "Authorized Signatures Required": 0,
+      "Schema Version": 1,
+      "Validity Period": "1 year",
+      "Renewal Period": "6 weeks",
+      "Minimum RSA Key Length": 2048,
+      "Template Created": "2026-05-20 11:41:25+00:00",
+      "Template Last Modified": "2026-05-20 11:41:25+00:00",
+      "Permissions": {
+        "Enrollment Permissions": {
+          "Enrollment Rights": [
+            "CADRE.LOCAL\\Domain Admins",
+            "CADRE.LOCAL\\Enterprise Admins"
+          ]
+        },
+        "Object Control Permissions": {
+          "Owner": "CADRE.LOCAL\\Enterprise Admins",
+          "Full Control Principals": [
+            "CADRE.LOCAL\\Domain Admins",
+            "CADRE.LOCAL\\Enterprise Admins"
+          ],
+          "Write Owner Principals": [
+            "CADRE.LOCAL\\Domain Admins",
+            "CADRE.LOCAL\\Enterprise Admins"
+          ],
+          "Write Dacl Principals": [
+            "CADRE.LOCAL\\Domain Admins",
+            "CADRE.LOCAL\\Enterprise Admins"
+          ],
+          "Write Property Enroll": [
+            "CADRE.LOCAL\\Domain Admins",
+            "CADRE.LOCAL\\Enterprise Admins"
+          ]
+        }
+      },
+      "[+] User ACL Principals": [
+        "CADRE.LOCAL\\Enterprise Admins"
+      ],
+      "[!] Vulnerabilities": {
+        "ESC4": "Template is owned by user."
+      }
+    },
+    "31": {
+      "Template Name": "UserSignature",
+      "Display Name": "User Signature Only",
+      "Enabled": false,
+      "Client Authentication": true,
+      "Enrollment Agent": false,
+      "Any Purpose": false,
+      "Enrollee Supplies Subject": false,
+      "Certificate Name Flag": [
+        33554432,
+        67108864,
+        536870912,
+        2147483648
+      ],
+      "Enrollment Flag": [
+        32
+      ],
+      "Extended Key Usage": [
+        "Secure Email",
+        "Client Authentication"
+      ],
+      "Requires Manager Approval": false,
+      "Requires Key Archival": false,
+      "Authorized Signatures Required": 0,
+      "Schema Version": 1,
+      "Validity Period": "1 year",
+      "Renewal Period": "6 weeks",
+      "Minimum RSA Key Length": 2048,
+      "Template Created": "2026-05-20 11:41:25+00:00",
+      "Template Last Modified": "2026-05-20 11:41:25+00:00",
+      "Permissions": {
+        "Enrollment Permissions": {
+          "Enrollment Rights": [
+            "CADRE.LOCAL\\Domain Admins",
+            "CADRE.LOCAL\\Domain Users",
+            "CADRE.LOCAL\\Enterprise Admins"
+          ]
+        },
+        "Object Control Permissions": {
+          "Owner": "CADRE.LOCAL\\Enterprise Admins",
+          "Full Control Principals": [
+            "CADRE.LOCAL\\Domain Admins",
+            "CADRE.LOCAL\\Enterprise Admins"
+          ],
+          "Write Owner Principals": [
+            "CADRE.LOCAL\\Domain Admins",
+            "CADRE.LOCAL\\Enterprise Admins"
+          ],
+          "Write Dacl Principals": [
+            "CADRE.LOCAL\\Domain Admins",
+            "CADRE.LOCAL\\Enterprise Admins"
+          ],
+          "Write Property Enroll": [
+            "CADRE.LOCAL\\Domain Admins",
+            "CADRE.LOCAL\\Domain Users",
+            "CADRE.LOCAL\\Enterprise Admins"
+          ]
+        }
+      },
+      "[+] User ACL Principals": [
+        "CADRE.LOCAL\\Enterprise Admins"
+      ],
+      "[!] Vulnerabilities": {
+        "ESC4": "Template is owned by user."
+      }
+    },
+    "32": {
+      "Template Name": "User",
+      "Display Name": "User",
+      "Certificate Authorities": [
+        "cadre-CA"
+      ],
+      "Enabled": true,
+      "Client Authentication": true,
+      "Enrollment Agent": false,
+      "Any Purpose": false,
+      "Enrollee Supplies Subject": false,
+      "Certificate Name Flag": [
+        33554432,
+        67108864,
+        536870912,
+        2147483648
+      ],
+      "Enrollment Flag": [
+        1,
+        8,
+        32
+      ],
+      "Private Key Flag": [
+        16
+      ],
+      "Extended Key Usage": [
+        "Encrypting File System",
+        "Secure Email",
+        "Client Authentication"
+      ],
+      "Requires Manager Approval": false,
+      "Requires Key Archival": false,
+      "Authorized Signatures Required": 0,
+      "Schema Version": 1,
+      "Validity Period": "1 year",
+      "Renewal Period": "6 weeks",
+      "Minimum RSA Key Length": 2048,
+      "Template Created": "2026-05-20 11:41:25+00:00",
+      "Template Last Modified": "2026-05-20 11:41:25+00:00",
+      "Permissions": {
+        "Enrollment Permissions": {
+          "Enrollment Rights": [
+            "CADRE.LOCAL\\Domain Admins",
+            "CADRE.LOCAL\\Domain Users",
+            "CADRE.LOCAL\\Enterprise Admins"
+          ]
+        },
+        "Object Control Permissions": {
+          "Owner": "CADRE.LOCAL\\Enterprise Admins",
+          "Full Control Principals": [
+            "CADRE.LOCAL\\Domain Admins",
+            "CADRE.LOCAL\\Enterprise Admins"
+          ],
+          "Write Owner Principals": [
+            "CADRE.LOCAL\\Domain Admins",
+            "CADRE.LOCAL\\Enterprise Admins"
+          ],
+          "Write Dacl Principals": [
+            "CADRE.LOCAL\\Domain Admins",
+            "CADRE.LOCAL\\Enterprise Admins"
+          ],
+          "Write Property Enroll": [
+            "CADRE.LOCAL\\Domain Admins",
+            "CADRE.LOCAL\\Domain Users",
+            "CADRE.LOCAL\\Enterprise Admins"
+          ]
+        }
+      },
+      "[+] User Enrollable Principals": [
+        "CADRE.LOCAL\\Domain Users",
+        "CADRE.LOCAL\\Enterprise Admins",
+        "CADRE.LOCAL\\Domain Admins"
+      ],
+      "[+] User ACL Principals": [
+        "CADRE.LOCAL\\Enterprise Admins"
+      ],
+      "[!] Vulnerabilities": {
+        "ESC4": "Template is owned by user."
+      },
+      "[*] Remarks": {
+        "ESC2 Target Template": "Template can be targeted as part of ESC2 exploitation. This is not a vulnerability by itself. See the wiki for more details. Template has schema version 1.",
+        "ESC3 Target Template": "Template can be targeted as part of ESC3 exploitation. This is not a vulnerability by itself. See the wiki for more details. Template has schema version 1."
+      }
+    },
+    "33": {
+      "Template Name": "CADRE-VSC",
+      "Display Name": "CADRE-VSC",
+      "Enabled": false,
+      "Client Authentication": true,
+      "Enrollment Agent": false,
+      "Any Purpose": false,
+      "Enrollee Supplies Subject": false,
+      "Certificate Name Flag": [
+        33554432,
+        2147483648
+      ],
+      "Enrollment Flag": [
+        256,
+        32
+      ],
+      "Extended Key Usage": [
+        "Smart Card Logon",
+        "Client Authentication"
+      ],
+      "Requires Manager Approval": false,
+      "Requires Key Archival": false,
+      "Authorized Signatures Required": 0,
+      "Schema Version": 2,
+      "Validity Period": "1 year",
+      "Renewal Period": "6 weeks",
+      "Minimum RSA Key Length": 2048,
+      "Template Created": "2026-05-21 19:19:21+00:00",
+      "Template Last Modified": "2026-05-21 19:19:38+00:00",
+      "Permissions": {
+        "Enrollment Permissions": {
+          "Enrollment Rights": [
+            "CADRE.LOCAL\\Domain Admins",
+            "CADRE.LOCAL\\Enterprise Admins"
+          ]
+        },
+        "Object Control Permissions": {
+          "Owner": "CADRE.LOCAL\\Administrator",
+          "Full Control Principals": [
+            "CADRE.LOCAL\\Domain Admins",
+            "CADRE.LOCAL\\Enterprise Admins"
+          ],
+          "Write Owner Principals": [
+            "CADRE.LOCAL\\Domain Admins",
+            "CADRE.LOCAL\\Enterprise Admins"
+          ],
+          "Write Dacl Principals": [
+            "CADRE.LOCAL\\Domain Admins",
+            "CADRE.LOCAL\\Enterprise Admins"
+          ],
+          "Write Property Enroll": [
+            "CADRE.LOCAL\\Domain Admins",
+            "CADRE.LOCAL\\Enterprise Admins"
+          ]
+        }
+      },
+      "[+] User ACL Principals": [
+        "CADRE.LOCAL\\Enterprise Admins",
+        "CADRE.LOCAL\\Domain Admins"
+      ],
+      "[!] Vulnerabilities": {
+        "ESC4": "User has dangerous permissions."
+      }
+    },
+    "34": {
+      "Template Name": "CADRE-ESC14",
+      "Display Name": "CADRE-ESC14",
+      "Certificate Authorities": [
+        "cadre-CA"
+      ],
+      "Enabled": true,
+      "Client Authentication": true,
+      "Enrollment Agent": false,
+      "Any Purpose": false,
+      "Enrollee Supplies Subject": false,
+      "Certificate Name Flag": [
+        33554432,
+        67108864,
+        536870912,
+        2147483648
+      ],
+      "Enrollment Flag": [
+        1,
+        8,
+        32
+      ],
+      "Private Key Flag": [
+        16
+      ],
+      "Extended Key Usage": [
+        "Client Authentication",
+        "Secure Email",
+        "Encrypting File System"
+      ],
+      "Requires Manager Approval": false,
+      "Requires Key Archival": false,
+      "Authorized Signatures Required": 0,
+      "Schema Version": 2,
+      "Validity Period": "1 year",
+      "Renewal Period": "6 weeks",
+      "Minimum RSA Key Length": 2048,
+      "Template Created": "2026-05-20 17:03:50+00:00",
+      "Template Last Modified": "2026-05-20 17:03:51+00:00",
+      "Permissions": {
+        "Enrollment Permissions": {
+          "Enrollment Rights": [
+            "CADRE.LOCAL\\Domain Admins",
+            "CADRE.LOCAL\\Domain Users",
+            "CADRE.LOCAL\\Enterprise Admins"
+          ]
+        },
+        "Object Control Permissions": {
+          "Owner": "CADRE.LOCAL\\Administrator",
+          "Full Control Principals": [
+            "CADRE.LOCAL\\Domain Admins",
+            "CADRE.LOCAL\\Enterprise Admins"
+          ],
+          "Write Owner Principals": [
+            "CADRE.LOCAL\\Domain Admins",
+            "CADRE.LOCAL\\Enterprise Admins"
+          ],
+          "Write Dacl Principals": [
+            "CADRE.LOCAL\\Domain Admins",
+            "CADRE.LOCAL\\Enterprise Admins"
+          ],
+          "Write Property Enroll": [
+            "CADRE.LOCAL\\Domain Admins",
+            "CADRE.LOCAL\\Domain Users",
+            "CADRE.LOCAL\\Enterprise Admins"
+          ]
+        }
+      },
+      "[+] User Enrollable Principals": [
+        "CADRE.LOCAL\\Domain Users",
+        "CADRE.LOCAL\\Enterprise Admins",
+        "CADRE.LOCAL\\Domain Admins"
+      ],
+      "[+] User ACL Principals": [
+        "CADRE.LOCAL\\Enterprise Admins",
+        "CADRE.LOCAL\\Domain Admins"
+      ],
+      "[!] Vulnerabilities": {
+        "ESC4": "User has dangerous permissions."
+      }
+    },
+    "35": {
+      "Template Name": "CADRE-ESC13",
+      "Display Name": "CADRE-ESC13",
+      "Certificate Authorities": [
+        "cadre-CA"
+      ],
+      "Enabled": true,
+      "Client Authentication": true,
+      "Enrollment Agent": false,
+      "Any Purpose": false,
+      "Enrollee Supplies Subject": false,
+      "Certificate Name Flag": [
+        33554432,
+        67108864,
+        536870912,
+        2147483648
+      ],
+      "Enrollment Flag": [
+        1,
+        8,
+        32
+      ],
+      "Private Key Flag": [
+        16
+      ],
+      "Extended Key Usage": [
+        "Client Authentication",
+        "Secure Email",
+        "Encrypting File System"
+      ],
+      "Requires Manager Approval": false,
+      "Requires Key Archival": false,
+      "Authorized Signatures Required": 0,
+      "Schema Version": 2,
+      "Validity Period": "1 year",
+      "Renewal Period": "6 weeks",
+      "Minimum RSA Key Length": 2048,
+      "Template Created": "2026-05-20 16:57:56+00:00",
+      "Template Last Modified": "2026-05-20 16:57:56+00:00",
+      "Issuance Policies": [
+        "1.3.6.1.4.1.311.21.55.1"
+      ],
+      "Permissions": {
+        "Enrollment Permissions": {
+          "Enrollment Rights": [
+            "CADRE.LOCAL\\Domain Admins",
+            "CADRE.LOCAL\\Domain Users",
+            "CADRE.LOCAL\\Enterprise Admins"
+          ]
+        },
+        "Object Control Permissions": {
+          "Owner": "CADRE.LOCAL\\Administrator",
+          "Full Control Principals": [
+            "CADRE.LOCAL\\Domain Admins",
+            "CADRE.LOCAL\\Enterprise Admins"
+          ],
+          "Write Owner Principals": [
+            "CADRE.LOCAL\\Domain Admins",
+            "CADRE.LOCAL\\Enterprise Admins"
+          ],
+          "Write Dacl Principals": [
+            "CADRE.LOCAL\\Domain Admins",
+            "CADRE.LOCAL\\Enterprise Admins"
+          ],
+          "Write Property Enroll": [
+            "CADRE.LOCAL\\Domain Admins",
+            "CADRE.LOCAL\\Domain Users",
+            "CADRE.LOCAL\\Enterprise Admins"
+          ]
+        }
+      },
+      "[+] User Enrollable Principals": [
+        "CADRE.LOCAL\\Domain Users",
+        "CADRE.LOCAL\\Enterprise Admins",
+        "CADRE.LOCAL\\Domain Admins"
+      ],
+      "[+] User ACL Principals": [
+        "CADRE.LOCAL\\Enterprise Admins",
+        "CADRE.LOCAL\\Domain Admins"
+      ],
+      "[!] Vulnerabilities": {
+        "ESC4": "User has dangerous permissions."
+      }
+    },
+    "36": {
+      "Template Name": "CADRE-ESC9",
+      "Display Name": "CADRE-ESC9",
+      "Certificate Authorities": [
+        "cadre-CA"
+      ],
+      "Enabled": true,
+      "Client Authentication": true,
+      "Enrollment Agent": false,
+      "Any Purpose": false,
+      "Enrollee Supplies Subject": true,
+      "Certificate Name Flag": [
+        1
+      ],
+      "Enrollment Flag": [
+        1,
+        8,
+        524288
+      ],
+      "Private Key Flag": [
+        16
+      ],
+      "Extended Key Usage": [
+        "Client Authentication",
+        "Secure Email",
+        "Encrypting File System"
+      ],
+      "Requires Manager Approval": false,
+      "Requires Key Archival": false,
+      "Authorized Signatures Required": 0,
+      "Schema Version": 2,
+      "Validity Period": "1 year",
+      "Renewal Period": "6 weeks",
+      "Minimum RSA Key Length": 2048,
+      "Template Created": "2026-05-20 16:52:33+00:00",
+      "Template Last Modified": "2026-05-20 17:10:30+00:00",
+      "Permissions": {
+        "Enrollment Permissions": {
+          "Enrollment Rights": [
+            "CADRE.LOCAL\\Domain Admins",
+            "CADRE.LOCAL\\Domain Users",
+            "CADRE.LOCAL\\Enterprise Admins"
+          ]
+        },
+        "Object Control Permissions": {
+          "Owner": "CADRE.LOCAL\\Administrator",
+          "Full Control Principals": [
+            "CADRE.LOCAL\\Domain Admins",
+            "CADRE.LOCAL\\Enterprise Admins"
+          ],
+          "Write Owner Principals": [
+            "CADRE.LOCAL\\Domain Admins",
+            "CADRE.LOCAL\\Enterprise Admins"
+          ],
+          "Write Dacl Principals": [
+            "CADRE.LOCAL\\Domain Admins",
+            "CADRE.LOCAL\\Enterprise Admins"
+          ],
+          "Write Property Enroll": [
+            "CADRE.LOCAL\\Domain Admins",
+            "CADRE.LOCAL\\Domain Users",
+            "CADRE.LOCAL\\Enterprise Admins"
+          ]
+        }
+      },
+      "[+] User Enrollable Principals": [
+        "CADRE.LOCAL\\Domain Users",
+        "CADRE.LOCAL\\Enterprise Admins",
+        "CADRE.LOCAL\\Domain Admins"
+      ],
+      "[+] User ACL Principals": [
+        "CADRE.LOCAL\\Enterprise Admins",
+        "CADRE.LOCAL\\Domain Admins"
+      ],
+      "[!] Vulnerabilities": {
+        "ESC1": "Enrollee supplies subject and template allows client authentication.",
+        "ESC9": "Template has no security extension.",
+        "ESC4": "User has dangerous permissions."
+      },
+      "[*] Remarks": {
+        "ESC9": "Other prerequisites may be required for this to be exploitable. See the wiki for more details."
+      }
+    },
+    "37": {
+      "Template Name": "CADRE-ESC4",
+      "Display Name": "CADRE-ESC4",
+      "Certificate Authorities": [
+        "cadre-CA"
+      ],
+      "Enabled": true,
+      "Client Authentication": true,
+      "Enrollment Agent": false,
+      "Any Purpose": false,
+      "Enrollee Supplies Subject": false,
+      "Certificate Name Flag": [
+        33554432,
+        67108864,
+        536870912,
+        2147483648
+      ],
+      "Enrollment Flag": [
+        1,
+        8,
+        32
+      ],
+      "Private Key Flag": [
+        16
+      ],
+      "Extended Key Usage": [
+        "Client Authentication",
+        "Secure Email",
+        "Encrypting File System"
+      ],
+      "Requires Manager Approval": false,
+      "Requires Key Archival": false,
+      "Authorized Signatures Required": 0,
+      "Schema Version": 2,
+      "Validity Period": "1 year",
+      "Renewal Period": "6 weeks",
+      "Minimum RSA Key Length": 2048,
+      "Template Created": "2026-05-20 16:50:33+00:00",
+      "Template Last Modified": "2026-05-20 16:51:34+00:00",
+      "Permissions": {
+        "Enrollment Permissions": {
+          "Enrollment Rights": [
+            "CADRE.LOCAL\\Domain Admins",
+            "CADRE.LOCAL\\Domain Users",
+            "CADRE.LOCAL\\Enterprise Admins"
+          ]
+        },
+        "Object Control Permissions": {
+          "Owner": "CADRE.LOCAL\\Administrator",
+          "Full Control Principals": [
+            "CADRE.LOCAL\\Domain Admins",
+            "CADRE.LOCAL\\Enterprise Admins",
+            "CADRE.LOCAL\\Engineering-Cadre"
+          ],
+          "Write Owner Principals": [
+            "CADRE.LOCAL\\Domain Admins",
+            "CADRE.LOCAL\\Enterprise Admins",
+            "CADRE.LOCAL\\Engineering-Cadre"
+          ],
+          "Write Dacl Principals": [
+            "CADRE.LOCAL\\Domain Admins",
+            "CADRE.LOCAL\\Enterprise Admins",
+            "CADRE.LOCAL\\Engineering-Cadre"
+          ],
+          "Write Property Enroll": [
+            "CADRE.LOCAL\\Domain Admins",
+            "CADRE.LOCAL\\Domain Users",
+            "CADRE.LOCAL\\Enterprise Admins"
+          ]
+        }
+      },
+      "[+] User Enrollable Principals": [
+        "CADRE.LOCAL\\Domain Users",
+        "CADRE.LOCAL\\Enterprise Admins",
+        "CADRE.LOCAL\\Domain Admins"
+      ],
+      "[+] User ACL Principals": [
+        "CADRE.LOCAL\\Enterprise Admins",
+        "CADRE.LOCAL\\Domain Admins"
+      ],
+      "[!] Vulnerabilities": {
+        "ESC4": "User has dangerous permissions."
+      }
+    },
+    "38": {
+      "Template Name": "CADRE-ESC3-Target",
+      "Display Name": "CADRE-ESC3-Target",
+      "Certificate Authorities": [
+        "cadre-CA"
+      ],
+      "Enabled": true,
+      "Client Authentication": true,
+      "Enrollment Agent": false,
+      "Any Purpose": false,
+      "Enrollee Supplies Subject": false,
+      "Certificate Name Flag": [
+        33554432,
+        67108864,
+        536870912,
+        2147483648
+      ],
+      "Enrollment Flag": [
+        1,
+        8,
+        32
+      ],
+      "Private Key Flag": [
+        16
+      ],
+      "Extended Key Usage": [
+        "Client Authentication",
+        "Secure Email",
+        "Encrypting File System"
+      ],
+      "Requires Manager Approval": false,
+      "Requires Key Archival": false,
+      "RA Application Policies": [
+        "Certificate Request Agent"
+      ],
+      "Authorized Signatures Required": 1,
+      "Schema Version": 2,
+      "Validity Period": "1 year",
+      "Renewal Period": "6 weeks",
+      "Minimum RSA Key Length": 2048,
+      "Template Created": "2026-05-20 16:49:34+00:00",
+      "Template Last Modified": "2026-05-20 16:51:27+00:00",
+      "Permissions": {
+        "Enrollment Permissions": {
+          "Enrollment Rights": [
+            "CADRE.LOCAL\\Domain Admins",
+            "CADRE.LOCAL\\Domain Users",
+            "CADRE.LOCAL\\Enterprise Admins"
+          ]
+        },
+        "Object Control Permissions": {
+          "Owner": "CADRE.LOCAL\\Administrator",
+          "Full Control Principals": [
+            "CADRE.LOCAL\\Domain Admins",
+            "CADRE.LOCAL\\Enterprise Admins"
+          ],
+          "Write Owner Principals": [
+            "CADRE.LOCAL\\Domain Admins",
+            "CADRE.LOCAL\\Enterprise Admins"
+          ],
+          "Write Dacl Principals": [
+            "CADRE.LOCAL\\Domain Admins",
+            "CADRE.LOCAL\\Enterprise Admins"
+          ],
+          "Write Property Enroll": [
+            "CADRE.LOCAL\\Domain Admins",
+            "CADRE.LOCAL\\Domain Users",
+            "CADRE.LOCAL\\Enterprise Admins"
+          ]
+        }
+      },
+      "[+] User Enrollable Principals": [
+        "CADRE.LOCAL\\Domain Users",
+        "CADRE.LOCAL\\Enterprise Admins",
+        "CADRE.LOCAL\\Domain Admins"
+      ],
+      "[+] User ACL Principals": [
+        "CADRE.LOCAL\\Enterprise Admins",
+        "CADRE.LOCAL\\Domain Admins"
+      ],
+      "[!] Vulnerabilities": {
+        "ESC4": "User has dangerous permissions."
+      },
+      "[*] Remarks": {
+        "ESC3 Target Template": "Template can be targeted as part of ESC3 exploitation. This is not a vulnerability by itself. See the wiki for more details. Template requires a signature with the Certificate Request Agent application policy."
+      }
+    },
+    "39": {
+      "Template Name": "CADRE-ESC3-Agent",
+      "Display Name": "CADRE-ESC3-Agent",
+      "Certificate Authorities": [
+        "cadre-CA"
+      ],
+      "Enabled": true,
+      "Client Authentication": true,
+      "Enrollment Agent": true,
+      "Any Purpose": false,
+      "Enrollee Supplies Subject": false,
+      "Certificate Name Flag": [
+        33554432,
+        67108864,
+        536870912,
+        2147483648
+      ],
+      "Enrollment Flag": [
+        1,
+        8,
+        32
+      ],
+      "Private Key Flag": [
+        16
+      ],
+      "Extended Key Usage": [
+        "Secure Email",
+        "Encrypting File System",
+        "Client Authentication",
+        "Certificate Request Agent"
+      ],
+      "Requires Manager Approval": false,
+      "Requires Key Archival": false,
+      "Authorized Signatures Required": 0,
+      "Schema Version": 2,
+      "Validity Period": "1 year",
+      "Renewal Period": "6 weeks",
+      "Minimum RSA Key Length": 2048,
+      "Template Created": "2026-05-20 16:48:15+00:00",
+      "Template Last Modified": "2026-05-20 16:51:21+00:00",
+      "Permissions": {
+        "Enrollment Permissions": {
+          "Enrollment Rights": [
+            "CADRE.LOCAL\\Domain Admins",
+            "CADRE.LOCAL\\Domain Users",
+            "CADRE.LOCAL\\Enterprise Admins"
+          ]
+        },
+        "Object Control Permissions": {
+          "Owner": "CADRE.LOCAL\\Administrator",
+          "Full Control Principals": [
+            "CADRE.LOCAL\\Domain Admins",
+            "CADRE.LOCAL\\Enterprise Admins"
+          ],
+          "Write Owner Principals": [
+            "CADRE.LOCAL\\Domain Admins",
+            "CADRE.LOCAL\\Enterprise Admins"
+          ],
+          "Write Dacl Principals": [
+            "CADRE.LOCAL\\Domain Admins",
+            "CADRE.LOCAL\\Enterprise Admins"
+          ],
+          "Write Property Enroll": [
+            "CADRE.LOCAL\\Domain Admins",
+            "CADRE.LOCAL\\Domain Users",
+            "CADRE.LOCAL\\Enterprise Admins"
+          ]
+        }
+      },
+      "[+] User Enrollable Principals": [
+        "CADRE.LOCAL\\Domain Users",
+        "CADRE.LOCAL\\Enterprise Admins",
+        "CADRE.LOCAL\\Domain Admins"
+      ],
+      "[+] User ACL Principals": [
+        "CADRE.LOCAL\\Enterprise Admins",
+        "CADRE.LOCAL\\Domain Admins"
+      ],
+      "[!] Vulnerabilities": {
+        "ESC3": "Template has Certificate Request Agent EKU set.",
+        "ESC4": "User has dangerous permissions."
+      }
+    },
+    "40": {
+      "Template Name": "CADRE-ESC2",
+      "Display Name": "CADRE-ESC2",
+      "Certificate Authorities": [
+        "cadre-CA"
+      ],
+      "Enabled": true,
+      "Client Authentication": true,
+      "Enrollment Agent": true,
+      "Any Purpose": true,
+      "Enrollee Supplies Subject": true,
+      "Certificate Name Flag": [
+        1
+      ],
+      "Enrollment Flag": [
+        1,
+        8
+      ],
+      "Private Key Flag": [
+        16
+      ],
+      "Extended Key Usage": [
+        "Any Purpose"
+      ],
+      "Requires Manager Approval": false,
+      "Requires Key Archival": false,
+      "Authorized Signatures Required": 0,
+      "Schema Version": 2,
+      "Validity Period": "1 year",
+      "Renewal Period": "6 weeks",
+      "Minimum RSA Key Length": 2048,
+      "Template Created": "2026-05-20 16:45:55+00:00",
+      "Template Last Modified": "2026-05-20 16:51:10+00:00",
+      "Permissions": {
+        "Enrollment Permissions": {
+          "Enrollment Rights": [
+            "CADRE.LOCAL\\Domain Admins",
+            "CADRE.LOCAL\\Domain Users",
+            "CADRE.LOCAL\\Enterprise Admins"
+          ]
+        },
+        "Object Control Permissions": {
+          "Owner": "CADRE.LOCAL\\Administrator",
+          "Full Control Principals": [
+            "CADRE.LOCAL\\Domain Admins",
+            "CADRE.LOCAL\\Enterprise Admins"
+          ],
+          "Write Owner Principals": [
+            "CADRE.LOCAL\\Domain Admins",
+            "CADRE.LOCAL\\Enterprise Admins"
+          ],
+          "Write Dacl Principals": [
+            "CADRE.LOCAL\\Domain Admins",
+            "CADRE.LOCAL\\Enterprise Admins"
+          ],
+          "Write Property Enroll": [
+            "CADRE.LOCAL\\Domain Admins",
+            "CADRE.LOCAL\\Domain Users",
+            "CADRE.LOCAL\\Enterprise Admins"
+          ]
+        }
+      },
+      "[+] User Enrollable Principals": [
+        "CADRE.LOCAL\\Domain Users",
+        "CADRE.LOCAL\\Enterprise Admins",
+        "CADRE.LOCAL\\Domain Admins"
+      ],
+      "[+] User ACL Principals": [
+        "CADRE.LOCAL\\Enterprise Admins",
+        "CADRE.LOCAL\\Domain Admins"
+      ],
+      "[!] Vulnerabilities": {
+        "ESC1": "Enrollee supplies subject and template allows client authentication.",
+        "ESC2": "Template can be used for any purpose.",
+        "ESC3": "Template has Certificate Request Agent EKU set.",
+        "ESC17": "Enrollee supplies subject and template allows server authentication.",
+        "ESC4": "User has dangerous permissions."
+      },
+      "[*] Remarks": {
+        "ESC17": "Other prerequisites may be required for this to be exploitable. See the wiki for more details."
+      }
+    },
+    "41": {
+      "Template Name": "CADRE-ESC1",
+      "Display Name": "CADRE-ESC1",
+      "Certificate Authorities": [
+        "cadre-CA"
+      ],
+      "Enabled": true,
+      "Client Authentication": true,
+      "Enrollment Agent": false,
+      "Any Purpose": false,
+      "Enrollee Supplies Subject": true,
+      "Certificate Name Flag": [
+        1
+      ],
+      "Extended Key Usage": [
+        "Client Authentication"
+      ],
+      "Requires Manager Approval": false,
+      "Requires Key Archival": false,
+      "Authorized Signatures Required": 0,
+      "Schema Version": 2,
+      "Validity Period": "2 years",
+      "Renewal Period": "6 weeks",
+      "Minimum RSA Key Length": 2048,
+      "Template Created": "2026-05-20 16:44:04+00:00",
+      "Template Last Modified": "2026-05-20 16:51:03+00:00",
+      "Permissions": {
+        "Enrollment Permissions": {
+          "Enrollment Rights": [
+            "CADRE.LOCAL\\Domain Admins",
+            "CADRE.LOCAL\\Enterprise Admins"
+          ]
+        },
+        "Object Control Permissions": {
+          "Owner": "CADRE.LOCAL\\Administrator",
+          "Full Control Principals": [
+            "CADRE.LOCAL\\Domain Admins",
+            "CADRE.LOCAL\\Enterprise Admins"
+          ],
+          "Write Owner Principals": [
+            "CADRE.LOCAL\\Domain Admins",
+            "CADRE.LOCAL\\Enterprise Admins"
+          ],
+          "Write Dacl Principals": [
+            "CADRE.LOCAL\\Domain Admins",
+            "CADRE.LOCAL\\Enterprise Admins"
+          ],
+          "Write Property Enroll": [
+            "CADRE.LOCAL\\Domain Admins",
+            "CADRE.LOCAL\\Enterprise Admins"
+          ]
+        }
+      },
+      "[+] User Enrollable Principals": [
+        "CADRE.LOCAL\\Enterprise Admins",
+        "CADRE.LOCAL\\Domain Admins"
+      ],
+      "[+] User ACL Principals": [
+        "CADRE.LOCAL\\Enterprise Admins",
+        "CADRE.LOCAL\\Domain Admins"
+      ],
+      "[!] Vulnerabilities": {
+        "ESC1": "Enrollee supplies subject and template allows client authentication.",
+        "ESC4": "User has dangerous permissions."
+      }
+    }
+  }
+}

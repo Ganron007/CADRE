@@ -223,8 +223,9 @@
           $xml = Get-Content "\\dc01.cadre.local\SYSVOL\cadre.local\Policies\*\Machine\Preferences\Groups\Groups.xml" -ErrorAction SilentlyContinue
           if (-not $xml) { Write-Output "FAIL: Groups.xml missing"; exit 1 }
           $joined = $xml -join "`n"
-          if ($joined -notmatch 'cpassword=') { Write-Output "FAIL: cpassword not present"; exit 1 }
-          Write-Output "PASS: SYSVOL Groups.xml present with cpassword"; exit 0
+          if ($joined -notmatch 'CADRE\\svc_ldap') { Write-Output "FAIL: svc_ldap reference missing"; exit 1 }
+          if ($joined -notmatch 'SJdRfgL08RXe4gdPngTefd3BFXTwkOk/fWTi9K0TGeY=') { Write-Output "FAIL: valid cpassword missing"; exit 1 }
+          Write-Output "PASS: SYSVOL Groups.xml present with valid svc_ldap cpassword"; exit 0
         } catch { Write-Output "FAIL: $_"; exit 1 }
       register: r
       changed_when: false
@@ -238,9 +239,14 @@
           Set-Location AD:
           $desc = (Get-ADObject "CN=AdminSDHolder,CN=System,DC=cadre,DC=local" -Properties ntSecurityDescriptor).ntSecurityDescriptor
           $sid = (Get-ADUser analyst_cloud).SID.Value
-          $exists = $desc.Access | Where-Object { try { $_.IdentityReference.Translate([System.Security.Principal.SecurityIdentifier]).Value -eq $sid } catch { $false } }
-          if ($exists) { Write-Output "PASS: AdminSDHolder ACE present"; exit 0 }
-          Write-Output "FAIL: AdminSDHolder ACE missing"; exit 1
+          $exists = $desc.Access | Where-Object {
+            try {
+              $ref = $_.IdentityReference.Translate([System.Security.Principal.SecurityIdentifier]).Value
+              $ref -eq $sid -and ($_.ActiveDirectoryRights -band [System.DirectoryServices.ActiveDirectoryRights]::WriteDacl)
+            } catch { $false }
+          }
+          if ($exists) { Write-Output "PASS: AdminSDHolder WriteDacl ACE present"; exit 0 }
+          Write-Output "FAIL: AdminSDHolder WriteDacl ACE missing"; exit 1
         } catch { Write-Output "FAIL: $_"; exit 1 }
       register: r
       changed_when: false

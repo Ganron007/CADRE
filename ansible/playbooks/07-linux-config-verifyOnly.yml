@@ -17,6 +17,36 @@
       changed_when: false
       failed_when: r_realm.rc != 0
 
+    - name: "[LINUX][WT#45] /etc/krb5.keytab is valid (LINUX01$ principal present)"
+      ansible.builtin.shell: |
+        klist -k /etc/krb5.keytab 2>/dev/null | grep -qE 'LINUX01\$|host/LINUX01' || { echo "FAIL: keytab missing/invalid"; exit 1; }
+        echo "PASS: keytab valid"
+      register: r
+      changed_when: false
+      failed_when: r.rc != 0
+
+    - name: "[LINUX][WT#45] sssd service active"
+      ansible.builtin.shell: systemctl is-active --quiet sssd
+      register: r
+      changed_when: false
+      failed_when: r.rc != 0
+
+    - name: "[LINUX][WT#45] Domain user resolves via SSSD (mssql-linux01)"
+      ansible.builtin.shell: |
+        getent passwd mssql-linux01 | grep -q "mssql-linux01" || { echo "FAIL: domain user not resolvable"; exit 1; }
+        echo "PASS: mssql-linux01 resolves"
+      register: r
+      changed_when: false
+      failed_when: r.rc != 0
+
+    - name: "[LINUX][Branch-D] sudoers misconfig for pivot user present"
+      ansible.builtin.shell: |
+        grep -q "mssql-linux01 ALL=(ALL) NOPASSWD:ALL" /etc/sudoers.d/cadre-domain-users || { echo "FAIL: sudo misconfig missing"; exit 1; }
+        echo "PASS: sudo misconfig present"
+      register: r
+      changed_when: false
+      failed_when: r.rc != 0
+
     - name: "[LINUX][WT#46] SSSD debug_level=5 in sssd.conf"
       ansible.builtin.shell: grep -q "^debug_level = 5$" /etc/sssd/sssd.conf
       register: r
@@ -59,6 +89,28 @@
       register: r
       changed_when: false
       failed_when: not r.stat.exists
+
+    - name: "[LINUX][WT#47] NFSv4 idmapd Domain = cadre.local"
+      ansible.builtin.shell: |
+        grep -q "^Domain = cadre.local$" /etc/idmapd.conf || { echo "FAIL: idmapd domain not cadre.local"; exit 1; }
+        echo "PASS: idmapd domain = cadre.local"
+      register: r
+      changed_when: false
+      failed_when: r.rc != 0
+
+    - name: "[LINUX][WT#47] rpc-svcgssd active (NFS server GSS)"
+      ansible.builtin.shell: systemctl is-active --quiet rpc-svcgssd
+      register: r
+      changed_when: false
+      failed_when: r.rc != 0
+
+    - name: "[LINUX][WT#47] nfs/<host> principal present in /etc/krb5.keytab"
+      ansible.builtin.shell: |
+        klist -ket /etc/krb5.keytab 2>/dev/null | grep -q "nfs/linux01@" || { echo "FAIL: nfs principal missing from keytab"; exit 1; }
+        echo "PASS: nfs principal in keytab"
+      register: r
+      changed_when: false
+      failed_when: r.rc != 0
 
     - name: "[LINUX][WT#48] NFS export active"
       ansible.builtin.shell: exportfs -v | grep secure-share

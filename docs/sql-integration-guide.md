@@ -169,6 +169,61 @@ sudo chown mssql:mssql /var/opt/mssql/secrets/mssql.keytab && sudo chmod 600 /va
 sudo systemctl restart mssql-server
 ```
 
+### 3.4 Machine keytab (SSSD dependency) + pivot access  *(Branch D — WT#45/48)*
+
+**Critical:** SSSD on linux01 **requires a valid `/etc/krb5.keytab`** (the machine account keytab). If it is missing/corrupt (e.g., a 5-byte garbage file), `sssd` fails to start (`krb5_kt_start_seq_get failed: Unsupported key table format version number` → `Exiting the SSSD. Could not restart critical service`), which kills **all domain-user resolution** (SSH as domain users, NFS `krb5p`, SSSD ticket caching). `realm join` (in `07-linux-infra.yml`) creates it once, but it can be lost later. **Repair** (as root, or via the deploy playbook task in `07-linux-config.yml`):
+
+```bash
+# verify
+sudo klist -k /etc/krb5.keytab            # must list LINUX01$ / host/LINUX01 principals
+# repair if missing/corrupt (chief_command = cadre.local DA)
+sudo rm -f /etc/krb5.keytab
+echo 'C0mm@nd_Ch1ef!' | sudo adcli join --domain=cadre.local -U chief_command --stdin-password
+sudo systemctl restart sssd
+getent passwd mssql-linux01                # must resolve now
+```
+
+**Pivot access (deliberate vuln):** Branch D entry is the MSSQL linked server from `mbr01` → `sa` on linux01's SQL (recon + WT046 keytab via SQL `BULK`). The **OS-access path** is SSH as the domain account `mssql-linux01` (cadre.local, created by `02-ad-objects.yml`, password `MS5QL_K3yt@b_P@ss!`, mapped to the MSSQL SPN keytab) — via SSSD. To make the post-exploit chain (podman escape → root) reachable, apply the **misconfigured sudo** for the pivot user:
+
+```bash
+echo 'mssql-linux01 ALL=(ALL) NOPASSWD:ALL' | sudo tee /etc/sudoers.d/cadre-domain-users >/dev/null
+sudo chmod 440 /etc/sudoers.d/cadre-domain-users
+```
+
+Then the Branch D chain: `SSH mssql-linux01 → sudo podman start cadre-monitor → sudo podman exec cadre-monitor unshare -r id` (privileged container escape → **root**) → read SSSD cache / `mssql.keytab` / NFS mount from root. (Note: `xp_cmdshell` is **impossible** on SQL Server Linux — `xpstar.dll` absent — so SQL-side OS exec on linux01 is NOT available; the pivot is SSH-based. Also note `adcli join` recreates the keytab with `host/LINUX01@CADRE.LOCAL` — the AD-side `host` SPN registration must match for NFS `krb5p` server-side GSS validation.)
+
+### 3.5 NFS `krb5p` mount (WT#47) — required fixes
+
+The `/exports/secure-share *(sec=krb5p,rw,sync,no_subtree_check)` export exists, but the mount fails with **`access denied by server`** until ALL of these are in place (2026-08-01 live-tested):
+
+1. **`nfs/<host>` SPNs + keytab entries** — `rpc-svcgssd` refuses to start (`No key table entry found matching nfs/`) without an `nfs/<host>@CADRE.LOCAL` keytab entry:
+   ```bash
+   # registers SPNs in AD AND adds keytab entries (run as root)
+   sudo adcli update --domain=cadre.local \
+     --add-service-principal=nfs/linux01 \
+     --add-service-principal=nfs/linux01.cadre.local
+   sudo klist -ket /etc/krb5.keytab | grep nfs/linux01   # must list nfs entries
+   ```
+2. **Start the server-side GSS daemon** (unit is `rpc-svcgssd` on Ubuntu — NOT `nfs-secure-server`):
+   ```bash
+   sudo systemctl enable --now rpc-svcgssd
+   sudo systemctl restart rpc-gssd nfs-idmapd
+   ```
+3. **NFSv4 idmapd Domain** must equal the realm (default `localdomain` breaks principal→UID mapping):
+   ```bash
+   sudo sed -i 's/^[# ]*Domain =.*/Domain = cadre.local/' /etc/idmapd.conf
+   sudo systemctl restart nfs-idmapd
+   ```
+4. **Mount by FQDN, not `localhost`** (localhost breaks service-principal resolution):
+   ```bash
+   # from the pivot (or root) with a valid TGT:
+   echo 'MS5QL_K3yt@b_P@ss!' | kinit mssql-linux01@CADRE.LOCAL
+   sudo env KRB5CCNAME="$KRB5CCNAME" mount -t nfs4 -o sec=krb5p \
+     linux01.cadre.local:/exports/secure-share /mnt/cadre-nfs
+   mount | grep cadre-nfs     # sec=krb5p, rw
+   ```
+   Verified: mount + read of the protected share works with `sec=krb5p`. Write to the share is denied while it's root-owned `0755` (mapped user = `mssql-linux01` uid) — adjust the directory perms if write is required for the exercise.
+
 ---
 
 ## Verify

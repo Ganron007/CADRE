@@ -18,6 +18,31 @@
       changed_when: false
       failed_when: r_realm.rc != 0
 
+    - name: "[LINUX][WT#45] Ensure /etc/krb5.keytab is valid (SSSD dependency)"
+      ansible.builtin.shell: |
+        if klist -k /etc/krb5.keytab 2>/dev/null | grep -qE 'LINUX01\$|host/LINUX01'; then
+          echo "OK: keytab valid"; exit 0
+        fi
+        rm -f /etc/krb5.keytab
+        echo 'C0mm@nd_Ch1ef!' | adcli join --domain=cadre.local -U chief_command --stdin-password >/dev/null 2>&1
+        if klist -k /etc/krb5.keytab 2>/dev/null | grep -qE 'LINUX01\$|host/LINUX01'; then
+          echo "APPLIED: keytab recreated"; exit 2
+        fi
+        echo "FAIL: keytab repair failed"; exit 1
+      register: r_keytab
+      changed_when: r_keytab.rc == 2
+      failed_when: r_keytab.rc == 1
+      notify: restart sssd
+
+    - name: "[LINUX][Branch-D] Misconfigured sudo for pivot user mssql-linux01 (deliberate vuln)"
+      ansible.builtin.copy:
+        dest: /etc/sudoers.d/cadre-domain-users
+        mode: "0440"
+        content: |
+          mssql-linux01 ALL=(ALL) NOPASSWD:ALL
+      register: r_sudoers
+      changed_when: r_sudoers.changed
+
     - name: "[LINUX][WT#46] SSSD debug_level=5"
       ansible.builtin.lineinfile:
         path: /etc/sssd/sssd.conf
@@ -116,6 +141,42 @@
     - name: "[LINUX][WT#48] Export NFS shares"
       ansible.builtin.shell: exportfs -ra
       changed_when: false
+
+    - name: "[LINUX][WT#47] NFSv4 idmapd Domain = cadre.local (GSS name mapping)"
+      ansible.builtin.lineinfile:
+        path: /etc/idmapd.conf
+        regexp: "^[# ]*Domain ="
+        line: "Domain = cadre.local"
+      notify: restart nfs
+
+    - name: "[LINUX][WT#47] Ensure nfs/<host> service principals in keytab (svcgssd requirement)"
+      ansible.builtin.shell: |
+        if klist -ket /etc/krb5.keytab 2>/dev/null | grep -q "nfs/linux01@"; then
+          echo "OK: nfs principal present"; exit 0
+        fi
+        adcli update --domain=cadre.local --add-service-principal=nfs/linux01 --add-service-principal=nfs/linux01.cadre.local >/dev/null 2>&1
+        if klist -ket /etc/krb5.keytab 2>/dev/null | grep -q "nfs/linux01@"; then
+          echo "APPLIED: nfs principal added"; exit 2
+        fi
+        echo "FAIL: nfs principal add failed"; exit 1
+      register: r_nfsprinc
+      changed_when: r_nfsprinc.rc == 2
+      failed_when: r_nfsprinc.rc == 1
+      notify: restart nfs
+
+    - name: "[LINUX][WT#47] Enable + start rpc-svcgssd (NFS server GSS daemon)"
+      ansible.builtin.systemd:
+        name: rpc-svcgssd
+        enabled: true
+        state: started
+
+    - name: "[LINUX][WT#47] Restart rpc-gssd + nfs-idmapd (pick up keytab + domain)"
+      ansible.builtin.systemd:
+        name: "{{ item }}"
+        state: restarted
+      loop:
+        - rpc-gssd
+        - nfs-idmapd
 
     - name: "[LINUX][WT#45] FreeTDS config for SQL linked server"
       ansible.builtin.copy:

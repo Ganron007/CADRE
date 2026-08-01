@@ -75,6 +75,7 @@
           $secPwd = ConvertTo-SecureString "{{ item.pw }}" -AsPlainText -Force
           New-ADUser -Name $uName -SamAccountName $uName -UserPrincipalName "$uName@cadre.local" `
             -GivenName "$uName" -Surname "" -Path "ou={{ item.ou }},dc=cadre,dc=local" `
+            -EmailAddress "$uName@cadre.local" `
             -AccountPassword $secPwd -Enabled $true -PasswordNeverExpires $true
           $verify = Get-ADUser -Identity $uName -ErrorAction Stop
           if (-not $verify) { throw "Verify failed" }
@@ -303,15 +304,20 @@
         try {
           $gpo = Get-GPO -Name "Vulnerable-GPO" -ErrorAction Stop
           $guid = $gpo.Id.ToString()
-          $cpassword = "T6Zc9T0qO/pEh+eOXTnxky0jSJvWvPcvAKWwGSpFOqY"
+          $cpassword = "SJdRfgL08RXe4gdPngTefd3BFXTwkOk/fWTi9K0TGeY="
           $path = "\\cadre.local\SYSVOL\cadre.local\Policies\{$guid}\Machine\Preferences\Groups\Groups.xml"
-          if (Test-Path $path) { Write-Output "SKIP: Groups.xml already exists"; exit 0 }
+          # cpassword = AES-256-ECB(MS14-025 static key) of UTF-16LE "s3rv1c3_Ld@p!" -> svc_ldap (real account)
           $xml = '<?xml version="1.0" encoding="utf-8"?>' + "`r`n" +
                  '<Groups clsid="{3125E937-EB16-4b4c-9934-544FC6D24D26}">' + "`r`n" +
                  '  <Group clsid="{6D4A79E4-529C-4481-ABD0-F5BD7EA93BA7}" name="CADRE-Backup" image="2" changed="2026-05-23 12:00:00" uid="{A5E8D2F1-3B4C-5D6E-7F8A-9B0C1D2E3F4A}">' + "`r`n" +
-                 '    <Properties action="U" newName="" fullName="CADRE Backup Service" description="Service account for automated backups" cpassword="' + $cpassword + '" changeLogon="0" noChange="1" neverExpires="1" acctDisabled="0" userName="CADRE\svc_backup"/>' + "`r`n" +
+                 '    <Properties action="U" newName="" fullName="CADRE Backup Service" description="Service account for automated backups" cpassword="' + $cpassword + '" changeLogon="0" noChange="1" neverExpires="1" acctDisabled="0" userName="CADRE\svc_ldap"/>' + "`r`n" +
                  '  </Group>' + "`r`n" +
                  '</Groups>'
+          if (Test-Path $path) {
+            $existing = Get-Content -Path $path -Raw
+            if ($existing -eq $xml) { Write-Output "OK: Groups.xml already correct"; exit 0 }
+            Write-Output "FIX: overwriting incorrect Groups.xml"
+          }
           New-Item -Path (Split-Path $path -Parent) -ItemType Directory -Force | Out-Null
           Set-Content -Path $path -Value $xml -Force
           if (-not (Test-Path $path)) { throw "File not found after write" }

@@ -1166,14 +1166,13 @@
           $policyGuid = "{6A7B8C9D-1234-5678-90AB-CDEF01234567}"
           $path = "\\dc01.cadre.local\SYSVOL\$domain\Policies\$policyGuid\Machine\Preferences\Groups"
           New-Item -ItemType Directory -Path $path -Force | Out-Null
-          $content = @"
-<?xml version="1.0" encoding="utf-8"?>
-<Groups clsid="{3125E937-EB16-4b4c-9934-544FC6D24D26}">
-  <User clsid="{DF5F1855-50E4-4402-8C65-4F83F7B07AAC}" name="CADRE\svc_ldap" image="0" changed="2026-07-31T00:00:00">
-    <Properties action="U" newName="" fullName="" description="" cpassword="VLDHPZLF/9k=" />
-  </User>
-</Groups>
-"@
+          # cpassword = AES-256-ECB(MS14-025 static key) of UTF-16LE "s3rv1c3_Ld@p!" -> svc_ldap (real account)
+          $content = '<?xml version="1.0" encoding="utf-8"?>' + "`r`n" +
+                     '<Groups clsid="{3125E937-EB16-4b4c-9934-544FC6D24D26}">' + "`r`n" +
+                     '  <User clsid="{DF5F1855-50E4-4402-8C65-4F83F7B07AAC}" name="CADRE\svc_ldap" image="0" changed="2026-07-31T00:00:00">' + "`r`n" +
+                     '    <Properties action="U" newName="" fullName="" description="" cpassword="SJdRfgL08RXe4gdPngTefd3BFXTwkOk/fWTi9K0TGeY=" />' + "`r`n" +
+                     '  </User>' + "`r`n" +
+                     '</Groups>'
           Set-Content -Path "$path\Groups.xml" -Value $content -Encoding UTF8
           if (-not (Test-Path "$path\Groups.xml")) { throw "Groups.xml missing" }
           Write-Output "APPLIED: SYSVOL Groups.xml deployed"; exit 2
@@ -1192,16 +1191,25 @@
           $Principal = "CADRE\analyst_cloud"
           $Rights = [System.DirectoryServices.ActiveDirectoryRights]::WriteDacl
           $AccessControlType = [System.Security.AccessControl.AccessControlType]::Allow
-          $InheritanceType = [System.Security.AccessControl.AccessControlSecurityInheritance]::None
+          $InheritanceType = [System.DirectoryServices.ActiveDirectorySecurityInheritance]::None
           $Acl = Get-Acl -Path $TargetDN
           $Identity = New-Object System.Security.Principal.NTAccount($Principal)
-          $exists = $Acl.Access | Where-Object { $_.IdentityReference.Value -eq $Identity.Translate([System.Security.Principal.SecurityIdentifier]).Value }
+          $IdentitySid = $Identity.Translate([System.Security.Principal.SecurityIdentifier]).Value
+          $exists = $Acl.Access | Where-Object {
+            $ref = $_.IdentityReference.Value
+            try { $ref = $_.IdentityReference.Translate([System.Security.Principal.SecurityIdentifier]).Value } catch {}
+            $ref -eq $IdentitySid -or $_.IdentityReference.Value -eq $IdentitySid
+          }
           if ($exists) { Write-Output "OK: AdminSDHolder ACE exists"; exit 0 }
-          $Rule = New-Object System.DirectoryServices.ActiveDirectoryAccessRule($Identity, $Rights, $AccessControlType, $null, $InheritanceType)
+          $Rule = New-Object System.DirectoryServices.ActiveDirectoryAccessRule($Identity, $Rights, $AccessControlType, [Guid]::Empty, $InheritanceType)
           $Acl.AddAccessRule($Rule)
           Set-Acl -Path $TargetDN -AclObject $Acl
           $vAcl = Get-Acl -Path $TargetDN
-          $verified = $vAcl.Access | Where-Object { $_.IdentityReference.Value -eq $Identity.Translate([System.Security.Principal.SecurityIdentifier]).Value }
+          $verified = $vAcl.Access | Where-Object {
+            $ref = $_.IdentityReference.Value
+            try { $ref = $_.IdentityReference.Translate([System.Security.Principal.SecurityIdentifier]).Value } catch {}
+            $ref -eq $IdentitySid -or $_.IdentityReference.Value -eq $IdentitySid
+          }
           if (-not $verified) { throw "Verify failed" }
           Write-Output "APPLIED: analyst_cloud WriteDacl on AdminSDHolder"; exit 2
         } catch { Write-Output "FAILED: $_"; exit 1 }

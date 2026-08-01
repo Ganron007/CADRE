@@ -1,8 +1,12 @@
 # CADRE — Attack Matrix
 
-100 attacks across 5 streams. Each attack is a verified, step-by-step technique against the CADRE lab substrate that produces observable telemetry.
+107+ attacks across the v3 campaign (main spine Phases 0.5–8 + 4 branches + E/F/G streams). Each attack is a step-by-step technique against the CADRE lab substrate that produces observable telemetry.
 
-> **🚀 START HERE → [`Campaign/Runbooks/CAMPAIGNS-RUNBOOK-README.md`](Campaign/Runbooks/CAMPAIGNS-RUNBOOK-README.md)** — campaign v2 per-phase runbooks (full narrative + commands). Index: [`Campaign/CAMPAIGNS.md`](Campaign/CAMPAIGNS.md). Full reference: [`Campaign/CAMPAIGNS_v2.md`](Campaign/CAMPAIGNS_v2.md).
+> **🚀 START HERE → [`Campaign/CAMPAIGNS_v3.md`](Campaign/CAMPAIGNS_v3.md)** — current v3 campaign narrative. Per-attack reference: [`Campaign/CAMPAIGNS-METADATA-v2.md`](Campaign/CAMPAIGNS-METADATA-v2.md). Runbooks: [`Campaign/Runbooks/CAMPAIGNS-RUNBOOK-README.md`](Campaign/Runbooks/CAMPAIGNS-RUNBOOK-README.md).
+>
+> **📊 Validation status → [`Campaign/CAMPAIGNS-VALIDATION-REPORT-20260730.md`](Campaign/CAMPAIGNS-VALIDATION-REPORT-20260730.md)** + [`Campaign/CADRE-Attack-Surface-Coverage-Audit-20260730.md`](Campaign/CADRE-Attack-Surface-Coverage-Audit-20260730.md) — live-tested vs configured surface per attack.
+>
+> **⛔ Hard rules (operator-locked 2026-07-31):** RULE 1 — all attacks run from `ws01` via direct SSH (`cadre-ws01-key`); provisioning (`.60`) is config-only, never an attack origin. RULE 2 — no scheduled tasks to run commands (persistence-only). See the metadata header for the full text.
 >
 > **🔬 DFIR parallel track → [`Campaign/DFIR-Nexus-Pioneer-workflow.md`](Campaign/DFIR-Nexus-Pioneer-workflow.md)** — link each campaign exercise to DFIR-Nexus cases and Plan 1 telemetry (`tracker.md`).
 
@@ -11,7 +15,7 @@ CADRE
 ├── C — Cloud       ── 09-cloud/ (Azure attack scenarios, Azure RM, hybrid chains)
 ├── A — Agentic     ── 06-telemetry-catalog/ (Plan 7 RAG corpus)
 ├── D — DFIR        ── 07-detection-rules/ + 08-hunting/ (Sigma → Elastic + VQL)
-├── R — Red-team    ── 01-walkthroughs/ + 04-automation/ (100 attacks, scripted)
+├── R — Red-team    ── 01-walkthroughs/ + 04-automation/ (107 attacks, scripted)
 └── E — Environment ── 02-diagrams/ (lab architecture) + Campaign/diagrams/ + Campaign/attackpath/
 ```
 
@@ -19,7 +23,7 @@ CADRE
 
 | Folder | Contents | Count Target | Plan |
 |--------|----------|--------------|------|
-| **`Campaign/`** | v2 index, CAMPAIGNS_v2, metadata, runbooks, study-guide, diagrams, attackpath, artifacts, DFIR bridge | — | Content |
+| **`Campaign/`** | **v3 narrative (`CAMPAIGNS_v3.md`)** + metadata-v2, validation report, coverage audit, runbooks, study-guide, diagrams, attackpath, artifacts, DFIR bridge | — | Content |
 | `01-walkthroughs/` | Step-by-step attack writeups (markdown) | 100 files | Content |
 | `02-diagrams/` | Lab architecture + trust topology (SVG/Mermaid) | ~3 | Content |
 | `04-automation/` | Reproducible attack scripts (bash + PowerShell) | ~90 scripts | Content |
@@ -47,24 +51,30 @@ CADRE
 
 ## How to Use
 
-1. **Open your phase runbook** from [`Campaign/Runbooks/CAMPAIGNS-RUNBOOK-README.md`](Campaign/Runbooks/CAMPAIGNS-RUNBOOK-README.md) — read theory, then run commands live
-2. Follow each phase — every command is runnable against the live CADRE lab
-3. When a phase references a WT# (e.g., WT#009), flip to `01-walkthroughs/` for the tool reference
-4. Run automation scripts from `04-automation/` for repeatable execution
-5. Observe telemetry in Kibana / Zeek / Velociraptor (see `docs/forensic-workflow.md`)
-6. **Optional:** Run the Pioneer loop — export evidence → DFIR-Nexus case (see [`Campaign/DFIR-Nexus-Pioneer-workflow.md`](Campaign/DFIR-Nexus-Pioneer-workflow.md))
-7. Revert to clean baseline → next phase
+1. **Open the v3 narrative** [`Campaign/CAMPAIGNS_v3.md`](Campaign/CAMPAIGNS_v3.md) — read the phase story, then run commands live from `ws01`
+2. **Check per-attack status** in [`Campaign/CAMPAIGNS-METADATA-v2.md`](Campaign/CAMPAIGNS-METADATA-v2.md) (WT#, playbook, ACE#, telemetry, RedStrike intent) and the [validation report](Campaign/CAMPAIGNS-VALIDATION-REPORT-20260730.md) for live-tested results
+3. **Run from ws01 only (Rule 1)** — tools staged via `scp` `localhost → ws01`, executed by direct SSH (`cadre-ws01-key`). No provisioning bridge
+4. When a phase references a WT# (e.g., WT#009), flip to `01-walkthroughs/` for the tool reference
+5. Run automation scripts from `04-automation/` for repeatable execution
+6. Observe telemetry in Kibana / Zeek / Velociraptor (see `docs/forensic-workflow.md`)
+7. **Optional:** Run the Pioneer loop — export evidence → DFIR-Nexus case (see [`Campaign/DFIR-Nexus-Pioneer-workflow.md`](Campaign/DFIR-Nexus-Pioneer-workflow.md))
+8. Revert to clean baseline → next phase
 
 ## Status
 
 | Folder | Status | Files |
 |--------|--------|:-----:|
-| `Campaign/` | v2 index + CAMPAIGNS_v2 + runbooks + study-guide + diagrams + attackpath | — |
+| `Campaign/` | **v3 narrative + metadata-v2 + validation report + coverage audit + runbooks + study-guide + diagrams + attackpath** | — |
+| `Campaign/CAMPAIGNS_v3.md` | Current campaign narrative | 1 |
+| `Campaign/CAMPAIGNS-METADATA-v2.md` | Per-attack reference (107+) | 1 |
+| `Campaign/CAMPAIGNS-VALIDATION-REPORT-20260730.md` | Live validation status per attack | 1 |
+| `Campaign/CADRE-Attack-Surface-Coverage-Audit-20260730.md` | Configured-surface audit vs campaign | 1 |
 | 01-walkthroughs | Walkthrough reference cards | 63 (+37 pending) |
 | 02-diagrams | Lab architecture Mermaid | 2 |
 | 04-automation | Core AD + Campaign E/G/H scripts | 91 |
 | `Campaign/study-guide` | Deep-dive attack reference (Phase 0-2 complete) | 12 |
-| `docs/internal/cert-map` | Per-certification study paths (internal) | 14 || 06-telemetry-catalog | Empty — Phase 1 fills this | — |
+| `docs/internal/cert-map` | Per-certification study paths (internal) | 14 |
+| 06-telemetry-catalog | Empty — Phase 1 fills this | — |
 | 07-detection-rules | Empty — Plan 5 | — |
 | 08-hunting | Empty — Plan 6 | — |
 | 09-cloud | Empty — Plan 11 | — |

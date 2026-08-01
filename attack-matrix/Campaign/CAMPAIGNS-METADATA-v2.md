@@ -15,6 +15,19 @@
 
 **Topology / Machine Roles** (from `CAMPAIGNS_v3.md` lines 41-86)
 
+> ### ⛔ HARD RULES — Attack Origin & Execution Methodology (2026-07-31, operator-locked)
+>
+> **RULE 1 — Direct SSH to ws01 only.** Every attack in this campaign runs from `ws01` via direct SSH only.
+> - **Attack origin:** `localhost → ws01` direct SSH (`analyst_t1` @ `192.168.77.62`) using `C:\Users\Ganro\.ssh\cadre-ws01-key`. No wrapper scripts, no provisioning bridge, no `ws01-exec.sh` / `ws01-stage-file.sh` indirection.
+> - **Provisioning (`.60`) is config-only** — apply/verify playbooks, deploy config, Ansible runs. It is **never** an attack origin.
+> - **Tool staging:** tools/scripts are copied `localhost → ws01` via `scp` with the ws01 key, then executed by SSH-ing into ws01.
+>
+> **RULE 2 — No scheduled tasks to run commands.** Scheduled tasks are **never** used as an execution wrapper just to run commands/tools. That is not how an attacker operates on a compromised machine; this campaign simulates real-world attack methodology. Scheduled tasks are legitimate **only as persistence mechanisms** (Phase 5) on an already-compromised machine.
+> - The former "3.5B execution wrapper" use is **REJECTED**. Any validation evidence produced by running a command via a scheduled task is **invalid**.
+> - If a scheduled task appears in the campaign, it must be a genuine persistence artifact (e.g. invisible-task via TaskCache SD deletion), not a "run this once" shortcut.
+>
+> Violations of either rule are treated as invalid validation evidence.
+
 | Machine | IP | Role | Beachhead? | Notes |
 |---------|----|------|------------|-------|
 | ws01 | 192.168.77.62 | Windows 11 workstation, MDE P2 | **Primary beachhead** | `child\analyst_t1` local admin; all AD tools staged in `C:\Tools\ADTools` |
@@ -47,10 +60,11 @@
 **Realistic Attack Principles**
 
 1. **No direct operator-to-target execution.** The operator uses `ws01` as the beachhead; commands run from `ws01` as `analyst_t1` unless noted.
-2. **Right credential on the right machine.** `analyst_t1` is used on `ws01` and `mbr01` (SQL/WinRM). `svc_mssql` is Phase 2 service account. `analyst_cloud` is extracted from `mbr01` and used for cross-domain/local movement. `dc02$` TGT is used for DCSync. `krbtgt` is used for Golden Ticket.
-3. **Lateral tool transfer over SMB.** Tools are staged on `ws01` in `C:\Tools\ADTools` and copied to `mbr01` via `C$`/`ADMIN$` shares, not downloaded from Kali directly onto `mbr01`.
-4. **No scheduled tasks for attack execution.** Scheduled tasks are persistence-only, not execution wrappers.
-5. **No provisioning shortcuts.** `provisioning` is for tooling/inventory; it does not execute campaign commands against lab targets directly.
+2. **Direct SSH only (Rule 1).** The attack lane is `localhost → ws01` direct SSH (`cadre-ws01-key`). No provisioning bridge, no `nxc winrm` wrappers, no staging-wrapper indirection. Provisioning is config-only.
+3. **Right credential on the right machine.** `analyst_t1` is used on `ws01` and `mbr01` (SQL/WinRM). `svc_mssql` is Phase 2 service account. `analyst_cloud` is extracted from `mbr01` and used for cross-domain/local movement. `dc02$` TGT is used for DCSync. `krbtgt` is used for Golden Ticket.
+4. **Lateral tool transfer over SMB.** Tools are staged on `ws01` in `C:\Tools\ADTools` and copied to `mbr01` via `C$`/`ADMIN$` shares, not downloaded from Kali directly onto `mbr01`.
+5. **No scheduled tasks for attack execution (Rule 2).** Scheduled tasks are persistence-only, never execution wrappers. Running a command/tool via a scheduled task is rejected methodology.
+6. **No provisioning shortcuts.** `provisioning` is for tooling/inventory; it does not execute campaign commands against lab targets directly.
 
 
 ## Main Spine — Phases 0.5–8
@@ -504,21 +518,19 @@ We have `nt authority\system` on mbr01 via GodPotato. `analyst_cloud` has an act
 | **RedStrike Intent** | — (token impersonation failed) |
 | **State Output** | — |
 
-#### 3.5B — Scheduled Task as analyst_cloud (Post-Credential) ❌ REJECTED FOR ATTACK CHAIN
+#### 3.5B — Scheduled Task as analyst_cloud ❌ REJECTED AS EXECUTION WRAPPER (Rule 2)
 
 | Field | Value |
 |-------|-------|
-| **Status** | ❌ Rejected for active attack chain |
+| **Status** | ❌ Rejected for attack chain as an execution wrapper — **Rule 2 (no scheduled tasks to run commands)**. Valid ONLY as a Phase 5 persistence mechanism. |
 | **Att&ck** | T1053.005 (Scheduled Task) |
-| **Technique** | Create scheduled task running as `analyst_cloud` using known password |
-| **What it does** | SYSTEM creates a scheduled task with `/ru CADRE\analyst_cloud /rp Cl0ud_An@lyst!`. Task executes SharpHound or arbitrary command as the domain user. |
-| **Prerequisite** | SYSTEM on mbr01 + `analyst_cloud` password from 3.5A |
-| **Why rejected** | Attackers do not use scheduled tasks to **run** attack tools. Scheduled tasks are a persistence technique, not an execution wrapper. |
-| **Valid use** | Persistence phase (Phase 5+) only, not credential-theft/Phase 3.5. |
+| **Technique** | (Rejected form) SYSTEM creates a scheduled task running as `analyst_cloud` just to run a command/tool. |
+| **Why rejected** | Real-world attackers do not create a scheduled task merely to execute a command — that is a lazy shortcut, not attack methodology. This campaign simulates real-world behavior. Scheduled tasks exist here only as **persistence** (Phase 5), e.g. the invisible-task variant below. |
+| **Persistent variant (valid)** | Phase 5 persistence: create a scheduled task on the compromised host that survives reboot (e.g. hide it by deleting `HKLM\...\TaskCache\Tree\<task>\Security` → invisible to `schtasks/query`, Task Scheduler GUI, Autoruns). |
+| **Prerequisite (persistence variant)** | SYSTEM on target + `SeBatchLogonRight` for the task principal (`06-member-services.yml`). |
 | **Key telemetry** | WinSec 4698 (task create), 4699 (task run), 4624 TargetUserName=analyst_cloud; Sysmon EID 1 |
-| **Invisible variant** | Delete `HKLM\...\TaskCache\Tree\CADRE-SharpHound\Security` → task invisible to `schtasks/query`, Task Scheduler GUI, Autoruns |
-| **RedStrike Intent** | — (rejected for attack chain) |
-| **State Output** | — |
+| **RedStrike Intent** | `schtasks.create` (persistence context only) |
+| **State Output** | — (no state set for rejected wrapper use) |
 
 #### 3.5C — RDP Interactive Session as analyst_cloud (T1021.001)
 
@@ -807,7 +819,7 @@ We have `nt authority\system` on mbr01 via GodPotato. `analyst_cloud` has an act
 
 | Field | Value |
 |-------|-------|
-| **Status** | ✅ Active — WT033 cross-forest Kerberoast verified from ws01 (scripted + RedStrike); WT034 NAA extraction verified via `vault` share on `mbr02` (scripted + RedStrike); WT035-039 SCCM attack chain ⏳ not yet tested (SCCM site `CAD` confirmed deployed and active on `mbr02`) |
+| **Status** | ✅ Active — WT033 cross-forest Kerberoast verified from ws01 (scripted + RedStrike); WT034 NAA extraction verified via `vault` share on `mbr02` (scripted + RedStrike); WT035-039 SCCM chain deep-validated 2026-08-01 (surface ✅, primitives ✅, full exec ⚠️ gated on **AdminService deployment** — the AdminService is NOT deployed on mbr02; fix documented in `sccm-integration-guide.md` Phase 6A + verify checks in `10-sccm-verify.yml`; CD path `svc_sccm`→HTTP/mbr02 correct) |
 | **Stream** | Core AD / Branch C |
 | **Att&ck** | T1558.003 (Cross-forest Kerberoasting), T1213 (Data from Information Repositories), T1071 (Application Layer Protocol) |
 | **Technique** | Use root domain `EA` rights to pivot across forest trust to `range.local` and abuse SCCM / delegations |
@@ -849,13 +861,15 @@ We have `nt authority\system` on mbr01 via GodPotato. `analyst_cloud` has an act
 
 #### WT035-039 — SCCM Attack Chain
 
+> **2026-08-01 deep validation (as `range\svc_sccm` via SMS Provider WMI explicit creds from ws01):** SMS Provider access proven (local `SMS Admins` membership); PXE approved cert + 2 boot images + NAA-in-policy confirmed (WT035 surface); client-push component enabled + `GenerateCCRByName`/`CreateCCR` available (WT036 primitive); `SMS_Scripts.CreateScripts` + `SMS_Package`/`SMS_Program` creation work (WT038/039 staging). **Root-caused blocker:** the **AdminService is NOT deployed on mbr02** (no IIS app pool, no `/AdminService` web app, no `bin\AdminService`) → CMPivot (WT037) / script-run (WT039) have no target. The `HTTP/mbr02.range.local` SPN on `svc_sccm` + `msDS-AllowedToDelegateTo=HTTP/mbr02.range.local` (cross-forest Kerberoast + CD target) is correct; intended path = post-Kerberoast S4U2Self→S4U2Proxy to HTTP/mbr02 → AdminService (pool MUST run as `RANGE\svc_sccm`). Deployment fix in `sccm-integration-guide.md` **Phase 6A** + verify checks in `10-sccm-verify.yml`. `SMS_Advertisement.Put` = Generic failure via raw WMI (needs console) → WT038/039 full exec via console. **`cifs/mbr02.range.local` SPN missing** → SMB Kerberos to mbr02 broken (verify-playbook candidate). Test objects cleaned up.
+
 | WT# | Technique | Status | Target | What it earns |
 |-----|-----------|--------|--------|---------------|
-| WT035 | SCCM PXE Boot abuse | ⏳ Not yet tested — no SCCM client on ws01; actual mbr02 exploitation not exercised | mbr02 | Bare-metal boot → domain join account |
-| WT036 | SCCM Client Push | ⏳ Not yet tested — no SCCM client on ws01; actual mbr02 exploitation not exercised | mbr02 | Coerced auth / lateral movement |
-| WT037 | SCCM CMPivot | ⏳ Not yet tested — no SCCM client on ws01; actual mbr02 exploitation not exercised | mbr02 | Remote query/exec on managed clients |
-| WT038 | SCCM Application Deploy | ⏳ Not yet tested — no SCCM client on ws01; actual mbr02 exploitation not exercised | mbr02 | Push malicious app to clients |
-| WT039 | SCCM Site Takeover | ⏳ Not yet tested — no SCCM client on ws01; actual mbr02 exploitation not exercised | mbr02 | Full SCCM site admin → DA in range.local |
+| WT035 | SCCM PXE Boot abuse | ✅ Surface verified (2026-08-01): approved PXE cert + 2 boot images + NAA-in-policy readable by svc_sccm; full boot-image exploit needs real PXE client | mbr02 | Bare-metal boot → domain join account |
+| WT036 | SCCM Client Push | ⚠️ Primitive verified: component enabled + `GenerateCCRByName`/`CreateCCR` available; relay needs console-created target device record | mbr02 | Coerced auth / lateral movement |
+| WT037 | SCCM CMPivot | ⚠️ Blocked — **AdminService NOT deployed** (no web app/pool/files on mbr02); fix = deploy AdminService + pool as `RANGE\svc_sccm` (guide Phase 6A), then Kerberoast → `s4u` to HTTP/mbr02 → AdminService as Administrator | mbr02 | Remote query/exec on managed clients |
+| WT038 | SCCM Application Deploy | ⚠️ Partial: package+program (SYSTEM) created via provider; `SMS_Advertisement` creation needs console | mbr02 | Push malicious app to clients |
+| WT039 | SCCM Site Takeover | ⚠️ Partial: `SMS_Scripts.CreateScripts` works; approval+run need AdminService (deploy per Phase 6A + CD path) or console | mbr02 | Full SCCM site admin → DA in range.local |
 
 #### Skipjack — Cross-Forest Trust Downgrade via PAC Signature Corruption (Phase 8 alt)
 
@@ -879,7 +893,7 @@ We have `nt authority\system` on mbr01 via GodPotato. `analyst_cloud` has an act
 
 | Field | Value |
 |-------|-------|
-| **Status** | ⠿ BLOCKED — missing ACE#7 surface — direct ws01 execution via SSH works, but `chief_command` does not expose `ForceChangePassword` to `hunter_dfir`. Retest requires `05-ad-attack-surface.yml` ACE#7 deploy + verify-only pass. |
+| **Status** | ✅ All paths VERIFIED 2026-07-31 — WT015 (ACE#7 ForceChangePassword), WT013 (WriteDacl), WT014 (GenericWrite→Shadow Creds), WT016 (GenericAll OU), WT008 (Shadow Creds dc01$), WT023 (GPO abuse), WT024 (gMSA extraction), GPP (stored password), WT025 (AdminSDHolder). DACL restored to pristine 23 ACEs. |
 | **Stream** | Branch A |
 | **Att&ck** | T1098 (Account Manipulation), T1484 (Domain Policy Modification), T1548 (Abuse Elevation Control Mechanism) |
 | **Technique** | Abuse over-permissive ACEs discovered by BloodHound to escalate to DA in `cadre.local` |
@@ -915,7 +929,7 @@ We have `nt authority\system` on mbr01 via GodPotato. `analyst_cloud` has an act
 | Field | Value |
 |-------|-------|
 | **WT#** | 013 |
-| **Status** | ✅ Active |
+| **Status** | ✅ Verified 2026-07-31 |
 | **Technique** | Grant self GenericAll on own user or other object using WriteDacl |
 | **Starting credential** | `chief_command` / `C0mm@nd_Ch1ef!` (DA earned via Branch A T015) |
 | **What it earns** | Full control over target AD object |
@@ -928,7 +942,7 @@ We have `nt authority\system` on mbr01 via GodPotato. `analyst_cloud` has an act
 | Field | Value |
 |-------|-------|
 | **WT#** | 014 |
-| **Status** | ✅ Active |
+| **Status** | ✅ Verified 2026-07-31 |
 | **Technique** | `GenericWrite` on user → add `msDS-KeyCredentialLink` (Shadow Credentials) → authenticate as that user via PKINIT |
 | **Starting credential** | `chief_command` / `C0mm@nd_Ch1ef!` (DA earned via Branch A T015) |
 | **What it earns** | NT hash / TGT of target user |
@@ -941,7 +955,7 @@ We have `nt authority\system` on mbr01 via GodPotato. `analyst_cloud` has an act
 | Field | Value |
 |-------|-------|
 | **WT#** | 016 |
-| **Status** | ✅ Active |
+| **Status** | ✅ Verified 2026-07-31 |
 | **Technique** | `GenericAll` on OU → add GPO link or modify child objects |
 | **Starting credential** | `chief_command` / `C0mm@nd_Ch1ef!` (DA earned via Branch A T015) |
 | **What it earns** | DA or mass object control |
@@ -954,50 +968,55 @@ We have `nt authority\system` on mbr01 via GodPotato. `analyst_cloud` has an act
 | Field | Value |
 |-------|-------|
 | **WT#** | 008 |
-| **Status** | ✅ Active |
+| **Status** | ✅ Verified 2026-07-31 |
 | **Technique** | Add Shadow Credentials to `dc01$` computer account → authenticate as DC |
 | **Starting credential** | `chief_command` / `C0mm@nd_Ch1ef!` (DA earned via Branch A T015) |
 | **What it earns** | DC machine account TGT → DCSync rights |
 | **RedStrike Intent** | — |
 | **State Output** | SET_STATE(<manual>) |
-| **Script** | `T008-shadow-credentials-ws01.sh` |
+| **Script** | `T008-shadow-credentials-ws01.sh` (corrected: pywhisker in-script, explicit creds + LDAPS; PKINIT TGT via gettgtpkinit; NT hash via getnthash) |
+| **Execution note** | Whisker.exe / Start-Process -Credential fails in SSH session (0xC0000142); pywhisker takes -u/-p in-process — no scheduled task needed. Result: dc01$ NT hash `09493093db08c8afa99193779d401b34` |
 
 #### Path F — GPO Abuse (WT023)
 
 | Field | Value |
 |-------|-------|
 | **WT#** | 023 |
-| **Status** | ✅ Active |
+| **Status** | ✅ Verified 2026-07-31 |
 | **Technique** | Modify GPO to push scheduled task, registry, or rights assignment |
 | **Starting credential** | `analyst_cloud` / `Cl0ud_An@lyst!` (Phase 3.5A extraction from mbr01) — alternative GPO path |
 | **What it earns** | Lateral movement / persistence / privilege escalation across OU |
 | **RedStrike Intent** | — |
 | **State Output** | SET_STATE(<manual>) |
-| **Script** | `T023-gpo-abuse-ws01.sh` |
+| **Script** | `T023-gpo-abuse-ws01.sh` (corrected: PowerView -Credential + SMB preference write in-script) |
+| **Execution note** | analyst_cloud holds WriteDacl/WriteOwner/GenericAll on Vulnerable-GPO `{885EE71C-79CD-4006-B7CF-616B449F745B}` (ACE#1); wrote + read back + deleted ScheduledTasks.xml preference via SYSVOL SMB as analyst_cloud |
 
 #### Path G — gMSA Extraction (WT024)
 
 | Field | Value |
 |-------|-------|
 | **WT#** | 024 |
-| **Status** | ✅ Active |
-| **Technique** | Extract Group Managed Service Account password using `GoldenGMSA` or DSInternals |
-| **Starting credential** | `chief_command` / `C0mm@nd_Ch1ef!` (DA earned via Branch A T015) |
-| **What it earns** | High-priv service account password |
-| **RedStrike Intent** | — |
-| **State Output** | SET_STATE(<manual>) |
-| **Script** | `T024-gmsa-extraction-ws01.sh` |
+| **Status** | ✅ Verified |
+| **Technique** | Read `msDS-ManagedPassword` blob for `gmsaTools$` (ACE#10: `eng_cloud → gmsaTools$: ReadGMSAPassword`) → decode MSDS-MANAGEDPASSWORD_BLOB → compute NT hash (MD4 of UTF-16LE) → validate auth as `gmsaTools$` |
+| **Starting credential** | `eng_cloud` / `Cl0ud_Eng!` (ACE#10 ReadGMSAPassword — NOT chief_command/GoldenGMSA; corrected to match `05-ad-attack-surface.yml` ACE#10) |
+| **What it earns** | `gmsaTools$` NT hash `0c81acad6a91e28bc1622ac9bf0cce05` (SMB auth as gmsaTools$ verified ✅) |
+| **RedStrike Intent** | `bloodyad.read_gmsa` / `gmsa-ng` |
+| **State Output** | SET_STATE(creds.gmsaTools.nthash = "0c81acad6a91e28bc1622ac9bf0cce05") |
+| **Script** | `t024-gmsa-extract.py` (ws01-native, in-script: ldap3 LDAPS bind as eng_cloud → blob decode → pure-MD4 → impacket SMB auth check) |
+| **Execution note** | 2026-07-31 verified from ws01 `.62` — LDAPS bind OK, blob 548 bytes, NTHASH `0c81acad...`, SMB_AUTH_OK as gmsaTools$. Prior run via GoldenGMSA/cache/gmsainfo as chief_command superseded — ACE#10 eng_cloud is the configured attack surface. |
 
 #### GPP Stored Password (Groups.xml)
 
 | Field | Value |
 |-------|-------|
-| **Status** | ⏳ Not tested |
+| **Status** | ✅ Verified (2026-07-31) |
 | **Technique** | Find and decrypt `cPassword` in legacy GPP `Groups.xml` in SYSVOL |
-| **What it earns** | Local admin or service account password |
-| **Command** | `Get-GPPPassword` |
+| **Starting credential** | `analyst_cloud` / `Cl0ud_An@lyst!` (SMB read on SYSVOL) |
+| **What it earns** | `svc_ldap` / `s3rv1c3_Ld@p!` (SMB auth as svc_ldap verified ✅) |
+| **Command** | `Get-GPPPassword` (script: `gpp-stored-password.py`, ws01-native, impacket SMB + AES-256-ECB MS14-025 static key) |
 | **RedStrike Intent** | — |
-| **State Output** | SET_STATE(<manual>) |
+| **State Output** | SET_STATE(creds.svc_ldap.password = "s3rv1c3_Ld@p!") |
+| **Execution note** | 2026-07-31 verified from ws01 `.62` as analyst_cloud — SYSVOL walk found `Groups.xml` in Vulnerable-GPO (`{885EE71C-...}`), cpassword `SJdRfgL08RXe4gdPngTefd3BFXTwkOk/fWTi9K0TGeY=` decrypted to `s3rv1c3_Ld@p!`. **Attack surface was misconfigured** in lab: `02-ad-objects.yml` deployed Groups.xml referencing non-existent `svc_backup` with malformed 43-char cpassword. Fixed playbook to reference real `svc_ldap` + valid cpassword (`s3rv1c3_Ld@p!` AES-256-ECB), re-ran on dc01, verified. `05-ad-attack-surface.yml` GPP task aligned to same value. Both verify-only playbooks updated to check svc_ldap + valid cpassword. |
 
 #### SPN Jacking — CVE-2026-25177 (WT027)
 
@@ -1013,11 +1032,12 @@ We have `nt authority\system` on mbr01 via GodPotato. `analyst_cloud` has an act
 
 | Field | Value |
 |-------|-------|
-| **Status** | ⏳ Not tested |
+| **Status** | ✅ Verified 2026-07-31 |
 | **Technique** | Modify AdminSDHolder template → ACL propagated to protected accounts |
 | **What it earns** | Persistent DA rights |
 | **RedStrike Intent** | — |
 | **State Output** | SET_STATE(<manual>) |
+| **Execution note** | `analyst_cloud` (WriteDacl = ACE6) added GenericAll backdoor ACE on AdminSDHolder via `PsBase.Options.SecurityMasks=Dacl`; ACE persisted. DACL had been polluted to 99 ACEs during an earlier PowerView attempt → restored from pristine range.local template (SID-translated) + re-added surface ACE → **23 ACEs, protected, no rogue GenericAll**. Exploit: `t025-adminsdholder-exploit.ps1`; restore: `t025-restore.ps1` + `t025-readd-aces.ps1`. |
 
 ---
 
@@ -1025,7 +1045,7 @@ We have `nt authority\system` on mbr01 via GodPotato. `analyst_cloud` has an act
 
 | Field | Value |
 |-------|-------|
-| **Status** | ⚠️ BLOCKED — Certify.exe from ws01 fails with DirectoryServices operations error; ADCS surface likely present but scripts need proper domain context or fix |
+| **Status** | ⏳ ESC1/ESC3/ESC8/UnPAC pending live run — surface fully configured (`adcs-configuration-guide.md`); credentials corrected to `chief_command@cadre.local`. **ESC8 (WT052):** v5 approach designed + preconditions verified 2026-08-01 (see ESC8 block). |
 | **Stream** | Branch B |
 | **Att&ck** | T1649 (Steal Crypto Wallet / Private Key), T1550 (Use Alternate Auth Material), T1553 (Subvert Trust Controls) |
 | **Technique** | Abuse misconfigured ADCS templates to request certificates as any user or escalate to DA |
@@ -1072,13 +1092,14 @@ We have `nt authority\system` on mbr01 via GodPotato. `analyst_cloud` has an act
 | Field | Value |
 |-------|-------|
 | **WT#** | 052 |
-| **Status** | ✅ Active |
+| **Status** | 🔬 DEFERRED 2026-08-01 — revisit at end. Root cause identified: no SMB-authenticated coerce works on Server 2025 (see Execution note). Surface stays configured. |
 | **Technique** | Coerce dc01$ or other account to authenticate to attacker listener; relay NTLM to ADCS web enrollment → certificate |
 | **Starting credential** | `chief_command` / `C0mm@nd_Ch1ef!` (DA earned via Branch A T015) or Golden Ticket |
-| **Command** | `ntlmrelayx.py -t http://dc01.cadre.local/certsrv/certfnsh.asp ...` |
+| **Command** | (blocked) `ntlmrelayx.py --smb-port 445 -t http://dc01.cadre.local/certsrv/certfnsh.asp --adcs --template Machine -smb2support` + working SMB coerce (none available) |
 | **Script** | `T052-esc8-ws01.sh` |
 | **RedStrike Intent** | — |
 | **State Output** | SET_STATE(<manual>) |
+| **Execution note (2026-08-01)** | **Root cause (live-tested):** (1) The earlier v5 premise — "Coercer emits `\\<listener>@8445` UNC paths the Windows SMB client resolves" — is FALSE: Windows SMB client ignores `@port` in UNC (tcpdump on relay host captured zero TCP connections to non-445 ports). (2) The only working coerce (MS-RPRN, WT017) makes the victim dial the attacker RPC endpoint (135) with **anonymous** auth ("Empty username ... just waiting") — never an authenticated SMB session to 445. (3) MS-EFSR `\PIPE\efsrpc` blocked, MS-DFSNM/MS-FSRVP/MS-EVEN no dial-out. ws01's kernel-held 445 was a red herring. Surface re-verified live (Spooler on DCs, web enrollment 401, firewall rules, tools staged). Diagnostic scripts: `esc8-v5-chain.ps1` (superseded), `esc8-relay-run.sh`, `esc8-relay-hold.sh`, `b050-find.ps1` (all in `04-automation/linux/windows/`). |
 
 #### UnPAC-the-Hash (WT053)
 

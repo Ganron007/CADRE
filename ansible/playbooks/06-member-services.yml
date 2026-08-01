@@ -239,6 +239,13 @@
       changed_when: r.rc == 2
       failed_when: r.rc == 1
 
+    - name: 'H — Grant analyst_cloud "Log on as a batch job" (scheduled-task persistence prerequisite)'
+      ansible.windows.win_user_right:
+        name: SeBatchLogonRight
+        users:
+          - CADRE\analyst_cloud
+        action: add
+
     - name: 'H — Configure auto-logon for analyst_cloud on mbr01'
       ansible.windows.win_shell: |
         $ErrorActionPreference = "Stop"

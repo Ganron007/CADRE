@@ -289,8 +289,11 @@
           if (-not $gpo) { Write-Output "SKIP: Vulnerable-GPO not found"; exit 0 }
           $guid = $gpo.Id.ToString()
           $path = "\\cadre.local\SYSVOL\cadre.local\Policies\{$guid}\Machine\Preferences\Groups\Groups.xml"
-          if (Test-Path $path) { Write-Output "PASS: Groups.xml exists"; exit 0 }
-          Write-Output "FAIL: Groups.xml not found at $path"; exit 1
+          if (-not (Test-Path $path)) { Write-Output "FAIL: Groups.xml not found at $path"; exit 1 }
+          $content = Get-Content -Path $path -Raw
+          if ($content -notmatch 'CADRE\\svc_ldap') { Write-Output "FAIL: Groups.xml does not reference svc_ldap"; exit 1 }
+          if ($content -notmatch 'SJdRfgL08RXe4gdPngTefd3BFXTwkOk/fWTi9K0TGeY=') { Write-Output "FAIL: cpassword does not match valid value"; exit 1 }
+          Write-Output "PASS: Groups.xml present with valid svc_ldap cpassword"; exit 0
         } catch { Write-Output "FAIL: GPP verify error: $_"; exit 1 }
       register: r
       changed_when: false
