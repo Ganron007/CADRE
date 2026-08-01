@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Audit runbook coverage vs CAMPAIGNS_v2.md — report gaps and stale line ranges."""
+"""Audit runbook coverage vs CAMPAIGNS_v3.md — report gaps and stale line ranges."""
 
 from __future__ import annotations
 
@@ -7,7 +7,7 @@ import re
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-V2 = ROOT / "attack-matrix" / "Campaign" / "CAMPAIGNS_v2.md"
+V2 = ROOT / "attack-matrix" / "Campaign" / "CAMPAIGNS_v3.md"
 RUNBOOKS = ROOT / "attack-matrix" / "Campaign" / "Runbooks"
 SPLIT = ROOT / "tools" / "split-campaign-runbooks.py"
 
@@ -33,13 +33,13 @@ def main() -> None:
     lines = text.splitlines(keepends=True)
     plain = [ln.rstrip("\n") for ln in lines]
 
-    print(f"CAMPAIGNS_v2.md: {len(lines)} lines\n")
+    print(f"CAMPAIGNS_v3.md: {len(lines)} lines\n")
     print("=== Section headings (## / ### / ####) ===")
     for ln, level, title in find_headings(lines):
         if level in ("##", "###"):
             print(f"  L{ln:4d} {level} {title}")
 
-    # Expected anchors from v2
+    # Expected anchors from v3
     anchors = {normalize(t): ln for ln, _, t in find_headings(lines) if _ == "##" or _ == "###"}
     
     # Import sections from split script (parse start/end manually)

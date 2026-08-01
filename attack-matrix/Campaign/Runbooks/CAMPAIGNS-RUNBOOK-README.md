@@ -1,8 +1,8 @@
-# CAMPAIGNS v2 — Runbook Index
+# CAMPAIGNS v3 — Runbook Index
 
 > **Purpose:** One runbook per phase — **full narrative + commands** for learning and live testing.
-> **Campaign index:** [`CAMPAIGNS.md`](../CAMPAIGNS.md) (topology, coverage) · **Full reference:** [`CAMPAIGNS_v2.md`](../CAMPAIGNS_v2.md)
-> **Per-attack metadata:** [`CAMPAIGNS-METADATA.md`](../CAMPAIGNS-METADATA.md) · **DFIR:** [`DFIR-Nexus-Pioneer-workflow.md`](../DFIR-Nexus-Pioneer-workflow.md)
+> **Campaign index:** [`CAMPAIGNS_v3.md`](../CAMPAIGNS_v3.md) (topology, coverage) · **Full reference (archived):** [`archive/CAMPAIGNS_v2.md`](../archive/CAMPAIGNS_v2.md)
+> **Per-attack metadata:** [`CAMPAIGNS-METADATA-v2.md`](../CAMPAIGNS-METADATA-v2.md) · **DFIR:** [`DFIR-Nexus-Pioneer-workflow.md`](../DFIR-Nexus-Pioneer-workflow.md)
 
 **Default host:** Kali / provisioning (`192.168.77.60`) unless a runbook says otherwise.
 
@@ -44,8 +44,8 @@
 
 ## Format rules (when editing)
 
-1. **Edit runbook + `CAMPAIGNS_v2.md` together** — same section in both files; runbooks are primary for lab work.
+1. **Edit runbook + `CAMPAIGNS_v3.md` together** — same section in both files; runbooks are primary for lab work.
 2. **Keep explanations** — theory, tables, detection notes, and prerequisites stay in the runbook.
 3. **One command per fenced block** where practical — comments above the block, not inside.
-4. **Study references** for phases 3.5, 4, 6, 8 are appended at the end of those runbooks (from v2 Study Reference Library).
+4. **Study references** for phases 3.5, 4, 6, 8 are appended at the end of those runbooks (from v3 Study Reference Library).
 5. **Verify coverage:** `python tools/split-campaign-runbooks.py --check`

@@ -1,7 +1,7 @@
 # CAMPAIGNS v3 — G — Pre-Auth DC Exploits (Standalone)
 
-> **Campaign v3** — read the theory here, run each command block live, then update [`CAMPAIGNS-METADATA.md`](../CAMPAIGNS-METADATA.md).
-> **Index:** [`CAMPAIGNS-RUNBOOK-README.md`](CAMPAIGNS-RUNBOOK-README.md) · **Full reference:** [`CAMPAIGNS_v3.md`](../CAMPAIGNS_v3.md) · **Topology:** [`CAMPAIGNS.md`](../CAMPAIGNS.md)
+> **Campaign v3** — read the theory here, run each command block live, then update [`CAMPAIGNS-METADATA-v2.md`](../CAMPAIGNS-METADATA-v2.md).
+> **Index:** [`CAMPAIGNS-RUNBOOK-README.md`](CAMPAIGNS-RUNBOOK-README.md) · **Full reference:** [`CAMPAIGNS_v3.md`](../CAMPAIGNS_v3.md) · **Topology:** [`archive/CAMPAIGNS.md`](../archive/CAMPAIGNS.md)
 > **DFIR track:** [`DFIR-Nexus-Pioneer-workflow.md`](../DFIR-Nexus-Pioneer-workflow.md)
 >
 > **Sync rule:** When you change this runbook during lab work, apply the same edit to [`CAMPAIGNS_v3.md`](../CAMPAIGNS_v3.md) (matching section). Re-run `python tools/split-campaign-runbooks.py --check` to verify coverage.
@@ -89,7 +89,7 @@ python3 poc.py 192.168.77.11 child.cadre.local -l 130
 - **Suricata SID for UDP/389 flood:** Optional — multi-packet detection of CLDAP scanning
 
 **Post-test:**
-- Promote CAMPAIGNS-METADATA.md Mechanics section from STUB to TESTED with actual telemetry
+- Promote CAMPAIGNS-METADATA-v2.md Mechanics section from STUB to TESTED with actual telemetry
 - Update CAMPAIGNS.md WT status from 🆕 to ✅ (if worked) or ❌ Patched (if build >= 32772)
 - Document outcome in `docs/internal/plan01-telemetry-catalog/phase1-source-matrix/tracker.md` (post-campaign)
 - Add to `plan1.7` defense deepening as detection engineering deliverable

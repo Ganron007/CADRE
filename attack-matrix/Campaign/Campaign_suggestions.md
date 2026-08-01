@@ -1,18 +1,18 @@
 # Campaign Suggestions — SpecterOps Blog Cross-Reference
 
-**Purpose:** Map research articles to specific campaign phases. Test each technique before integrating into CAMPAIGNS.md.
+**Purpose:** Map research articles to specific campaign phases. Test each technique before integrating into CAMPAIGNS_v3.md.
 
 **Status:** Planning — test before deploy.
 
 **DFIR parallel track:** [`DFIR-Nexus-Pioneer-workflow.md`](DFIR-Nexus-Pioneer-workflow.md) — links each campaign exercise to DFIR-Nexus ingest, cases, and `tracker.md` (Phase 3.5 active).
 
-**Legend:** ✅ = adopted into CAMPAIGNS.md | ⏳ = pending test | 🔬 = research only | ⏭️ = skip
+**Legend:** ✅ = adopted into CAMPAIGNS_v3.md | ⏳ = pending test | 🔬 = research only | ⏭️ = skip
 
 ---
 
 ## Summary — All Items at a Glance
 
-✅ = adopted into CAMPAIGNS.md | ⏳ = pending | 🔬 = research only | ⏭️ = skip
+✅ = adopted into CAMPAIGNS_v3.md | ⏳ = pending | 🔬 = research only | ⏭️ = skip
 
 | Phase | Method | Status |
 |:------|:-------|:-------|
@@ -136,5 +136,5 @@
 
 ## Full item write-ups (separate file)
 
-Per-item sources, test plans, and integration notes are in **[Campaign_suggestions-detail.md](Campaign_suggestions-detail.md)** (~3.9k lines). Keep this index open for the summary table; open the detail file when researching a specific item.
+Per-item sources, test plans, and integration notes are in **[archive/Campaign_suggestions-detail.md](archive/Campaign_suggestions-detail.md)** (~3.9k lines). Keep this index open for the summary table; open the detail file when researching a specific item.
 

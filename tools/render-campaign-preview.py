@@ -25,7 +25,7 @@ except ImportError as exc:  # pragma: no cover
 
 ROOT = Path(__file__).resolve().parents[1]
 CAMPAIGN = ROOT / "attack-matrix" / "Campaign"
-PREVIEW_DIR = CAMPAIGN / "_preview"
+PREVIEW_DIR = CAMPAIGN / "archive" / "_preview"
 
 STYLE = """
 body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
@@ -80,7 +80,7 @@ def write_preview(src: Path) -> Path:
 
 
 def default_targets() -> list[Path]:
-    paths = [CAMPAIGN / "CAMPAIGNS-METADATA.md"]
+    paths = [CAMPAIGN / "CAMPAIGNS-METADATA-v2.md"]
     paths.extend(sorted((CAMPAIGN / "Runbooks").glob("CAMPAIGNS-RUNBOOK*.md")))
     return paths
 

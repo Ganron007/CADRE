@@ -2,9 +2,9 @@
 
 Each walkthrough is a verified, step-by-step attack against the live CADRE substrate. Produces observable telemetry in Elastic/Zeek/Suricata/Velociraptor.
 
-> **Full campaign:** [`../Campaign/CAMPAIGNS.md`](../Campaign/CAMPAIGNS.md) — 8 phases + 4 branches, 75 campaign attacks across a single identity-driven credential chain.
-> **Standalone exercises:** 14 E (network defense) + 10 F (supply-chain). See [`../Campaign/CAMPAIGNS.md`](../Campaign/CAMPAIGNS.md) for details.
-> **Per-attack metadata:** [`../Campaign/CAMPAIGNS-METADATA.md`](../Campaign/CAMPAIGNS-METADATA.md) — playbook refs, ACE#s, telemetry expectations.
+> **Full campaign:** [`../Campaign/CAMPAIGNS_v3.md`](../Campaign/CAMPAIGNS_v3.md) — 8 phases + 4 branches, 75 campaign attacks across a single identity-driven credential chain.
+> **Standalone exercises:** 14 E (network defense) + 10 F (supply-chain). See [`../Campaign/CAMPAIGNS_v3.md`](../Campaign/CAMPAIGNS_v3.md) for details.
+> **Per-attack metadata:** [`../Campaign/CAMPAIGNS-METADATA-v2.md`](../Campaign/CAMPAIGNS-METADATA-v2.md) — playbook refs, ACE#s, telemetry expectations.
 
 ## On-Prem AD (001-033)
 

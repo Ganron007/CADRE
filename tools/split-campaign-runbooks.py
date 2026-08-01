@@ -268,8 +268,8 @@ def nav(prev: str | None, nxt: str | None) -> str:
 def runbook_header(title: str) -> str:
     return f"""# CAMPAIGNS v3 — {title}
 
-> **Campaign v3** — read the theory here, run each command block live, then update [`CAMPAIGNS-METADATA.md`](../CAMPAIGNS-METADATA.md).
-> **Index:** [`CAMPAIGNS-RUNBOOK-README.md`](CAMPAIGNS-RUNBOOK-README.md) · **Full reference:** [`CAMPAIGNS_v3.md`](../CAMPAIGNS_v3.md) · **Topology:** [`CAMPAIGNS.md`](../CAMPAIGNS.md)
+> **Campaign v3** — read the theory here, run each command block live, then update [`CAMPAIGNS-METADATA-v2.md`](../CAMPAIGNS-METADATA-v2.md).
+> **Index:** [`CAMPAIGNS-RUNBOOK-README.md`](CAMPAIGNS-RUNBOOK-README.md) · **Full reference:** [`CAMPAIGNS_v3.md`](../CAMPAIGNS_v3.md) · **Topology:** [`archive/CAMPAIGNS.md`](../archive/CAMPAIGNS.md)
 > **DFIR track:** [`DFIR-Nexus-Pioneer-workflow.md`](../DFIR-Nexus-Pioneer-workflow.md)
 >
 > **Sync rule:** When you change this runbook during lab work, apply the same edit to [`CAMPAIGNS_v3.md`](../CAMPAIGNS_v3.md) (matching section). Re-run `python tools/split-campaign-runbooks.py --check` to verify coverage.
@@ -353,18 +353,18 @@ Open **one runbook per phase**. Each file contains the full explanation, prerequ
 | **A–D** Branches | [`Runbooks/CAMPAIGNS-RUNBOOK-branch-a.md`](Runbooks/CAMPAIGNS-RUNBOOK-branch-a.md) … [`branch-d`](Runbooks/CAMPAIGNS-RUNBOOK-branch-d.md) | Optional |
 | **E / F / G** | [`e`](Runbooks/CAMPAIGNS-RUNBOOK-e.md) · [`f`](Runbooks/CAMPAIGNS-RUNBOOK-f.md) · [`g`](Runbooks/CAMPAIGNS-RUNBOOK-exercises-g.md) | Standalone |
 
-**Full monolithic reference (search / print):** [`CAMPAIGNS_v2.md`](CAMPAIGNS_v2.md) · **Archived v1:** [`CAMPAIGNS_v1_archived.md`](CAMPAIGNS_v1_archived.md)
+**Full v3 reference (search / print):** [`CAMPAIGNS_v3.md`](CAMPAIGNS_v3.md) · **Archived:** [`archive/CAMPAIGNS_v2.md`](archive/CAMPAIGNS_v2.md) · **v1:** [`archive/CAMPAIGNS_v1_archived.md`](archive/CAMPAIGNS_v1_archived.md)
 
-**Per-attack metadata:** [`CAMPAIGNS-METADATA.md`](CAMPAIGNS-METADATA.md) · **DFIR bridge:** [`DFIR-Nexus-Pioneer-workflow.md`](DFIR-Nexus-Pioneer-workflow.md)
+**Per-attack metadata:** [`CAMPAIGNS-METADATA-v2.md`](CAMPAIGNS-METADATA-v2.md) · **DFIR bridge:** [`DFIR-Nexus-Pioneer-workflow.md`](DFIR-Nexus-Pioneer-workflow.md)
 
-**Editing:** Update the runbook and `CAMPAIGNS_v2.md` together. Run `python tools/split-campaign-runbooks.py --check` after bulk regen.
+**Editing:** Update the runbook and `CAMPAIGNS_v3.md` together. Run `python tools/split-campaign-runbooks.py --check` after bulk regen.
 
 ---
 """
     header = """# CADRE — Attack Campaign (v3)
 
 > **v3 is current.** Per-phase runbooks below are the primary path — full narrative + commands for learning and live testing.
-> **Archived v1:** [`CAMPAIGNS_v1_archived.md`](CAMPAIGNS_v1_archived.md) · **Full v3 reference:** [`CAMPAIGNS_v3.md`](CAMPAIGNS_v3.md)
+> **Archived v1:** [`archive/CAMPAIGNS_v1_archived.md`](archive/CAMPAIGNS_v1_archived.md) · **Full v3 reference:** [`CAMPAIGNS_v3.md`](CAMPAIGNS_v3.md)
 
 **81 campaign attacks + 14 E exercises + 10 F supply-chain scenarios = 105 total.**
 
@@ -373,11 +373,11 @@ Open **one runbook per phase**. Each file contains the full explanation, prerequ
 
 
 def build_readme() -> str:
-    return """# CAMPAIGNS v2 — Runbook Index
+    return """# CAMPAIGNS v3 — Runbook Index
 
 > **Purpose:** One runbook per phase — **full narrative + commands** for learning and live testing.
-> **Campaign index:** [`CAMPAIGNS.md`](../CAMPAIGNS.md) (topology, coverage) · **Full reference:** [`CAMPAIGNS_v2.md`](../CAMPAIGNS_v2.md)
-> **Per-attack metadata:** [`CAMPAIGNS-METADATA.md`](../CAMPAIGNS-METADATA.md) · **DFIR:** [`DFIR-Nexus-Pioneer-workflow.md`](../DFIR-Nexus-Pioneer-workflow.md)
+> **Campaign index:** [`CAMPAIGNS_v3.md`](../CAMPAIGNS_v3.md) (topology, coverage) · **Full reference (archived):** [`archive/CAMPAIGNS_v2.md`](../archive/CAMPAIGNS_v2.md)
+> **Per-attack metadata:** [`CAMPAIGNS-METADATA-v2.md`](../CAMPAIGNS-METADATA-v2.md) · **DFIR:** [`DFIR-Nexus-Pioneer-workflow.md`](../DFIR-Nexus-Pioneer-workflow.md)
 
 **Default host:** Kali / provisioning (`192.168.77.60`) unless a runbook says otherwise.
 
@@ -419,10 +419,10 @@ def build_readme() -> str:
 
 ## Format rules (when editing)
 
-1. **Edit runbook + `CAMPAIGNS_v2.md` together** — same section in both files; runbooks are primary for lab work.
+1. **Edit runbook + `CAMPAIGNS_v3.md` together** — same section in both files; runbooks are primary for lab work.
 2. **Keep explanations** — theory, tables, detection notes, and prerequisites stay in the runbook.
 3. **One command per fenced block** where practical — comments above the block, not inside.
-4. **Study references** for phases 3.5, 4, 6, 8 are appended at the end of those runbooks (from v2 Study Reference Library).
+4. **Study references** for phases 3.5, 4, 6, 8 are appended at the end of those runbooks (from v3 Study Reference Library).
 5. **Verify coverage:** `python tools/split-campaign-runbooks.py --check`
 """
 
@@ -531,7 +531,7 @@ def main() -> None:
     gaps = audit_coverage(lines, sections)
 
     if check_only:
-        print(f"CAMPAIGNS_v2.md: {len(lines)} lines")
+        print(f"CAMPAIGNS_v3.md: {len(lines)} lines")
         for sec in sections:
             extra = ""
             if sec.get("study_start"):

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Split CAMPAIGNS-METADATA.md into index + mechanics (preview-friendly)."""
+"""Split archived CAMPAIGNS-METADATA.md (pre-v2) into index + mechanics (preview-friendly)."""
 
 from __future__ import annotations
 
@@ -7,8 +7,8 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 CAMPAIGN = ROOT / "attack-matrix" / "Campaign"
-MAIN = CAMPAIGN / "CAMPAIGNS-METADATA.md"
-MECH = CAMPAIGN / "CAMPAIGNS-METADATA-mechanics.md"
+MAIN = CAMPAIGN / "archive" / "CAMPAIGNS-METADATA.md"
+MECH = CAMPAIGN / "archive" / "CAMPAIGNS-METADATA-mechanics.md"
 SPLIT_AT = "## Mechanics: Phase 0 Step 0.5 — NetExec Quick-Recon"
 
 

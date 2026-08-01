@@ -1,7 +1,7 @@
 # CAMPAIGNS v3 — Phase 5 — Lateral Movement (Coercion + Delegation)
 
-> **Campaign v3** — read the theory here, run each command block live, then update [`CAMPAIGNS-METADATA.md`](../CAMPAIGNS-METADATA.md).
-> **Index:** [`CAMPAIGNS-RUNBOOK-README.md`](CAMPAIGNS-RUNBOOK-README.md) · **Full reference:** [`CAMPAIGNS_v3.md`](../CAMPAIGNS_v3.md) · **Topology:** [`CAMPAIGNS.md`](../CAMPAIGNS.md)
+> **Campaign v3** — read the theory here, run each command block live, then update [`CAMPAIGNS-METADATA-v2.md`](../CAMPAIGNS-METADATA-v2.md).
+> **Index:** [`CAMPAIGNS-RUNBOOK-README.md`](CAMPAIGNS-RUNBOOK-README.md) · **Full reference:** [`CAMPAIGNS_v3.md`](../CAMPAIGNS_v3.md) · **Topology:** [`archive/CAMPAIGNS.md`](../archive/CAMPAIGNS.md)
 > **DFIR track:** [`DFIR-Nexus-Pioneer-workflow.md`](../DFIR-Nexus-Pioneer-workflow.md)
 >
 > **Sync rule:** When you change this runbook during lab work, apply the same edit to [`CAMPAIGNS_v3.md`](../CAMPAIGNS_v3.md) (matching section). Re-run `python tools/split-campaign-runbooks.py --check` to verify coverage.
@@ -279,7 +279,7 @@ Reset-ComputerMachinePassword -Server dc01.cadre.local -Credential (Get-Credenti
 - `references/sources/onelogon/` (clone, source-only)
 - `references/onelogon-analysis.md` (full breakdown)
 - External references #123+ in `external-references.md`
-- Mechanics section in CAMPAIGNS-METADATA.md (currently stub)
+- Mechanics section in CAMPAIGNS-METADATA-v2.md (currently stub)
 - plan1.7 §16 (detection engineering)
 - Update WT095 status from ⏳ to ✅ once executed in lab
 

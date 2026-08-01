@@ -2,9 +2,9 @@
 
 > **Status:** **Current** campaign SSoT — ws01 beachhead + Plan 1.1 dual assume-breach routing.
 > **Implements** `[docs/internal/plan01-telemetry-catalog/phase1-source-matrix/five-stream-merge.md](../../docs/internal/plan01-telemetry-catalog/phase1-source-matrix/five-stream-merge.md)` — the unified 100-attack pipeline.
-> **Per-attack metadata:** `[CAMPAIGNS-METADATA.md](CAMPAIGNS-METADATA.md)` — playbook refs, ACE#s, telemetry expectations.
+> **Per-attack metadata:** `[CAMPAIGNS-METADATA-v2.md](CAMPAIGNS-METADATA-v2.md)` — playbook refs, ACE#s, telemetry expectations.
 > **DFIR investigation bridge:** `[DFIR-Nexus-Pioneer-workflow.md](DFIR-Nexus-Pioneer-workflow.md)` — parallel attack + DFIR-Nexus case workflow (Phase 3.5 active).
-> **Index:** `[CAMPAIGNS.md](CAMPAIGNS.md)` · **Automation:** [`docs/internal/plan1.1-campaign-automation/`](../../docs/internal/plan1.1-campaign-automation/) · **Archived v1:** `[CAMPAIGNS_v1_archived.md](CAMPAIGNS_v1_archived.md)` · **v2 monolith:** `[CAMPAIGNS_v2.md](CAMPAIGNS_v2.md)`.
+> **Index:** [`Runbooks/CAMPAIGNS-RUNBOOK-README.md`](Runbooks/CAMPAIGNS-RUNBOOK-README.md) · **Automation:** [`docs/internal/plan1.1-campaign-automation/`](../../docs/internal/plan1.1-campaign-automation/) · **Archive:** [`archive/CAMPAIGNS.md`](archive/CAMPAIGNS.md) (v2 index) · [`archive/CAMPAIGNS_v2.md`](archive/CAMPAIGNS_v2.md) (v2 monolith) · [`archive/CAMPAIGNS_v1_archived.md`](archive/CAMPAIGNS_v1_archived.md) (v1).
 
 **81 campaign attacks + 14 E exercises + 10 F supply-chain scenarios = 105 total.**
 
@@ -344,10 +344,10 @@ STREAMS E / F / G — STANDALONE EXERCISES (Not part of campaign narrative)
 > | Learn + execute one phase | **Phase runbook** (e.g. [`Runbooks/CAMPAIGNS-RUNBOOK-0.md`](Runbooks/CAMPAIGNS-RUNBOOK-0.md)) |
 > | Pick which file to open | [`Runbooks/CAMPAIGNS-RUNBOOK-README.md`](Runbooks/CAMPAIGNS-RUNBOOK-README.md) |
 > | Search entire campaign / print | **This file** (`CAMPAIGNS_v3.md`) |
-> | Index + topology pointer | [`CAMPAIGNS.md`](CAMPAIGNS.md) |
+> | Index + topology pointer | [`archive/CAMPAIGNS.md`](archive/CAMPAIGNS.md) (archived v2) |
 > | Attack routing (ws01-primary) | [`WS01-ROUTING.md`](../04-automation/linux/lib/WS01-ROUTING.md) |
 >
-> **After each verified attack:** update [`CAMPAIGNS-METADATA.md`](CAMPAIGNS-METADATA.md).
+> **After each verified attack:** update [`CAMPAIGNS-METADATA-v2.md`](CAMPAIGNS-METADATA-v2.md).
 >
 > **Editing (going forward):** Update the **runbook** and the matching section in **`CAMPAIGNS_v3.md`** together. Run `python tools/split-campaign-runbooks.py --check` to verify nothing was dropped. New Phase 0.5 maps to **[`Runbook H`](Runbooks/CAMPAIGNS-RUNBOOK-H.md)**.
 >
@@ -577,7 +577,7 @@ nxc smb 192.168.77.10 -u 'guest' -p '' --rid-brute 10000
 ```
 
 **What CAN run unauthenticated in Phase 0 (not NetExec):**
-- **Step 0** — nmap port/service scan (already in CAMPAIGNS.md)
+- **Step 0** — nmap port/service scan (already in CAMPAIGNS_v3.md)
 - **Step 1** — RPC anonymous enum (blocked on Server 2025 — historical)
 - **Step 2** — DNS zone transfers, public records
 - **Step 3** — ADWS enumeration (port 9389 — may still work unauth in some configs)
@@ -2776,7 +2776,7 @@ Reset-ComputerMachinePassword -Server dc01.cadre.local -Credential (Get-Credenti
 - `references/sources/onelogon/` (clone, source-only)
 - `references/onelogon-analysis.md` (full breakdown)
 - External references #123+ in `external-references.md`
-- Mechanics section in CAMPAIGNS-METADATA.md (currently stub)
+- Mechanics section in CAMPAIGNS-METADATA-v2.md (currently stub)
 - plan1.7 §16 (detection engineering)
 - Update WT095 status from ⏳ to ✅ once executed in lab
 
@@ -3575,7 +3575,7 @@ env /bin/sh                                # Shell via env
 - This enables the SID History injection in WT010-012
 - Detection: monitor `4662` events on `CN=ForeignSecurityPrincipals` and `5136` events for SID History modifications
 
-**Action item:** Read before Phase 8. Cross-reference with the SID filter footnote in the CAMPAIGNS.md topology diagram.
+**Action item:** Read before Phase 8. Cross-reference with the SID filter footnote in the CAMPAIGNS_v3.md topology diagram.
 
 #### 📖 CVE-2020-0665 — Forest Trust Privilege Escalation — Dirk-jan Mollema
 
@@ -3606,7 +3606,7 @@ env /bin/sh                                # Shell via env
 
 **Why read:** Comprehensive guide to running purple team exercises. Direct relevance:
 - Chapter 6 (Collecting Telemetry) — patterns for Suricata/Zeek/Sysmon/WinSec correlation that match our plan1.7
-- Chapter 8 (Atomic Red Team) — execution framework with 1000+ tests that complement our manual CAMPAIGNS.md commands
+- Chapter 8 (Atomic Red Team) — execution framework with 1000+ tests that complement our manual CAMPAIGNS_v3.md commands
 - Chapter 9 (Caldera AD Recon) — adversary emulation automation (already in our Track B Parallel Tracks)
 - Chapter 10 (Mythic C2) — C2 operations (relevant to Plan 10 + Loki integration)
 - Chapter 11 (Reporting + Tracking) — directly relevant to our `tracker.md` workflow + DFIR-Nexus case reports
@@ -3614,7 +3614,7 @@ env /bin/sh                                # Shell via env
 **Source:** `CADRE-Courses/NoStarchPress_extract/Practical_Purple_Teaming-0642572230173/` (725KB .txt, 770KB .html). See Campaign_suggestions.md #101.
 
 **Concrete techniques extracted from this book (see Campaign_suggestions.md):**
-- **#106 Atomic Red Team as validation framework** (Ch 8) — 1000+ pre-built MITRE ATT&CK tests for cross-validation of our manual CAMPAIGNS.md attacks. Run `Invoke-AtomicTest T1003.001,T1558.003,... -ShowDetails` per phase.
+- **#106 Atomic Red Team as validation framework** (Ch 8) — 1000+ pre-built MITRE ATT&CK tests for cross-validation of our manual CAMPAIGNS_v3.md attacks. Run `Invoke-AtomicTest T1003.001,T1558.003,... -ShowDetails` per phase.
 
 **Action item:** Read **before plan1.7 detection engineering work** and **before DFIR-Nexus integration**. Use Ch 6 telemetry patterns + Ch 8 Atomic Red Team tests to validate our detection coverage.
 
@@ -3767,7 +3767,7 @@ npm threat emulation on linux01 (Bash) + mbr01 (PowerShell). Detected via auditd
 | F-11 | Cache poisoning (CI side analog)                | T1195.001        | auditd file-watch · Sysmon EID 11                 | npm-011: `write to .npm/_cacache outside install workflow` (held — Plan 0.8 expansion, see Campaign_suggestions #107) |
 | F-12 | Tag pollution analog (`npm dist-tag add`)       | T1195.001        | auditd exec of `npm dist-tag`                    | npm-012: `npm dist-tag add to existing tag name` (held — Plan 0.8 expansion, see Campaign_suggestions #107) |
 
-> **GitHub Actions Supply-Chain Patterns (Plan 0.8 expansion + CADRE-Strike defensive):** F-11/F-12 are npm-side analogs of the GitHub Actions supply-chain attack patterns documented in [GMO Flatt Security blog Part 1](https://blog.flatt.tech/entry/2026-github-actions-security-part1) (2026-06-24). 3 attack patterns: vulnerable trigger injection (Ultralytics Dec 2024, nx Aug 2025), tag pollution + Imposter Commits (tj-actions/changed-files Mar 2025, trivy Feb 2026), AI agent over-permission (cline Feb 2026). F-11/F-12 are NOT yet integrated into Plan 0.8 playbook — held for Plan 0.8 expansion. See Campaign_suggestions.md #107 + CAMPAIGNS-METADATA.md "Mechanics: Item #107" for full Mechanics stub. Also applies to CADRE-Strike (Track H) as defensive guardrails when `claude-code-action` or similar is integrated — see Track H entry.
+> **GitHub Actions Supply-Chain Patterns (Plan 0.8 expansion + CADRE-Strike defensive):** F-11/F-12 are npm-side analogs of the GitHub Actions supply-chain attack patterns documented in [GMO Flatt Security blog Part 1](https://blog.flatt.tech/entry/2026-github-actions-security-part1) (2026-06-24). 3 attack patterns: vulnerable trigger injection (Ultralytics Dec 2024, nx Aug 2025), tag pollution + Imposter Commits (tj-actions/changed-files Mar 2025, trivy Feb 2026), AI agent over-permission (cline Feb 2026). F-11/F-12 are NOT yet integrated into Plan 0.8 playbook — held for Plan 0.8 expansion. See Campaign_suggestions.md #107 + CAMPAIGNS-METADATA-v2.md "Mechanics: Item #107" for full Mechanics stub. Also applies to CADRE-Strike (Track H) as defensive guardrails when `claude-code-action` or similar is integrated — see Track H entry.
 
 ---
 
@@ -3850,8 +3850,8 @@ python3 poc.py 192.168.77.11 child.cadre.local -l 130
 - **Suricata SID for UDP/389 flood:** Optional — multi-packet detection of CLDAP scanning
 
 **Post-test:**
-- Promote CAMPAIGNS-METADATA.md Mechanics section from STUB to TESTED with actual telemetry
-- Update CAMPAIGNS.md WT status from 🆕 to ✅ (if worked) or ❌ Patched (if build >= 32772)
+- Promote CAMPAIGNS-METADATA-v2.md Mechanics section from STUB to TESTED with actual telemetry
+- Update CAMPAIGNS_v3.md WT status from 🆕 to ✅ (if worked) or ❌ Patched (if build >= 32772)
 - Document outcome in `docs/internal/plan01-telemetry-catalog/phase1-source-matrix/tracker.md` (post-campaign)
 - Add to `plan1.7` defense deepening as detection engineering deliverable
 - Cross-reference: Item #65 Zerologon Alternative (superseded), Item #76 Onelogon (also exploits Netlogon but different vuln class)

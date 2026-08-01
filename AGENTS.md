@@ -30,14 +30,18 @@ Use `vagrant ssh provisioning` (from the `Vagrantfile` directory) when available
 
 ## Attack Campaign (`attack-matrix/Campaign/`)
 
-**Start here:** [`attack-matrix/Campaign/Runbooks/CAMPAIGNS-RUNBOOK-README.md`](attack-matrix/Campaign/Runbooks/CAMPAIGNS-RUNBOOK-README.md) (per-phase learn + execute) · **Index:** [`attack-matrix/Campaign/CAMPAIGNS.md`](attack-matrix/Campaign/CAMPAIGNS.md) (topology + coverage) · **Full reference:** [`CAMPAIGNS_v2.md`](attack-matrix/Campaign/CAMPAIGNS_v2.md) · **DFIR:** [`DFIR-Nexus-Pioneer-workflow.md`](attack-matrix/Campaign/DFIR-Nexus-Pioneer-workflow.md)
+**Start here:** [`attack-matrix/Campaign/Runbooks/CAMPAIGNS-RUNBOOK-README.md`](attack-matrix/Campaign/Runbooks/CAMPAIGNS-RUNBOOK-README.md) (per-phase learn + execute) · **Index:** [`attack-matrix/Campaign/CAMPAIGNS_v3.md`](attack-matrix/Campaign/CAMPAIGNS_v3.md) (topology + coverage) · **Full reference (archived):** [`archive/CAMPAIGNS_v2.md`](attack-matrix/Campaign/archive/CAMPAIGNS_v2.md) · **DFIR:** [`DFIR-Nexus-Pioneer-workflow.md`](attack-matrix/Campaign/DFIR-Nexus-Pioneer-workflow.md)
 
 | Path | Role |
 |------|------|
-| `Campaign/CAMPAIGNS.md` | v2 index — topology, attack flow, runbook table |
-| `Campaign/CAMPAIGNS_v2.md` | Full monolithic campaign (search / print) |
-| `Campaign/CAMPAIGNS_v1_archived.md` | Archived v1 (60-attack campaign) |
-| `Campaign/CAMPAIGNS-METADATA.md` | Per-attack metadata, playbook refs, telemetry |
+| `Campaign/CAMPAIGNS_v3.md` | **Current campaign** — full narrative (search / print) |
+| `Campaign/CAMPAIGNS-METADATA-v2.md` | Per-attack metadata, playbook refs, telemetry |
+| `Campaign/archive/CAMPAIGNS.md` | Archived v2 index — topology, attack flow, runbook table |
+| `Campaign/archive/CAMPAIGNS_v2.md` | Archived v2 monolithic campaign (search / print) |
+| `Campaign/archive/CAMPAIGNS_v1_archived.md` | Archived v1 (60-attack campaign) |
+| `Campaign/archive/CAMPAIGNS-METADATA.md` | Archived per-attack metadata (pre-v2) |
+| `Campaign/archive/CAMPAIGNS-METADATA-mechanics.md` | Archived command-level mechanics |
+| `Campaign/archive/Campaign_suggestions-detail.md` | Archived per-item write-ups |
 | `Campaign/Campaign_suggestions.md` | Research backlog (promote → campaign when verified) |
 | `Campaign/Runbooks/` | **Primary path** — full phase narrative + commands (Phase 0–8, 3.5, branches, E/F/G) |
 | `Campaign/study-guide/` | Phase deep-dives (was `05-study-guide/`) |
@@ -49,13 +53,13 @@ Use `vagrant ssh provisioning` (from the `Vagrantfile` directory) when available
 
 **Sibling dirs (not under Campaign/):** `01-walkthroughs/` (WT reference), `04-automation/` (scripts), `02-diagrams/cadre-architecture-reference.md` (lab topology).
 
-**Workflow:** Open phase runbook → read theory → run commands live → update `CAMPAIGNS-METADATA.md` → review `Campaign_suggestions.md` before next phase.
+**Workflow:** Open phase runbook → read theory → run commands live → update `CAMPAIGNS-METADATA-v2.md` → review `Campaign_suggestions.md` before next phase.
 
-**Editing (going forward):** Change **runbook + matching `CAMPAIGNS_v2.md` section together**. Verify with `python tools/split-campaign-runbooks.py --check`. Full regen from v2 only: `python tools/split-campaign-runbooks.py` (overwrites runbooks).
+**Editing (going forward):** Change **runbook + matching `CAMPAIGNS_v3.md` section together**. Verify with `python tools/split-campaign-runbooks.py --check`. Full regen from v3 only: `python tools/split-campaign-runbooks.py` (overwrites runbooks).
 
 **Tools:** `tools/split-campaign-runbooks.py` (heading-anchored split + coverage audit).
 
-**Path notes:** Historical entries may say `attack-matrix/CAMPAIGNS.md` → now `attack-matrix/Campaign/CAMPAIGNS.md` (index) or `CAMPAIGNS_v2.md` (full narrative).
+**Path notes:** Historical entries may say `attack-matrix/CAMPAIGNS.md` or `attack-matrix/Campaign/CAMPAIGNS.md` → now `attack-matrix/Campaign/CAMPAIGNS_v3.md` (full narrative); v2/v1 + old metadata live under `attack-matrix/Campaign/archive/`.
 
 ## Mini-Projects & Integrations
 

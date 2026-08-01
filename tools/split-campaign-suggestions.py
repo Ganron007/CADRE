@@ -8,7 +8,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 CAMPAIGN = ROOT / "attack-matrix" / "Campaign"
 MAIN = CAMPAIGN / "Campaign_suggestions.md"
-DETAIL = CAMPAIGN / "Campaign_suggestions-detail.md"
+DETAIL = CAMPAIGN / "archive" / "Campaign_suggestions-detail.md"
 SPLIT_AT = "## Tier 1 — Directly Maps to Our Attack Surface"
 
 
@@ -32,7 +32,7 @@ def main() -> None:
 
 ## Full item write-ups (separate file)
 
-Per-item sources, test plans, and integration notes are in **[Campaign_suggestions-detail.md](Campaign_suggestions-detail.md)** (~3.9k lines). Keep this index open for the summary table; open the detail file when researching a specific item.
+Per-item sources, test plans, and integration notes are in **[archive/Campaign_suggestions-detail.md](archive/Campaign_suggestions-detail.md)** (~3.9k lines). Keep this index open for the summary table; open the detail file when researching a specific item.
 """
     detail_header = (
         "# Campaign Suggestions — Detail Write-ups\n\n"

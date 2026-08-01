@@ -51,11 +51,11 @@ Each attack entry follows this structure:
 1. Start with `phase0-reconnaissance.md` — understand the lab environment
 2. Follow the campaign phases in order: Phase 1 → 2 → 3 → ...
 3. Each file builds on the previous — later phases assume you've earned credentials from earlier ones
-4. Cross-reference with `../CAMPAIGNS-METADATA.md` for playbook/ACE details
+4. Cross-reference with `../CAMPAIGNS-METADATA-v2.md` for playbook/ACE details
 5. Cross-reference with `../../01-walkthroughs/` for step-by-step execution guides
 
 ## Related
 
-- `../CAMPAIGNS-METADATA.md` — structured per-attack data (playbook refs, ACE#s, telemetry)
-- `../CAMPAIGNS.md` — campaign narrative and attack flow
+- `../CAMPAIGNS-METADATA-v2.md` — structured per-attack data (playbook refs, ACE#s, telemetry)
+- `../CAMPAIGNS_v3.md` — campaign narrative and attack flow
 - `../../docs/internal/cert-map/` — per-certification learning paths (internal reference, not linked publicly)

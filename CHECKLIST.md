@@ -121,7 +121,7 @@
 
 ## C — Campaign v3 execution
 
-**Runbook:** [`CAMPAIGNS-RUNBOOK-*.md`](attack-matrix/Campaign/Runbooks/) · **Narrative:** [`CAMPAIGNS_v3.md`](attack-matrix/Campaign/CAMPAIGNS_v3.md) · **Metadata:** [`CAMPAIGNS-METADATA.md`](attack-matrix/Campaign/CAMPAIGNS-METADATA.md)
+**Runbook:** [`CAMPAIGNS-RUNBOOK-*.md`](attack-matrix/Campaign/Runbooks/) · **Narrative:** [`CAMPAIGNS_v3.md`](attack-matrix/Campaign/CAMPAIGNS_v3.md) · **Metadata:** [`CAMPAIGNS-METADATA-v2.md`](attack-matrix/Campaign/CAMPAIGNS-METADATA-v2.md)
 
 | ID | Phase / stream | Profile | Status | Attack | Tracker | Metadata | Notes |
 |----|----------------|---------|--------|--------|---------|----------|-------|

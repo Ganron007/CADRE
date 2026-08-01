@@ -1,6 +1,6 @@
 # ~~WT#031 — Password Spray~~
 
-> **⏳ PENDING RELOCATION — Valid technique, temporarily removed from active campaign.** Password spray requires a user list. The original source (WT028 null session) is invalid. Awaits reinsertion at a point in the chain where a user list is available. See [`CAMPAIGNS.md`](../Campaign/CAMPAIGNS.md) Phase 1 notes.
+> **⏳ PENDING RELOCATION — Valid technique, temporarily removed from active campaign.** Password spray requires a user list. The original source (WT028 null session) is invalid. Awaits reinsertion at a point in the chain where a user list is available. See [`CAMPAIGNS_v3.md`](../Campaign/CAMPAIGNS_v3.md) Phase 1 notes.
 
 ## Metadata
 | Field | Value |

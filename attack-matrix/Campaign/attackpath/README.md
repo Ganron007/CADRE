@@ -8,7 +8,7 @@
 > - ~~WT028~~ ❌ Invalid — SAMR null bind blocked on Server 2025
 > - ~~WT031~~ ⏳ Pending relocation — needs user list source
 > - ~~WT018-020~~ ❌ Non-functional on Server 2025
-> - See [`../CAMPAIGNS.md`](../CAMPAIGNS.md) for the restructured campaign (8 phases + 4 branches)
+> - See [`../CAMPAIGNS_v3.md`](../CAMPAIGNS_v3.md) for the restructured campaign (8 phases + 4 branches)
 
 ---
 
@@ -255,19 +255,19 @@
 | **Status** | CONFIGURED |
 
 ### ~~#18 — PetitPotam~~ ❌
-> **Non-functional on Server 2025.** `\PIPE\efsrpc` blocked by default. See [`CAMPAIGNS.md`](../CAMPAIGNS.md).
+> **Non-functional on Server 2025.** `\PIPE\efsrpc` blocked by default. See [`CAMPAIGNS_v3.md`](../CAMPAIGNS_v3.md).
 | **Status** | **❌ NON-FUNCTIONAL** |
 | **Reason** | EFSR named pipe inaccessible on Server 2025 |
 | **Alternative** | Use WT017 (PrinterBug) for confirmed coercion |
 
 ### ~~#19 — DFSCoerce~~ ❌
-> **Non-functional in detection context.** SMB-pipe DCE-RPC undetectable by Suricata 8.0.5 and Zeek. See [`CAMPAIGNS.md`](../CAMPAIGNS.md).
+> **Non-functional in detection context.** SMB-pipe DCE-RPC undetectable by Suricata 8.0.5 and Zeek. See [`CAMPAIGNS_v3.md`](../CAMPAIGNS_v3.md).
 | **Status** | **❌ NON-FUNCTIONAL** |
 | **Reason** | MS-DFSNM uses SMB-encapsulated DCE-RPC — Suricata `dcerpc` keywords don't match `app_proto:"smb"` |
 | **Alternative** | Use WT017 (PrinterBug) for confirmed coercion detection |
 
 ### ~~#20 — ShadowCoerce~~ ❌
-> **Non-functional on Server 2025.** MS-FSRVP service not available. See [`CAMPAIGNS.md`](../CAMPAIGNS.md).
+> **Non-functional on Server 2025.** MS-FSRVP service not available. See [`CAMPAIGNS_v3.md`](../CAMPAIGNS_v3.md).
 | **Status** | **❌ NON-FUNCTIONAL** |
 | **Reason** | FSRVP (File Server VSS Agent) not available on Server 2025 DCs |
 | **Alternative** | Use WT017 (PrinterBug) for confirmed coercion detection |
@@ -633,7 +633,7 @@ All target CA `cadre-CA` on `dc01.cadre.local`. Starting credential: low-priv do
 ## Recon / Other Attacks
 
 ### ~~#28 — Null Session Enumeration~~
-> **❌ INVALID — Removed.** Server 2025 `RestrictAnonymousSAM=1` blocks SAMR null binds. See [`CAMPAIGNS.md`](../CAMPAIGNS.md).
+> **❌ INVALID — Removed.** Server 2025 `RestrictAnonymousSAM=1` blocks SAMR null binds. See [`CAMPAIGNS_v3.md`](../CAMPAIGNS_v3.md).
 | **Starting point** | kali -> dc02 (no creds) |
 | **Target** | dc02 -- `RestrictAnonymous=0` (insufficient — SAM=1 blocks) |
 | **Tool** | `enum4linux -U dc02` / `rpcclient -U "" -N dc02` |
@@ -657,7 +657,7 @@ All target CA `cadre-CA` on `dc01.cadre.local`. Starting credential: low-priv do
 | **Status** | CONFIGURED |
 
 ### ~~#31 — Password Spray~~
-> **⏳ PENDING RELOCATION.** Valid technique — needs a user list source. See [`CAMPAIGNS.md`](../CAMPAIGNS.md).
+> **⏳ PENDING RELOCATION.** Valid technique — needs a user list source. See [`CAMPAIGNS_v3.md`](../CAMPAIGNS_v3.md).
 | **Starting point** | kali -> dc01 (needs user list) |
 | **Target** | All domain users |
 | **Tool** | `kerbrute passwordspray` / `DomainPasswordSpray` |

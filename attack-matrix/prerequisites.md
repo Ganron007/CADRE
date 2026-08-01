@@ -43,4 +43,4 @@ Snapshot the lab clean before attacking so you can revert between walkthroughs. 
 
 - Attack numbering starts at **WT#002** (Kerberoasting begins with AES — RC4 is non-viable on Server 2025).
 - Attacks are **telemetry exercises** — each walkthrough's "Telemetry Verification" section tells you which Elastic index / detection rule / EID to check after running it.
-- The full campaign is documented in **[`Campaign/CAMPAIGNS.md`](Campaign/CAMPAIGNS.md)** — identity-driven, credential-earned, detection-verified.
+- The full campaign is documented in **[`Campaign/CAMPAIGNS_v3.md`](Campaign/CAMPAIGNS_v3.md)** — identity-driven, credential-earned, detection-verified.

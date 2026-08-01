@@ -8,4 +8,4 @@
 | `attack-flow.md` | Moved to [`../Campaign/diagrams/attack-flow.md`](../Campaign/diagrams/attack-flow.md) — main spine + 4 branches |
 | `../../docs/img/cadre-architecture.svg` | Full-color architecture diagram (SVG, 1920×1080) |
 
-For the full campaign attack flow, see [`../Campaign/diagrams/attack-flow.md`](../Campaign/diagrams/attack-flow.md) and [`../Campaign/CAMPAIGNS.md`](../Campaign/CAMPAIGNS.md).
+For the full campaign attack flow, see [`../Campaign/diagrams/attack-flow.md`](../Campaign/diagrams/attack-flow.md) and [`../Campaign/CAMPAIGNS_v3.md`](../Campaign/CAMPAIGNS_v3.md).
