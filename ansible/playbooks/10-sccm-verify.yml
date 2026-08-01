@@ -130,8 +130,8 @@
         $ErrorActionPreference = "Stop"
         try {
           Import-Module WebAdministration -ErrorAction Stop
-          $pool = Get-ItemProperty "IIS:\AppPools\AdminService" -ErrorAction SilentlyContinue
-          if (-not $pool) { Write-Output "FAIL: AdminService app pool not found"; exit 1 }
+          $pool = Get-ItemProperty "IIS:\AppPools\SMS_AdminService_AppPool" -ErrorAction SilentlyContinue
+          if (-not $pool) { Write-Output "FAIL: AdminService app pool (SMS_AdminService_AppPool) not found"; exit 1 }
           $user = $pool.processModel.userName
           if ($user -eq "RANGE\svc_sccm") { Write-Output "PASS: AdminService pool identity = RANGE\svc_sccm"; exit 0 }
           Write-Output "FAIL: AdminService pool identity is '$user' (expected RANGE\svc_sccm — required for CD ticket decryption)"; exit 1
