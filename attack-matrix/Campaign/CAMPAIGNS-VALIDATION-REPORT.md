@@ -243,22 +243,24 @@
 
 ## E - Network Defense
 
+> **Status (2026-08-02):** Attack side **✅ COMPLETE** — all 13 simulated attacks (WT069–081) + E-10 SNI validated from `ws01` (scripts `04-automation/campaign-e/ws01-campaign-e.ps1` / `-fix.ps1`). Detection rules already deployed (`13-net-monitor.yml`: `cadre-ad/phaseb/et-lab/coercion` rules + Zeek `cadre-outbound/conn-beacon`). **PENDING (what remains):** per-item rule fire-confirmation + telemetry capture — deferred to **Plan 1 telemetry catalog** (monitor `.55` unreachable during the ws01 run). WT093 ransomware → future Branch R (`plan1.8-offensive-upgrades.md` §7).
+
 | ID | Attack | Source Machine | Credential | Status | Notes | Re-test Needed |
 |------|--------|----------------|------------|--------|-------|----------------|
-| E-01 | E-01 — Kerberoast detection | monitor VM (192.168.77.55) | None / SIEM analyst | ⏳ Not exercised | Detection rule validation; see plan1.7-defense-deepening.md | Yes |
-| E-02 | E-02 — DCSync detection | monitor VM (192.168.77.55) | None / SIEM analyst | ⏳ Not exercised | Detection rule validation; see plan1.7-defense-deepening.md | Yes |
-| E-03 | E-03 — AS-REP roast detection | monitor VM (192.168.77.55) | None / SIEM analyst | ⏳ Not exercised | Detection rule validation; see plan1.7-defense-deepening.md | Yes |
-| E-04 | E-04 — DGA detection | monitor VM (192.168.77.55) | None / SIEM analyst | ⏳ Not exercised | Detection rule validation; see plan1.7-defense-deepening.md | Yes |
-| E-05 | E-05 — DNS TXT exfil | monitor VM (192.168.77.55) | None / SIEM analyst | ⏳ Not exercised | Detection rule validation; see plan1.7-defense-deepening.md | Yes |
-| E-06 | E-06 — NXDOMAIN bursts | monitor VM (192.168.77.55) | None / SIEM analyst | ⏳ Not exercised | Detection rule validation; see plan1.7-defense-deepening.md | Yes |
-| E-07 | E-07 — TLD anomalies | monitor VM (192.168.77.55) | None / SIEM analyst | ⏳ Not exercised | Detection rule validation; see plan1.7-defense-deepening.md | Yes |
-| E-08 | E-08 — IP literal C2 | monitor VM (192.168.77.55) | None / SIEM analyst | ⏳ Not exercised | Detection rule validation; see plan1.7-defense-deepening.md | Yes |
-| E-09 | E-09 — TLS 1.0 anomalies | monitor VM (192.168.77.55) | None / SIEM analyst | ⏳ Not exercised | Detection rule validation; see plan1.7-defense-deepening.md | Yes |
-| E-10 | E-10 — SNI anomalies | monitor VM (192.168.77.55) | None / SIEM analyst | ⏳ Not exercised | Detection rule validation; see plan1.7-defense-deepening.md | Yes |
-| E-11 | E-11 — C2 cipher suites | monitor VM (192.168.77.55) | None / SIEM analyst | ⏳ Not exercised | Detection rule validation; see plan1.7-defense-deepening.md | Yes |
-| E-12 | E-12 — SMB admin share | monitor VM (192.168.77.55) | None / SIEM analyst | ⏳ Not exercised | Detection rule validation; see plan1.7-defense-deepening.md | Yes |
-| E-13 | E-13 — SMBv1 downgrade | monitor VM (192.168.77.55) | None / SIEM analyst | ⏳ Not exercised | Detection rule validation; see plan1.7-defense-deepening.md | Yes |
-| E-14 | E-14 — HTTP UA anomalies | monitor VM (192.168.77.55) | None / SIEM analyst | ⏳ Not exercised | Detection rule validation; see plan1.7-defense-deepening.md | Yes |
+| E-01 | E-01 — Kerberoast detection | monitor VM (192.168.77.55) | None / SIEM analyst | ⏳ Rule validate pending | Attack run (main campaign); detection rule validation; see plan1.7-defense-deepening.md | Yes |
+| E-02 | E-02 — DCSync detection | monitor VM (192.168.77.55) | None / SIEM analyst | ⏳ Rule validate pending | Attack run (main campaign); detection rule validation; see plan1.7-defense-deepening.md | Yes |
+| E-03 | E-03 — AS-REP roast detection | monitor VM (192.168.77.55) | None / SIEM analyst | ⏳ Rule validate pending | Attack run (main campaign); detection rule validation; see plan1.7-defense-deepening.md | Yes |
+| E-04 | E-04 — DGA detection | monitor VM (192.168.77.55) | None / SIEM analyst | ⏳ Rule validate pending | Attack sim (WT069) validated from ws01; detection rule validation | Yes |
+| E-05 | E-05 — DNS TXT exfil | monitor VM (192.168.77.55) | None / SIEM analyst | ⏳ Rule validate pending | Attack sim (WT070) validated from ws01; detection rule validation | Yes |
+| E-06 | E-06 — NXDOMAIN bursts | monitor VM (192.168.77.55) | None / SIEM analyst | ⏳ Rule validate pending | Attack sim (WT071) validated from ws01; detection rule validation | Yes |
+| E-07 | E-07 — TLD anomalies | monitor VM (192.168.77.55) | None / SIEM analyst | ⏳ Rule validate pending | Attack sim (WT072) validated from ws01; detection rule validation | Yes |
+| E-08 | E-08 — IP literal C2 | monitor VM (192.168.77.55) | None / SIEM analyst | ⏳ Rule validate pending | Attack sim (WT073) validated from ws01; detection rule validation | Yes |
+| E-09 | E-09 — TLS 1.0 anomalies | monitor VM (192.168.77.55) | None / SIEM analyst | ⏳ Rule validate pending | Attack sim (WT074) validated from ws01; detection rule validation | Yes |
+| E-10 | E-10 — SNI anomalies | monitor VM (192.168.77.55) | None / SIEM analyst | ⏳ Rule validate pending | Attack sim (E-10 custom-SNI) validated from ws01; detection rule validation | Yes |
+| E-11 | E-11 — C2 cipher suites | monitor VM (192.168.77.55) | None / SIEM analyst | ⏳ Rule validate pending | Detection rule validation | Yes |
+| E-12 | E-12 — SMB admin share | monitor VM (192.168.77.55) | None / SIEM analyst | ⏳ Rule validate pending | Attack sim (WT075) validated from ws01; detection rule validation | Yes |
+| E-13 | E-13 — SMBv1 downgrade | monitor VM (192.168.77.55) | None / SIEM analyst | ⏳ Rule validate pending | Detection rule validation | Yes |
+| E-14 | E-14 — HTTP UA anomalies | monitor VM (192.168.77.55) | None / SIEM analyst | ⏳ Rule validate pending | Attack sim (WT076-078) validated from ws01; detection rule validation | Yes |
 
 ## F - Supply Chain
 
@@ -317,7 +319,7 @@
 
 1. **Branch C SCCM (WT035-039) — AdminService CD chain VERIFIED (2026-08-01).** Root cause of the 401 was the **SPN owner**, not the provider identity: the self-hosted AdminService always runs as LocalSystem and can only decrypt machine-account tickets. **Fix applied + playbook-updated (`05-ad-attack-surface.yml`):** `HTTP/mbr02.range.local` moved `svc_sccm` → `mbr02$` (svc_sccm keeps decoy `HTTP/sccm.range.local` for WT033 Kerberoast; CD unchanged). Verified live: getST → ST encrypted to `mbr02$` → `AdminService/wmi/SMS_Site` → **200** as `administrator` (anon 401). WT037/039 auth gate **CLOSED**. Remaining: exercise CMPivot/script-run on the only managed client (MBR02).
 2. **ESC8 (WT052) / ESC11** — deferred; revisit at end via Kerberos-relay (krbrelayx) or a restored SMB-coerce primitive (NTLM-relay path proven non-viable on Server 2025).
-3. **E exercises (E-01..14)** — run on monitor VM once elk/monitor are online (telemetry phase).
+3. **E exercises (E-01..14) — detection rule validation only** — attack side COMPLETE (13/13 WT069–081 + E-10 from `ws01`, 2026-08-02). Remaining: confirm rule fires on monitor VM once elk/monitor are online (telemetry phase).
 4. **F supply-chain scenarios (F-01..13)** — run on linux01/mbr01/npm registry.
 5. **Branch G (CVE-2026-41089)** — snapshot DCs + verify dc02 patch level (UBR < 32772), then PoC from Kali.
 6. **H-01..06 (initial access)** — needs `19-initial-access.yml` (currently excluded per operator).
@@ -347,7 +349,7 @@
 | WT053 | Branch B | UnPAC-the-Hash | ws01 | chief_command / C0mm@nd_Ch1ef! | ✅ VERIFIED 2026-08-01 | `certipy auth` → administrator NT hash. |
 | ESC2/4/7/9 | Branch B | ADCS ESC2/4/7/9 | ws01 | hunter_dfir / lead_engineering | ✅ VERIFIED 2026-08-01 | All verified — see Branch B body table. |
 | WT044..048 | Branch D | MSSQL / SSSD / keytab / NFS / podman | linux01 | mssql-linux01 pivot → root | ✅ VERIFIED 2026-08-01 | All verified — see Branch D body table. |
-| E-01..E-14 | E stream | Network defense exercises | monitor/elk | — | ⏳ Configured | Sensors configured; exercises pending. Keep offline until telemetry phase. |
+| E-01..E-14 | E stream | Network defense exercises | ws01 (attack) / monitor (detect) | analyst_t1 / — | ✅ Attack side COMPLETE 2026-08-02 (WT069–081 + E-10) | Rule fire-confirmation + telemetry capture pending (telemetry phase, monitor `.55`). |
 | F-01..F-13 | F stream | npm supply-chain scenarios | linux01/mbr01 | — | ⏳ Configured | Tooling configured; scenarios pending. |
 | G | Branch G | CVE-2026-41089 | Kali | — | 🔬 Deferred | PoC present; depends on dc02 patch state. |
 | H-01..H-06 | Phase 0.5 | Initial access payloads | Kali/ws01 | — | ❌ Missing | No playbook stages payloads; needs `19-initial-access.yml`. |
