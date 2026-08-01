@@ -138,7 +138,7 @@
 | C.8 | Phase 8 — Cross-forest | P-FOREST | [ ] | [ ] | [ ] | [ ] | |
 | C.A | Branch A — ACL abuse | P-DELEG | [x] | [x] | [x] | [~] | Branch A 013/014/015/016/023/024/025/008/GPP verified; WT027 SPN Jacking verified 2026-08-01 |
 | C.B | Branch B — ADCS | P-DELEG | [x] | [x] | [x] | [~] | ESC1/2/3/4/7/9 + UnPAC verified 2026-08-01; ESC8/11 🔬 deferred |
-| C.C | Branch C — SCCM | P-FOREST | [~] | [x] | [x] | [~] | Surface + primitives verified; AdminService confirmed DEPLOYED (self-hosted, corrected 2026-08-01); CD chain S4U2Proxy fixed (UAC flag); exec gated on REST provider identity (guide Phase 6A) |
+| C.C | Branch C — SCCM | P-FOREST | [~] | [x] | [x] | [~] | Surface + primitives verified; AdminService confirmed DEPLOYED (self-hosted, corrected 2026-08-01); CD chain S4U2Proxy fixed (UAC flag); **SPN owner FIXED (HTTP/mbr02.range.local → mbr02$) → AdminService 200 as Administrator VERIFIED (2026-08-01)**; CMPivot/script-run on MBR02 = next |
 | C.D | Branch D — Linux pivot | P-LINUX | [x] | [x] | [x] | [~] | WT044-048 verified 2026-08-01 |
 | C.E | Stream E — Network defense (14) | P-PURPLE | [ ] | [ ] | [ ] | [ ] | Plan 0.7 overlap |
 | C.F | Stream F — Supply chain (10) | P-CHILD + linux01 | [ ] | [ ] | [ ] | [ ] | Plan 0.8 |

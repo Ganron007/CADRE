@@ -515,13 +515,17 @@
   hosts: dc03
   gather_facts: false
   tasks:
-    - name: "[SPN][WT#2][WT#33] Verify SPNs: svc_mssql, svc_sccm (range.local)"
+    - name: "[SPN][WT#2][WT#33] Verify SPNs: svc_mssql, svc_sccm, mbr02$ (range.local)"
       ansible.windows.win_shell: |
         $ErrorActionPreference = "Stop"
         try {
+          # NOTE 2026-08-01 (SPN owner FIXED): HTTP/mbr02.range.local lives on mbr02$ (machine account)
+          # because the self-hosted AdminService runs as LocalSystem and can only decrypt machine-account
+          # tickets. svc_sccm keeps the decoy HTTP/sccm.range.local so WT033 Kerberoast still works.
           $entries = @(
             @{User="svc_mssql"; SPN="MSSQLSvc/mbr02.range.local:1433"},
-            @{User="svc_sccm"; SPN="HTTP/mbr02.range.local"}
+            @{User="svc_sccm"; SPN="HTTP/sccm.range.local"},
+            @{User="mbr02$"; SPN="HTTP/mbr02.range.local"}
           )
           $missing = @()
           foreach ($e in $entries) {

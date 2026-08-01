@@ -878,9 +878,16 @@
       ansible.windows.win_shell: |
         $ErrorActionPreference = "Stop"
         try {
+          # NOTE 2026-08-01 (SPN owner FIXED): the AdminService is self-hosted in SMS_EXECUTIVE which
+          # ALWAYS runs as LocalSystem -> it can only decrypt service tickets encrypted to the MACHINE
+          # account (mbr02$). Therefore HTTP/mbr02.range.local is registered on mbr02$ (not svc_sccm).
+          # svc_sccm keeps a decoy Kerberoast SPN (HTTP/sccm.range.local) so WT033 cross-forest Kerberoast
+          # still works; its constrained delegation (msDS-AllowedToDelegateTo=HTTP/mbr02.range.local)
+          # targets the machine-owned SPN -> getST ST decrypts -> AdminService 200 (verified live).
           $entries = @(
             @{User="svc_mssql"; SPN="MSSQLSvc/mbr02.range.local:1433"},
-            @{User="svc_sccm"; SPN="HTTP/mbr02.range.local"}
+            @{User="svc_sccm"; SPN="HTTP/sccm.range.local"},
+            @{User="mbr02$"; SPN="HTTP/mbr02.range.local"}
           )
           $applied = $false
           foreach ($e in $entries) {
