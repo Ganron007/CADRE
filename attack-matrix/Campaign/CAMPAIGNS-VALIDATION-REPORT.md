@@ -20,6 +20,47 @@
 > - ws01 (Windows 11 Enterprise build 26200): **soft-disable per `17-ws01-deploy.yml`** — RTP=`False`, TP=`False`, `DisableAntiSpyware=1`, all RTP/Behavior/IOAV/OnAccess policy blocks set, SpyNet=0, tooling exclusions active (`C:\Temp;C:\Tools;C:\Tools\cadre-attack;C:\Users\Public` + `cmd.exe;mimikatz.exe;powershell.exe;pwsh.exe;Rubeus.exe;SharpHound.exe`). WinDefend service stays **Running** — Windows 11 client SKU hard-protects the service; `Set/Stop-Service`, `sc.exe config/stop`, and even a SYSTEM scheduled task all get **Access denied** (OpenService FAILED 5). This matches the playbook design ("do NOT stop WinDefend"); with RTP off + excludes, campaign tools are unaffected.
 > - Rubeus `golden` silent-failure is **not** Defender-related — it persists after the full policy kill. Use mimikatz `kerberos::golden` (verified working) or `impacket` equivalents.
 
+## Campaign Status Rollup (2026-08-02)
+
+> **Legend:** ✅ done/verified (attack side) · ⚠️ partial (env-gated / primitive-only / script-runs) · ⏳ pending (not exercised / detection validate / needs prerequisite) · 🔬 deferred (decision) · ❌ invalid/rejected (non-functional / rejected methodology).
+> **Streams E/F:** attack side validated; the ⏳ counts are the detection-validation tracker rows (Plan 1 telemetry stage). Stream E attack sims (WT069-081 + E-10) are complete but not part of the 106 rows below.
+
+| Phase / Branch | Total | ✅ Done | ⚠️ Partial | ⏳ Pending | 🔬 Deferred | ❌ Invalid |
+|---|---|---:|---:|---:|---:|---:|
+| Phase 0.5 / H (initial access) | 6 | 0 | 0 | 6 | 0 | 0 |
+| Phase 0 Recon | 4 | 3 | 0 | 0 | 0 | 1 |
+| Phase 0/1 Fallback (WT031) | 1 | 1 | 0 | 0 | 0 | 0 |
+| Phase 1 — AS-REP Roast | 1 | 1 | 0 | 0 | 0 | 0 |
+| Phase 2 — Kerberoast | 1 | 1 | 0 | 0 | 0 | 0 |
+| Phase 2 Alt — NTLMv1 | 1 | 0 | 0 | 1 | 0 | 0 |
+| Phase 3 — SQL + GodPotato | 2 | 2 | 0 | 0 | 0 | 0 |
+| Phase 3.5 — Credential Theft | 14 | 3 | 1 | 8 | 0 | 2 |
+| Phase 4 — Discovery | 1 | 1 | 0 | 0 | 0 | 0 |
+| Phase 5 — RBCD | 1 | 1 | 0 | 0 | 0 | 0 |
+| Phase 5 Coercion | 9 | 1 | 0 | 1 | 4 | 3 |
+| Phase 5 T102 (unconst. deleg.) | 1 | 1 | 0 | 0 | 0 | 0 |
+| Phase 6 — DCSync | 1 | 1 | 0 | 0 | 0 | 0 |
+| Phase 7 — Ticket forgery | 3 | 1 | 2 | 0 | 0 | 0 |
+| Phase 8 — Cross-forest | 2 | 2 | 0 | 0 | 0 | 0 |
+| Phase 8 / Branch C — SCCM | 5 | 3 | 2 | 0 | 0 | 0 |
+| Phase 8 Alt — Skipjack | 1 | 0 | 0 | 0 | 1 | 0 |
+| Branch A — ACL Abuse | 10 | 10 | 0 | 0 | 0 | 0 |
+| Branch B — ADCS | 8 | 7 | 0 | 0 | 1 | 0 |
+| Branch D — Linux Pivot | 6 | 6 | 0 | 0 | 0 | 0 |
+| Branch G — CVE-2026-41089 | 1 | 0 | 0 | 1 | 0 | 0 |
+| Stream E — Network Defense | 14 | 0 | 0 | 14 | 0 | 0 |
+| Stream F — Supply Chain | 13 | 9 | 1 | 0 | 3 | 0 |
+| **TOTAL** | **106** | **54** | **6** | **31** | **9** | **6** |
+
+**Rollup notes (2026-08-02):**
+- **54 items attack-side verified** — full AD spine (Phases 0-8), **Branch A 100%**, **Branch B** (ESC1/2/3/4/7/9 + UnPAC), **Branch D 100%**, **Branch C exec chain** (WT037/038/039 FULL EXEC), F linux scenarios (9). Stream E attack sims additionally complete (13/13 + E-10).
+- **6 partial:** 3.5C (RDP script missing), WT011/012 (script runs, real-service verify pending), WT035 (surface deep-verified, needs PXE client), WT036 (primitive verified, needs console device), F-05 (env-gated on public npm registry).
+- **31 pending:** H-01..06 (needs `19-initial-access.yml`), NTLMv1, 3.5G/H/D/J/K/L/M/N, WT096, Branch G, **14 Stream E detection rows** + F detection/mbr01 (telemetry stage).
+- **9 deferred:** WT021/022 (NTLM relay — no SMB coerce on Server 2025), WT094/095 (UnCanny/Onelogon), Skipjack, ESC8/11 (relay family), F-11..F-13 (held expansions).
+- **6 invalid/rejected:** WT028 (SAMR null blocked), WT018/019/020 (coercion non-functional), 3.5B (scheduled-task execution — Rule 2), 3.5I (token impersonation, error 1346).
+- **Detection validation (E/F)** deferred to the Plan 1 telemetry catalog stage (monitor `.55`).
+- **Future:** CADRE NPM-Chain upgrade designed (`plan1.8-offensive-upgrades.md` §11), not implemented.
+
 ## Summary Statistics
 
 - **Phase 0.5 / H**: 6 attacks
@@ -40,12 +81,12 @@
 - **Phase 8 / Branch C**: 5 attacks
 - **Phase 8 Alt**: 1 attacks
 - **Branch A**: 10 attacks
-- **Branch B**: 4 attacks
-- **Branch D**: 5 attacks
+- **Branch B**: 8 attacks
+- **Branch D**: 6 attacks
 - **Branch G**: 1 attacks
 - **E - Network Defense**: 14 attacks
 - **F - Supply Chain**: 13 attacks
-- **Total attacks listed**: 101
+- **Total attacks listed**: 106
 
 ## Phase 0.5 / H
 
@@ -206,7 +247,7 @@
 | 023 | GPO Abuse (WT023) | ws01 | analyst_cloud / Cl0ud_An@lyst! (ACE#1) | ✅ Verified | analyst_cloud has WriteDacl/WriteOwner/GenericAll on Vulnerable-GPO ({885EE71C-...}); wrote ScheduledTasks.xml preference to GPO SYSVOL path; read back + deleted | No |
 | 024 | gMSA Extraction (WT024) | ws01 | eng_cloud / Cl0ud_Eng! (ACE#10 ReadGMSAPassword) | ✅ Verified | LDAPS bind as eng_cloud → read msDS-ManagedPassword blob on gmsaTools$ → decode → NT hash 0c81acad6a91e28bc1622ac9bf0cce05 → SMB auth as gmsaTools$ verified. ACE#10 path corrected (not chief_command/GoldenGMSA) | No |
 | GPP | GPP Stored Password (Groups.xml) | ws01 | analyst_cloud / Cl0ud_An@lyst! | ✅ Verified | SYSVOL walk found Groups.xml in Vulnerable-GPO; cpassword decrypted to svc_ldap / s3rv1c3_Ld@p!; SMB auth as svc_ldap verified. **Attack surface was misconfigured** (svc_backup + malformed cpassword) → fixed `02-ad-objects.yml` + `05-ad-attack-surface.yml` to svc_ldap + valid cpassword, re-applied on dc01 | No |
-| 027 | SPN Jacking CVE-2026-25177 (WT027) | ws01 | DA or writeSPN rights | ⏳ Not exercised | Abuse writeSPN/validateSPN to Kerberoast target | Yes |
+| 027 | SPN Jacking CVE-2026-25177 (WT027) | ws01 | chief_command (writeSPN) → analyst_cloud | ✅ VERIFIED 2026-08-01 | Planted `MSSQLSvc/dc01.cadre.local:14333` on analyst_cloud as chief_command → LDAP read-back OK → Rubeus `asktgt /enctype:aes256` + `asktgs` → **KDC issued TGS encrypted with analyst_cloud's AES key** (attacker-known → offline crack) → cleaned. Documented low-priv self-write NOT viable (SPN 1433 owned by `child\svc_mssql` → uniqueness; free cross-host SPN → validated-write denies). `wt027-spn-jack.ps1` / `-cleanup.ps1` / `-lookup*.ps1`. | No |
 | 025 | AdminSDHolder persistence (WT025) | ws01 | analyst_cloud (WriteDacl on AdminSDHolder) | ✅ VERIFIED 2026-07-31 | Surface confirmed (analyst_cloud WriteDacl = ACE6). Exploit: analyst_cloud added GenericAll backdoor ACE on AdminSDHolder via `PsBase.Options.SecurityMasks=Dacl`; ACE persisted. **DACL had been polluted to 99 ACEs during earlier PowerView attempt → restored from pristine range.local template (SID-translated) + re-added surface ACE → now 23 ACEs, protected, no rogue GenericAll.** Exploit: `t025-adminsdholder-exploit.ps1`; restore: `t025-restore.ps1` + `t025-readd-aces.ps1` | No |
 
 ## Branch B
