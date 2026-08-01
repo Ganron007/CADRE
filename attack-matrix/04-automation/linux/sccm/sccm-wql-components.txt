@@ -1,0 +1,4 @@
+SELECT ComponentName, MachineName FROM SMS_SCI_Component WHERE ComponentName = 'SMS_ADMIN_SERVICE'
+SELECT ComponentName, MachineName FROM SMS_SCI_Component WHERE ComponentName LIKE '%HTTP%'
+SELECT ComponentName, MachineName FROM SMS_SCI_Component WHERE ComponentName = 'SMS_PROVIDER'
+SELECT RoleName, SiteSystem FROM SMS_SCI_SysResUse WHERE RoleName LIKE '%Provider%'

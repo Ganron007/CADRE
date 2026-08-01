@@ -102,43 +102,46 @@
       changed_when: false
       failed_when: r.rc == 1
 
-    - name: "[SCCM][WT#37] AdminService web app deployed (verify)"
+    - name: "[SCCM][WT#37] AdminService REST provider installed (verify)"
       ansible.windows.win_shell: |
         $ErrorActionPreference = "Stop"
         try {
-          $apps = & "$env:windir\system32\inetsrv\appcmd.exe" list apps 2>$null
-          if ($apps -match "AdminService") { Write-Output "PASS: AdminService web app present"; exit 0 }
-          Write-Output "FAIL: AdminService web app not found (deploy per sccm-integration-guide.md Phase 6A)"; exit 1
-        } catch { Write-Output "FAIL: AdminService app check error: $_"; exit 1 }
+          # Modern builds: AdminService is SELF-HOSTED (SMS_REST_PROVIDER), NOT an IIS app.
+          $log = "C:\Program Files\Microsoft Configuration Manager\logs\RESTPROVIDERSetup.log"
+          if (-not (Test-Path $log)) { Write-Output "FAIL: RESTPROVIDERSetup.log missing (AdminService not installed)"; exit 1 }
+          $ok = Get-Content $log -Raw | Select-String -Pattern "Installation was successful"
+          if ($ok) { Write-Output "PASS: AdminService REST provider installed (RESTPROVIDERSetup.log)"; exit 0 }
+          Write-Output "FAIL: RESTPROVIDERSetup.log exists but no successful install marker"; exit 1
+        } catch { Write-Output "FAIL: AdminService install check error: $_"; exit 1 }
       register: r
       changed_when: false
       failed_when: r.rc == 1
 
-    - name: "[SCCM][WT#37] AdminService physical files present (verify)"
+    - name: "[SCCM][WT#37] AdminService REST provider running + 443 (verify)"
       ansible.windows.win_shell: |
         $ErrorActionPreference = "Stop"
         try {
-          if (Test-Path "C:\Program Files\Microsoft Configuration Manager\bin\AdminService") { Write-Output "PASS: AdminService files present"; exit 0 }
-          Write-Output "FAIL: AdminService files missing (bin\AdminService)"; exit 1
-        } catch { Write-Output "FAIL: AdminService files check error: $_"; exit 1 }
+          $hl = "C:\Program Files\Microsoft Configuration Manager\logs\SMS_REST_PROVIDER.log"
+          if (-not (Test-Path $hl)) { Write-Output "FAIL: SMS_REST_PROVIDER.log missing (component not started)"; exit 1 }
+          $tail = (Get-Content $hl -Tail 200 -Raw)
+          if ($tail -notmatch "started successfully") { Write-Output "FAIL: SMS_REST_PROVIDER has not started successfully"; exit 1 }
+          $listen = netstat -ano | findstr ":443" | findstr "LISTENING"
+          if (-not $listen) { Write-Output "FAIL: port 443 not listening (REST provider not bound)"; exit 1 }
+          Write-Output "PASS: AdminService REST provider running + 443 listening"; exit 0
+        } catch { Write-Output "FAIL: AdminService run check error: $_"; exit 1 }
       register: r
       changed_when: false
       failed_when: r.rc == 1
 
-    - name: "[SCCM][WT#37] AdminService app pool identity = RANGE\svc_sccm (verify)"
+    - name: "[SCCM][WT#37] AdminService endpoint responds (verify)"
       ansible.windows.win_shell: |
         $ErrorActionPreference = "Stop"
         try {
-          Import-Module WebAdministration -ErrorAction Stop
-          $pool = Get-ItemProperty "IIS:\AppPools\SMS_AdminService_AppPool" -ErrorAction SilentlyContinue
-          if (-not $pool) { Write-Output "FAIL: AdminService app pool (SMS_AdminService_AppPool) not found"; exit 1 }
-          $user = $pool.processModel.userName
-          if ($user -eq "RANGE\svc_sccm") {
-            if ($pool.state -eq "Started") { Write-Output "PASS: AdminService pool identity = RANGE\svc_sccm + Running"; exit 0 }
-            Write-Output "FAIL: AdminService pool identity OK but state = '$($pool.state)' (check SeServiceLogonRight for svc_sccm)"; exit 1
-          }
-          Write-Output "FAIL: AdminService pool identity is '$user' (expected RANGE\svc_sccm — required for CD ticket decryption)"; exit 1
-        } catch { Write-Output "FAIL: AdminService pool check error: $_"; exit 1 }
+          # 401 = auth challenge -> service is UP. Anything else (refused/404/timeout) = NOT up.
+          $code = & curl.exe -k -s -o NUL -w "%{http_code}" --max-time 15 "https://mbr02.range.local/AdminService/v1.0/" 2>$null
+          if ($code -eq "401") { Write-Output "PASS: AdminService endpoint responds (401 auth challenge)"; exit 0 }
+          Write-Output "FAIL: AdminService endpoint code=$code (expected 401)"; exit 1
+        } catch { Write-Output "FAIL: AdminService endpoint check error: $_"; exit 1 }
       register: r
       changed_when: false
       failed_when: r.rc == 1

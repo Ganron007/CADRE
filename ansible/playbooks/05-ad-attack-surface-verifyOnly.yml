@@ -739,14 +739,14 @@
       ansible.windows.win_shell: |
         $ErrorActionPreference = "Stop"
         try {
-          $user = Get-ADUser -Identity "svc_sccm" -Server "dc03.range.local" -Properties msDS-AllowedToDelegateTo -ErrorAction SilentlyContinue
+          $user = Get-ADUser -Identity "svc_sccm" -Server "dc03.range.local" -Properties msDS-AllowedToDelegateTo, TrustedToAuthForDelegation -ErrorAction SilentlyContinue
           if (-not $user) { Write-Output "SKIP: svc_sccm not found"; exit 0 }
           $expectedSPN = "HTTP/mbr02.range.local"
           $currentSPNs = @($user."msDS-AllowedToDelegateTo")
-          if ($currentSPNs -contains $expectedSPN) {
-            Write-Output "PASS: svc_sccm constrained delegation configured"; exit 0
+          if (($currentSPNs -contains $expectedSPN) -and $user.TrustedToAuthForDelegation) {
+            Write-Output "PASS: svc_sccm constrained delegation configured (ATD + TrustedToAuthForDelegation)"; exit 0
           }
-          Write-Output "FAIL: svc_sccm missing delegation SPN"; exit 1
+          Write-Output "FAIL: svc_sccm missing delegation SPN or TrustedToAuthForDelegation flag (S4U2Proxy needs both)"; exit 1
         } catch { Write-Output "FAIL: $_"; exit 1 }
       register: r
       changed_when: false

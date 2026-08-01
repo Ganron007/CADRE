@@ -191,62 +191,36 @@ Run the SCCM setup wizard and follow the screen-by-screen options below. Install
 
 ---
 
-## Phase 6A — Deploy the SCCM AdminService (REQUIRED for WT037 CMPivot / WT039 script-run / CD chain)
+## Phase 6A — SCCM AdminService: verify + configure for the CD chain (WT037 CMPivot / WT039 script-run)
 
-> **Why this phase exists (2026-08-01):** The SCCM **AdminService** (`/AdminService` REST API) powers **CMPivot (WT037)** and **script-run (WT039)**. It is **NOT deployed** on mbr02 after Phase 6 (verified: no `AdminService` IIS app pool, no web app, no `bin\AdminService` dir). The `Kerberoast svc_sccm → CD → AdminService` chain (see `05-ad-attack-surface.yml` WT#6: `svc_sccm` owns `HTTP/mbr02.range.local` + `msDS-AllowedToDelegateTo=HTTP/mbr02.range.local`) has **no target** until this service is deployed. Without it, `https://mbr02.range.local/AdminService/` returns IIS 401 for a non-existent app — NOT an auth challenge.
+> **CORRECTED 2026-08-01 — the AdminService is NOT missing.** Earlier notes claimed it was "NOT deployed" based on IIS-era indicators (no `/AdminService` IIS app, no `SMS_AdminService_AppPool`, no `bin\AdminService`). That was WRONG for modern builds: since CB 2010 the AdminService runs **self-hosted** (`SMS_REST_PROVIDER` component inside `SMS_EXECUTIVE`, no IIS). Verified live on mbr02:
+> - `RESTPROVIDERSetup.log` — installed successfully (2026-05-23 original + re-installed 2026-08-01)
+> - `SMS_REST_PROVIDER.log` — component started, certificate bound, binding state [2]
+> - Port **443 LISTENING** (http.sys) · `/AdminService/v1.0/` answers **401** (real auth challenge — the service IS up)
+>
+> So the `/AdminService/` 401 seen in earlier sessions was a **genuine auth failure**, not a missing app. WT037/039 were blocked by **authorization/delegation config**, not deployment.
 
-### Live state check (2026-08-01, verified via provisioning as `range\svc_naa`)
+### What actually gates the CD chain (verified 2026-08-01, live)
 
-- Site **IS** deployed and healthy: Site Code `CAD`, Site Name `CADRE Primary Site`, Site Type 1 (Primary), DB `CM_CAD`, build **5.00.9141.1000** (console 5.2509.x) — far newer than CB 2103. `SMS_EXECUTIVE`, `SMS_SITE_COMPONENT_MANAGER`, `CcmExec`, `SMS_NOTIFICATION_SERVER` all Running; full MP/DP/CCM/WSUS IIS app set present.
-- **AdminService is confirmed ABSENT**: no `/AdminService` IIS app, no `SMS_AdminService_AppPool` pool, no `bin\AdminService` DLL, no `SMS_AdminService` WMI class (`Invalid class`), no `SMS_ADMIN_SERVICE` site role.
-- Prerequisite OK: IIS **Windows Authentication** feature installed (`Web-Windows-Auth` = True).
-- **HTTPS prerequisite ALREADY SATISFIED** (part-D check 2026-08-01): Default Web Site has `https/:443` binding + valid `CN=mbr02.range.local` cert (ADCS-issued, expires 2027-05-20, private key) in the machine store → **no cert/binding work needed** for the AdminService.
-- ⚠️ **`range\svc_sccm` does NOT have `SeServiceLogonRight`** (verified via `secedit /export`) → must be granted before the pool will start under `svc_sccm` (see step below).
-- `range\svc_sccm` = SCCM admin but **NOT local admin** on mbr02 (config review had to run as `range\svc_naa`).
+1. **SMS Admins membership** — the AdminService authorizes via the local `SMS Admins` group on mbr02. `svc_sccm` (+ `CADRE\chief_command`, `CADRE\analyst_purple`) must be members. **A site reinstall RESETS this group** (recreated with only `mbr02$` + the setup account) — restore via `Add-LocalGroupMember -Group 'SMS Admins' -Member 'RANGE\svc_sccm','CADRE\chief_command','CADRE\analyst_purple'` (or re-run `06-member-services.yml`).
+2. **Constrained delegation UAC flag** — `svc_sccm` needs `msDS-AllowedToDelegateTo=HTTP/mbr02.range.local` **AND** `TrustedToAuthForDelegation` (UAC `0x80000`). The attribute alone → `KDC_ERR_BADOPTION` on S4U2Proxy. (The playbook had set `TRUSTED_FOR_DELEGATION` `0x10000` — the WRONG flag. Fixed in `05-ad-attack-surface.yml` + `-verifyOnly.yml`.)
+3. **Password expiry** — `svc_sccm`'s password must be valid + `DONT_EXPIRE_PASSWORD` (`0x1000000`) set (it expired mid-testing 2026-08-01).
+4. **REST provider identity (REMAINING GATE)** — the S4U2Proxy ST for `HTTP/mbr02.range.local` is encrypted with **svc_sccm's key**. The REST provider runs as **LocalSystem** (inside `SMS_EXECUTIVE`) and **cannot decrypt it → 401** even with a valid ST (verified: ST issued via getST, request → 401). The self-hosted equivalent of the old "app pool identity = svc_sccm" requirement is: the **REST provider must run as `svc_sccm`** (e.g., change the site server service account via SCCM Setup → site maintenance → modify the site system installation account). Until then the CD ticket can't be consumed → WT037/039 remain gated.
 
-### Why there is NO console option (important)
-
-The **Administration Service is NOT a checkbox in the "Add Site System Roles" wizard**. Since ConfigMgr Current Branch **2103**, it installs **automatically as part of the SMS Provider role**. On mbr02 it is **confirmed ABSENT at the site level**: `SMS_SCI_Component` has **no `SMS_ADMIN_SERVICE` component** (verified 2026-08-01 as `svc_sccm`), so the AdminService was never enabled/deployed — not merely hidden.
-
-**The console "Remove Role" is DISABLED by design for the site's own provider.** mbr02 hosts the site's **only** SMS Provider (verified: exactly one `SMS Provider` role entry). Per Microsoft: *"To remove the last SMS provider for a site, you must uninstall the site."* — so **Method B below must use SCCM Setup, not the console.**
-
-### Deploy (two supported methods)
-
-**Method A — SMS Provider role Properties (preferred, no reinstall):**
-
-1. Open **SCCM Console** on mbr02 (or any console connected to site `CAD`).
-2. **Administration** → **Site Configuration** → **Servers and Site System Roles** → select `MBR02.RANGE.LOCAL`.
-3. Right-click the **SMS Provider** role → **Properties**.
-4. Open the **Admin Service** tab → check **"Enable the admin service"** (label may read "Install the admin service" / "Enable the Administration Service" depending on build).
-5. **OK**. SCCM deploys the AdminService web app under the Default Web Site (`/AdminService`) with its own app pool **`SMS_AdminService_AppPool`** + files under `bin\AdminService` + the `SMS_AdminService` WMI class.
-6. Watch `C:\Program Files\Microsoft Configuration Manager\Logs\smsadminui.log` (console side) until the deployment completes.
-
-**Method B — via SCCM Setup (the ONLY way to modify the provider on the site server; console Remove is disabled for the last provider):**
-
-1. On mbr02 run `\BIN\X64\setup.exe` from the Configuration Manager installation folder (or `\SMSSETUP\BIN\X64\setup.exe` from the install media — same version as the site).
-2. **Getting Started** → **Perform site maintenance or reset this site**.
-3. **Site Maintenance** → **Modify SMS provider configuration** → **Uninstall the specified SMS provider** (mbr02) → run again → **Add a new SMS provider** (mbr02). The reinstall deploys the AdminService.
-4. **Alternative (stronger, documented):** instead of step 3 choose **Reset site with no configuration changes** — a site reset *reinstalls all site components and all site system roles* (re-triggers the AdminService deployment).
-5. Monitor **`ConfigMgrSetup.log`** in the root of the site install folder (the documented setup log).
-6. Prerequisites (per Microsoft): local **Administrator** on mbr02 + **Full Administrator** RBAC security role (for the site-reset path).
-7. Verify after: `/AdminService` web app + `SMS_AdminService_AppPool` + `bin\AdminService` + `SMS_AdminService` WMI class exist.
-
-### Set the AdminService app pool identity to `RANGE\svc_sccm` (CRITICAL for the CD attack)
-
-> ⚠️ **The app pool is named `SMS_AdminService_AppPool`** (default identity **NetworkService**) — NOT "AdminService".
-
-Because the `HTTP/mbr02.range.local` SPN is registered on **`svc_sccm`** (not `mbr02$` — intentional, `05-ad-attack-surface.yml`), tickets for that SPN are encrypted with **svc_sccm's** key. The AdminService pool MUST run as `svc_sccm` so it can decrypt the S4U2Proxy ticket from the CD chain. With the default NetworkService identity the CD ticket will NOT decrypt → 401.
+### Verify the AdminService (real indicators)
 
 ```powershell
-Import-Module WebAdministration
-Set-ItemProperty "IIS:\AppPools\SMS_AdminService_AppPool" -Name processModel -Value @{
-    identityType = 3;               # 3 = SpecificUser
-    userName     = "RANGE\svc_sccm"
-    password     = "s3rv1c3_SCCM!"
-}
-iisreset
-# Equivalent: appcmd set apppool "SMS_AdminService_AppPool" /processModel.identityType:SpecificUser /processModel.userName:"RANGE\svc_sccm" /processModel.password:"s3rv1c3_SCCM!"
+Test-Path "C:\Program Files\Microsoft Configuration Manager\logs\RESTPROVIDERSetup.log"   # install log
+Test-Path "C:\Program Files\Microsoft Configuration Manager\logs\SMS_REST_PROVIDER.log"  # health log
+netstat -ano | findstr ":443"           # expect http.sys LISTENING
+curl.exe -k -s -o NUL -w "%{http_code}" https://mbr02.range.local/AdminService/v1.0/   # expect 401 = up
 ```
+
+### NOT applicable (IIS-era model — do not follow)
+
+- "Enable the AdminService via SMS Provider Properties → Admin Service tab" — no such tab on this build; not required (self-hosted, always on).
+- "Set the `SMS_AdminService_AppPool` identity / grant `SeServiceLogonRight`" — there is NO IIS app pool in modern self-hosted builds. The identity requirement moves to the REST provider process itself (see gate #4).
+- "Reinstall the SMS Provider to deploy the AdminService" — it's already deployed; a reinstall does not change the auth gates above.
 
 ### Grant `svc_sccm` "Log on as a service" (REQUIRED — verified MISSING 2026-08-01)
 

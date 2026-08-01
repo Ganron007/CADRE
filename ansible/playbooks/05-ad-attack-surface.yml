@@ -1136,16 +1136,19 @@
       ansible.windows.win_shell: |
         $ErrorActionPreference = "Stop"
         try {
-          $user = Get-ADUser -Identity "svc_sccm" -Server "dc03.range.local" -Properties msDS-AllowedToDelegateTo
+          # NOTE 2026-08-01: S4U2Proxy REQUIRES BOTH msDS-AllowedToDelegateTo AND
+          # TrustedToAuthForDelegation (UAC 0x80000) — the attribute alone fails with
+          # KDC_ERR_BADOPTION on the S4U2Proxy step (verified live).
+          $user = Get-ADUser -Identity "svc_sccm" -Server "dc03.range.local" -Properties msDS-AllowedToDelegateTo, TrustedToAuthForDelegation
           if (-not $user) { Write-Output "SKIP: svc_sccm not found"; exit 0 }
           $expectedSPN = "HTTP/mbr02.range.local"
           $currentSPNs = @($user."msDS-AllowedToDelegateTo")
-          if ($currentSPNs -contains $expectedSPN) { Write-Output "OK: Already configured"; exit 0 }
-          Set-ADUser -Identity "svc_sccm" -Server "dc03.range.local" -Add @{ "msDS-AllowedToDelegateTo" = [string[]]@($expectedSPN) }
-          $v = Get-ADUser -Identity "svc_sccm" -Server "dc03.range.local" -Properties msDS-AllowedToDelegateTo
+          if (($currentSPNs -contains $expectedSPN) -and $user.TrustedToAuthForDelegation) { Write-Output "OK: Already configured (ATD + TrustedToAuthForDelegation)"; exit 0 }
+          Set-ADUser -Identity "svc_sccm" -Server "dc03.range.local" -Add @{ "msDS-AllowedToDelegateTo" = [string[]]@($expectedSPN) } -TrustedToAuthForDelegation $true
+          $v = Get-ADUser -Identity "svc_sccm" -Server "dc03.range.local" -Properties msDS-AllowedToDelegateTo, TrustedToAuthForDelegation
           $vSPNs = @($v."msDS-AllowedToDelegateTo")
-          if (-not ($vSPNs -contains $expectedSPN)) { throw "SPN not applied" }
-          Write-Output "APPLIED: svc_sccm constrained delegation configured and verified"; exit 2
+          if (-not (($vSPNs -contains $expectedSPN) -and $v.TrustedToAuthForDelegation)) { throw "SPN/flag not applied" }
+          Write-Output "APPLIED: svc_sccm constrained delegation (ATD + TrustedToAuthForDelegation) configured and verified"; exit 2
         } catch { Write-Output "FAILED: $_"; exit 1 }
       register: r
       changed_when: r.rc == 2
