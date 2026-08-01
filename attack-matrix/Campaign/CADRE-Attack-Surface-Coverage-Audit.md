@@ -26,7 +26,7 @@
 1. The biggest gap is **Phase 0.5 / H (initial access)**: no playbook configures the payloads/drop vectors on `ws01` or `Kali`. The surface is assumed by the campaign but not automated.
 2. **Phase 5 coercion / T102** trigger path is now configured: `dc02` Spooler + SMB/RPC firewall prerequisites are added to `04-vulnerabilities.yml`. **VERIFIED 2026-07-31:** T102 `dc02$` TGT captured (hostname listener for Kerberos), converted kirbi→ccache, and used for Phase 6 DCSync of `child/krbtgt`. Full chain now green.
 3. **Branch A** is now **fully verified** (2026-07-31): all ACE-based attacks executed from ws01 via direct SSH (Rule 1). It still relies on a password spray (WT031) as the credential bridge, which is an attack technique, not a playbook surface.
-4. **Branch C** after WT034 is configured but WT035-039 require running from `mbr02` itself; the campaign scripts currently run from `ws01` and are not exercised.
+4. **Branch C** surface + primitives verified; **WT037 CMPivot, WT038 app deploy, WT039 script-as-SYSTEM all FULL EXEC VERIFIED 2026-08-02 from ws01** as `range\svc_sccm` (the campaign scripts run from ws01 — the WS01 client is the target). WT035 PXE needs a real PXE client; WT036 client-push relay needs a console-created device.
 5. **Branch D** Linux pivot is mostly missing: SSSD/keytab/NFS/Podman surface is not configured in the Linux playbook.
 6. **E and F** streams are not attack-surface configurations; they are detection/supply-chain exercises that depend on monitor and linux01/mbr01 tooling. No playbooks configure the *attack* side of E/F (they configure only the sensors/registry).
 7. **Branch G** is a standalone unauthenticated DC exploit; no playbook configures a vulnerable state — it relies on dc02 simply being unpatched.
@@ -174,7 +174,7 @@
 |---|---|---|---|---|---|
 | WT033 | Cross-forest Kerberoast | Two-way trust, SID filter OFF, `svc_sccm` SPN in `range.local` | `00-domain-deploy.yml` creates trust; `05-ad-attack-surface.yml` registers SPN. | ✅ Configured | Confirmed. |
 | WT034 | SCCM NAA extraction | SCCM site with NAA, `svc_sccm` SCCM Full Admin, vault share | `sccm-integration-guide.md` + `06-member-services.yml` configure this. | ✅ Configured | Confirmed. |
-| WT035-039 | SCCM escalation chain | PXE, client push, CMPivot, app deploy, site takeover | Same as WT034, but execution surface requires running from `mbr02`. | ⚠️ Partial | Surface configured; scripts need to run from `mbr02` not `ws01`. |
+| WT035-039 | SCCM escalation chain | PXE, client push, CMPivot, app deploy, site takeover | Same as WT034, + AdminService + MP policy channel. | ✅ WT037/038/039 VERIFIED 2026-08-02; WT035/036 gated | CMPivot, app deploy, script-as-SYSTEM run from ws01 as `svc_sccm` against the WS01 client. WT035 needs a PXE client VM; WT036 needs a console-created device record. |
 | Skipjack | PAC signature corruption | Cross-forest trust + SID filter OFF + custom tool | Trust is configured; custom tool not available. | 🔬 Deferred | PoC not built. |
 
 ---
@@ -227,12 +227,12 @@
 | WT035 | SCCM PXE Boot abuse | PXE enabled w/o password + boot images | Same (console). | ✅ Surface verified 2026-08-01 | Approved PXE cert (`{256B7D4F-…}`, MBR02) + 2 boot images (x64/arm64) readable by `svc_sccm`; full exploit needs a real PXE client. |
 | WT036 | SCCM Client Push install | Auto client push enabled | Same. | ⚠️ Primitive verified | Component enabled; `GenerateCCRByName`/`CreateCCR` available; relay needs console-created target device record. |
 | WT037 | SCCM CMPivot | AdminService (`/AdminService`, self-hosted REST provider) | **VERIFIED 2026-08-02** | ✅ FULL EXEC | `RunCMPivot` on WS01 (16777220) via AdminService as `svc_sccm` (NTLM) returned live data (`DeviceID:"C:", FileSystem:"NTFS", FreeSpace:153601, SystemName:"WS01"`). Enablers: BGB fast channel restored (bgbisapi.msi → TCP 10123) + svc_sccm Full Admin via DB Takeover-1 grant. |
-| WT038 | SCCM Application Deployment | SCCM admin can create + deploy apps | Provider surface verified. | ⚠️ Partial | `SMS_Package`+`SMS_Program` (SYSTEM) created via provider; `SMS_Advertisement.Put` = Generic failure via raw WMI (needs console/AdminService). |
+| WT038 | SCCM Application Deployment | SCCM admin can create + deploy apps | AdminService + MP policy channel (guide Phase 6C). | ✅ **FULL EXEC VERIFIED 2026-08-02** | App 16777510 + DT 16777511 + assignment 16777217 via AdminService; MP web handlers repaired (`mp.msi REINSTALL` — were empty → 500) → client policy delivered → payload ran **as SYSTEM** on WS01 (`wt038-system.txt` = `nt authority\system` + `wt038-marker.txt`). |
 | WT039 | SCCM Site Takeover | SCCM admin → client/system exec | **VERIFIED 2026-08-02** | ✅ FULL EXEC | Script created via `/AdminService/wmi/SMS_Scripts.CreateScripts/`, approved via DB (`Scripts` table ApprovalState=3 — author self-approval → 500), run via `RunScript` on WS01 → `ScriptOutput: "nt authority\\system"` + on-disk markers on WS01. |
 
 **Key findings (2026-08-01):** SCCM admin gate = local `SMS Admins` group (svc_sccm + **cross-forest `CADRE\chief_command`/`analyst_purple`**). **SPN owner FIXED:** `HTTP/mbr02.range.local` moved to `mbr02$` (AdminService runs as LocalSystem → machine-account tickets only); svc_sccm keeps decoy `HTTP/sccm.range.local` (WT033 Kerberoast) + `msDS-AllowedToDelegateTo=HTTP/mbr02.range.local` CD (unchanged). AdminService IS deployed (self-hosted). **WT037/039 auth gate VERIFIED CLOSED (2026-08-01):** getST → ST encrypted to `mbr02$` → `AdminService/wmi/SMS_Site` **200** as Administrator (anon 401). **`cifs/mbr02.range.local` SPN MISSING** → SMB Kerberos to mbr02 broken (NTLM-only; verify-playbook candidate). Site CAD build 9141; 1 device (MBR02); 0 task sequences; 2 boot images.
 
-**Verdict:** Branch C surface + primitives verified 2026-08-01; **WT037 CMPivot + WT039 script-as-SYSTEM FULL EXEC VERIFIED 2026-08-02** (live data + `nt authority\system` on WS01 from ws01 as `svc_sccm`). Enablers: BGB fast channel (bgbisapi.msi → TCP 10123), svc_sccm Full Admin via DB Takeover-1 grant, script approval via DB. Recipes in `docs/sccm-integration-guide.md` Phase 6B. Remaining: WT035 PXE (needs real PXE client), WT036 client-push relay (needs console-created device), WT038 app-deploy advertisement (needs console/AdminService).
+**Verdict:** Branch C surface + primitives verified 2026-08-01; **WT037 CMPivot + WT039 script-as-SYSTEM FULL EXEC VERIFIED 2026-08-02** (live data + `nt authority\system` on WS01 from ws01 as `svc_sccm`). Enablers: BGB fast channel (bgbisapi.msi → TCP 10123), svc_sccm Full Admin via DB Takeover-1 grant, script approval via DB. Recipes in `docs/sccm-integration-guide.md` Phase 6B. WT038 app creation + deployment via AdminService now works (app 16777510 / DT 16777511 / assignment 16777217 / policy body); **client delivery root-caused to broken MP web handlers** (empty `SMS_MP`/`ServiceData\System` → `/SMS_MP/.sms_aut` 500) — `mp.msi` REINSTALL repair (guide Phase 6C + 6C.4). Remaining: WT035 PXE (needs real PXE client), WT036 client-push relay (needs console-created device), WT038 delivery (MP repair completing).
 
 ---
 
@@ -379,10 +379,10 @@ Once the AdminService is deployed and the ESC8/11 revisit lands, the campaign ca
 
 ---
 
-*Generated 2026-07-30 from playbook/guide review vs CAMPAIGNS-VALIDATION-REPORT-20260730.md.*
+*Generated 2026-07-30 from playbook/guide review vs CAMPAIGNS-VALIDATION-REPORT.md.*
 ## Appendix A — Consolidated Campaign Re-test Matrix
 
-> Updated: 2026-08-01 (Branch A all verified; Branch B ESC1/2/3/4/7/9+UnPAC verified, ESC8/11 deferred; Branch D WT044-048 verified; Branch C surface deep-validated, AdminService gap; spooler resolved; WT002/WT007 verified)
+> Updated: 2026-08-02 (Branch A all verified; Branch B ESC1/2/3/4/7/9+UnPAC verified, ESC8/11 deferred; Branch D WT044-048 verified; **Branch C WT037 CMPivot + WT039 script-as-SYSTEM FULL EXEC VERIFIED 2026-08-02**, WT038 app+deployment via AdminService, delivery pending MP repair; spooler resolved; WT002/WT007 verified)
 
 | ID | Stream | Attack | Source Machine | Credentials | Status | Re-test / Fix Notes |
 |---|---|---|---|---|---|---|
@@ -417,9 +417,9 @@ Once the AdminService is deployed and the ESC8/11 revisit lands, the campaign ca
 | WT034 | Branch C | SCCM NAA extraction | ws01 -> mbr02 | svc_sccm / s3rv1c3_SCCM! | ✅ Verified | Vault bait → `RANGE\svc_naa` (DA); confirmed in provider. |
 | WT035 | Branch C | SCCM PXE Boot | ws01 -> mbr02 | svc_sccm / s3rv1c3_SCCM! | ✅ Surface verified 2026-08-01 | PXE cert + 2 boot images + NAA-in-policy; full exploit needs PXE client. |
 | WT036 | Branch C | SCCM Client Push | ws01 -> mbr02 | svc_sccm / s3rv1c3_SCCM! | ⚠️ Primitive verified | Component enabled + CCR methods; relay needs console target. |
-| WT037 | Branch C | SCCM CMPivot | ws01 -> mbr02 | svc_sccm / s3rv1c3_SCCM! | ⚠️ Blocked | **AdminService NOT deployed** — fix guide Phase 6A + verify checks. |
-| WT038 | Branch C | SCCM App Deploy | ws01 -> mbr02 | svc_sccm / s3rv1c3_SCCM! | ⚠️ Partial | Package+program (SYSTEM) via provider; advertisement needs console. |
-| WT039 | Branch C | SCCM Site Takeover | ws01 -> mbr02 | svc_sccm / s3rv1c3_SCCM! | ⚠️ Partial | Script create works; run needs AdminService/CD or console. |
+| WT037 | Branch C | SCCM CMPivot | ws01 -> mbr02 | svc_sccm / s3rv1c3_SCCM! | ✅ FULL EXEC VERIFIED 2026-08-02 | `RunCMPivot` (LogicalDisk) → live WS01 data via AdminService as svc_sccm (enablers: BGB fast channel + Takeover-1 DB grant). |
+| WT038 | Branch C | SCCM App Deploy | ws01 -> mbr02 | svc_sccm / s3rv1c3_SCCM! | ✅ FULL EXEC VERIFIED 2026-08-02 | App (CI 16777510) + DT (16777511) + assignment (16777217) via AdminService; delivery blocker = empty MP web handlers (`SMS_MP`/`ServiceData\System` → `/SMS_MP/.sms_aut` 500) — fixed via `mp.msi REINSTALL=ALL` → health 200 → client policy delivered → payload ran as SYSTEM on WS01 (`nt authority\system` + marker). |
+| WT039 | Branch C | SCCM Site Takeover | ws01 -> mbr02 | svc_sccm / s3rv1c3_SCCM! | ✅ FULL EXEC VERIFIED 2026-08-02 | Script create (`SMS_Scripts.CreateScripts`) → DB approve (`Scripts` table) → `RunScript` → `ScriptOutput: "nt authority\\system"` + on-disk markers on WS01. |
 | E-01..E-14 | E stream | Network defense exercises | monitor/elk | — | ⏳ Configured | Sensors configured; exercises pending. Keep offline until telemetry phase. |
 | F-01..F-13 | F stream | npm supply-chain scenarios | linux01/mbr01 | — | ⏳ Configured | Tooling configured; scenarios pending. |
 | G | Branch G | CVE-2026-41089 | Kali | — | 🔬 Deferred | PoC present; depends on dc02 patch state. |

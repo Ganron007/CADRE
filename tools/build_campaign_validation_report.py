@@ -235,6 +235,6 @@ report_lines.append('')
 report_lines.append('---')
 report_lines.append('*Generated from CAMPAIGNS-METADATA-v2.md and 2026-07-30 validation run.*')
 
-path = pathlib.Path('attack-matrix/Campaign/CAMPAIGNS-VALIDATION-REPORT-20260730.md')
+path = pathlib.Path('attack-matrix/Campaign/CAMPAIGNS-VALIDATION-REPORT.md')
 path.write_text('\n'.join(report_lines), encoding='utf-8')
 print(f'Wrote {len(records)} records to {path}')

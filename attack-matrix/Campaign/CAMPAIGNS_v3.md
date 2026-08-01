@@ -235,7 +235,9 @@ PHASE 8 — CROSS-FOREST + SCCM (range.local Domain Admin)
   │          WT039 script-as-SYSTEM ✅ VERIFIED (ScriptOutput "nt authority\  │
   │          system" + markers on WS01). Requires: svc_sccm as Full Admin     │
   │          (Takeover-1 DB grant) + BGB fast channel up (bgbisapi.msi).      │
-  │          WT035 PXE / WT036 Client Push / WT038 App Deploy pending.        │
+  │          WT038 app deploy ✅ FULL EXEC VERIFIED 2026-08-02 (app 16777510 /   │
+  │          assignment 16777217 → payload as SYSTEM on WS01 after mp.msi fix).  │
+  │          WT035 PXE / WT036 Client Push pending.                            │
   └──────────────────────────────────────────────────────────────────────────
 
 

@@ -1355,7 +1355,26 @@ Standalone supply-chain attack scenarios on linux01 / mbr01 / npm registry. See 
 
 ---
 
+## Validation Update — 2026-08-02 (SCCM Branch C — WS01 now a managed client)
+
+The 2026-07-30 rows above (`T034-039 … "SCCM client not present on ws01"`) are **superseded**. On 2026-08-02 WS01 was completed as a managed SCCM client (ResourceID 16777220, GUID `7ABC7A69-…`, site CAD) and the Branch C chain was exercised **from ws01** as `range\svc_sccm`:
+
+| Attack | Status (2026-08-02) | Evidence |
+|--------|--------------------|----------|
+| WT034 SCCM NAA extraction | ✅ Verified | Vault bait → `RANGE\svc_naa` (range.local DA) |
+| WT035 SCCM PXE Boot | ✅ Surface verified | PXE approved cert `{256B7D4F-…}` + 2 boot images; full exploit needs a real PXE client (not in lab) |
+| WT036 SCCM Client Push | ⚠️ Primitive verified | Client-push component enabled + `GenerateCCRByName`/`CreateCCR`; relay needs console-created device |
+| WT037 SCCM CMPivot | ✅ **FULL EXEC VERIFIED** | `RunCMPivot` (LogicalDisk) → live WS01 data via AdminService as svc_sccm |
+| WT038 SCCM App Deploy | ✅ **FULL EXEC VERIFIED** | App (CI 16777510) + DT (16777511) + assignment (16777217) via AdminService; MP web handlers repaired (`mp.msi` REINSTALL — were empty → `/SMS_MP/.sms_aut` 500) → client policy delivered → payload ran **as SYSTEM** on WS01 (`nt authority\system` + marker) |
+| WT039 SCCM Site Takeover | ✅ **FULL EXEC VERIFIED** | Script as `NT AUTHORITY\SYSTEM` on WS01 (`ScriptOutput: "nt authority\\system"` + on-disk markers) |
+
+**Stacked root causes fixed (2026-08-02):** BGB fast channel (empty `SMS_BGB` → `bgbisapi.msi` → TCP 10123), `svc_sccm` Full Admin (DB Takeover-1 grant — was never an RBAC admin), script approval (DB `Scripts` table, `ApprovalState=3`), app model XML (SCCMHunter structure + XML-escaped payload), MP web handlers (`mp.msi` REINSTALL — in progress). Recipes: `docs/sccm-integration-guide.md` Phase 6B (WT037/039) + Phase 6C (WT038 console GUI path) + 6C.4 (MP delivery prerequisite).
+
+---
+
 ## Change Log
+
+- **2026-08-02** — WS01 completed as managed SCCM client (ResourceID 16777220). WT037 CMPivot + WT039 script-as-SYSTEM **FULL EXEC VERIFIED** from ws01 as `range\svc_sccm` (live LogicalDisk data; `nt authority\system` + on-disk markers). WT038 app creation + deployment via AdminService working (app 16777510, DT 16777511, assignment 16777217, policy body generated); client delivery root-caused to broken MP web handlers (empty `SMS_MP`/`ServiceData\System` → `/SMS_MP/.sms_aut` 500 → `/ccm_system/request` 0x8000000A) — `mp.msi` REINSTALL repair. Added Phase 6C (WT038 console GUI path) + 6C.4 (MP delivery prerequisite) to `docs/sccm-integration-guide.md`. Superseded the 2026-07-30 "SCCM client not present" rows.
 
 - **2026-07-29** — Created `CAMPAIGNS-METADATA-v2.md` aligned with `CAMPAIGNS_v3.md`. Documented all 8 main-spine phases, Branch 3.5 alternatives, Branches A-D, G section, E/F exercises, identity/credential map, and machine roles. Marked T035/T035A/T004-mbr01 as tested from `ws01`. Marked T102 as in-progress with script created.
 
@@ -1363,6 +1382,8 @@ Standalone supply-chain attack scenarios on linux01 / mbr01 / npm registry. See 
 ---
 
 ## Validation Run — 2026-07-30
+
+> ⚠️ **HISTORICAL — state as of 2026-07-30.** The SCCM rows below (`T034-039 … "SCCM client not present on ws01"`) are **superseded** by the 2026-08-02 update further down: WS01 is now a managed SCCM client and WT037/039 are FULL EXEC VERIFIED. Keep this section only as the 07-30 snapshot.
 
 A batch of campaign scripts was executed from `provisioning` (`192.168.77.60`) via NetExec WinRM to `ws01` (`192.168.77.62`).
 
@@ -1408,7 +1429,7 @@ A batch of campaign scripts was executed from `provisioning` (`192.168.77.60`) v
 1. **Phase 5 / T102 coercion** — Print Spooler on dc02 must be running/exposed. Verify `04-vulnerabilities.yml` and `04-vulnerabilities-verifyOnly.yml`.
 2. **Phase 5 / WT007 RBCD** — PowerView LDAP query fails from ws01. Fix script or verify dc02 LDAP connectivity.
 3. **Branch B / ADCS ESC1/ESC3/ESC8/UnPAC** — Certify from ws01 fails with DirectoryServices operations error. Run from a `cadre.local` domain-joined machine or provide explicit DC/domain credentials.
-4. **Branch C / WT035-039 SCCM chain** — Requires running from a SCCM client/site system (e.g., mbr02) or with SCCM PowerShell module; not exercisable from ws01.
+4. **Branch C / WT035-039 SCCM chain** — ~~Requires running from a SCCM client/site system (e.g., mbr02) or with SCCM PowerShell module; not exercisable from ws01.~~ **SUPERSEDED 2026-08-02** — WS01 is now a managed SCCM client (ResourceID 16777220); WT037 CMPivot + WT039 script-as-SYSTEM verified from ws01 as `range\svc_sccm`; WT038 app creation/deployment via AdminService works, client delivery pending MP web-handler repair.
 5. **Branch D / WT045-048** — Linux pivot scripts do not exist; manual execution required.
 6. **Branch 3.5 / 3.5G, 3.5H, 3.5J, 3.5K, 3.5L, 3.5M** — Not exercised in this run.
 7. **Phase 0.5 / H-01..H-06** — Intentionally excluded per user request (barring initial access).

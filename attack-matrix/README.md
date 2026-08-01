@@ -4,7 +4,7 @@
 
 > **🚀 START HERE → [`Campaign/CAMPAIGNS_v3.md`](Campaign/CAMPAIGNS_v3.md)** — current v3 campaign narrative. Per-attack reference: [`Campaign/CAMPAIGNS-METADATA-v2.md`](Campaign/CAMPAIGNS-METADATA-v2.md). Runbooks: [`Campaign/Runbooks/CAMPAIGNS-RUNBOOK-README.md`](Campaign/Runbooks/CAMPAIGNS-RUNBOOK-README.md).
 >
-> **📊 Validation status → [`Campaign/CAMPAIGNS-VALIDATION-REPORT-20260730.md`](Campaign/CAMPAIGNS-VALIDATION-REPORT-20260730.md)** + [`Campaign/CADRE-Attack-Surface-Coverage-Audit-20260730.md`](Campaign/CADRE-Attack-Surface-Coverage-Audit-20260730.md) — live-tested vs configured surface per attack.
+> **📊 Validation status → [`Campaign/CAMPAIGNS-VALIDATION-REPORT.md`](Campaign/CAMPAIGNS-VALIDATION-REPORT.md)** + [`Campaign/CADRE-Attack-Surface-Coverage-Audit.md`](Campaign/CADRE-Attack-Surface-Coverage-Audit.md) — live-tested vs configured surface per attack.
 >
 > **⛔ Hard rules (operator-locked 2026-07-31):** RULE 1 — all attacks run from `ws01` via direct SSH (`cadre-ws01-key`); provisioning (`.60`) is config-only, never an attack origin. RULE 2 — no scheduled tasks to run commands (persistence-only). See the metadata header for the full text.
 >
@@ -52,7 +52,7 @@ CADRE
 ## How to Use
 
 1. **Open the v3 narrative** [`Campaign/CAMPAIGNS_v3.md`](Campaign/CAMPAIGNS_v3.md) — read the phase story, then run commands live from `ws01`
-2. **Check per-attack status** in [`Campaign/CAMPAIGNS-METADATA-v2.md`](Campaign/CAMPAIGNS-METADATA-v2.md) (WT#, playbook, ACE#, telemetry, RedStrike intent) and the [validation report](Campaign/CAMPAIGNS-VALIDATION-REPORT-20260730.md) for live-tested results
+2. **Check per-attack status** in [`Campaign/CAMPAIGNS-METADATA-v2.md`](Campaign/CAMPAIGNS-METADATA-v2.md) (WT#, playbook, ACE#, telemetry, RedStrike intent) and the [validation report](Campaign/CAMPAIGNS-VALIDATION-REPORT.md) for live-tested results
 3. **Run from ws01 only (Rule 1)** — tools staged via `scp` `localhost → ws01`, executed by direct SSH (`cadre-ws01-key`). No provisioning bridge
 4. When a phase references a WT# (e.g., WT#009), flip to `01-walkthroughs/` for the tool reference
 5. Run automation scripts from `04-automation/` for repeatable execution
@@ -67,8 +67,8 @@ CADRE
 | `Campaign/` | **v3 narrative + metadata-v2 + validation report + coverage audit + runbooks + study-guide + diagrams + attackpath** | — |
 | `Campaign/CAMPAIGNS_v3.md` | Current campaign narrative | 1 |
 | `Campaign/CAMPAIGNS-METADATA-v2.md` | Per-attack reference (107+) | 1 |
-| `Campaign/CAMPAIGNS-VALIDATION-REPORT-20260730.md` | Live validation status per attack | 1 |
-| `Campaign/CADRE-Attack-Surface-Coverage-Audit-20260730.md` | Configured-surface audit vs campaign | 1 |
+| `Campaign/CAMPAIGNS-VALIDATION-REPORT.md` | Live validation status per attack | 1 |
+| `Campaign/CADRE-Attack-Surface-Coverage-Audit.md` | Configured-surface audit vs campaign | 1 |
 | 01-walkthroughs | Walkthrough reference cards | 63 (+37 pending) |
 | 02-diagrams | Lab architecture Mermaid | 2 |
 | 04-automation | Core AD + Campaign E/G/H scripts | 91 |

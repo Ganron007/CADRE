@@ -8,8 +8,8 @@ Unified attack campaign **v3** — per-phase runbooks, metadata, research, and s
 |------|---------|
 | [`CAMPAIGNS_v3.md`](CAMPAIGNS_v3.md) | **Current campaign** — full narrative (search / print); start spine at Phase 0.5 / ws01 |
 | [`CAMPAIGNS-METADATA-v2.md`](CAMPAIGNS-METADATA-v2.md) | Per-attack playbook refs, ACE#s, telemetry (index) |
-| [`CAMPAIGNS-VALIDATION-REPORT-20260730.md`](CAMPAIGNS-VALIDATION-REPORT-20260730.md) | Live validation report (Branches B/C/D verified) |
-| [`CADRE-Attack-Surface-Coverage-Audit-20260730.md`](CADRE-Attack-Surface-Coverage-Audit-20260730.md) | Attack-surface coverage audit (6-doc sync set) |
+| [`CAMPAIGNS-VALIDATION-REPORT.md`](CAMPAIGNS-VALIDATION-REPORT.md) | Live validation report (Branches B/C/D verified) |
+| [`CADRE-Attack-Surface-Coverage-Audit.md`](CADRE-Attack-Surface-Coverage-Audit.md) | Attack-surface coverage audit (6-doc sync set) |
 | [`LAB-PROFILES.md`](LAB-PROFILES.md) | **Modular VM sets** — which VMs to run per phase (save RAM; P-FULL = worst case) |
 | [`Campaign_suggestions.md`](Campaign_suggestions.md) | Research backlog summary table (index) |
 | [`ATTACK-MAP.md`](ATTACK-MAP.md) | Visual mindmap of AD attack surface |

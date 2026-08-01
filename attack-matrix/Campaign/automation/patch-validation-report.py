@@ -1,6 +1,6 @@
 from pathlib import Path
 
-path = Path(r'C:\STUDY\Github\CADRE-Platform\CADRE\attack-matrix\Campaign\CAMPAIGNS-VALIDATION-REPORT-20260730.md')
+path = Path(r'C:\STUDY\Github\CADRE-Platform\CADRE\attack-matrix\Campaign\CAMPAIGNS-VALIDATION-REPORT.md')
 text = path.read_text(encoding='utf-8')
 
 blocker_bullet = '''- **Provisioning bridge path:** `/tmp/nxc-venv` on `provisioning` now contains `nxc` and `certipy` installed from git. Use this bridge for attacks that cannot run on `ws01` until the Rust compiler is added or prebuilt wheels are available.

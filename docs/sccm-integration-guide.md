@@ -351,6 +351,57 @@ GET https://mbr02.range.local/AdminService/v1.0/Device(16777220)/AdminService.Sc
 
 ---
 
+## Phase 6C — WT038 Application Deployment: Console GUI Path (ground-truth)
+
+> ✅ **BOTH PATHS VERIFIED 2026-08-02.** The programmatic path (`ws01-wt038-deploy.ps1` from ws01 as `range\svc_sccm`) is now **FULL EXEC VERIFIED**: app (CI 16777510) + DT (16777511) + assignment (16777217) created via the AdminService wmi passthrough, and after the MP web-handler repair the client received the assignment and ran the payload **as SYSTEM** (`C:\Windows\Temp\wt038-system.txt` = `nt authority\system`). Two model-document gotchas to replicate: (1) the AppMgmtDigest must be **SCCMHunter-exact** — `<CustomData>` wrapper + `<ExecutionContext>` at the `<Installer>` level (a hand-rebuilt XML without them → `Failed to initialize from Model document (0x80004005)`); (2) the `InstallCommandLine` payload must be **XML-escaped** (`>` and `&` in `cmd /c "..."` break the model parser). The console GUI path below is the reliable ground-truth alternative and how the collection schedule gets set correctly (see 6C.1 note).
+
+### 6C.1 — Collection (Console GUI)
+
+1. **Assets and Compliance → Device Collections** → right-click → **Create Device Collection**
+2. General: Name `WT038-<random>` → Limiting collection **All Systems** → Next
+3. **Membership Rules** → **Add Rule → Direct Rule** → Resource class **System Resource** → search → select **WS01** (ResourceID 16777220) → OK → Next → Finish
+4. Right-click the collection → **Properties** → **Membership Rules tab** → check **"Use incremental updates for this collection"** → OK
+5. Right-click → **Update Membership** — the evaluator MUST show the member before deploying (verify WS01 appears in the Membership tab)
+
+> **Why this step matters:** collections created programmatically via the AdminService default to `RefreshType=1` (manual, no schedule) and never materialize for policy delivery. The console wizard sets incremental updates by default. The evaluator log line `Collection <ID> does not have a schedule` is the symptom of the missing schedule.
+
+### 6C.2 — Application (Console GUI)
+
+1. **Software Library → Application Management → Applications** → right-click → **Create Application** → **Manually specify the application information** → Next
+2. General: Name `WT038-<random>` → Next
+3. **Deployment Type** → **Add** → **Script Installer** → Next
+4. **Content**: Installation program:
+   ```
+   cmd /c whoami > C:\Windows\Temp\wt038-system.txt & echo WT038-PROOF-APP-DEPLOY > C:\Windows\Temp\wt038-marker.txt
+   ```
+   Installation behavior: **Install for system** (SYSTEM context = the WT038 objective)
+5. **Detection method** → **Add Clause** → Setting type **File System** → Path `C:\Windows\Temp` → File `wt038-marker.txt` → **"This file or folder exists"** → OK → Next → Next → Finish → Finish
+
+### 6C.3 — Deployment (Console GUI)
+
+1. Right-click the app → **Deploy**
+2. Collection: the 6C.1 collection → **Action: Install, Purpose: Required** → Next
+3. Schedule: **As soon as possible** + deadline **As soon as possible** → Next → Next → Next → Finish
+4. Wait 1–2 min → on WS01 verify:
+   - `C:\Windows\Temp\wt038-system.txt` = `nt authority\system`
+   - `C:\Windows\Temp\wt038-marker.txt` = `WT038-PROOF-APP-DEPLOY`
+
+### 6C.4 — WT038 delivery prerequisites (client↔MP policy channel)
+
+> ✅ **VERIFIED 2026-08-02 — applied live:** `mp.msi REINSTALL=ALL` (exact site command from `MPSetup.log`) → `/SMS_MP/.sms_aut?MPLIST` flipped 500 → **200** → client policy delivered → `AppEnforce.log` ran the payload **with system context**, exit 0 → markers on WS01.
+
+**The client must be able to reach the MP's policy endpoint or NOTHING delivers** (CMPivot/scripts ride the BGB fast channel, but app deployments ride client→MP policy):
+
+- MP health check `/SMS_MP/.sms_aut?MPLIST` must return **200** (not 500). Symptom of a broken MP: client `CcmMessaging.log` → `Post to http://<mp>/ccm_system/request failed with 0x8000000a` + `LocationServices.log` → repeated `assigned MP errors`.
+- **Root cause seen in this lab (2026-08-02):** the MP web handler dirs were EMPTY — `C:\Program Files\SMS_CCM\SMS_MP` and `C:\Program Files\SMS_CCM\ServiceData\System` had 0 files (same class of issue as the empty `SMS_BGB` dir that broke the fast channel). **Fix (same pattern as the BGB fix):** repair the MP component MSI with the exact command the site itself uses (from `MPSetup.log`):
+  ```
+  msiexec /i "C:\Program Files\Microsoft Configuration Manager\bin\x64\mp.msi" REINSTALL=ALL REINSTALLMODE=vmaus CCMINSTALLDIR="C:\Program Files\SMS_CCM" CCMSERVERDATAROOT="C:\Program Files\Microsoft Configuration Manager" USESMSPORTS=TRUE SMSPORTS=80 USESMSSSLPORTS=TRUE SMSSSLPORTS=443 USESMSSSL=TRUE SMSSSLSTATE=1024 CCMENABLELOGGING=TRUE CCMLOGLEVEL=1 CCMLOGMAXSIZE=1000000 CCMLOGMAXHISTORY=1 /qn /l*v "C:\Program Files\Microsoft Configuration Manager\logs\mpRepair.log"
+  ```
+  Then verify `SMS_MP` / `ServiceData\System` are populated and `mpcontrol.log` shows the MP availability check passing.
+- After the fix, re-trigger the client policy cycle: **SCCM console → Monitoring → Client Operations → Start Client Operation → Machine Policy Retrieval & Evaluation Cycle** (target the WT038 collection), or from ws01: `POST /AdminService/wmi/SMS_ClientOperation.InitiateClientOperation` `{"Type":8,"TargetCollectionID":"<coll>"}`.
+
+---
+
 ## Phase 7 — Apply SCCM Misconfigurations (Attack Surface) — SCCM Console GUI
 
 After SCCM is installed and running. **Do NOT use WMI** — the WMI approach fails on Server 2025. Use the SCCM Console GUI for all three:

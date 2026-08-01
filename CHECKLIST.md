@@ -157,7 +157,7 @@
 
 ## Campaign re-test tracker (2026-07-31)
 
-> Source of truth: [`attack-matrix/Campaign/CAMPAIGNS-VALIDATION-REPORT-20260730.md`](attack-matrix/Campaign/CAMPAIGNS-VALIDATION-REPORT-20260730.md) · [`attack-matrix/Campaign/CADRE-Attack-Surface-Coverage-Audit-20260730.md`](attack-matrix/Campaign/CADRE-Attack-Surface-Coverage-Audit-20260730.md) · [`attack-matrix/Campaign/CAMPAIGNS-METADATA-v2.md`](attack-matrix/Campaign/CAMPAIGNS-METADATA-v2.md)
+> Source of truth: [`attack-matrix/Campaign/CAMPAIGNS-VALIDATION-REPORT.md`](attack-matrix/Campaign/CAMPAIGNS-VALIDATION-REPORT.md) · [`attack-matrix/Campaign/CADRE-Attack-Surface-Coverage-Audit.md`](attack-matrix/Campaign/CADRE-Attack-Surface-Coverage-Audit.md) · [`attack-matrix/Campaign/CAMPAIGNS-METADATA-v2.md`](attack-matrix/Campaign/CAMPAIGNS-METADATA-v2.md)
 >
 > **Scope:** Phase 1–8 + Branch A–D + Streams E/F/G · **Excluded:** Phase 0.5 / H-01..H-06 initial access · **Legend:** ✅ verified / 📝 script corrected pending re-test / ⏳ not exercised / ⠿ blocked / ❌ non-functional or rejected / 🔬 deferred
 
