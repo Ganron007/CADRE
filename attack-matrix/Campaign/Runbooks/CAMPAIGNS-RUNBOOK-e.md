@@ -16,7 +16,9 @@
 
 ### E — Network Defense (14 exercises)
 
-Run from linux01 or provisioning. Each triggers a Suricata SID or Zeek notice. See `04-automation/campaign-e/` and `docs/internal/plan01-telemetry-catalog/phase0.7-defense-deepening/`.
+> **Status (2026-08-02):** Attack side **✅ COMPLETE** — all 13 simulated attacks (WT069–081) + E-10 SNI validated from `ws01` (scripts `04-automation/campaign-e/ws01-campaign-e.ps1` / `-fix.ps1`). Detection rules are **already deployed** in ELK/Suricata/Zeek (`13-net-monitor.yml`: `cadre-ad.rules`, `cadre-phaseb.rules`, `cadre-et-lab.rules`, `cadre-coercion.rules` + `cadre-outbound.zeek` / `cadre-conn-beacon.zeek`). **Fire-confirmation ⏳ PENDING** — deferred to the telemetry catalog stage (monitor `.55` unreachable during the ws01 run). **WT093 Ransomware** tracked separately → future Branch R (see [`plan1.8-offensive-upgrades.md`](../../../docs/internal/plan01-upgrades/plan1.8-offensive-upgrades.md) §7).
+
+Attack-side scripts run from `ws01` (beachhead) as `analyst_t1`; each triggers a Suricata SID or Zeek notice. See `04-automation/campaign-e/` and `docs/internal/plan01-telemetry-catalog/phase0.7-defense-deepening/`.
 
 
 | WT# | Technique                  | Trigger                                | Detection                                 |

@@ -3668,7 +3668,9 @@ Survey of `C:\STUDY\Github\CADRE-Platform\CADRE-Courses\ebooks\` (75 .txt files)
 
 ### E — Network Defense (14 exercises)
 
-Run from linux01 or provisioning. Each triggers a Suricata SID or Zeek notice. See `04-automation/campaign-e/` and `docs/internal/plan01-telemetry-catalog/phase0.7-defense-deepening/`.
+> **Status (2026-08-02):** Attack side **✅ COMPLETE** — all 13 simulated attacks (WT069–081) + E-10 SNI validated from `ws01` (scripts `04-automation/campaign-e/ws01-campaign-e.ps1` / `-fix.ps1`). Detection rules are **already deployed** in ELK/Suricata/Zeek (`13-net-monitor.yml`: `cadre-ad.rules`, `cadre-phaseb.rules`, `cadre-et-lab.rules`, `cadre-coercion.rules` + `cadre-outbound.zeek` / `cadre-conn-beacon.zeek`). **Fire-confirmation ⏳ PENDING** — deferred to the telemetry catalog stage (monitor `.55` unreachable during the ws01 run). **WT093 Ransomware** tracked separately → future Branch R (see [`plan1.8-offensive-upgrades.md`](../../docs/internal/plan01-upgrades/plan1.8-offensive-upgrades.md) §7).
+
+Attack-side scripts run from `ws01` (beachhead) as `analyst_t1`; each triggers a Suricata SID or Zeek notice. See `04-automation/campaign-e/` and `docs/internal/plan01-telemetry-catalog/phase0.7-defense-deepening/`.
 
 
 | WT# | Technique                  | Trigger                                | Detection                                 |
@@ -3687,6 +3689,8 @@ Run from linux01 or provisioning. Each triggers a Suricata SID or Zeek notice. S
 | 080 | Long Connection Beacon     | Sustained TCP connection >300s         | Z9 — `cadre-conn-beacon.zeek`             |
 | 081 | Outbound Anomaly           | Connection to unknown external IP      | Z1 — `cadre-outbound.zeek`                |
 | 093 | Ransomware Simulation      | AES-256 file encryption on disk        | Sysmon EID 11 + Elastic Defend file event |
+
+> **Ransomware Simulation (WT093) — future standalone campaign.** Tracked here in E for now as a single exercise (AES-256 file encryption on disk → Sysmon EID 11 + Elastic Defend file event). It is deliberately **not** re-purposed into the `ws01-campaign-e` scripts — it is a disk-level Impact simulation, not a network trigger. **Planned as a separate Branch R (Ransomware) campaign** with dedicated scripts + more items (shadow-copy deletion T1490, service stop T1489, ransom-note drop, lateral mass-encryption, backup destruction, encryption beacon). See [`plan1.8-offensive-upgrades.md`](../../docs/internal/plan01-upgrades/plan1.8-offensive-upgrades.md) §7.
 
 
 ### F — Supply-Chain Simulation (10 scenarios)

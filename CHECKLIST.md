@@ -431,22 +431,24 @@
 
 ### Stream E — Network defense
 
+> **Status (2026-08-02):** Attack side **✅ COMPLETE** — all 13 simulated attacks (WT069–081) + E-10 SNI validated from `ws01` (scripts `attack-matrix/04-automation/campaign-e/ws01-campaign-e.ps1` / `-fix.ps1`). **Detection rules already deployed** in ELK/Suricata/Zeek (`13-net-monitor.yml`: `cadre-ad/phaseb/et-lab/coercion` rules + `cadre-outbound/conn-beacon` Zeek scripts). **PENDING (all that remains):** per-item rule fire-confirmation + telemetry capture + tracker update — deferred to **Plan 1 telemetry catalog** (monitor `.55` unreachable during the ws01 run). **WT093 Ransomware** tracked separately → future Branch R (`plan1.8-offensive-upgrades.md` §7).
+
 | ID | Attack | Source | Credential | Status |
 |----|--------|--------|------------|--------|
-| E-01 | Kerberoast detection | monitor VM (192.168.77.55) | None / SIEM analyst | ⏳ Not exercised |
-| E-02 | DCSync detection | monitor VM (192.168.77.55) | None / SIEM analyst | ⏳ Not exercised |
-| E-03 | AS-REP roast detection | monitor VM (192.168.77.55) | None / SIEM analyst | ⏳ Not exercised |
-| E-04 | DGA detection | monitor VM (192.168.77.55) | None / SIEM analyst | ⏳ Not exercised |
-| E-05 | DNS TXT exfil | monitor VM (192.168.77.55) | None / SIEM analyst | ⏳ Not exercised |
-| E-06 | DNS NXDOMAIN burst | monitor VM (192.168.77.55) | None / SIEM analyst | ⏳ Not exercised |
-| E-07 | TLS 1.0 usage | monitor VM (192.168.77.55) | None / SIEM analyst | ⏳ Not exercised |
-| E-08 | SNI anomaly | monitor VM (192.168.77.55) | None / SIEM analyst | ⏳ Not exercised |
-| E-09 | Cipher suite anomaly | monitor VM (192.168.77.55) | None / SIEM analyst | ⏳ Not exercised |
-| E-10 | Self-signed cert chain | monitor VM (192.168.77.55) | None / SIEM analyst | ⏳ Not exercised |
-| E-11 | SMB admin share | monitor VM (192.168.77.55) | None / SIEM analyst | ⏳ Not exercised |
-| E-12 | SMBv1 attempt | monitor VM (192.168.77.55) | None / SIEM analyst | ⏳ Not exercised |
-| E-13 | HTTP user-agent anomaly | monitor VM (192.168.77.55) | None / SIEM analyst | ⏳ Not exercised |
-| E-14 | Exploit path telemetry | monitor VM (192.168.77.55) | None / SIEM analyst | ⏳ Not exercised |
+| E-01 | Kerberoast detection | monitor VM (192.168.77.55) | None / SIEM analyst | ⏳ Rule validate pending |
+| E-02 | DCSync detection | monitor VM (192.168.77.55) | None / SIEM analyst | ⏳ Rule validate pending |
+| E-03 | AS-REP roast detection | monitor VM (192.168.77.55) | None / SIEM analyst | ⏳ Rule validate pending |
+| E-04 | DGA detection | monitor VM (192.168.77.55) | None / SIEM analyst | ⏳ Rule validate pending |
+| E-05 | DNS TXT exfil | monitor VM (192.168.77.55) | None / SIEM analyst | ⏳ Rule validate pending |
+| E-06 | DNS NXDOMAIN burst | monitor VM (192.168.77.55) | None / SIEM analyst | ⏳ Rule validate pending |
+| E-07 | TLS 1.0 usage | monitor VM (192.168.77.55) | None / SIEM analyst | ⏳ Rule validate pending |
+| E-08 | SNI anomaly | monitor VM (192.168.77.55) | None / SIEM analyst | ⏳ Rule validate pending |
+| E-09 | Cipher suite anomaly | monitor VM (192.168.77.55) | None / SIEM analyst | ⏳ Rule validate pending |
+| E-10 | Self-signed cert chain | monitor VM (192.168.77.55) | None / SIEM analyst | ⏳ Rule validate pending |
+| E-11 | SMB admin share | monitor VM (192.168.77.55) | None / SIEM analyst | ⏳ Rule validate pending |
+| E-12 | SMBv1 attempt | monitor VM (192.168.77.55) | None / SIEM analyst | ⏳ Rule validate pending |
+| E-13 | HTTP user-agent anomaly | monitor VM (192.168.77.55) | None / SIEM analyst | ⏳ Rule validate pending |
+| E-14 | Exploit path telemetry | monitor VM (192.168.77.55) | None / SIEM analyst | ⏳ Rule validate pending |
 
 - [ ] **E-01** Kerberoast detection — rule validate · telemetry captured · tracker updated
 - [ ] **E-02** DCSync detection — rule validate · telemetry captured · tracker updated
