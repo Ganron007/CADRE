@@ -268,16 +268,16 @@
 
 | ID | Attack | Source Machine | Credential | Status | Notes | Re-test Needed |
 |------|--------|----------------|------------|--------|-------|----------------|
-| F-01 | F-01 — npm registry poisoning | linux01 / mbr01 / npm registry | Attacker-controlled npm package or CI token | ⏳ Not exercised | Supply-chain simulation; see plan1.8-npm-upgrade.md | Yes |
-| F-02 | F-02 — Malicious dependency install | linux01 / mbr01 / npm registry | Attacker-controlled npm package or CI token | ⏳ Not exercised | Supply-chain simulation; see plan1.8-npm-upgrade.md | Yes |
-| F-03 | F-03 — Typosquat publish | linux01 / mbr01 / npm registry | Attacker-controlled npm package or CI token | ⏳ Not exercised | Supply-chain simulation; see plan1.8-npm-upgrade.md | Yes |
-| F-04 | F-04 — Compromised maintainer | linux01 / mbr01 / npm registry | Attacker-controlled npm package or CI token | ⏳ Not exercised | Supply-chain simulation; see plan1.8-npm-upgrade.md | Yes |
-| F-05 | F-05 — Build script execution | linux01 / mbr01 / npm registry | Attacker-controlled npm package or CI token | ⏳ Not exercised | Supply-chain simulation; see plan1.8-npm-upgrade.md | Yes |
-| F-06 | F-06 — Post-install hook | linux01 / mbr01 / npm registry | Attacker-controlled npm package or CI token | ⏳ Not exercised | Supply-chain simulation; see plan1.8-npm-upgrade.md | Yes |
-| F-07 | F-07 — npm token exfil | linux01 / mbr01 / npm registry | Attacker-controlled npm package or CI token | ⏳ Not exercised | Supply-chain simulation; see plan1.8-npm-upgrade.md | Yes |
-| F-08 | F-08 — Package metadata manipulation | linux01 / mbr01 / npm registry | Attacker-controlled npm package or CI token | ⏳ Not exercised | Supply-chain simulation; see plan1.8-npm-upgrade.md | Yes |
-| F-09 | F-09 — Cache poisoning | linux01 / mbr01 / npm registry | Attacker-controlled npm package or CI token | ⏳ Not exercised | Supply-chain simulation; see plan1.8-npm-upgrade.md | Yes |
-| F-10 | F-10 — Tag pollution | linux01 / mbr01 / npm registry | Attacker-controlled npm package or CI token | ⏳ Not exercised | Supply-chain simulation; see plan1.8-npm-upgrade.md | Yes |
+| F-01 | F-01 — npm registry poisoning | linux01 / mbr01 / npm registry | Attacker-controlled npm package or CI token | ✅ Attack run (linux01) · ⏳ detection validate | Deployed suite (`scenario_*.sh` linux / `Scenario-*.ps1` win) covers install/postinstall behaviors | Yes |
+| F-02 | F-02 — Malicious dependency install | linux01 / mbr01 / npm registry | Attacker-controlled npm package or CI token | ✅ Attack run (linux01) · ⏳ detection validate | Deployed suite covers dependency-install behaviors | Yes |
+| F-03 | F-03 — Typosquat publish | linux01 / mbr01 / npm registry | Attacker-controlled npm package or CI token | ✅ Attack run (linux01) · ⏳ detection validate | Deployed suite covers publish/typosquat-ish behaviors | Yes |
+| F-04 | F-04 — Compromised maintainer | linux01 / mbr01 / npm registry | Attacker-controlled npm package or CI token | ✅ Attack run (linux01) · ⏳ detection validate | Deployed suite covers maintainer-account-style behaviors | Yes |
+| F-05 | F-05 — Build script execution | linux01 / mbr01 / npm registry | Attacker-controlled npm package or CI token | ⚠️ PARTIAL — scenario 4 env-gated | Package-patching scenario (s4) hangs on public-registry `npm install` offline; other exec scenarios ran | Yes |
+| F-06 | F-06 — Post-install hook | linux01 / mbr01 / npm registry | Attacker-controlled npm package or CI token | ✅ Attack run (linux01) · ⏳ detection validate | s1 (malicious postinstall) verified — sink captured payload | Yes |
+| F-07 | F-07 — npm token exfil | linux01 / mbr01 / npm registry | Attacker-controlled npm package or CI token | ✅ Attack run (linux01) · ⏳ detection validate | s2 (TruffleHog) + s8 (repo weaponization, fake tokens) ran | Yes |
+| F-08 | F-08 — Package metadata manipulation | linux01 / mbr01 / npm registry | Attacker-controlled npm package or CI token | ✅ Attack run (linux01) · ⏳ detection validate | s8 (data.json weaponization) + s3 (workflow injection) ran | Yes |
+| F-09 | F-09 — Cache poisoning | linux01 / mbr01 / npm registry | Attacker-controlled npm package or CI token | ✅ Attack run (linux01) · ⏳ detection validate | s9 (bundle repack) verified — summary artifact produced | Yes |
+| F-10 | F-10 — Tag pollution | linux01 / mbr01 / npm registry | Attacker-controlled npm package or CI token | ✅ Attack run (linux01) · ⏳ detection validate | s6 (npm publish worm, dry-run) verified | Yes |
 | F-11 | F-11 — CI-side cache poisoning analog | linux01 / mbr01 / npm registry | Attacker-controlled npm package or CI token | 🔬 Held expansion | Plan 0.8 expansion; see CAMPAIGNS_v3.md F section + Campaign_suggestions #107 | Yes |
 | F-12 | F-12 — Tag pollution / npm dist-tag add analog | linux01 / mbr01 / npm registry | Attacker-controlled npm package or CI token | 🔬 Held expansion | Plan 0.8 expansion; see CAMPAIGNS_v3.md F section + Campaign_suggestions #107 | Yes |
 | F-13 | F-13 — Prepare hook / dead-man switch | linux01 / mbr01 / npm registry | Attacker-controlled npm package or CI token | 🔬 Held expansion | Plan 0.8 expansion; see CAMPAIGNS_v3.md F section + Campaign_suggestions #107 | Yes |
@@ -322,7 +322,7 @@
 1. **Branch C SCCM (WT035-039) — AdminService CD chain VERIFIED (2026-08-01).** Root cause of the 401 was the **SPN owner**, not the provider identity: the self-hosted AdminService always runs as LocalSystem and can only decrypt machine-account tickets. **Fix applied + playbook-updated (`05-ad-attack-surface.yml`):** `HTTP/mbr02.range.local` moved `svc_sccm` → `mbr02$` (svc_sccm keeps decoy `HTTP/sccm.range.local` for WT033 Kerberoast; CD unchanged). Verified live: getST → ST encrypted to `mbr02$` → `AdminService/wmi/SMS_Site` → **200** as `administrator` (anon 401). WT037/039 auth gate **CLOSED**. Remaining: exercise CMPivot/script-run on the only managed client (MBR02).
 2. **ESC8 (WT052) / ESC11** — deferred; revisit at end via Kerberos-relay (krbrelayx) or a restored SMB-coerce primitive (NTLM-relay path proven non-viable on Server 2025).
 3. **E exercises (E-01..14) — detection rule validation only** — attack side COMPLETE (13/13 WT069–081 + E-10 from `ws01`, 2026-08-02). Remaining: confirm rule fires on monitor VM once elk/monitor are online (telemetry phase).
-4. **F supply-chain scenarios (F-01..13)** — run on linux01/mbr01/npm registry.
+4. **F supply-chain — detection rule validation only** — environment ✅ VERIFIED on linux01 + mbr01 (2026-08-02) and linux01 attack side run (8/9 scenarios; scenario 4 env-gated on public-registry `npm install`). Remaining: confirm detection fires once monitor/elk are online (telemetry phase).
 5. **Branch G (CVE-2026-41089)** — snapshot DCs + verify dc02 patch level (UBR < 32772), then PoC from Kali.
 6. **H-01..06 (initial access)** — needs `19-initial-access.yml` (currently excluded per operator).
 
@@ -352,7 +352,7 @@
 | ESC2/4/7/9 | Branch B | ADCS ESC2/4/7/9 | ws01 | hunter_dfir / lead_engineering | ✅ VERIFIED 2026-08-01 | All verified — see Branch B body table. |
 | WT044..048 | Branch D | MSSQL / SSSD / keytab / NFS / podman | linux01 | mssql-linux01 pivot → root | ✅ VERIFIED 2026-08-01 | All verified — see Branch D body table. |
 | E-01..E-14 | E stream | Network defense exercises | ws01 (attack) / monitor (detect) | analyst_t1 / — | ✅ Attack side COMPLETE 2026-08-02 (WT069–081 + E-10) | Rule fire-confirmation + telemetry capture pending (telemetry phase, monitor `.55`). |
-| F-01..F-13 | F stream | npm supply-chain scenarios | linux01/mbr01 | — | ⏳ Configured | Tooling configured; scenarios pending. |
+| F-01..F-13 | F stream | npm supply-chain scenarios | linux01 (attack) / mbr01 (env) | — | ✅ Env verified + linux01 attack run 2026-08-02 (8/9; s4 env-gated) | Detection fire-confirmation + telemetry pending (telemetry phase). |
 | G | Branch G | CVE-2026-41089 | Kali | — | 🔬 Deferred | PoC present; depends on dc02 patch state. |
 | H-01..H-06 | Phase 0.5 | Initial access payloads | Kali/ws01 | — | ❌ Missing | No playbook stages payloads; needs `19-initial-access.yml`. |
 
