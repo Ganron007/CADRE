@@ -1,0 +1,4 @@
+SELECT RoleName, SiteSystem, NumOfRoles FROM SMS_SCI_SysResUse
+SELECT ComponentName, MachineName FROM SMS_SCI_Component
+SELECT * FROM SMS_SCI_Component WHERE ComponentName = 'SMS_ADMIN_SERVICE'
+SELECT RoleName, Props FROM SMS_SCI_SysResUse WHERE RoleName LIKE '%Provider%'

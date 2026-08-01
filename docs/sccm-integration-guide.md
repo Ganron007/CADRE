@@ -206,7 +206,9 @@ Run the SCCM setup wizard and follow the screen-by-screen options below. Install
 
 ### Why there is NO console option (important)
 
-The **Administration Service is NOT a checkbox in the "Add Site System Roles" wizard**. Since ConfigMgr Current Branch **2103**, it installs **automatically as part of the SMS Provider role**. The only console control is the **SMS Provider role Properties → "Admin Service" tab** (enable/disable). mbr02 is a modern build, so the AdminService *should* have auto-deployed with the provider — its absence means the deployment was skipped or failed at install time.
+The **Administration Service is NOT a checkbox in the "Add Site System Roles" wizard**. Since ConfigMgr Current Branch **2103**, it installs **automatically as part of the SMS Provider role**. On mbr02 it is **confirmed ABSENT at the site level**: `SMS_SCI_Component` has **no `SMS_ADMIN_SERVICE` component** (verified 2026-08-01 as `svc_sccm`), so the AdminService was never enabled/deployed — not merely hidden.
+
+**The console "Remove Role" is DISABLED by design for the site's own provider.** mbr02 hosts the site's **only** SMS Provider (verified: exactly one `SMS Provider` role entry). Per Microsoft: *"To remove the last SMS provider for a site, you must uninstall the site."* — so **Method B below must use SCCM Setup, not the console.**
 
 ### Deploy (two supported methods)
 
@@ -219,11 +221,15 @@ The **Administration Service is NOT a checkbox in the "Add Site System Roles" wi
 5. **OK**. SCCM deploys the AdminService web app under the Default Web Site (`/AdminService`) with its own app pool **`SMS_AdminService_AppPool`** + files under `bin\AdminService` + the `SMS_AdminService` WMI class.
 6. Watch `C:\Program Files\Microsoft Configuration Manager\Logs\smsadminui.log` (console side) until the deployment completes.
 
-**Method B — reinstall the SMS Provider role (if Method A has no Admin Service tab, or enabling does nothing):**
+**Method B — via SCCM Setup (the ONLY way to modify the provider on the site server; console Remove is disabled for the last provider):**
 
-1. **Administration** → **Site Configuration** → **Servers and Site System Roles** → `MBR02.RANGE.LOCAL` → **SMS Provider** role → **Remove Role**.
-2. Re-add: **Add Site System Roles** → select **SMS Provider** → complete the wizard.
-3. On 2103+ builds the reinstall deploys the AdminService automatically.
+1. On mbr02 run `\BIN\X64\setup.exe` from the Configuration Manager installation folder (or `\SMSSETUP\BIN\X64\setup.exe` from the install media — same version as the site).
+2. **Getting Started** → **Perform site maintenance or reset this site**.
+3. **Site Maintenance** → **Modify SMS provider configuration** → **Uninstall the specified SMS provider** (mbr02) → run again → **Add a new SMS provider** (mbr02). The reinstall deploys the AdminService.
+4. **Alternative (stronger, documented):** instead of step 3 choose **Reset site with no configuration changes** — a site reset *reinstalls all site components and all site system roles* (re-triggers the AdminService deployment).
+5. Monitor **`ConfigMgrSetup.log`** in the root of the site install folder (the documented setup log).
+6. Prerequisites (per Microsoft): local **Administrator** on mbr02 + **Full Administrator** RBAC security role (for the site-reset path).
+7. Verify after: `/AdminService` web app + `SMS_AdminService_AppPool` + `bin\AdminService` + `SMS_AdminService` WMI class exist.
 
 ### Set the AdminService app pool identity to `RANGE\svc_sccm` (CRITICAL for the CD attack)
 
