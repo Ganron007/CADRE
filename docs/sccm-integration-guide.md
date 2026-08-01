@@ -200,6 +200,8 @@ Run the SCCM setup wizard and follow the screen-by-screen options below. Install
 - Site **IS** deployed and healthy: Site Code `CAD`, Site Name `CADRE Primary Site`, Site Type 1 (Primary), DB `CM_CAD`, build **5.00.9141.1000** (console 5.2509.x) — far newer than CB 2103. `SMS_EXECUTIVE`, `SMS_SITE_COMPONENT_MANAGER`, `CcmExec`, `SMS_NOTIFICATION_SERVER` all Running; full MP/DP/CCM/WSUS IIS app set present.
 - **AdminService is confirmed ABSENT**: no `/AdminService` IIS app, no `SMS_AdminService_AppPool` pool, no `bin\AdminService` DLL, no `SMS_AdminService` WMI class (`Invalid class`), no `SMS_ADMIN_SERVICE` site role.
 - Prerequisite OK: IIS **Windows Authentication** feature installed (`Web-Windows-Auth` = True).
+- **HTTPS prerequisite ALREADY SATISFIED** (part-D check 2026-08-01): Default Web Site has `https/:443` binding + valid `CN=mbr02.range.local` cert (ADCS-issued, expires 2027-05-20, private key) in the machine store → **no cert/binding work needed** for the AdminService.
+- ⚠️ **`range\svc_sccm` does NOT have `SeServiceLogonRight`** (verified via `secedit /export`) → must be granted before the pool will start under `svc_sccm` (see step below).
 - `range\svc_sccm` = SCCM admin but **NOT local admin** on mbr02 (config review had to run as `range\svc_naa`).
 
 ### Why there is NO console option (important)
@@ -240,6 +242,28 @@ iisreset
 # Equivalent: appcmd set apppool "SMS_AdminService_AppPool" /processModel.identityType:SpecificUser /processModel.userName:"RANGE\svc_sccm" /processModel.password:"s3rv1c3_SCCM!"
 ```
 
+### Grant `svc_sccm` "Log on as a service" (REQUIRED — verified MISSING 2026-08-01)
+
+> ⚠️ `svc_sccm` has **no `SeServiceLogonRight`** on mbr02 (verified via `secedit /export /areas USER_RIGHTS`). The pool will **NOT start** under that identity until it is granted. The **IIS Manager GUI grants this automatically** when you set the identity in the UI — but the **scripted path above does NOT**, so grant it explicitly:
+
+```powershell
+# Grant SeServiceLogonRight (Log on as a service) to RANGE\svc_sccm
+$cfg = "$env:windir\Temp\cadre-secpol.cfg"
+& "$env:windir\System32\secedit.exe" /export /areas USER_RIGHTS /cfg $cfg | Out-Null
+$sid = ([System.Security.Principal.NTAccount]"RANGE\svc_sccm").Translate([System.Security.Principal.SecurityIdentifier]).Value
+$lines = Get-Content $cfg
+for ($i = 0; $i -lt $lines.Count; $i++) {
+  if ($lines[$i] -match '^SeServiceLogonRight\s*=' -and $lines[$i] -notmatch [regex]::Escape($sid)) {
+    $lines[$i] = $lines[$i].TrimEnd() + ",*$sid"
+  }
+}
+Set-Content $cfg $lines
+& "$env:windir\System32\secedit.exe" /configure /db secedit.sdb /cfg $cfg /areas USER_RIGHTS | Out-Null
+Remove-Item $cfg -Force
+iisreset
+# Verify: svc_sccm SID ($sid) is now in SeServiceLogonRight, and the pool State = Started (next section)
+```
+
 ### Verify deployment
 
 ```powershell
@@ -252,6 +276,8 @@ Test-Path "C:\Program Files\Microsoft Configuration Manager\bin\AdminService"
 Import-Module WebAdministration
 (Get-ItemProperty "IIS:\AppPools\SMS_AdminService_AppPool").processModel.userName
 # Expect: RANGE\svc_sccm
+(Get-ItemProperty "IIS:\AppPools\SMS_AdminService_AppPool").state
+# Expect: Started  (if Stopped -> identity/logon-right problem: re-check SeServiceLogonRight step)
 
 # WMI class only exists once the AdminService is deployed:
 Get-CimInstance -Namespace "root\SMS\site_CAD" -ClassName SMS_AdminService

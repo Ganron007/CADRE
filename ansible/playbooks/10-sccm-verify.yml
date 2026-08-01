@@ -133,7 +133,10 @@
           $pool = Get-ItemProperty "IIS:\AppPools\SMS_AdminService_AppPool" -ErrorAction SilentlyContinue
           if (-not $pool) { Write-Output "FAIL: AdminService app pool (SMS_AdminService_AppPool) not found"; exit 1 }
           $user = $pool.processModel.userName
-          if ($user -eq "RANGE\svc_sccm") { Write-Output "PASS: AdminService pool identity = RANGE\svc_sccm"; exit 0 }
+          if ($user -eq "RANGE\svc_sccm") {
+            if ($pool.state -eq "Started") { Write-Output "PASS: AdminService pool identity = RANGE\svc_sccm + Running"; exit 0 }
+            Write-Output "FAIL: AdminService pool identity OK but state = '$($pool.state)' (check SeServiceLogonRight for svc_sccm)"; exit 1
+          }
           Write-Output "FAIL: AdminService pool identity is '$user' (expected RANGE\svc_sccm — required for CD ticket decryption)"; exit 1
         } catch { Write-Output "FAIL: AdminService pool check error: $_"; exit 1 }
       register: r
