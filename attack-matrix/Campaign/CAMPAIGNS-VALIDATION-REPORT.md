@@ -264,6 +264,8 @@
 
 ## F - Supply Chain
 
+> **Status (2026-08-02):** Environment **✅ VERIFIED** on both VMs (`16-supplychain-verifyOnly.yml`: linux01 15/15, mbr01 6/6 — mbr01 scenario-path check fixed to canonical `C:\Tools\npm-threat-emulation\scenarios` + `windows\scenarios` fallback; windows scripts staged + author refs stripped on mbr01/linux01). **Attack side ⚠️ PARTIAL on linux01:** 8/9 scenarios execute clean (1,2,3,5,6,7,8,9); mock sink captured **+4 exfil payloads** (75→79); auditd `npm_node_exec` events confirmed firing. **Scenario 4 (package patching) env-gated** — `npm install ethers` to the public registry hangs in the offline lab. **Detection fire-confirmation ⏳ PENDING** — deferred to the telemetry catalog stage. Future: independent CADRE NPM-Chain upgrade (plan1.8 §11).
+
 | ID | Attack | Source Machine | Credential | Status | Notes | Re-test Needed |
 |------|--------|----------------|------------|--------|-------|----------------|
 | F-01 | F-01 — npm registry poisoning | linux01 / mbr01 / npm registry | Attacker-controlled npm package or CI token | ⏳ Not exercised | Supply-chain simulation; see plan1.8-npm-upgrade.md | Yes |

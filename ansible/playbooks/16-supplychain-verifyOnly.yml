@@ -137,7 +137,7 @@
 
     - name: "[VERIFY] 9 PowerShell scenarios present"
       ansible.windows.win_shell: |
-        $paths = @("C:\Tools\NPM-Threat-Emulation-main\scenarios", "C:\Tools\npm-threat-emulation\scenarios")
+        $paths = @("C:\Tools\npm-threat-emulation\scenarios", "C:\Tools\NPM-Threat-Emulation-main\windows\scenarios", "C:\Tools\NPM-Threat-Emulation-main\scenarios")
         foreach ($p in $paths) {
           $count = (Get-ChildItem "$p\*.ps1" -ErrorAction SilentlyContinue).Count
           if ($count -ge 9) { Write-Output "PASS: $count scenarios in $p"; exit 0 }

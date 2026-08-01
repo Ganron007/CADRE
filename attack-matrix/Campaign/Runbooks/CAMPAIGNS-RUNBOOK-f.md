@@ -12,7 +12,9 @@
 
 ### F — Supply-Chain Simulation (10 scenarios)
 
-npm threat emulation on linux01 (Bash) + mbr01 (PowerShell). Detected via auditd (process/file) + Zeek (network). See `docs/internal/npm-supplychain-installation-guide.md`. Attribution: integrates [MHaggis/NPM-Threat-Emulation](https://github.com/MHaggis/NPM-Threat-Emulation) (Shai-Hulud worm emulation).
+> **Status (2026-08-02):** Environment **✅ VERIFIED** on both VMs (`16-supplychain-verifyOnly.yml`: linux01 15/15, mbr01 6/6 — mbr01 scenario-path check fixed to canonical `C:\Tools\npm-threat-emulation\scenarios` + `windows\scenarios` fallback). **Attack side ⚠️ PARTIAL on linux01:** 8/9 scenarios execute clean (1,2,3,5,6,7,8,9) — mock sink captured **+4 exfil payloads**, auditd `npm_node_exec` events firing; **scenario 4 (package patching) env-gated** — `npm install ethers` to the public registry hangs in the offline lab. **Detection fire-confirmation ⏳ PENDING** — deferred to the telemetry catalog stage. Deployed copies on linux01/mbr01 have upstream author references **stripped**. **Future:** independent **CADRE NPM-Chain** upgrade — see [`plan1.8-offensive-upgrades.md`](../../../docs/internal/plan01-upgrades/plan1.8-offensive-upgrades.md) §11 + [`cadre_npm_chain_upgrade.md`](../../../docs/internal/plan01-upgrades/cadre_npm_chain_upgrade.md).
+
+npm threat emulation on linux01 (Bash) + mbr01 (PowerShell). Detected via auditd (process/file) + Zeek (network). See `docs/internal/npm-supplychain-installation-guide.md`. Upstream reference (current deployment): MHaggis/NPM-Threat-Emulation (Shai-Hulud worm emulation) — deployed copies stripped of author refs on the VMs.
 
 
 | F-#  | Scenario                                        | MITRE            | Sensor                                            | Detection Rule                                                 |

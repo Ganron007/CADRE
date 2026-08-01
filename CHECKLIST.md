@@ -467,6 +467,8 @@
 
 ### Stream F — Supply chain
 
+> **Status (2026-08-02):** Environment **✅ VERIFIED** on both VMs (`16-supplychain-verifyOnly.yml`: linux01 15/15, mbr01 6/6; mbr01 scenario-path check fixed to canonical `C:\Tools\npm-threat-emulation\scenarios`; windows scripts staged + author refs stripped on mbr01/linux01). **Attack side ⚠️ PARTIAL on linux01:** 8/9 scenarios execute clean (1,2,3,5,6,7,8,9); mock sink captured **+4 exfil payloads**; auditd `npm_node_exec` events confirmed firing. **Scenario 4 env-gated** (npm install to public registry hangs offline). **PENDING (what remains):** per-scenario fire-confirmation + telemetry capture + tracker update — deferred to **Plan 1 telemetry catalog** (same gate as Stream E). Future: independent CADRE NPM-Chain upgrade (`plan1.8-offensive-upgrades.md` §11).
+
 | ID | Attack | Source | Credential | Status |
 |----|--------|--------|------------|--------|
 | F-01 | npm install lifecycle script exfil | linux01 / mbr01 | npm project context | ⏳ Not exercised |
