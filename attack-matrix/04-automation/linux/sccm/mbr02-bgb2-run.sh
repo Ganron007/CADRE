@@ -1,0 +1,2 @@
+#!/bin/bash
+scp -i C:\Users\Ganro\.ssh\cadre-provisioning-key -o StrictHostKeyChecking=no "C:\STUDY\Github\CADRE-Platform\CADRE\attack-matrix\04-automation\linux\sccm\mbr02-bgb2.ps1" vagrant@192.168.77.23:/C:/Users/vagrant/; ssh -i C:\Users\Ganro\.ssh\cadre-provisioning-key -o StrictHostKeyChecking=no vagrant@192.168.77.23 "powershell -NoProfile -ExecutionPolicy Bypass -File C:\Users\vagrant\mbr02-bgb2.ps1"

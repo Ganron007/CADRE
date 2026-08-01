@@ -1,0 +1,2 @@
+#!/bin/bash
+scp -i C:\Users\Ganro\.ssh\cadre-ws01-key -o StrictHostKeyChecking=no "C:\STUDY\Github\CADRE-Platform\CADRE\attack-matrix\04-automation\linux\sccm\ws01-scripts-log.ps1" analyst_t1@192.168.77.62:/C:/Users/analyst_t1/; ssh -i C:\Users\Ganro\.ssh\cadre-ws01-key -o StrictHostKeyChecking=no analyst_t1@192.168.77.62 "powershell -NoProfile -ExecutionPolicy Bypass -File C:\Users\analyst_t1\ws01-scripts-log.ps1"

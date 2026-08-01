@@ -230,8 +230,12 @@ PHASE 8 — CROSS-FOREST + SCCM (range.local Domain Admin)
   │         -> WT037 CMPivot -> WT038 App Deploy -> WT039 Site Takeover         │
   │  Tools: SharpSCCM.exe get naa / get pxe / client-push / cmpivot / exec   │
   │  Converges: This IS Phase 8 completion — no separate convergence         │
-  │  Status: SCCM site CAD confirmed deployed on mbr02; WT034 verified;      │
-  │          WT035-039 not yet tested (require bare-metal/client infra)      │
+  │  Status: WT034 verified; WT037 CMPivot ✅ VERIFIED 2026-08-02 (live       │
+  │          LogicalDisk data from WS01 client via AdminService as svc_sccm); │
+  │          WT039 script-as-SYSTEM ✅ VERIFIED (ScriptOutput "nt authority\  │
+  │          system" + markers on WS01). Requires: svc_sccm as Full Admin     │
+  │          (Takeover-1 DB grant) + BGB fast channel up (bgbisapi.msi).      │
+  │          WT035 PXE / WT036 Client Push / WT038 App Deploy pending.        │
   └──────────────────────────────────────────────────────────────────────────
 
 
