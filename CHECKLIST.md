@@ -138,7 +138,7 @@
 | C.8 | Phase 8 — Cross-forest | P-FOREST | [ ] | [ ] | [ ] | [ ] | |
 | C.A | Branch A — ACL abuse | P-DELEG | [x] | [x] | [x] | [~] | Branch A 013/014/015/016/023/024/025/008/GPP verified; WT027 SPN Jacking verified 2026-08-01 |
 | C.B | Branch B — ADCS | P-DELEG | [x] | [x] | [x] | [~] | ESC1/2/3/4/7/9 + UnPAC verified 2026-08-01; ESC8/11 🔬 deferred |
-| C.C | Branch C — SCCM | P-FOREST | [x] | [x] | [x] | [x] | Surface + primitives verified; **WT037 CMPivot + WT039 script-as-SYSTEM FULL EXEC VERIFIED 2026-08-02** (live data + `nt authority\system` on WS01 via AdminService as svc_sccm; enablers: BGB fast channel + svc_sccm Full Admin DB grant + DB script approval). Recipes: guide Phase 6B. Remaining: WT035 PXE client, WT036 relay device, WT038 advertisement |
+| C.C | Branch C — SCCM | P-FOREST | [x] | [x] | [x] | [x] | **WT037 CMPivot + WT038 app deploy + WT039 script-as-SYSTEM FULL EXEC VERIFIED 2026-08-02** (live data + `nt authority\system` on WS01 via AdminService as svc_sccm; enablers: BGB fast channel + svc_sccm Full Admin DB grant + DB script approval + mp.msi MP repair). Recipes: guide Phase 6B/6C. Remaining: WT035 PXE client, WT036 relay device |
 | C.D | Branch D — Linux pivot | P-LINUX | [x] | [x] | [x] | [~] | WT044-048 verified 2026-08-01 |
 | C.E | Stream E — Network defense (14) | P-PURPLE | [ ] | [ ] | [ ] | [ ] | Plan 0.7 overlap |
 | C.F | Stream F — Supply chain (10) | P-CHILD + linux01 | [ ] | [ ] | [ ] | [ ] | Plan 0.8 |
@@ -338,13 +338,13 @@
 | 035 | SCCM PXE Boot abuse (WT035) | ws01 -> mbr02 | svc_sccm / s3rv1c3_SCCM! | ✅ Surface verified 2026-08-01 — PXE cert + 2 boot images + NAA-in-policy readable; full exploit needs PXE client |
 | 036 | SCCM Client Push install (WT036) | ws01 -> mbr02 | svc_sccm / s3rv1c3_SCCM! | ⚠️ Primitive verified — component enabled + `GenerateCCRByName`/`CreateCCR`; relay needs console-created target |
 | 037 | SCCM CMPivot (WT037) | ws01 -> mbr02 | svc_sccm / s3rv1c3_SCCM! | ✅ FULL EXEC VERIFIED 2026-08-02 — `RunCMPivot` (LogicalDisk) → live WS01 data via AdminService (enablers: BGB fast channel + svc_sccm Full Admin DB grant) |
-| 038 | SCCM Application Deployment (WT038) | ws01 -> mbr02 | svc_sccm / s3rv1c3_SCCM! | ⚠️ Partial — package+program (SYSTEM) via provider; `SMS_Advertisement` needs console |
+| 038 | SCCM Application Deployment (WT038) | ws01 -> mbr02 | svc_sccm / s3rv1c3_SCCM! | ✅ FULL EXEC VERIFIED 2026-08-02 — app+DT+assignment via AdminService; MP web handlers repaired (mp.msi) → payload ran as SYSTEM on WS01 (`nt authority\system` + marker) |
 | 039 | SCCM Site Takeover (WT039) | ws01 -> mbr02 | svc_sccm / s3rv1c3_SCCM! | ✅ FULL EXEC VERIFIED 2026-08-02 — script as `nt authority\system` on WS01 (create via AdminService wmi passthrough, approve via DB, `RunScript`) |
 
 - [x] **T035** SCCM PXE Boot — surface check ✅ (cert/boot images/NAA) · attack run ⏳ (needs PXE client) · tracker · telemetry
 - [~] **T036** SCCM Client Push — surface check ✅ · attack run ⏳ (relay needs console-created target) · tracker · telemetry
 - [x] **T037** SCCM CMPivot — ✅ FULL EXEC VERIFIED 2026-08-02 (live data from WS01; BGB fast channel + svc_sccm Full Admin DB grant) · tracker · telemetry
-- [~] **T038** SCCM Application Deployment — surface check ✅ (package/program created) · full deploy ⏳ (console) · tracker · telemetry
+- [x] **T038** SCCM Application Deployment — ✅ FULL EXEC VERIFIED 2026-08-02 (AdminService app create → mp.msi MP repair → payload as SYSTEM on WS01) · tracker · telemetry
 - [x] **T039** SCCM Site Takeover — ✅ FULL EXEC VERIFIED 2026-08-02 (`nt authority\system` on WS01; DB approval bypass) · tracker · telemetry
 
 ### Phase 8 Alt
@@ -500,7 +500,7 @@
 1. ~~**T102** dc02$ TGT capture~~ — **DONE 2026-07-31** (hostname listener → TGT → DCSync). 
 2. ~~**Branch A** after T015~~ — **DONE 2026-07-31/08-01** (013/014/015/016/023/024/025/008/GPP + **WT027 SPN Jacking** all verified).
 3. ~~**Branch B ADCS scripts**~~ — **DONE 2026-08-01** (ESC1/2/3/4/7/9 + UnPAC). ESC8/11 🔬 deferred (relay family — no SMB coerce on Server 2025).
-4. **Branch C SCCM chain** — **WT037 CMPivot + WT039 script-as-SYSTEM ✅ VERIFIED 2026-08-02** (see `docs/sccm-integration-guide.md` Phase 6B); remaining WT035 PXE (needs PXE client), WT036 relay (console-created device), WT038 advertisement (console/AdminService).
+4. **Branch C SCCM chain** — **WT037 CMPivot + WT038 app deploy + WT039 script-as-SYSTEM ✅ FULL EXEC VERIFIED 2026-08-02** (see `docs/sccm-integration-guide.md` Phase 6B/6C); remaining WT035 PXE (needs PXE client), WT036 relay (console-created device).
 5. ~~**Branch D** extraction exercises (WT045-048)~~ — **DONE 2026-08-01** (all verified).
 6. **Branch G** CVE-2026-41089 from Kali against dc02 with snapshot.
 7. **Stream E** exercises on monitor VM once elk/monitor are online.

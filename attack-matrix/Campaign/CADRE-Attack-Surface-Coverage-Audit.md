@@ -232,7 +232,7 @@
 
 **Key findings (2026-08-01):** SCCM admin gate = local `SMS Admins` group (svc_sccm + **cross-forest `CADRE\chief_command`/`analyst_purple`**). **SPN owner FIXED:** `HTTP/mbr02.range.local` moved to `mbr02$` (AdminService runs as LocalSystem → machine-account tickets only); svc_sccm keeps decoy `HTTP/sccm.range.local` (WT033 Kerberoast) + `msDS-AllowedToDelegateTo=HTTP/mbr02.range.local` CD (unchanged). AdminService IS deployed (self-hosted). **WT037/039 auth gate VERIFIED CLOSED (2026-08-01):** getST → ST encrypted to `mbr02$` → `AdminService/wmi/SMS_Site` **200** as Administrator (anon 401). **`cifs/mbr02.range.local` SPN MISSING** → SMB Kerberos to mbr02 broken (NTLM-only; verify-playbook candidate). Site CAD build 9141; 1 device (MBR02); 0 task sequences; 2 boot images.
 
-**Verdict:** Branch C surface + primitives verified 2026-08-01; **WT037 CMPivot + WT039 script-as-SYSTEM FULL EXEC VERIFIED 2026-08-02** (live data + `nt authority\system` on WS01 from ws01 as `svc_sccm`). Enablers: BGB fast channel (bgbisapi.msi → TCP 10123), svc_sccm Full Admin via DB Takeover-1 grant, script approval via DB. Recipes in `docs/sccm-integration-guide.md` Phase 6B. WT038 app creation + deployment via AdminService now works (app 16777510 / DT 16777511 / assignment 16777217 / policy body); **client delivery root-caused to broken MP web handlers** (empty `SMS_MP`/`ServiceData\System` → `/SMS_MP/.sms_aut` 500) — `mp.msi` REINSTALL repair (guide Phase 6C + 6C.4). Remaining: WT035 PXE (needs real PXE client), WT036 client-push relay (needs console-created device), WT038 delivery (MP repair completing).
+**Verdict:** Branch C surface + primitives verified 2026-08-01; **WT037 CMPivot + WT038 app deploy + WT039 script-as-SYSTEM FULL EXEC VERIFIED 2026-08-02** (live data + `nt authority\system` on WS01 from ws01 as `svc_sccm`). Enablers: BGB fast channel (bgbisapi.msi → TCP 10123), svc_sccm Full Admin via DB Takeover-1 grant, script approval via DB, **MP web-handler repair** (`mp.msi` REINSTALL — empty `SMS_MP`/`ServiceData\System` → `/SMS_MP/.sms_aut` 500 was the WT038 delivery blocker; health now 200, client policy delivered, payload ran as SYSTEM). Recipes in `docs/sccm-integration-guide.md` Phase 6B/6C/6C.4. Remaining: WT035 PXE (needs real PXE client), WT036 client-push relay (needs console-created device).
 
 ---
 
@@ -382,7 +382,7 @@ Once the AdminService is deployed and the ESC8/11 revisit lands, the campaign ca
 *Generated 2026-07-30 from playbook/guide review vs CAMPAIGNS-VALIDATION-REPORT.md.*
 ## Appendix A — Consolidated Campaign Re-test Matrix
 
-> Updated: 2026-08-02 (Branch A all verified; Branch B ESC1/2/3/4/7/9+UnPAC verified, ESC8/11 deferred; Branch D WT044-048 verified; **Branch C WT037 CMPivot + WT039 script-as-SYSTEM FULL EXEC VERIFIED 2026-08-02**, WT038 app+deployment via AdminService, delivery pending MP repair; spooler resolved; WT002/WT007 verified)
+> Updated: 2026-08-02 (Branch A all verified; Branch B ESC1/2/3/4/7/9+UnPAC verified, ESC8/11 deferred; Branch D WT044-048 verified; **Branch C WT037 CMPivot + WT038 app deploy + WT039 script-as-SYSTEM FULL EXEC VERIFIED 2026-08-02** — `mp.msi` MP web-handler repair was the WT038 delivery fix; spooler resolved; WT002/WT007 verified)
 
 | ID | Stream | Attack | Source Machine | Credentials | Status | Re-test / Fix Notes |
 |---|---|---|---|---|---|---|
