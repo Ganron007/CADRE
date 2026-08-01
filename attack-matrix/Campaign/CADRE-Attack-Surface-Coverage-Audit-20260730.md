@@ -14,9 +14,9 @@
 |---|---|---|---|---|
 | Main spine (Phases 0-8) | 23 | 5 | 2 | 1 |
 | Branch A (ACL abuse) | 9 | 0 | 0 | 0 |
-| Branch B (ADCS) | 4 | 0 | 0 | 0 |
-| Branch C (SCCM) | 2 | 0 | 3 | 0 |
-| Branch D (Linux pivot) | 1 | 0 | 4 | 0 |
+| Branch B (ADCS) | 7 | 0 | 2 | 2 |
+| Branch C (SCCM) | 4 | 1 | 1 | 0 |
+| Branch D (Linux pivot) | 5 | 0 | 0 | 0 |
 | Branch G (CVE-2026-41089) | 0 | 0 | 1 | 0 |
 | Phase 0.5 / H (initial access) | 0 | 0 | 6 | 0 |
 | E (network defense) | 0 | 0 | 14 | 0 |
@@ -202,30 +202,55 @@
 
 | ID | Attack | Expected Surface | Coverage | Status | Notes |
 |---|---|---|---|---|------------|
-| WT050 | ESC1 | `CADRE-ESC1` template: enrollee supplies subject, ClientAuth, Domain Users Enroll | `adcs-configuration-guide.md` Phase 2. | ✅ Configured | Script corrected to use `chief_command`. |
-| WT051 | ESC3 | `CADRE-ESC3-Agent` + `CADRE-ESC3-Target` templates | Same. | ✅ Configured | Script corrected. |
-| WT052 | ESC8 / NTLM relay to web enrollment | Web Enrollment + NetworkService app pool | `adcs-configuration-guide.md` Phase 1. | ✅ Configured | **2026-08-01 v5:** surface re-verified live — Spooler enabled on all 3 DCs; ADCS `/certsrv/certfnsh.asp` reachable from ws01 (401 unauth = expected); `chief_command` bind OK; firewall rules present; `ntlmrelayx`/`coercer`/`MS-RPRN.exe` staged on ws01. v5 relay chain (custom SMB port 8445) designed; cert issuance run pending. |
-| WT053 | UnPAC-the-Hash | Cert + `EFS` EKU + `Certify.exe` + `Rubeus` | Same templates + tools. | ✅ Configured | Script corrected. |
+| WT050 | ESC1 | `CADRE-ESC1` template: enrollee supplies subject, ClientAuth, Domain Users Enroll | `adcs-configuration-guide.md` Phase 2. | ✅ VERIFIED 2026-08-01 | Req 39 + `-sid` + `-dynamic-endpoint` → PKINIT TGT + UnPAC NT hash `81c3b644…f1eb7b`. |
+| ESC2 | Any Purpose EKU | `CADRE-ESC2`: Any Purpose EKU + Supply Subject (also flags ESC3+ESC17) | Same. | ✅ VERIFIED 2026-08-01 | Req 45 as low-priv `hunter_dfir` → PKINIT TGT as administrator. |
+| WT051 | ESC3 | `CADRE-ESC3-Agent` + `CADRE-ESC3-Target` templates | Same. | ✅ VERIFIED 2026-08-01 | Agent cert + `-on-behalf-of "cadre\administrator"` (NetBIOS) → admin cert Req 44. |
+| ESC4 | WriteDacl | `CADRE-ESC4`: Engineering-Cadre (lead_engineering) WriteDacl/Full Control | Same. | ✅ VERIFIED 2026-08-01 | `certipy template -write-default-configuration` as lead_engineering → Req 47 → NT hash; **template restored** (NameFlag verified). |
+| ESC7 | CA officer/manager | cadre-CA: lead_engineering ManageCa + ManageCertificates + Enroll + Read | `05-ad-attack-surface.yml` sets CA ACLs. | ✅ VERIFIED 2026-08-01 | `certipy ca -add-officer hunter_dfir` succeeded (ManageCA) + removed. |
+| ESC8 | NTLM relay to web enrollment | Web Enrollment + NetworkService app pool | `adcs-configuration-guide.md` Phase 1. | 🔬 DEFERRED | Surface configured; **no SMB-authenticated coerce on Server 2025** (root cause documented 2026-08-01). Revisit at end. |
+| WT053 | UnPAC-the-Hash | Cert + EKU + `certipy auth` | Same templates + tools. | ✅ VERIFIED 2026-08-01 | PKINIT TGT + U2U → administrator NT hash. |
+| ESC9 | NoSecurityExtension | `CADRE-ESC9`: `NO_SECURITY_EXTENSION` + EnrolleeSuppliesSubject | Same. | ✅ VERIFIED 2026-08-01 | Req 46 as `hunter_dfir` → PKINIT TGT + UnPAC NT hash. |
+| ESC11 | ICPR no encryption | cadre-CA: Enforce Encryption for Requests = Disabled | CA-level. | 🔬 Deferred | Relay family — deferred with ESC8. |
+| ESC6 | User Specified SAN | CA `EDITF_ATTRIBUTESUBJECTALTNAME2` | Not set (User Specified SAN = Disabled). | ❌ Not deployed | Campaign docs list ESC6; CA flag NOT enabled. |
+| ESC13 | Issuance Policy → group | `CADRE-ESC13` template | Template does NOT exist. | ❌ Not deployed | Campaign docs list it; never created. |
+| ESC14 | altSecurityIdentities | `CADRE-ESC14` template | Template does NOT exist. | ❌ Not deployed | Campaign docs list it; never created. |
 
-**Verdict:** Branch B surface is fully configured. ESC8 preconditions re-verified live 2026-08-01 (spooler on all DCs, ADCS endpoint reachable, chief bind OK, tools staged, firewall rules present). Credential context corrected to `chief_command@cadre.local`; ESC8 v5 relay chain (custom SMB port 8445) designed and pending execution.
+**Verdict:** Branch B live surface (fresh `certipy find -vulnerable` 2026-08-01) = CA cadre-CA (ESC7/ESC8/ESC11) + templates CADRE-ESC1/2/3-Agent/3-Target/4/9. **ESC1/ESC2/ESC3/ESC4/ESC7/ESC9 + UnPAC all VERIFIED 2026-08-01** (low-priv hunter_dfir enrollments → PKINIT admin; lead_engineering ESC4/ESC7; ESC4 template restored). ESC8/ESC11 deferred (no SMB coerce / relay family). ESC6 not enabled; ESC13/14 templates absent. Recurring flags: `-sid`, `-dynamic-endpoint`, NetBIOS `-on-behalf-of`, kill certipy procs before `certipy auth`.
 
 ---
 
-### 2.14 Branch D (Linux Pivot)
+### 2.14 Branch C (SCCM)
 
 | ID | Attack | Expected Surface | Coverage | Status | Notes |
 |---|---|---|---|---|---|
-| WT044 | MSSQL linked server recon | `mbr01` linked server to `LINUX01`, `analyst_t1` IMPERSONATE | `sql-integration-guide.md` configures linked server. | ✅ Configured | Confirmed. |
-| WT045 | SSSD ticket extraction | SSSD cache + valid session on `linux01` | `07-linux-config.yml` joins domain but does not expose SSSD cache for extraction. | ❌ Missing | No playbook configures SSSD as an attack target. |
-| WT046 | MSSQL keytab extraction | `mssql.keytab` on `linux01` | `sql-integration-guide.md` creates keytab. | ✅ Configured | Confirmed configured, but extraction script not exercised. |
-| WT047 | NFS Kerberos mount | NFS server with `sec=krb5p` export on `linux01` | No NFS server configured in Linux playbooks. | ❌ Missing | Surface not configured. |
-| WT048 | Podman container escape | Podman + privileged/misconfigured container | No playbook deploys containers on `linux01`. | ❌ Missing | Surface not configured. |
+| WT034 | SCCM NAA extraction | NAA configured on site CAD; `vault` bait share | `sccm-integration-guide.md` Phase 7 (manual console). | ✅ VERIFIED | Bait file read as `svc_sccm` → `RANGE\svc_naa` (DA); NAA confirmed in provider (`SMS_SCI_ClientComp` `Network Access User Names`). |
+| WT035 | SCCM PXE Boot abuse | PXE enabled w/o password + boot images | Same (console). | ✅ Surface verified 2026-08-01 | Approved PXE cert (`{256B7D4F-…}`, MBR02) + 2 boot images (x64/arm64) readable by `svc_sccm`; full exploit needs a real PXE client. |
+| WT036 | SCCM Client Push install | Auto client push enabled | Same. | ⚠️ Primitive verified | Component enabled; `GenerateCCRByName`/`CreateCCR` available; relay needs console-created target device record. |
+| WT037 | SCCM CMPivot | AdminService web app (`/AdminService`) | **AdminService NOT deployed** (no IIS pool/web app/`bin\AdminService`). | ❌ Blocked | Fix documented in `sccm-integration-guide.md` **Phase 6A** + verify checks in `10-sccm-verify.yml`; then CD path (`svc_sccm`→HTTP/mbr02) grants admin. |
+| WT038 | SCCM Application Deployment | SCCM admin can create + deploy apps | Provider surface verified. | ⚠️ Partial | `SMS_Package`+`SMS_Program` (SYSTEM) created via provider; `SMS_Advertisement.Put` = Generic failure via raw WMI (needs console/AdminService). |
+| WT039 | SCCM Site Takeover | SCCM admin → client/system exec | Provider surface verified. | ⚠️ Partial | `SMS_Scripts.CreateScripts` works (caller GUID); approval+run need AdminService/CD or console. |
 
-**Verdict:** Branch D Linux surfaces are configured in playbooks. The remaining gaps are extraction/execution coverage, not missing lab surface.
+**Key findings (2026-08-01):** SCCM admin gate = local `SMS Admins` group (svc_sccm + **cross-forest `CADRE\chief_command`/`analyst_purple`**). `svc_sccm` owns `HTTP/mbr02.range.local` SPN + `msDS-AllowedToDelegateTo` (CD) — correct, intended Kerberoast+CD target. **`cifs/mbr02.range.local` SPN MISSING** → SMB Kerberos to mbr02 broken (NTLM-only; verify-playbook candidate). Site CAD build 9141; 1 device (MBR02); 0 task sequences; 2 boot images.
+
+**Verdict:** Branch C surface + primitives verified 2026-08-01; full exec (CMPivot/script-run/app-deploy) gated on **AdminService deployment** (user to configure per guide Phase 6A — checks added to `10-sccm-verify.yml`).
 
 ---
 
-### 2.15 Branch G (CVE-2026-41089)
+### 2.15 Branch D (Linux Pivot)
+
+| ID | Attack | Expected Surface | Coverage | Status | Notes |
+|---|---|---|---|---|---|
+| WT044 | MSSQL linked server recon | `mbr01` linked server to `LINUX01`, `analyst_t1` IMPERSONATE | `sql-integration-guide.md` configures linked server. | ✅ VERIFIED | OPENQUERY to LINUX01.master.sys.databases returns linux01 databases. |
+| WT045 | SSSD ticket extraction | SSSD cache + valid session on `linux01` | `07-linux-config.yml` (keytab ensure task added 2026-08-01). | ✅ VERIFIED 2026-08-01 | Keytab recreated (was corrupt → sssd dead); SSSD cache active/fresh; `getent passwd mssql-linux01` resolves. |
+| WT046 | MSSQL keytab extraction | `mssql.keytab` on `linux01` | `sql-integration-guide.md` creates keytab. | ✅ VERIFIED 2026-08-01 | Keytab readable from pivot root. |
+| WT047 | NFS Kerberos mount | NFS server with `sec=krb5p` export on `linux01` | `07-linux-config.yml` NFS section (svcgssd/idmapd/nfs-principal tasks added 2026-08-01). | ✅ VERIFIED 2026-08-01 | Fixed svcgssd + idmapd Domain + nfs SPNs; **mount by FQDN with `sec=krb5p` + read OK** (write denied — root-owned 0755 dir). |
+| WT048 | Podman container escape | Podman + privileged/misconfigured container | `07-linux-config.yml` (sudo misconfig task added 2026-08-01) + podman on linux01. | ✅ VERIFIED 2026-08-01 | `sudo podman exec cadre-monitor unshare -r id` → **root** + host read/write. |
+
+**Verdict:** Branch D fully verified 2026-08-01 (WT044-048). Config fixes propagated to `07-linux-config.yml`/`-verifyOnly.yml` + `sql-integration-guide.md` §3.4/§3.5.
+
+---
+
+### 2.16 Branch G (CVE-2026-41089)
 
 | ID | Attack | Expected Surface | Coverage | Status | Notes |
 |---|---|---|---|---|---|
@@ -235,7 +260,7 @@
 
 ---
 
-### 2.16 E Stream — Network Defense
+### 2.17 E Stream — Network Defense
 
 | ID | Attack | Expected Surface | Coverage | Status | Notes |
 |---|---|---|---|---|---|
@@ -245,7 +270,7 @@
 
 ---
 
-### 2.17 F Stream — Supply Chain
+### 2.18 F Stream — Supply Chain
 
 | ID | Attack | Expected Surface | Coverage | Status | Notes |
 |---|---|---|---|---|---|
@@ -341,22 +366,23 @@ These are either rejected by modern defaults (Server 2025) or intentionally defe
 
 ## 6. Recommendation
 
-The lab is **close to complete** for the main Windows AD spine and the core ADCS/SCCM branches. The biggest remaining work is:
+The lab is **close to complete** for the main Windows AD spine and the core ADCS/SCCM branches. As of 2026-08-01:
 
-1. **Run the ESC8 (WT052) v5 relay chain** from ws01 (preconditions verified 2026-08-01; custom SMB port 8445 relay → ADCS certfnsh → cert → UnPAC-the-Hash). The `dc02` Spooler P0 is **RESOLVED** (spooler enabled on all DCs; T102 TGT chain VERIFIED).
-2. **Complete Branch D** Linux surfaces.
-3. **Automate Phase 0.5 / H** initial access staging.
-4. **Add missing 3.5 tools** (Nemesis, LAPS, WerFault, AAD Connect) if those techniques are required for the campaign.
-5. **Run E/F stream scenarios** as exercises, not surface configuration.
+1. **Branch D (Linux pivot) is COMPLETE** (WT044-048 verified; config fixes propagated to playbooks + guide).
+2. **Branch B is nearly complete** — ESC1/2/3/4/7/9 + UnPAC verified; **ESC8 (WT052) + ESC11 deferred** (no SMB-authenticated coerce on Server 2025 — root cause documented; revisit at end with Kerberos-relay candidates).
+3. **Branch C (SCCM)** surface + primitives verified; full exec gated on **AdminService deployment** (`sccm-integration-guide.md` Phase 6A + `10-sccm-verify.yml` checks added; user to configure).
+4. **Automate Phase 0.5 / H** initial access staging.
+5. **Add missing 3.5 tools** (Nemesis, LAPS, WerFault, AAD Connect) if those techniques are required.
+6. **Run E/F stream scenarios** as exercises, not surface configuration.
 
-Once P0 items are fixed, the campaign can be re-run cleanly from Phase 0 through Phase 8 with the designed credential flow, and the validation report can move many `⏳`/`⚠️` items to `✅`.
+Once the AdminService is deployed and the ESC8/11 revisit lands, the campaign can be re-run cleanly from Phase 0 through Phase 8 with the designed credential flow, and the validation report can move many `⏳`/`⚠️` items to `✅`.
 
 ---
 
 *Generated 2026-07-30 from playbook/guide review vs CAMPAIGNS-VALIDATION-REPORT-20260730.md.*
 ## Appendix A — Consolidated Campaign Re-test Matrix
 
-> Updated: 2026-08-01 (Branch A all verified; ESC8 v5 approach + preconditions; spooler resolved; WT002/WT007 verified)
+> Updated: 2026-08-01 (Branch A all verified; Branch B ESC1/2/3/4/7/9+UnPAC verified, ESC8/11 deferred; Branch D WT044-048 verified; Branch C surface deep-validated, AdminService gap; spooler resolved; WT002/WT007 verified)
 
 | ID | Stream | Attack | Source Machine | Credentials | Status | Re-test / Fix Notes |
 |---|---|---|---|---|---|---|
@@ -369,21 +395,31 @@ Once P0 items are fixed, the campaign can be re-run cleanly from Phase 0 through
 | WT024 | Branch A | gMSA extraction | ws01 | eng_cloud / Cl0ud_Eng! | ✅ Verified | ACE#10 LDAPS bind → blob decode → NT hash → SMB auth OK. |
 | GPP | Branch A | GPP stored password | ws01 | analyst_cloud / Cl0ud_An@lyst! | ✅ Verified | Groups.xml cpassword → svc_ldap / s3rv1c3_Ld@p!; SMB auth verified. |
 | WT025 | Branch A | AdminSDHolder persistence | ws01 | analyst_cloud / Cl0ud_An@lyst! | ✅ VERIFIED 2026-07-31 | Backdoor ACE persisted; DACL restored to pristine 23 ACEs. |
-| WT050 | Branch B | ADCS ESC1 | ws01 | chief_command / C0mm@nd_Ch1ef! | ⠿ Scripted | Script present; awaiting retest. |
-| WT051 | Branch B | ADCS ESC3 | ws01 | chief_command / C0mm@nd_Ch1ef! | ⠿ Scripted | Script present; awaiting retest. |
-| WT052 | Branch B | ADCS ESC8 | ws01 | chief_command / C0mm@nd_Ch1ef! | 📝 v5 designed | Preconditions verified 2026-08-01; v5 = custom SMB port 8445 relay. Cert issuance run pending. |
-| WT053 | Branch B | UnPAC-the-Hash | ws01 | chief_command / C0mm@nd_Ch1ef! | ⠿ Scripted | Script present; awaiting retest (needs a cert first). |
+| WT050 | Branch B | ADCS ESC1 | ws01 | chief_command / C0mm@nd_Ch1ef! | ✅ VERIFIED 2026-08-01 | Req 39 + `-sid` + `-dynamic-endpoint` → PKINIT + UnPAC NT hash. |
+| WT051 | Branch B | ADCS ESC3 | ws01 | chief_command / C0mm@nd_Ch1ef! | ✅ VERIFIED 2026-08-01 | Agent + `-on-behalf-of` → admin cert Req 44. |
+| WT052 | Branch B | ADCS ESC8 | ws01 | chief_command / C0mm@nd_Ch1ef! | 🔬 DEFERRED | No SMB-authenticated coerce on Server 2025 (root cause documented). Revisit at end. |
+| WT053 | Branch B | UnPAC-the-Hash | ws01 | chief_command / C0mm@nd_Ch1ef! | ✅ VERIFIED 2026-08-01 | PKINIT + U2U → NT hash `81c3b644…f1eb7b`. |
+| ESC2 | Branch B | Any Purpose EKU (CADRE-ESC2) | ws01 | hunter_dfir → admin | ✅ VERIFIED 2026-08-01 | Req 45 → PKINIT TGT as administrator. |
+| ESC4 | Branch B | WriteDacl (CADRE-ESC4) | ws01 | lead_engineering | ✅ VERIFIED 2026-08-01 | Template modify → Req 47 → NT hash; **template restored**. |
+| ESC7 | Branch B | CA officer (cadre-CA) | ws01 | lead_engineering | ✅ VERIFIED 2026-08-01 | `certipy ca -add-officer` (ManageCA) + removed. |
+| ESC9 | Branch B | NoSecurityExtension (CADRE-ESC9) | ws01 | hunter_dfir → admin | ✅ VERIFIED 2026-08-01 | Req 46 → PKINIT + UnPAC NT hash. |
 
 | WT003 | Phase 1 | AS-REP Roast | ws01 (direct SSH) | intern_blue / 1nt3rn_Blu3! | ✅ Verified | Via `ws01` direct SSH as `analyst_t1` — per attack-origin rule. | No |
 | WT002 | Phase 2 | Kerberoast via ACE#18 | ws01 (direct SSH) | intern_blue / 1nt3rn_Blu3! | ✅ VERIFIED 2026-07-31 | ACE#18 bridge + getTGT AES path; `svc_mssql` TGS cracked to `s3rv1c3_MSSQL!`; analyst_t2 pw restored. | No |
-| WT041/043 | Phase 3 | SQL xp_cmdshell + GodPotato | ws01 -> mbr01 | analyst_t1 / T13r_An@lyst! | ⠿ Partial | `xp_cmdshell 'whoami'` returned `nt service\mssql$sqlexpress`; SYSTEM escalation blocked because `GodPotato.exe` is missing on `mbr01` | Yes — stage `GodPotato-NET4.exe` |
-| 3.5A | Phase 3.5 | Winlogon plaintext extraction | SYSTEM on mbr01 | SYSTEM | ⠿ Blocked | Depends on SYSTEM execution helper + `GodPotato`; missing `GodPotato.exe` on `mbr01` blocked verification | Yes — stage `GodPotato-NET4.exe` |
+| WT041/043 | Phase 3 | SQL xp_cmdshell + GodPotato | ws01 -> mbr01 | analyst_t1 / T13r_An@lyst! | ✅ VERIFIED 2026-08-01 | SQL auth → xp_cmdshell (mssql$sqlexpress) → GodPotato-NET4 → **SYSTEM on mbr01**; Winlogon creds extracted (T035A). |
+| 3.5A | Phase 3.5 | Winlogon plaintext extraction | SYSTEM on mbr01 | SYSTEM | ✅ Verified | T035A extracted `analyst_cloud:Cl0ud_An@lyst!` from Winlogon registry as SYSTEM. |
 | 3.5C | Phase 3.5 | RDP interactive session | ws01 -> mbr01 | analyst_cloud / Cl0ud_An@lyst! | ⠿ Blocked | No dedicated execution script found in `attack-matrix/04-automation/` | Yes — add/verify script |
-| WT044 | Branch D | MSSQL linked server recon | linux01 | analyst_t1 / ... | ✅ Configured | Confirmed configured; extraction exercise pending. |
-| WT045 | Branch D | SSSD ticket extraction | linux01 | analyst_t1 / ... | ❌ Missing | No playbook exposes SSSD cache for extraction. |
-| WT046 | Branch D | MSSQL keytab extraction | linux01 | analyst_t1 / ... | ⠿ Scripted | Configured; extraction script not exercised. |
-| WT047 | Branch D | NFS Kerberos mount | linux01 | analyst_t1 / ... | ❌ Missing | No NFS server export configured. |
-| WT048 | Branch D | Podman container escape | linux01 | analyst_t1 / ... | ❌ Missing | No container surface deployed. |
+| WT044 | Branch D | MSSQL linked server recon | linux01 | analyst_t1 / T13r_An@lyst! | ✅ VERIFIED | OPENQUERY → linux01 databases. |
+| WT045 | Branch D | SSSD ticket extraction | linux01 | mssql-linux01 pivot | ✅ VERIFIED 2026-08-01 | Keytab recreated; SSSD cache active. |
+| WT046 | Branch D | MSSQL keytab extraction | linux01 | mssql-linux01 pivot → root | ✅ VERIFIED 2026-08-01 | Keytab readable from pivot root. |
+| WT047 | Branch D | NFS Kerberos mount | linux01 | mssql-linux01 + TGT | ✅ VERIFIED 2026-08-01 | krb5p mount + read (svcgssd/idmapd/SPN fixed). |
+| WT048 | Branch D | Podman container escape | linux01 | mssql-linux01 → sudo root | ✅ VERIFIED 2026-08-01 | `unshare -r id` → root + host read/write. |
+| WT034 | Branch C | SCCM NAA extraction | ws01 -> mbr02 | svc_sccm / s3rv1c3_SCCM! | ✅ Verified | Vault bait → `RANGE\svc_naa` (DA); confirmed in provider. |
+| WT035 | Branch C | SCCM PXE Boot | ws01 -> mbr02 | svc_sccm / s3rv1c3_SCCM! | ✅ Surface verified 2026-08-01 | PXE cert + 2 boot images + NAA-in-policy; full exploit needs PXE client. |
+| WT036 | Branch C | SCCM Client Push | ws01 -> mbr02 | svc_sccm / s3rv1c3_SCCM! | ⚠️ Primitive verified | Component enabled + CCR methods; relay needs console target. |
+| WT037 | Branch C | SCCM CMPivot | ws01 -> mbr02 | svc_sccm / s3rv1c3_SCCM! | ⚠️ Blocked | **AdminService NOT deployed** — fix guide Phase 6A + verify checks. |
+| WT038 | Branch C | SCCM App Deploy | ws01 -> mbr02 | svc_sccm / s3rv1c3_SCCM! | ⚠️ Partial | Package+program (SYSTEM) via provider; advertisement needs console. |
+| WT039 | Branch C | SCCM Site Takeover | ws01 -> mbr02 | svc_sccm / s3rv1c3_SCCM! | ⚠️ Partial | Script create works; run needs AdminService/CD or console. |
 | E-01..E-14 | E stream | Network defense exercises | monitor/elk | — | ⏳ Configured | Sensors configured; exercises pending. Keep offline until telemetry phase. |
 | F-01..F-13 | F stream | npm supply-chain scenarios | linux01/mbr01 | — | ⏳ Configured | Tooling configured; scenarios pending. |
 | G | Branch G | CVE-2026-41089 | Kali | — | 🔬 Deferred | PoC present; depends on dc02 patch state. |

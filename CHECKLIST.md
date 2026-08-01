@@ -1,7 +1,7 @@
 # CADRE Main Lab — Canonical Checklist
 
 **Path:** `CHECKLIST.md` (repo root)  
-**Last updated:** 2026-07-31  
+**Last updated:** 2026-08-01  
 **Writer repo:** `C:\STUDY\Github\CADRE-Platform\CADRE\`  
 **Scope:** Lab operations, **Plan 1.1 campaign automation (RedStrike)**, **campaign execution**, **Plan 1 telemetry catalog**, **log corpus for DFIR-Nexus**, integrations — **not** per-exercise study progress (`plan1.7-exercises.md` / `plan1.8-exercises.md`).
 
@@ -136,10 +136,10 @@
 | C.6 | Phase 6 — DCSync | P-DELEG | [ ] | [ ] | [ ] | [ ] | |
 | C.7 | Phase 7 — Golden / alt persistence | P-FOREST | [ ] | [ ] | [ ] | [ ] | |
 | C.8 | Phase 8 — Cross-forest | P-FOREST | [ ] | [ ] | [ ] | [ ] | |
-| C.A | Branch A — ACL abuse | P-DELEG | [!] | [ ] | [ ] | [ ] | |
-| C.B | Branch B — ADCS | P-DELEG | [!] | [ ] | [ ] | [ ] | |
-| C.C | Branch C — SCCM | P-FOREST | [!] | [ ] | [ ] | [ ] | |
-| C.D | Branch D — Linux pivot | P-LINUX | [!] | [ ] | [ ] | [ ] | |
+| C.A | Branch A — ACL abuse | P-DELEG | [x] | [x] | [x] | [~] | WT013/015/023/025/008 verified; WT014/016/024 pending |
+| C.B | Branch B — ADCS | P-DELEG | [x] | [x] | [x] | [~] | ESC1/2/3/4/7/9 + UnPAC verified 2026-08-01; ESC8/11 🔬 deferred |
+| C.C | Branch C — SCCM | P-FOREST | [~] | [x] | [x] | [~] | Surface + primitives verified 2026-08-01; full exec gated on AdminService deploy (guide Phase 6A) |
+| C.D | Branch D — Linux pivot | P-LINUX | [x] | [x] | [x] | [~] | WT044-048 verified 2026-08-01 |
 | C.E | Stream E — Network defense (14) | P-PURPLE | [ ] | [ ] | [ ] | [ ] | Plan 0.7 overlap |
 | C.F | Stream F — Supply chain (10) | P-CHILD + linux01 | [ ] | [ ] | [ ] | [ ] | Plan 0.8 |
 | C.G | Stream G — Pre-auth DC CVE lab | snapshot | [~] | [ ] | [ ] | [ ] | Deferred per campaign |
@@ -335,17 +335,17 @@
 
 | ID | Attack | Source | Credential | Status |
 |----|--------|--------|------------|--------|
-| 035 | SCCM PXE Boot abuse (WT035) | mbr02 | svc_sccm / svc_naa | ⏳ Not exercised |
-| 036 | SCCM Client Push install (WT036) | mbr02 | svc_sccm / svc_naa | ⏳ Not exercised |
-| 037 | SCCM CMPivot (WT037) | mbr02 | svc_sccm / svc_naa | ⏳ Not exercised |
-| 038 | SCCM Application Deployment (WT038) | mbr02 | svc_sccm / svc_naa | ⏳ Not exercised |
-| 039 | SCCM Site Takeover (WT039) | mbr02 | svc_sccm / svc_naa | ⏳ Not exercised |
+| 035 | SCCM PXE Boot abuse (WT035) | ws01 -> mbr02 | svc_sccm / s3rv1c3_SCCM! | ✅ Surface verified 2026-08-01 — PXE cert + 2 boot images + NAA-in-policy readable; full exploit needs PXE client |
+| 036 | SCCM Client Push install (WT036) | ws01 -> mbr02 | svc_sccm / s3rv1c3_SCCM! | ⚠️ Primitive verified — component enabled + `GenerateCCRByName`/`CreateCCR`; relay needs console-created target |
+| 037 | SCCM CMPivot (WT037) | ws01 -> mbr02 | svc_sccm / s3rv1c3_SCCM! | ⚠️ Blocked — **AdminService NOT deployed** (fix: guide Phase 6A + verify checks) |
+| 038 | SCCM Application Deployment (WT038) | ws01 -> mbr02 | svc_sccm / s3rv1c3_SCCM! | ⚠️ Partial — package+program (SYSTEM) via provider; `SMS_Advertisement` needs console |
+| 039 | SCCM Site Takeover (WT039) | ws01 -> mbr02 | svc_sccm / s3rv1c3_SCCM! | ⚠️ Partial — `SMS_Scripts.CreateScripts` works; run needs AdminService/CD |
 
-- [ ] **T035** SCCM PXE Boot — surface check · attack run · telemetry captured · tracker updated
-- [ ] **T036** SCCM Client Push — surface check · attack run · telemetry captured · tracker updated
-- [ ] **T037** SCCM CMPivot — surface check · attack run · telemetry captured · tracker updated
-- [ ] **T038** SCCM Application Deployment — surface check · attack run · telemetry captured · tracker updated
-- [ ] **T039** SCCM Site Takeover — surface check · attack run · telemetry captured · tracker updated
+- [x] **T035** SCCM PXE Boot — surface check ✅ (cert/boot images/NAA) · attack run ⏳ (needs PXE client) · tracker · telemetry
+- [~] **T036** SCCM Client Push — surface check ✅ · attack run ⏳ (relay needs console-created target) · tracker · telemetry
+- [~] **T037** SCCM CMPivot — blocked ⏳ **AdminService not deployed** (user to configure per guide Phase 6A) · tracker · telemetry
+- [~] **T038** SCCM Application Deployment — surface check ✅ (package/program created) · full deploy ⏳ (console) · tracker · telemetry
+- [~] **T039** SCCM Site Takeover — surface check ✅ (script create) · exec ⏳ (AdminService/CD) · tracker · telemetry
 
 ### Phase 8 Alt
 
@@ -359,8 +359,8 @@
 
 | ID | Attack | Source | Credential | Status |
 |----|--------|--------|------------|--------|
-| 015 | ACL ForceChangePassword ACE#7 (WT015) | ws01 | hunter_dfir / DF1R_Hunt3r! | ⠿ BLOCKED — missing ACE#7 surface |
-| 013 | ACL WriteDacl self-escalate (WT013) | ws01 | chief_command / C0mm@nd_Ch1ef! (DA) | 📝 Script corrected, pending re-test |
+| 015 | ACL ForceChangePassword ACE#7 (WT015) | ws01 | hunter_dfir / DF1R_Hunt3r! | ✅ VERIFIED — ACE#7 deployed + verified (`05-ad-attack-surface-verifyOnly.yml` 18/18); hunter_dfir reset chief_command password via bloodyAD |
+| 013 | ACL WriteDacl self-escalate (WT013) | ws01 | chief_command / C0mm@nd_Ch1ef! (DA) | ✅ VERIFIED 2026-07-31 — T013 granted hunter_dfir GenericAll on CN=Command-Cadre; ACE read-back verified |
 | 014 | ACL GenericWrite -> Shadow Credentials (WT014) | ws01 | chief_command / C0mm@nd_Ch1ef! (DA) | 📝 Script corrected, pending re-test |
 | 016 | ACL GenericAll on OU (WT016) | ws01 | chief_command / C0mm@nd_Ch1ef! (DA) | 📝 Script corrected, pending re-test |
 | 008 | Shadow Credentials on dc01$ (WT008) | ws01 | chief_command / C0mm@nd_Ch1ef! (DA) | ✅ VERIFIED — pywhisker (explicit creds, LDAPS) added KeyCredential to dc01$; PKINIT TGT as dc01$; NT hash 09493093db08c8afa99193779d401b34 recovered (= DCSync rights) |
@@ -368,11 +368,11 @@
 | 024 | gMSA Extraction (WT024) | ws01 | chief_command / C0mm@nd_Ch1ef! (DA) | 📝 Script corrected, pending re-test |
 | GPP | GPP Stored Password (Groups.xml) | Kali / provisioning | Any domain user | 📝 Configured / pending re-test |
 | 027 | SPN Jacking CVE-2026-25177 (WT027) | ws01 | DA or writeSPN rights | ⏳ Not exercised |
-| 025 | AdminSDHolder persistence (WT025) | ws01 | DA | 📝 Configured / pending re-test |
+| 025 | AdminSDHolder persistence (WT025) | ws01 | DA | ✅ VERIFIED 2026-07-31 — analyst_cloud WriteDacl on AdminSDHolder; ACE persisted; DACL restored to 23 ACEs |
 
-- [ ] **T015** ACE#7 ForceChangePassword — surface check · attack run · telemetry captured · tracker updated
-- [ ] **EXEC-001** Restore operator SSH access to `ws01` — fix local `ssh-agent` service (`Stopped`/`Disabled`) and retry direct `localhost -> ws01` SSH, or rerun from `provisioning`/WSL/Git Bash instead.
-- [ ] **T013** WriteDacl self-escalate — surface check · attack run · telemetry captured · tracker updated
+- [x] **T015** ACE#7 ForceChangePassword — surface check ✅ · attack run ✅ (bloodyAD reset, DA login confirmed, password restored) · tracker · telemetry
+- [x] **EXEC-001** Restore operator SSH access to `ws01` — direct `localhost -> ws01` SSH works via `cadre-ws01-key`
+- [x] **T013** WriteDacl self-escalate — surface check ✅ · attack run ✅ (ACE read-back verified) · tracker · telemetry
 - [ ] **T014** GenericWrite -> Shadow Credentials — surface check · attack run · telemetry captured · tracker updated
 - [ ] **T016** GenericAll on OU — surface check · attack run · telemetry captured · tracker updated
 - [x] **T008** Shadow Credentials on dc01$ — surface check ✅ · attack run ✅ (pywhisker + PKINIT TGT + NT hash recovered) · telemetry captured · tracker updated
@@ -380,37 +380,46 @@
 - [ ] **T024** gMSA Extraction — surface check · attack run · telemetry captured · tracker updated
 - [ ] **GPP** Get-GPPPassword — surface check · attack run · telemetry captured · tracker updated
 - [ ] **T027** SPN Jacking — surface check · attack run · telemetry captured · tracker updated
-- [ ] **T025** AdminSDHolder persistence — surface check · attack run · telemetry captured · tracker updated
+- [x] **T025** AdminSDHolder persistence — surface check ✅ · attack run ✅ (ACE persisted) · telemetry captured · tracker updated
 
 ### Branch B — ADCS
 
 | ID | Attack | Source | Credential | Status |
 |----|--------|--------|------------|--------|
-| 050 | ADCS ESC1 (WT050) | ws01 | chief_command / C0mm@nd_Ch1ef! (DA+EA) | 📝 Script corrected, pending re-test |
-| 051 | ADCS ESC3 (WT051) | ws01 | chief_command / C0mm@nd_Ch1ef! (DA+EA) | 📝 Script corrected, pending re-test |
-| 052 | ADCS ESC8 / NTLM relay web enrollment (WT052) | ws01 | chief_command / C0mm@nd_Ch1ef! (DA+EA) | 📝 v5 designed + preconditions verified 2026-08-01; cert issuance pending |
-| 053 | UnPAC-the-Hash (WT053) | ws01 | chief_command / C0mm@nd_Ch1ef! (DA+EA) | 📝 Script corrected, pending re-test |
+| 050 | ADCS ESC1 (WT050) | ws01 | chief_command / C0mm@nd_Ch1ef! (DA+EA) | ✅ VERIFIED 2026-08-01 — cert Req 39 + PKINIT TGT + UnPAC NT hash |
+| 051 | ADCS ESC3 (WT051) | ws01 | chief_command / C0mm@nd_Ch1ef! (DA+EA) | ✅ VERIFIED 2026-08-01 — agent + `-on-behalf-of` → admin cert Req 44 |
+| 052 | ADCS ESC8 / NTLM relay web enrollment (WT052) | ws01 | chief_command / C0mm@nd_Ch1ef! (DA+EA) | 🔬 DEFERRED — no SMB-authenticated coerce on Server 2025 (root cause documented); revisit at end |
+| 053 | UnPAC-the-Hash (WT053) | ws01 | chief_command / C0mm@nd_Ch1ef! (DA+EA) | ✅ VERIFIED 2026-08-01 — `certipy auth` → NT hash `81c3b644…f1eb7b` |
+| ESC2 | ADCS ESC2 — Any Purpose EKU (CADRE-ESC2) | ws01 | hunter_dfir → admin | ✅ VERIFIED 2026-08-01 — Req 45 + PKINIT TGT as administrator (also flags ESC3+ESC17) |
+| ESC4 | ADCS ESC4 — WriteDacl (CADRE-ESC4) | ws01 | lead_engineering | ✅ VERIFIED 2026-08-01 — template modify → Req 47 → NT hash; **template restored** |
+| ESC7 | ADCS ESC7 — CA officer/manager (cadre-CA) | ws01 | lead_engineering | ✅ VERIFIED 2026-08-01 — `certipy ca -add-officer` succeeded (ManageCA) + cleaned |
+| ESC9 | ADCS ESC9 — NoSecurityExtension (CADRE-ESC9) | ws01 | hunter_dfir → admin | ✅ VERIFIED 2026-08-01 — Req 46 + PKINIT TGT + UnPAC NT hash |
+| ESC11 | ADCS ESC11 — ICPR no encryption (cadre-CA) | ws01 | — | 🔬 Deferred with ESC8 (relay family) |
 
-- [ ] **T050** ADCS ESC1 — surface check · attack run · telemetry captured · tracker updated
-- [ ] **T051** ADCS ESC3 — surface check · attack run · telemetry captured · tracker updated
-- [ ] **T052** ADCS ESC8 / NTLM relay web enrollment — **v5 chain (custom SMB port 8445) designed + preconditions verified 2026-08-01**; cert issuance run pending · telemetry captured · tracker updated
-- [ ] **T053** UnPAC-the-Hash — surface check · attack run · telemetry captured · tracker updated
+- [x] **T050** ADCS ESC1 — surface check ✅ · attack run ✅ · tracker · telemetry
+- [x] **T051** ADCS ESC3 — surface check ✅ · attack run ✅ · tracker · telemetry
+- [~] **T052** ADCS ESC8 — deferred (no SMB coerce on Server 2025) · revisit at end · tracker · telemetry
+- [x] **T053** UnPAC-the-Hash — surface check ✅ · attack run ✅ (NT hash recovered) · tracker · telemetry
+- [x] **ESC2** Any Purpose EKU — surface check ✅ · attack run ✅ (PKINIT admin) · tracker · telemetry
+- [x] **ESC4** WriteDacl — surface check ✅ · attack run ✅ (template modify + enroll + restore) · tracker · telemetry
+- [x] **ESC7** CA officer — surface check ✅ · attack run ✅ (add/remove officer) · tracker · telemetry
+- [x] **ESC9** NoSecurityExtension — surface check ✅ · attack run ✅ (PKINIT + UnPAC) · tracker · telemetry
 
 ### Branch D — Linux pivot
 
 | ID | Attack | Source | Credential | Status |
 |----|--------|--------|------------|--------|
 | 044 | MSSQL Linked Server Recon (WT044) | ws01 -> mbr01 | child\analyst_t1 / T13r_An@lyst! | ✅ Verified |
-| 045 | SSSD Ticket Extraction (WT045) | linux01 | linux01 local access or SSH key | 📝 Configured / pending re-test |
-| 046 | MSSQL Keytab Extraction (WT046) | linux01 | linux01 root or mssql service | ⏳ Not exercised |
-| 047 | NFS Kerberos Mount (WT047) | linux01 | Valid domain Kerberos ticket | 📝 Configured / pending re-test |
-| 048 | Podman Container Escape (WT048) | linux01 | Privileged container or misconfig | 📝 Configured / pending re-test |
+| 045 | SSSD Ticket Extraction (WT045) | linux01 | mssql-linux01 pivot | ✅ VERIFIED 2026-08-01 — SSSD cache active after keytab fix |
+| 046 | MSSQL Keytab Extraction (WT046) | linux01 | mssql-linux01 pivot → root | ✅ VERIFIED 2026-08-01 — keytab readable from pivot root |
+| 047 | NFS Kerberos Mount (WT047) | linux01 | mssql-linux01 + TGT | ✅ VERIFIED 2026-08-01 — krb5p mount + read (svcgssd/idmapd/SPN fixed); write denied (root-owned 0755 dir) |
+| 048 | Podman Container Escape (WT048) | linux01 | mssql-linux01 → sudo root | ✅ VERIFIED 2026-08-01 — `unshare -r id` → root + host read/write |
 
 - [x] **T044** MSSQL Linked Server Recon — surface check · attack run · telemetry captured · tracker updated
-- [ ] **T045** SSSD Ticket Extraction — surface check · attack run · telemetry captured · tracker updated
-- [ ] **T046** MSSQL Keytab Extraction — surface check · attack run · telemetry captured · tracker updated
-- [ ] **T047** NFS Kerberos Mount — surface check · attack run · telemetry captured · tracker updated
-- [ ] **T048** Podman Container Escape — surface check · attack run · telemetry captured · tracker updated
+- [x] **T045** SSSD Ticket Extraction — surface check ✅ · attack run ✅ · tracker · telemetry
+- [x] **T046** MSSQL Keytab Extraction — surface check ✅ · attack run ✅ · tracker · telemetry
+- [x] **T047** NFS Kerberos Mount — surface check ✅ · attack run ✅ (krb5p mount+read) · tracker · telemetry
+- [x] **T048** Podman Container Escape — surface check ✅ · attack run ✅ (root) · tracker · telemetry
 
 ### Branch G — Pre-auth DC CVE lab
 
