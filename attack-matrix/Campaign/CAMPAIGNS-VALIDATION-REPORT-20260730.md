@@ -315,7 +315,7 @@
 
 > Updated 2026-08-01 — Branch A (013/014/015/016/023/024/025/008/GPP/**027**) and Branch D (044-048) and Branch B (050/051/053/ESC2/4/7/9) are all **VERIFIED**. Only the following remain open:
 
-1. **Branch C SCCM (WT035-039)** — AdminService IS deployed (self-hosted). CD chain verified to the ST (S4U2Proxy fixed: UAC `TrustedToAuthForDelegation` + SMS Admins restored). Remaining gate: run the REST provider as `svc_sccm` (site server service account via SCCM Setup → site maintenance), then re-present the ST → closes WT037/039.
+1. **Branch C SCCM (WT035-039)** — AdminService IS deployed (self-hosted). CD chain verified to the ST (S4U2Proxy fixed: UAC `TrustedToAuthForDelegation` + SMS Admins restored). **Remaining gate = REST provider identity, and the direct change is NOT viable (2026-08-01):** switching `SMS_EXECUTIVE` to `RANGE\svc_sccm` via `sc config` broke the site (503 — smsexec can't init components as a domain user); revert via `password= ""` failed silently; proper revert `sc config SMS_EXECUTIVE obj= "LocalSystem"` (no password arg) recovered it. ST presentation against the LocalSystem provider → **401** (can't decrypt the CD ticket). **Only path: SCCM Setup → site maintenance → modify site system installation account (GUI, operator-run)** → then re-present the ST → closes WT037/039.
 2. **ESC8 (WT052) / ESC11** — deferred; revisit at end via Kerberos-relay (krbrelayx) or a restored SMB-coerce primitive (NTLM-relay path proven non-viable on Server 2025).
 3. **E exercises (E-01..14)** — run on monitor VM once elk/monitor are online (telemetry phase).
 4. **F supply-chain scenarios (F-01..13)** — run on linux01/mbr01/npm registry.
