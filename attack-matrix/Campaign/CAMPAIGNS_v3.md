@@ -3272,6 +3272,8 @@ AD CS is deployed on dc01 with **12 in-scope ESC misconfigurations**. Each explo
 
 > **Out of scope:** ESC5 (CA object ACL not configured). ESC12 (no formal definition). **Excluded:** ESC15 (Server 2025 rejects v1 schema).
 
+> **Verification note (2026-08-01 — deep):** Fresh `certipy find -vulnerable` (chief_command) confirmed the live surface. **Deployed vulnerable templates:** CADRE-ESC1 (ESC1), CADRE-ESC2 (ESC1+ESC2+ESC3+ESC17), CADRE-ESC3-Agent/Target (ESC3), CADRE-ESC4 (ESC4 — Engineering-Cadre WriteDacl), CADRE-ESC9 (ESC1+ESC9), MachineEnrollmentAgent (default, ESC4 flag). **NOT deployed:** CADRE-ESC13/ESC14 (docs list them, templates absent), ESC6 (CA User Specified SAN = Disabled). CA cadre-CA flags **ESC7** (lead_engineering ManageCA+ManageCertificates+Enroll+Read), **ESC8** (HTTP web enrollment), **ESC11** (ICPR no encryption). **Verified live 2026-08-01:** ESC1 (WT050), ESC3 (WT051), UnPAC (WT053), **ESC2** (CADRE-ESC2, low-priv hunter_dfir → PKINIT admin), **ESC9** (CADRE-ESC9, → PKINIT + NT hash), **ESC4** (CADRE-ESC4, lead_engineering WriteDacl → template modify → enroll admin; template restored), **ESC7** (lead_engineering `certipy ca -add-officer` succeeded/cleaned). **Deferred with ESC8:** ESC11 (relay family). Recurring flags: ESC2/4/7/9 require `-sid` + `-dynamic-endpoint` on req, NetBIOS `-on-behalf-of` for ESC3, kill orphaned certipy procs before `certipy auth`.
+
 **Common command pattern (ESC1):**
 
 ```bash

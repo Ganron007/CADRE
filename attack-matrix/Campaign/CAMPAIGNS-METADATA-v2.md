@@ -1045,7 +1045,7 @@ We have `nt authority\system` on mbr01 via GodPotato. `analyst_cloud` has an act
 
 | Field | Value |
 |-------|-------|
-| **Status** | ⏳ ESC1/ESC3/ESC8/UnPAC pending live run — surface fully configured (`adcs-configuration-guide.md`); credentials corrected to `chief_command@cadre.local`. **ESC8 (WT052):** v5 approach designed + preconditions verified 2026-08-01 (see ESC8 block). |
+| **Status** | ✅ ESC1 (WT050) / ESC3 (WT051) / UnPAC (WT053) verified 2026-08-01; **ESC2 / ESC9 / ESC4 / ESC7 verified 2026-08-01** (CADRE-ESC2/ESC9 low-priv enrollment → PKINIT admin + UnPAC NT hash; ESC4 lead_engineering WriteDacl → template modify/enroll → restored; ESC7 lead_engineering ManageCA officer add/remove). **ESC8 (WT052) deferred** (no SMB-authenticated coerce on Server 2025 — root cause documented). **ESC11 deferred with ESC8** (relay family). **ESC13/14 NOT deployed**; ESC6 not deployed (User Specified SAN disabled). |
 | **Stream** | Branch B |
 | **Att&ck** | T1649 (Steal Crypto Wallet / Private Key), T1550 (Use Alternate Auth Material), T1553 (Subvert Trust Controls) |
 | **Technique** | Abuse misconfigured ADCS templates to request certificates as any user or escalate to DA |
