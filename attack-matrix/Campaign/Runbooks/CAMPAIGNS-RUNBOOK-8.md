@@ -21,6 +21,15 @@
 | **What you earn** | `s3rv1c3_SCCM!` → `N@A_s3rv1c3!` → **range.local DA** → all 3 domains |
 | **MITRE**         | T1550.002 (Use Alternate Auth Mat) + T1078 (Valid Accounts)             |
 
+**Status:**
+- **Validated in two independent runs:** scripted run (2026-07-29) via `attack-matrix/04-automation/linux` wrappers + RedStrike orchestrator run (2026-07-29) via `redstrike-campaign --execute --prefer-script`.
+- **WT033** ✅ — cross-forest Kerberoast from `ws01` succeeded; captured `svc_mssql` and `svc_sccm` TGS hashes for `range.local`.
+- **WT034** ✅ — SCCM NAA credentials extracted from `\\mbr02.range.local\vault\naa-rotation-notice.txt` using `range\svc_sccm` (SCCM Full Admin); NAA account is `range\svc_naa` / `N@A_s3rv1c3!`. Verified `range\svc_naa` is Domain Admin on `dc03`.
+- **WT035-039 / Branch C** ✅ **WT037 CMPivot + WT038 app deploy + WT039 script-as-SYSTEM FULL EXEC VERIFIED 2026-08-02** from ws01 as `range\svc_sccm` against the WS01 managed client (enablers: BGB fast channel, svc_sccm Full Admin DB grant, DB script approval, mp.msi MP repair). WT035 PXE still needs a real PXE client; WT036 client-push relay needs a console-created device.
+- **Skipjack** ⏳ — still deferred pending custom tool.
+
+**Fallback path already achieved:** root `cadre.local` DA/EA via WT031 (`chief_command`), so the primary campaign objective (root domain compromise) is satisfied. The `range.local` DA step is now also achieved via WT034 NAA extraction.
+
 
 cadre.local has a bidirectional forest trust with range.local (SID Filter OFF). In the realistic multi-hop chain, the operator uses the cadre.local Enterprise Admin ticket on `mbr01` or a fresh session staged from `dc01` to cross-forest authenticate to `range.local`.
 
@@ -174,7 +183,7 @@ dir \\DC01.cadre.local\C$
 - This enables the SID History injection in WT010-012
 - Detection: monitor `4662` events on `CN=ForeignSecurityPrincipals` and `5136` events for SID History modifications
 
-**Action item:** Read before Phase 8. Cross-reference with the SID filter footnote in the CAMPAIGNS.md topology diagram.
+**Action item:** Read before Phase 8. Cross-reference with the SID filter footnote in the CAMPAIGNS_v3.md topology diagram.
 
 #### 📖 CVE-2020-0665 — Forest Trust Privilege Escalation — Dirk-jan Mollema
 
@@ -205,7 +214,7 @@ dir \\DC01.cadre.local\C$
 
 **Why read:** Comprehensive guide to running purple team exercises. Direct relevance:
 - Chapter 6 (Collecting Telemetry) — patterns for Suricata/Zeek/Sysmon/WinSec correlation that match our plan1.7
-- Chapter 8 (Atomic Red Team) — execution framework with 1000+ tests that complement our manual CAMPAIGNS.md commands
+- Chapter 8 (Atomic Red Team) — execution framework with 1000+ tests that complement our manual CAMPAIGNS_v3.md commands
 - Chapter 9 (Caldera AD Recon) — adversary emulation automation (already in our Track B Parallel Tracks)
 - Chapter 10 (Mythic C2) — C2 operations (relevant to Plan 10 + Loki integration)
 - Chapter 11 (Reporting + Tracking) — directly relevant to our `tracker.md` workflow + DFIR-Nexus case reports
@@ -213,7 +222,7 @@ dir \\DC01.cadre.local\C$
 **Source:** `CADRE-Courses/NoStarchPress_extract/Practical_Purple_Teaming-0642572230173/` (725KB .txt, 770KB .html). See Campaign_suggestions.md #101.
 
 **Concrete techniques extracted from this book (see Campaign_suggestions.md):**
-- **#106 Atomic Red Team as validation framework** (Ch 8) — 1000+ pre-built MITRE ATT&CK tests for cross-validation of our manual CAMPAIGNS.md attacks. Run `Invoke-AtomicTest T1003.001,T1558.003,... -ShowDetails` per phase.
+- **#106 Atomic Red Team as validation framework** (Ch 8) — 1000+ pre-built MITRE ATT&CK tests for cross-validation of our manual CAMPAIGNS_v3.md attacks. Run `Invoke-AtomicTest T1003.001,T1558.003,... -ShowDetails` per phase.
 
 **Action item:** Read **before plan1.7 detection engineering work** and **before DFIR-Nexus integration**. Use Ch 6 telemetry patterns + Ch 8 Atomic Red Team tests to validate our detection coverage.
 

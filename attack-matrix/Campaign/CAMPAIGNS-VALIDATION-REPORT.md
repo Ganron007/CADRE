@@ -33,31 +33,33 @@
 | Phase 1 — AS-REP Roast | 1 | 1 | 0 | 0 | 0 | 0 |
 | Phase 2 — Kerberoast | 1 | 1 | 0 | 0 | 0 | 0 |
 | Phase 2 Alt — NTLMv1 | 1 | 0 | 0 | 1 | 0 | 0 |
-| Phase 3 — SQL + GodPotato | 2 | 2 | 0 | 0 | 0 | 0 |
-| Phase 3.5 — Credential Theft | 14 | 3 | 1 | 8 | 0 | 2 |
+| Phase 3 — SQL + GodPotato | 3 | 2 | 0 | 1 | 0 | 0 |
+| Phase 3.5 — Credential Theft | 18 | 3 | 1 | 12 | 0 | 2 |
 | Phase 4 — Discovery | 1 | 1 | 0 | 0 | 0 | 0 |
 | Phase 5 — RBCD | 1 | 1 | 0 | 0 | 0 | 0 |
 | Phase 5 Coercion | 9 | 1 | 0 | 1 | 4 | 3 |
 | Phase 5 T102 (unconst. deleg.) | 1 | 1 | 0 | 0 | 0 | 0 |
 | Phase 6 — DCSync | 1 | 1 | 0 | 0 | 0 | 0 |
 | Phase 7 — Ticket forgery | 3 | 1 | 2 | 0 | 0 | 0 |
+| Post-DA — KDS/gMSA/DSRM cluster | 7 | 0 | 0 | 7 | 0 | 0 |
 | Phase 8 — Cross-forest | 2 | 2 | 0 | 0 | 0 | 0 |
 | Phase 8 Alt — Skipjack | 1 | 0 | 0 | 0 | 1 | 0 |
 | **Branch A** — ACL Abuse | 10 | 10 | 0 | 0 | 0 | 0 |
-| **Branch B** — ADCS | 8 | 7 | 0 | 0 | 1 | 0 |
+| **Branch B** — ADCS | 9 | 7 | 0 | 1 | 1 | 0 |
 | **Branch C** — SCCM | 5 | 3 | 2 | 0 | 0 | 0 |
 | **Branch D** — Linux Pivot | 6 | 6 | 0 | 0 | 0 | 0 |
 | **Branch E** — Network Defense (attack sims WT069-081 + E-10) | 14 | 14 | 0 | 0 | 0 | 0 |
 | **Branch F** — Supply Chain | 13 | 9 | 1 | 0 | 3 | 0 |
 | **Branch G** — CVE-2026-41089 | 1 | 0 | 0 | 1 | 0 | 0 |
-| **TOTAL** | **106** | **68** | **6** | **17** | **9** | **6** |
+| **TOTAL** | **119** | **68** | **6** | **30** | **9** | **6** |
 
 **Rollup notes (2026-08-02):**
 - **68 items attack-side verified** — full AD spine (Phases 0-8), **Branch A 100%**, **Branch B** (ESC1/2/3/4/7/9 + UnPAC), **Branch D 100%**, **Branch C exec chain** (WT037/038/039 FULL EXEC), **Branch E attack sims** (14), Branch F linux scenarios (9).
 - **6 partial:** 3.5C (RDP script missing), WT011/012 (script runs, real-service verify pending), WT035 (surface deep-verified, needs PXE client), WT036 (primitive verified, needs console device), F-05 (env-gated on public npm registry).
-- **17 pending:** H-01..06 (needs `19-initial-access.yml`), NTLMv1, 3.5G/H/D/J/K/L/M/N, WT096, Branch G (Branch E/F detection validation tracked in `CHECKLIST.md`, telemetry stage).
+- **30 pending:** H-01..06 (needs `19-initial-access.yml`), NTLMv1, 3.5G/H/D/J/K/L/M/N + **3.5O (WT104-107)**, WT096, **Post-DA cluster (WT097-103)**, WT108/109, Branch G (Branch E/F detection validation tracked in `CHECKLIST.md`, telemetry stage).
 - **9 deferred:** WT021/022 (NTLM relay — no SMB coerce on Server 2025), WT094/095 (UnCanny/Onelogon), Skipjack, ESC8/11 (relay family), F-11..F-13 (held expansions).
 - **6 invalid/rejected:** WT028 (SAMR null blocked), WT018/019/020 (coercion non-functional), 3.5B (scheduled-task execution — Rule 2), 3.5I (token impersonation, error 1346).
+- **Post-DA cluster (WT097-103) + extensions (WT104-109) adopted 2026-08-02** — new items, all ⏳ not exercised (post-DA KDS/gMSA/dMSA/DSRM/DCShadow/DPAPI-NG; 3.5O persistence; DCOMIllusionist; ESC16).
 - **Detection validation (Branch E/F)** tracked in `CHECKLIST.md` — deferred to the Plan 1 telemetry catalog stage (monitor `.55`).
 - **Future:** CADRE NPM-Chain upgrade designed (`plan1.8-offensive-upgrades.md` §11), not implemented.
 
@@ -77,6 +79,7 @@
 - **Phase 5 T102**: 1 attacks
 - **Phase 6**: 1 attacks
 - **Phase 7**: 3 attacks
+- **Post-DA (KDS/gMSA/DSRM cluster)**: 7 attacks
 - **Phase 8**: 2 attacks
 - **Phase 8 / Branch C**: 5 attacks
 - **Phase 8 Alt**: 1 attacks
@@ -86,7 +89,7 @@
 - **Branch G**: 1 attacks
 - **E attack sims (WT069-081 + E-10)**: 14 attacks
 - **F - Supply Chain**: 13 attacks
-- **Total attacks listed**: 106
+- **Total attacks listed**: 119
 
 ## Phase 0.5 / H
 
@@ -138,6 +141,7 @@
 |------|--------|----------------|------------|--------|-------|----------------|
 | 041/043 | SQL xp_cmdshell + GodPotato (WT041/WT043) | ws01 -> mbr01 | child\analyst_t1 / T13r_An@lyst! | ✅ VERIFIED 2026-08-01 | Full chain: SQL auth `analyst_t1` → `EXECUTE AS LOGIN='sa'` (sysadmin=1) → `xp_cmdshell` (`nt service\mssql$sqlexpress`) → `SeImpersonatePrivilege` enabled → `GodPotato-NET4.exe` → **`nt authority\system`**. GodPotato staged to `C:\Windows\Temp\cadre-tools\GodPotato.exe`. Note: WinRM Copy-Item to `C:\Users\Public\cadre-gp.exe` was denied (stale SYSTEM-owned file) — use the `-GpPath` proven path. | No |
 | 042 | CLR Assembly on mbr02 (WT042) | ws01 -> mbr02 | child\analyst_t1 / T13r_An@lyst! | ✅ Reachable | CLR path reachable; actual malicious assembly not loaded in this run | Yes - load and execute .NET assembly |
+| 108 | DCOMIllusionist fileless DCOM (WT108) | ws01 -> mbr01 | child\analyst_t1 / T13r_An@lyst! | ⏳ Not exercised | Fileless DCOM lateral via .NET deserialization | Yes |
 
 ## Phase 3.5
 
@@ -157,6 +161,7 @@
 | 3.5L | LAPS extraction (3.5L) | dc01 | DA | ⏳ Not exercised | ms-Mcs-AdmPwd read | Yes |
 | 3.5M | Azure AD Connect DPAPI dump (3.5M) | dc01 | DA | ⏳ Not exercised | adconnectdump / MSOL credentials | Yes |
 | 3.5N | UnCanny LPE via InstallService (3.5N) | ws01 | local user | ⏳ Not exercised | Requires Developer Mode; deferred | Yes - after Developer Mode decision |
+| 104-107 | Persistence Extensions: DLL/COM/IFEO/LSA SSP (3.5O) | mbr01 (SYSTEM) | SYSTEM | ⏳ Not exercised | Host persistence set (WT104-107) | Yes |
 
 ## Phase 4
 
@@ -203,6 +208,20 @@
 | 010 | Golden Ticket (WT010) | ws01 | krbtgt hash (child.cadre.local) | ✅ Verified | **Verified 2026-07-31:** mimikatz `kerberos::golden` with extracted child krbtgt NT + AES256, `/sids:<root EA>` forged + injected (PTT) + saved `EA-aes.kirbi`. Rubeus `golden` binary fails silently on ws01 (non-Defender quirk — persists after full Defender kill) — use mimikatz. Cross-realm DCSync of root via golden hits PAC checksum quirk on dc01 DRSUAPI bind; root EA achieved via fallback paths (Branch A chief_command / WT031). | No (as-written forgery path complete); cross-realm DCSync via golden = known quirk, root access covered by fallback |
 | 011 | Silver Ticket (WT011) | ws01 | Service account hash | ✅ Script executes | Script runs | Yes - verify against actual service |
 | 012 | Diamond Ticket (WT012) | ws01 | krbtgt hash | ✅ Script executes | Script runs | Yes - verify with extracted krbtgt |
+
+## Post-DA Sub-Phase — KDS/gMSA/dMSA Cluster (WT097-103)
+
+> Adopted 2026-08-02 — all ⏳ not exercised. Post-DA primitives (run with DA). See `CAMPAIGNS_v3.md` Post-DA sub-phase + `CAMPAIGNS-METADATA-v2.md`.
+
+| ID | Attack | Source Machine | Credential | Status | Notes | Re-test Needed |
+|------|--------|----------------|------------|--------|-------|----------------|
+| 097 | KDS Root Key Extraction (WT097) | ws01 / dc01 | DA (chief_command) | ⏳ Not exercised | Enabler for WT098/099/103 (KDS root key) | Yes |
+| 098 | Golden gMSA Attack (WT098) | ws01 | DA + ACE#10 (gmsaTools$) | ⏳ Not exercised | Offline gMSA password from KDS key | Yes |
+| 099 | Golden dMSA / BadSuccessor (WT099) | ws01 | DA + ACE#24 (dmsaPrivService$) | ⏳ Not exercised | Server 2025 dMSA offline compute | Yes |
+| 100 | LAPS Bulk Extraction (WT100) | ws01 | DA | ⏳ Not exercised | Domain-wide ms-Mcs-AdmPwd read | Yes |
+| 101 | DSRM Password Extract & Set (WT101) | dc01 | DA | ⏳ Not exercised | DC DSRM persistence | Yes |
+| 102 | DCShadow (WT102) | ws01 | DA + DRS | ⏳ Not exercised | DRS attribute push (inverse of DCSync) | Yes |
+| 103 | DPAPI-NG SID Protector Decryption (WT103) | ws01 | DA + WT097 | ⏳ Not exercised | BitLocker/PFX/DNSSEC/ASP.NET | Yes |
 
 ## Phase 8
 
@@ -262,6 +281,7 @@
 | ESC4 | ADCS ESC4 — WriteDacl (`CADRE-ESC4`) | ws01 | lead_engineering (Engineering-Cadre) | ✅ VERIFIED 2026-08-01 | As **lead_engineering** (`Eng_L3ad!`): backed up template → `certipy template -write-default-configuration` (ESC1 flags) succeeded → **hunter_dfir** enrolled admin cert (Req 47) → PKINIT TGT + **NT hash `81c3b644…f1eb7b`**. **Template restored to original config** (NameFlag back to `-1509949440`, original EKUs/ACL, verified). | No |
 | ESC7 | ADCS ESC7 — CA officer/manager (`cadre-CA`) | ws01 | lead_engineering | ✅ VERIFIED 2026-08-01 | `lead_engineering` has **ManageCA + ManageCertificates + Enroll + Read** on cadre-CA (certipy find flags ESC7). Proof: `certipy ca -ca cadre-CA -add-officer hunter_dfir` as lead_engineering → **"Successfully added officer"** (ManageCA-only op) → **removed** (cleanup). Full approve-pending-request chain needs CA Request Disposition=Pending (lab CA = Issue/auto-issue) — documented. | No |
 | ESC9 | ADCS ESC9 — NoSecurityExtension (`CADRE-ESC9`) | ws01 | hunter_dfir (low-priv) → admin | ✅ VERIFIED 2026-08-01 | `certipy req -template CADRE-ESC9 -upn administrator@cadre.local -sid <admin-SID> -dynamic-endpoint` as **hunter_dfir** → cert issued (Req 46, NoSecurityExtension) → `certipy auth` → **PKINIT TGT + NT hash `81c3b644…f1eb7b`**. | No |
+| 109 | ADCS ESC16 — CA SID-extension disable (WT109) | ws01 | lead_engineering (ManageCA) | ⏳ Not exercised | Verify `DisableExtensionList` SID OID on cadre-CA | Yes |
 
 **Branch B additional notes (2026-08-01):** **CADRE-ESC13/ESC14 templates do NOT exist** in the deployment (campaign docs list them; not created). **ESC6 not deployed** (CA User Specified SAN = Disabled). **ESC11** (ICPR no encryption) flagged on the CA — exploit is relay-family (like ESC8) → deferred with ESC8. MachineEnrollmentAgent (default) flags ESC4 ("template owned by user" — EA-owned, standard). Deployed vulnerable surface = CADRE-ESC1/2/3-Agent/3-Target/4/9 (+ default MachineEnrollmentAgent).
 

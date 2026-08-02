@@ -90,7 +90,7 @@ python3 poc.py 192.168.77.11 child.cadre.local -l 130
 
 **Post-test:**
 - Promote CAMPAIGNS-METADATA-v2.md Mechanics section from STUB to TESTED with actual telemetry
-- Update CAMPAIGNS.md WT status from 🆕 to ✅ (if worked) or ❌ Patched (if build >= 32772)
+- Update CAMPAIGNS_v3.md WT status from 🆕 to ✅ (if worked) or ❌ Patched (if build >= 32772)
 - Document outcome in `docs/internal/plan01-telemetry-catalog/phase1-source-matrix/tracker.md` (post-campaign)
 - Add to `plan1.7` defense deepening as detection engineering deliverable
 - Cross-reference: Item #65 Zerologon Alternative (superseded), Item #76 Onelogon (also exploits Netlogon but different vuln class)

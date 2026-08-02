@@ -22,7 +22,9 @@
 | **MITRE**         | T1003.006 (DCSync)                                                                   |
 
 
-In the realistic multi-hop chain, DCSync is executed **from mbr01** using the captured dc02$ machine account credentials, or from ws01 after bringing the captured material back. This mirrors real operations where the attacker uses a member server with existing domain trust rather than running everything from their C2.
+**Status:** ⚠️ As-written path blocked. Phase 5 T102 coercion did not capture a usable `dc02$` TGT. `child\analyst_t1` authenticates to dc02 but lacks DCSync rights. Campaign pivoted to WT031 password-spray fallback, which yielded `chief_command` (DA+EA in `cadre.local`). Root `krbtgt` was extracted via `chief_command` DCSync against `dc01`.
+
+**Validated pivot:** root domain `cadre.local` compromise achieved without child `krbtgt`.
 
 **Step 1 — Transfer captured dc02$ TGT from mbr01 to ws01 (or use directly on mbr01):**
 

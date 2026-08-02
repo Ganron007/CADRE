@@ -21,6 +21,7 @@
 | Phase 0.5 / H (initial access) | 0 | 0 | 6 | 0 |
 | E (network defense) | 0 | 0 | 14 | 0 |
 | F (supply chain) | 0 | 0 | 13 | 0 |
+| Post-DA cluster + extensions (WT097-109) | 9 | 1 | 3 | 0 |
 
 **Key findings:**
 1. The biggest gap is **Phase 0.5 / H (initial access)**: no playbook configures the payloads/drop vectors on `ws01` or `Kali`. The surface is assumed by the campaign but not automated.
@@ -277,6 +278,30 @@
 | F-01..F-13 | npm supply-chain scenarios | npm registry, mock sink, `auditd`, Node.js on `linux01`/`mbr01` | `16-supplychain.yml` installs Node.js + mock sink + auditd. | ✅ Tools configured | The actual malicious package scenarios are not automated. |
 
 **Verdict:** F stream tools are configured but the attack scenarios themselves (publish typosquat, malicious dependency, etc.) are not playbook-defined.
+
+---
+
+### 2.19 Post-DA Cluster + Extension Surface (WT097-109)
+
+> Adopted 2026-08-02. **Surface assessment only** — not status tracking (see validation report).
+
+| ID | Attack | Expected Surface | Coverage | Status | Notes |
+|---|---|---|---|---|---|
+| WT097 | KDS Root Key Extraction | KDS root key (`CN=Master Root Keys,…`) | Present when gMSA enabled (`gmsaTools$` exists → KDS running) | ✅ Surface present | No playbook change needed |
+| WT098 | Golden gMSA | `gmsaTools$` + `msDS-ManagedPassword` readable (ACE#10) | `05-ad-attack-surface.yml` ACE#10 (verified) | ✅ Surface present | — |
+| WT099 | Golden dMSA / BadSuccessor | `dmsaPrivService$` in range.local (ACE#24) | `05-ad-attack-surface.yml` ACE#24 | ✅ Surface present | Server 2025 dMSA |
+| WT100 | LAPS Bulk Extraction | LAPS on machines (`ms-Mcs-AdmPwd`) | `04-vulnerabilities.yml` (mbr01 LAPS) | ⚠️ Partial surface | Only mbr01 currently LAPS-enabled |
+| WT101 | DSRM Password Extract & Set | DC local SAM DSRM account | Default at DC promotion | ✅ Surface present | Verify DSRM password set on all DCs |
+| WT102 | DCShadow | DRS replication from non-DC (DA) | AD default | ✅ Surface present | — |
+| WT103 | DPAPI-NG SID Protector | SID-protected blob (BitLocker/PFX/DNSSEC/ASP.NET) | Not staged | ❌ Missing target | Needs a protected store to decrypt |
+| WT104 | DLL Hijacking | Vulnerable trusted app + writable dir | Not staged | ❌ Missing target | Needs a target app staged |
+| WT105 | COM Hijacking | COM registry writable (SYSTEM) | SYSTEM on mbr01 | ✅ Surface present | — |
+| WT106 | IFEO | HKLM registry write (SYSTEM) | SYSTEM on mbr01 | ✅ Surface present | — |
+| WT107 | LSA SSP / Password Filter | Loadable SSP DLL + registry | Not staged | ❌ Missing target | Needs SSP DLL built/staged |
+| WT108 | DCOMIllusionist | DCOM reachable ws01→mbr01 | Windows default | ✅ Surface present | — |
+| WT109 | ESC16 | CA `DisableExtensionList` + ManageCA | `lead_engineering` ManageCA (ESC7 verified) | ✅ Surface present | Verify SID OID state |
+
+**Verdict:** most of the post-DA cluster uses surface already present (KDS root key, gMSA/dMSA accounts, DSRM, DCOM, ManageCA). **Three genuine surface gaps:** DPAPI-NG protected-store target (WT103), a DLL-hijack target app (WT104), and a loadable SSP DLL (WT107) — those need staging before the attacks are executable. LAPS is partial (mbr01 only).
 
 ---
 
