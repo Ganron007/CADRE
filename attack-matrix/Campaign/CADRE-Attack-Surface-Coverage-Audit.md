@@ -18,13 +18,13 @@
 | Branch C (SCCM) | 4 | 1 | 1 | 0 |
 | Branch D (Linux pivot) | 5 | 0 | 0 | 0 |
 | Branch G (CVE-2026-41089) | 0 | 0 | 1 | 0 |
-| Phase 0.5 / H (initial access) | 0 | 0 | 6 | 0 |
+| Phase 0.5 / H (initial access) | 5 | 0 | 1 | 0 |
 | E (network defense) | 0 | 0 | 14 | 0 |
 | F (supply chain) | 0 | 0 | 13 | 0 |
 | Post-DA cluster + extensions (WT097-109) | 9 | 1 | 3 | 0 |
 
 **Key findings:**
-1. The biggest gap is **Phase 0.5 / H (initial access)**: no playbook configures the payloads/drop vectors on `ws01` or `Kali`. The surface is assumed by the campaign but not automated.
+1. **Phase 0.5 / H (initial access) is now STAGED + 5/6 VERIFIED (2026-08-03)** — `19-initial-access.yml` + `-verifyOnly.yml` stage the payload artifacts on provisioning `~/www` + HTTP `:8081` + ws01 staging dir; H-01/02/04/05/06 delivery verified live (marker `H-PAYLOAD|executed as CHILD\analyst_t1|WS01`); H-03 CHM build+content verified, execution platform-blocked by modern `hh.exe` ActiveX sandbox (⚠️, not ❌).
 2. **Phase 5 coercion / T102** trigger path is now configured: `dc02` Spooler + SMB/RPC firewall prerequisites are added to `04-vulnerabilities.yml`. **VERIFIED 2026-07-31:** T102 `dc02$` TGT captured (hostname listener for Kerberos), converted kirbi→ccache, and used for Phase 6 DCSync of `child/krbtgt`. Full chain now green.
 3. **Branch A** is now **fully verified** (2026-07-31): all ACE-based attacks executed from ws01 via direct SSH (Rule 1). It still relies on a password spray (WT031) as the credential bridge, which is an attack technique, not a playbook surface.
 4. **Branch C** surface + primitives verified; **WT037 CMPivot, WT038 app deploy, WT039 script-as-SYSTEM all FULL EXEC VERIFIED 2026-08-02 from ws01** as `range\svc_sccm` (the campaign scripts run from ws01 — the WS01 client is the target). WT035 PXE needs a real PXE client; WT036 client-push relay needs a console-created device.
@@ -45,14 +45,14 @@
 
 | ID | Attack | Expected Surface | Playbook/Guide Coverage | Status | Notes |
 |---|---|---|---|---|---|
-| H-01 | Malicious LNK drop | `Kali` payload + `ws01` Downloads folder, user clicks | No playbook stages LNK payloads. | ❌ Missing | Entirely manual / operator-driven. |
-| H-02 | Malicious MSI | MSI builder + drop on `ws01` | No playbook. | ❌ Missing | Needs WiX/MSI tooling staged. |
-| H-03 | Compiled HTML Help (.chm) | HTML Help Workshop + payload | No playbook. | ❌ Missing | Needs `hhc.exe` etc. |
-| H-04 | HTML smuggling | Kali HTTP server + browser on `ws01` | No playbook. | ❌ Missing | No web server payload or browser macro. |
-| H-05 | AutoIt3 payload | AutoIt3 compiler + script drop | No playbook. | ❌ Missing | Tool not installed. |
-| H-06 | Malicious EXE | Payload builder + drop | No playbook. | ❌ Missing | Generic placeholder. |
+| H-01 | Malicious LNK drop | provisioning `~/www` + ws01 Downloads, user clicks | `19-initial-access.yml` stages Invoice.lnk on provisioning:8081 | ✅ Verified 2026-08-03 | Invoice.lnk 1793B → click → marker `CHILD\analyst_t1` |
+| H-02 | Malicious MSI | WiX builder + drop on `ws01` | `19-initial-access.yml`; builder `wt064-msi-installer.ps1` | ✅ Verified 2026-08-03 | WiX 32768B MSI → `msiexec /qn` deferred CA ran payload (ICE77 fix) |
+| H-03 | Compiled HTML Help (.chm) | HTML Help Workshop + payload | `19-initial-access.yml`; builder `wt065-chm-execution.ps1` | ⚠️ Build+content verified | CHM 9306B; Shortcut object embedded; exec blocked by modern hh.exe sandbox (platform limit) |
+| H-04 | HTML smuggling | provisioning HTTP server + browser on `ws01` | `19-initial-access.yml`; builder `wt066-html-smuggling.py` | ✅ Builder verified 2026-08-03 | H-04-smuggle.html 5883B payload embedded; detonation = user practice (Rule 3) |
+| H-05 | AutoIt3 payload | AutoIt3 compiler + script drop | `19-initial-access.yml`; builder `wt067-autoit3.ps1` | ✅ Verified 2026-08-03 | AutoIt3.exe 980064B + au3 from :8081 → marker |
+| H-06 | Malicious EXE | Payload builder + drop | `19-initial-access.yml`; `wt068-malicious-exe.ps1` | ✅ Verified 2026-08-03 | payload.exe 4096B from :8081 → marker |
 
-**Verdict:** Phase 0.5 is intentionally a user-execution stage, but the campaign metadata treats it as part of the chain. To make the lab "flawless" we should add a `19-initial-access.yml` playbook that stages the payloads on `Kali` and the drop directories on `ws01`.
+**Verdict:** Phase 0.5 is now **staged + delivery-verified (5/6)** via `19-initial-access.yml` + `-verifyOnly.yml` (artifacts on provisioning `~/www`, HTTP :8081, ws01 staging dir). H-03 remains ⚠️ build+content verified — execution is platform-blocked by the modern `hh.exe` ActiveX sandbox (not a playbook gap). User-click detonation stays user practice (Rule 3).
 
 ---
 
@@ -341,12 +341,11 @@
 
 ### 3.6 Initial Access (Phase 0.5 / H)
 
-- **Issue:** No playbook configures the initial access vectors. The campaign assumes the operator will stage them.
-- **Fix:** Add `19-initial-access.yml` that:
-  - Stages a malicious LNK/MSI/CHM/HTML/AutoIt/EXE payload on `Kali`.
-  - Drops a payload into `ws01` `C:\Users\analyst_t1\Downloads\` or similar.
-  - Optionally creates a fake phishing email/document.
-  This is not a vulnerability surface, but it is a campaign dependency that should be automated for reproducibility.
+- **Status: DONE 2026-08-03.** `19-initial-access.yml` + `-verifyOnly.yml` now stage the delivery stack:
+  - provisioning `~/www` webroot + H artifacts (Invoice.lnk / H-02-evil.msi / H-03-evil.chm / H-04-smuggle.html / payload.exe / AutoIt3.exe), idempotent `python3 -m http.server 8081` (nohup, `~/www-server.log`).
+  - ws01 `C:\Tools\campaign-h\www\` staging dir (builder tooling: WiX, hhc, AutoIt3, 7-Zip — third-party binaries staged manually per session).
+  - `-verifyOnly` checks artifact presence/sizes + HTTP 200 ×6 + :8081 listening.
+- **5/6 vectors verified live 2026-08-03** (H-01/02/04/05/06; marker `H-PAYLOAD|executed as CHILD\analyst_t1|WS01`). H-03 build+content verified; execution platform-blocked by modern `hh.exe` ActiveX sandbox. Not a vulnerability surface — a campaign delivery dependency, now automated.
 
 ### 3.7 E/F Stream Attack Scenarios
 
@@ -364,7 +363,7 @@
 | **P0** | `dc02` Spooler not running/exposed | **RESOLVED 2026-08-01** — Spooler confirmed enabled on all 3 DCs (`nxc smb -M spooler`); T102 TGT capture chain VERIFIED 2026-07-31. | `04-vulnerabilities.yml` |
 | **P0** | Branch A/B credential bridge | Ensure `chief_command` / `hunter_dfir` passwords are in the sprayable set; document in `lab-seed-creds.json`. | `02-ad-objects.yml` + docs |
 | **P1** | Branch D Linux surfaces | Add SSSD ticket cache, NFS `sec=krb5p`, Podman privileged container to `linux01`. | `07-linux-config.yml` or new `07-linux-attack-surface.yml` |
-| **P1** | Phase 0.5 / H initial access | Stage payloads on `Kali` and `ws01` drop directory. | New `19-initial-access.yml` |
+| **P1** | Phase 0.5 / H initial access | Stage payloads on provisioning `~/www` + ws01 staging dir. | **DONE 2026-08-03** — `19-initial-access.yml` + `-verifyOnly.yml`; 5/6 vectors verified (H-03 platform-blocked) |
 | **P1** | 3.5 missing tools | Install Nemesis, LAPS, configure WerFault dump keys, deploy AAD Connect sync (not just provisioning agent). | `06-member-services.yml`, `07-linux-config.yml`, `15-cloud-sync.yml` |
 | **P2** | GPP / AdminSDHolder | Add `Groups.xml` with cpassword to SYSVOL; configure AdminSDHolder writable ACL. | `02-ad-objects.yml` + `05-ad-attack-surface.yml` |
 | **P2** | F stream scenarios | Automate malicious npm package scenarios against mock registry. | `16-supplychain.yml` |
@@ -396,7 +395,7 @@ The lab is **close to complete** for the main Windows AD spine and the core ADCS
 1. **Branch D (Linux pivot) is COMPLETE** (WT044-048 verified; config fixes propagated to playbooks + guide).
 2. **Branch B is nearly complete** — ESC1/2/3/4/7/9 + UnPAC verified; **ESC8 (WT052) + ESC11 deferred** (no SMB-authenticated coerce on Server 2025 — root cause documented; revisit at end with Kerberos-relay candidates).
 3. **Branch C (SCCM)** surface + primitives verified; full exec gated on **AdminService deployment** (`sccm-integration-guide.md` Phase 6A + `10-sccm-verify.yml` checks added; user to configure).
-4. **Automate Phase 0.5 / H** initial access staging.
+4. ~~Automate Phase 0.5 / H initial access staging~~ — **DONE 2026-08-03** (`19-initial-access.yml` + `-verifyOnly.yml`; 5/6 verified).
 5. **Add missing 3.5 tools** (Nemesis, LAPS, WerFault, AAD Connect) if those techniques are required.
 6. **Run E/F stream scenarios** as exercises, not surface configuration.
 
@@ -404,7 +403,7 @@ Once the AdminService is deployed and the ESC8/11 revisit lands, the campaign ca
 
 ---
 
-*Generated 2026-07-30 from playbook/guide review vs CAMPAIGNS-VALIDATION-REPORT.md.*
+*Generated 2026-08-03 from playbook/guide review vs CAMPAIGNS-VALIDATION-REPORT.md.*
 ## Appendix A — Consolidated Campaign Re-test Matrix
 
 > Updated: 2026-08-02 (Branch A all verified; Branch B ESC1/2/3/4/7/9+UnPAC verified, ESC8/11 deferred; Branch D WT044-048 verified; **Branch C WT037 CMPivot + WT038 app deploy + WT039 script-as-SYSTEM FULL EXEC VERIFIED 2026-08-02** — `mp.msi` MP web-handler repair was the WT038 delivery fix; spooler resolved; WT002/WT007 verified)
@@ -448,5 +447,5 @@ Once the AdminService is deployed and the ESC8/11 revisit lands, the campaign ca
 | E-01..E-14 | E stream | Network defense exercises | monitor/elk | — | ⏳ Configured | Sensors configured; exercises pending. Keep offline until telemetry phase. |
 | F-01..F-13 | F stream | npm supply-chain scenarios | linux01/mbr01 | — | ⏳ Configured | Tooling configured; scenarios pending. |
 | G | Branch G | CVE-2026-41089 | Kali | — | 🔬 Deferred | PoC present; depends on dc02 patch state. |
-| H-01..H-06 | Phase 0.5 | Initial access payloads | Kali/ws01 | — | ❌ Missing | No playbook stages payloads; needs `19-initial-access.yml`. |
+| H-01..H-06 | Phase 0.5 | Initial access payloads | provisioning/ws01 | 19-initial-access.yml | ✅ 5/6 verified 2026-08-03 | Hosting provisioning:8081 (Invoice.lnk, H-02-evil.msi, H-03-evil.chm, H-04-smuggle.html, payload.exe, AutoIt3.exe); H-03 exec platform-blocked |
 

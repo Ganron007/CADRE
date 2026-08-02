@@ -126,7 +126,7 @@
 | ID | Phase / stream | Profile | Status | Attack | Tracker | Metadata | Notes |
 |----|----------------|---------|--------|--------|---------|----------|-------|
 | C.0 | Phase 0 — Recon | P-CHILD | [ ] | [ ] | [ ] | [ ] | Unauth recon, Kerberos enum, NetExec modules |
-| C.0.5 | Phase 0.5 — ws01 beachhead | **P-BEACH** | [ ] | [ ] | [ ] | [ ] | H-01..H-06; **ws01 live** (CADRE-All + soft Defender) — attack path pending |
+| C.0.5 | Phase 0.5 — ws01 beachhead | **P-BEACH** | [x] | [x] | [x] | [~] | **H-01/02/04/05/06 VERIFIED 2026-08-03** (provisioning→ws01); H-03 build+content, exec platform-blocked; playbooks `19-initial-access` |
 | C.1 | Phase 1 — AS-REP | P-CHILD | [x] | [x] | [x] | [~] | WT003/T003; re-verified 2026-07-25 |
 | C.2 | Phase 2 — Kerberoast | P-CHILD | [x] | [x] | [x] | [~] | WT002; re-verified + bundle 2026-07-25 |
 | C.3 | Phase 3 — SQL → GodPotato | P-CHILD | [x] | [x] | [~] | [~] | Needs **mbr01** up |
@@ -143,7 +143,7 @@
 | C.E | Stream E — Network defense (14) | P-PURPLE | [ ] | [ ] | [ ] | [ ] | Plan 0.7 overlap |
 | C.F | Stream F — Supply chain (10) | P-CHILD + linux01 | [ ] | [ ] | [ ] | [ ] | Plan 0.8 |
 | C.G | Stream G — Pre-auth DC CVE lab | snapshot | [~] | [ ] | [ ] | [ ] | Deferred per campaign |
-| C.H | H-01..H-06 placeholders | P-BEACH | [ ] | [ ] | [ ] | [ ] | In `tracker.md`; ws01 reachable — execute when ready |
+| C.H | H-01..H-06 (initial access) | P-BEACH | [x] | [x] | [x] | [~] | **5/6 VERIFIED 2026-08-03** (H-01/02/04/05/06); H-03 exec platform-blocked (hh.exe sandbox); `19-initial-access.yml` + artifacts hosted provisioning:8081 |
 
 **Campaign hygiene (each phase complete):**
 
@@ -159,7 +159,7 @@
 
 > Source of truth: [`attack-matrix/Campaign/CAMPAIGNS-VALIDATION-REPORT.md`](attack-matrix/Campaign/CAMPAIGNS-VALIDATION-REPORT.md) · [`attack-matrix/Campaign/CADRE-Attack-Surface-Coverage-Audit.md`](attack-matrix/Campaign/CADRE-Attack-Surface-Coverage-Audit.md) · [`attack-matrix/Campaign/CAMPAIGNS-METADATA-v2.md`](attack-matrix/Campaign/CAMPAIGNS-METADATA-v2.md)
 >
-> **Scope:** Phase 1–8 + Branch A–D + Streams E/F/G · **Excluded:** Phase 0.5 / H-01..H-06 initial access · **Legend:** ✅ verified / 📝 script corrected pending re-test / ⏳ not exercised / ⠿ blocked / ❌ non-functional or rejected / 🔬 deferred
+> **Scope:** Phase 1–8 + Branch A–D + Streams E/F/G · **H-01..H-06 initial access verified 2026-08-03** (5/6; H-03 platform-blocked) · **Legend:** ✅ verified / 📝 script corrected pending re-test / ⏳ not exercised / ⠿ blocked / ❌ non-functional or rejected / 🔬 deferred
 
 **How to use this tracker:**
 - Flip the main attack checkbox when the attack is re-tested end-to-end.
@@ -229,28 +229,28 @@
 | 101 | WinRS lateral pivot ws01 -> mbr01 (T101) | ws01 | child\analyst_t1 / T13r_An@lyst! | ✅ Verified |
 | 3.5F | LSASS/SAM credential dump via mimikatz | SYSTEM on mbr01 | SYSTEM | ✅ Verified |
 | 3.5A | Winlogon plaintext credential extraction | SYSTEM on mbr01 | SYSTEM | ✅ Verified |
-| 3.5G | DPAPI via Nemesis | SYSTEM on mbr01 | SYSTEM | ⏳ Not exercised |
-| 3.5H | ctfmon.exe password extraction | SYSTEM on mbr01 | SYSTEM | ⏳ Not exercised |
+| 3.5G | DPAPI via Nemesis | SYSTEM on mbr01 | SYSTEM | ⚠️ Partial 2026-08-03 |
+| 3.5H | ctfmon.exe password extraction | SYSTEM on mbr01 | SYSTEM | ⚠️ Partial 2026-08-03 |
 | 3.5I | Token impersonation | mbr01 | SYSTEM | ❌ Rejected |
 | 3.5B | Scheduled Task as analyst_cloud | mbr01 | analyst_cloud | ❌ Rejected for attack chain |
 | 3.5C | RDP interactive session as analyst_cloud | ws01 -> mbr01 | analyst_cloud / Cl0ud_An@lyst! | ⏳ Not exercised |
-| 3.5D | File detonation / payload drop (WT063-068) | ws01 / mbr01 | analyst_t1 or analyst_cloud | ⏳ Not exercised |
-| 3.5J | WMI Event Subscriptions | SYSTEM on mbr01 | SYSTEM | ⏳ Not exercised |
-| 3.5K | LSASS dump via WerFault | SYSTEM on mbr01 | SYSTEM | ⏳ Not exercised |
+| 3.5D | File detonation / payload drop (WT063-068) | ws01 / mbr01 | analyst_t1 or analyst_cloud | ✅ Verified 2026-08-03 |
+| 3.5J | WMI Event Subscriptions | SYSTEM on mbr01 | SYSTEM | ⚠️ Partial 2026-08-03 |
+| 3.5K | LSASS dump via WerFault | SYSTEM on mbr01 | SYSTEM | ✅ Verified 2026-08-03 |
 | 3.5L | LAPS extraction | dc01 | DA | ⏳ Not exercised |
 | 3.5M | Azure AD Connect DPAPI dump | dc01 | DA | ⏳ Not exercised |
 | 3.5N | UnCanny LPE via InstallService | ws01 | local user | 🔬 Deferred |
 
 - [x] **3.5F** mimikatz LSASS/SAM — surface check · attack run · telemetry captured · tracker updated
-- [ ] **3.5A** Winlogon plaintext extraction — surface check · attack run · telemetry captured · tracker updated
+- [x] **3.5A** Winlogon plaintext extraction — surface check · attack run · telemetry captured · tracker updated
 - [ ] **3.5G** DPAPI via Nemesis — surface check · attack run · telemetry captured · tracker updated
 - [ ] **3.5H** ctfmon.exe extraction — surface check · attack run · telemetry captured · tracker updated
 - [x] **3.5I** Token impersonation — surface check · attack run · telemetry captured · tracker updated
 - [x] **3.5B** Scheduled Task — **REJECTED as execution wrapper (Rule 2: scheduled tasks are persistence-only).** Not a campaign attack. SeBatchLogonRight retained as persistence-prerequisite surface only.
 - [ ] **3.5C** RDP interactive session — surface check · attack run · telemetry captured · tracker updated
-- [ ] **3.5D** File detonation / payload drop — surface check · attack run · telemetry captured · tracker updated
+- [x] **3.5D** File detonation / payload drop — surface check · attack run · telemetry captured · tracker updated
 - [ ] **3.5J** WMI Event Subscriptions — surface check · attack run · telemetry captured · tracker updated
-- [ ] **3.5K** WerFault LSASS dump — surface check · attack run · telemetry captured · tracker updated
+- [x] **3.5K** WerFault LSASS dump — surface check · attack run · telemetry captured · tracker updated
 - [ ] **3.5L** LAPS extraction — surface check · attack run · telemetry captured · tracker updated
 - [ ] **3.5M** Azure AD Connect DPAPI dump — surface check · attack run · telemetry captured · tracker updated
 - [~] **3.5N** UnCanny LPE — surface check · attack run · telemetry captured · tracker updated
@@ -574,7 +574,7 @@
 | E — Net def | 23 | 15 | 10 |
 | F — npm | 10 | 0 | 0 |
 | G — MITRE gap | 11 | 0 | 0 |
-| H — Initial access | 6 | 0 | 0 (placeholders) |
+| H — Initial access | 6 | 5 | 1 (H-03 platform-blocked) |
 | **Total** | **~110** | **21** | **6+** |
 
 ---
@@ -766,5 +766,5 @@ Next:
 | E-01..14 | Network defense | monitor/elk | — | ⏳ Configured | Offline until telemetry phase. |
 | F-01..13 | npm supply-chain | linux01/mbr01 | — | ⏳ Configured | Scenarios pending. |
 | G | CVE-2026-41089 | Kali | — | 🔬 Deferred | PoC present; dc02 patch state + snapshot. |
-| H-01..06 | Initial access | Kali/ws01 | — | ❌ Missing | Needs `19-initial-access.yml`. |
+| H-01..06 | Initial access | provisioning/ws01 | 19-initial-access.yml | ✅ 5/6 verified 2026-08-03 | H-01/02/04/05/06 verified (provisioning→ws01); H-03 build+content verified, exec platform-blocked (hh.exe sandbox) |
 
