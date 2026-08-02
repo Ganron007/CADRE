@@ -6,7 +6,7 @@
 
 **DFIR parallel track:** [`DFIR-Nexus-Pioneer-workflow.md`](DFIR-Nexus-Pioneer-workflow.md) — links each campaign exercise to DFIR-Nexus ingest, cases, and `tracker.md` (Phase 3.5 active).
 
-**Legend:** ✅ = adopted into CAMPAIGNS_v3.md | ⏳ = pending test | 🔬 = research only | ⏭️ = skip
+**Legend:** ✅ = adopted into CAMPAIGNS_v3.md | ⏳ = pending test | 🔬 = research only | ⏭️ = skip | 📋 = tracked elsewhere
 
 ---
 
@@ -59,9 +59,9 @@
 | | Cross-Session Activation (COM lateral) | ⏳ |
 | | SpeechRuntime Lateral | ⏳ |
 | | DCOMIllusionist (fileless .NET deserialization) | ⏳ |
-| | RBCD (Resource-Based Constrained Delegation) | ⏳ |
-| | Unconstrained Delegation (krbrelayx / mbr01) | ⏳ |
-| | NTLM Relay to ADCS ESC8 (ntlmrelayx + coerce) | ⏳ |
+| | RBCD (Resource-Based Constrained Delegation) | ✅ |
+| | Unconstrained Delegation (krbrelayx / mbr01) | ✅ |
+| | NTLM Relay to ADCS ESC8 (ntlmrelayx + coerce) | ✅ |
 | | SMB-to-LDAP Relay (CVE-2019-1040) | ⏳ |
 | | Kerberos Relay over DNS (mitm6 + krbrelayx) | ⏳ |
 | **Phase 7 — Privilege Escalation (DCSync)** | Golden/Silver Ticket | ⏳ |
@@ -72,7 +72,7 @@
 | | Forest Trust SID Filtering (study ref) | ✅ |
 | | Forest Trust Bypass CVE-2020-0665 (study ref) | ✅ |
 | **Branch B — ADCS** | Certified Pre-Owned (ESC1-8) | ✅ |
-| | UnPAC-the-Hash (cert → NT hash) | ⏳ |
+| | UnPAC-the-Hash (cert → NT hash) | ✅ |
 | | ESC16 (CA-level SID extension disable) | ⏳ |
 | **Branch C — SCCM** | Ludus SCCM Lab | ✅ |
 | **Branch D — Linux** | GTFOBins (python, perl, find, vim, awk, curl, env, tee) | ✅ |
@@ -90,8 +90,8 @@
 | **External Vuln Research (2026-06-18)** | MiniPlasma (CVE-2020-17103 unpatched → SYSTEM) | 🔬 |
 | | GreenPlasma (CTFMON arbitrary section → EoP) | 🔬 |
 | | YellowKey (BitLocker bypass via FsTx + WinRE) | 🔬 |
-| **Phase 5 — Lateral Movement** | UnCanny Coerce (NTLM coercion via InstallService) | ⏳ |
-| **Phase 3.5 — Credential Access** | UnCanny LPE (Non-admin → SYSTEM via InstallService) | ⏳ |
+| **Phase 5 — Lateral Movement** | UnCanny Coerce (NTLM coercion via InstallService) | ✅ |
+| **Phase 3.5 — Credential Access** | UnCanny LPE (Non-admin → SYSTEM via InstallService) | ✅ |
 | **Detection Engineering** | IPv4-mapped IPv6 URL Parser Bypass (SANS ISC 33090) | ⏳ |
 | **Post-DA Cleanup** | KDS Root Key Extraction (prerequisite for #85-89) | ⏳ |
 | | Golden gMSA Attack (offline password computation) | ⏳ |
@@ -99,23 +99,22 @@
 | | LAPS Bulk Extraction (DSInternals enhancement) | ⏳ |
 | | Golden dMSA Attack (Server 2025) | ⏳ |
 | | DPAPI-NG SID Protector Decryption (BitLocker/PFX/DNSSEC/ASP.NET) | ⏳ |
-| **Phase 5 → Phase 7 Shortcut** | Onelogon Zero-Channel (single-channel NRPC bypass — WOOT 2026) | ⏳ |
-| **Phase 3.5 alt → Phase 7** | Onelogon AES-CBC8 Downgrade (KRBTGT hash extraction — WOOT 2026) | ⏳ |
-| **Phases 0-5 cross-cutting** | NetExec (nxc) — CrackMapExec replacement | 🆕 |
-| **Phase 3.5 (Credential Access)** | DonPAPI v2.0+ — Remote DPAPI harvesting | 🆕 |
-| **Phase 3.5 (Credential Access)** | lsassy v3.1.16 — Remote LSASS dump (15+ methods) | 🆕 |
-| **Branch 3.5 (LPE)** | KrbRelay + KrbRelayUp — LPE via Kerberos relay | 🆕 |
+| **Phase 5 → Phase 7 Shortcut** | Onelogon Zero-Channel (single-channel NRPC bypass — WOOT 2026) | ✅ |
+| **Phase 3.5 alt → Phase 7** | Onelogon AES-CBC8 Downgrade (KRBTGT hash extraction — WOOT 2026) | ✅ |
+| **Phase 0-5 cross-cutting** | NetExec (nxc) — CrackMapExec replacement | ✅ |
+| **Phase 3.5 (Credential Access)** | DonPAPI v2.0+ — Remote DPAPI harvesting | ✅ |
+| **Phase 3.5 (Credential Access)** | lsassy v3.1.16 — Remote LSASS dump (15+ methods) | ✅ |
+| **Branch 3.5 (LPE)** | KrbRelay + KrbRelayUp — LPE via Kerberos relay | ✅ |
 | **Plan 11 (Cloud/Entra)** | BARK (BloodHound Attack Research Kit) | ⏳ |
 | **Agentic Offense (parallel)** | CADRE-Strike — Agentic AD Reasoning Engine | 📋 Tracked (Track H) |
-| **Phase 0 + Branch A + B** | ADeleg — GUI tool for ACL/ADCS recon | 🆕 |
+| **Phase 0 + Branch A + B** | ADeleg — GUI tool for ACL/ADCS recon | ✅ |
 | **Phase 1/2/5/6/7/8 (study ref)** | Windows Security Internals — Kerberos/AD internals | ⏳ |
-| **Phase 0/1 (Recon)** | dsHeuristics abuse (forest-level AD behavior) | 🆕 |
-| **Phase 8 alt (Forest Trust)** | Skipjack — PAC signature downgrade (GhostWolfLab 2026-06-23) | ⏳ |
-| **Phase 0/3.5/5** | NetExec `coerce_plus` + 5 new modules (`pre2k`, `enum_av`, `get-desc-users`, `winscp`, `rdp`) + `--kdcHost` flag | 🆕 |
-| **Exercise (Standalone)** | CVE-2026-41089 Netlogon RCE (PoC available — pre-auth DC crash) | 🆕 |
-| **Plan 0.8 + Track H (defensive)** | GitHub Actions Supply-Chain Attack Patterns (cache poisoning + tag pollution analog + AI agent guardrails) — Flatt Security 2026-06-24 | ⏳ |
-| **Phase 3 + plan1.7** | Defender Exclusion via PowerShell (T1562.001) — KQL patterns + AI-vs-human finding — Detect FYI 2026-06-24 | ⏳ |
-| **Phase 3 + plan1.7** | AMSI Bypass Techniques — Gray Hat Hacking 6th Ed | ⏳ |
+| **Phase 0/1 (Recon)** | dsHeuristics abuse (forest-level AD behavior) | ⏳ |
+| **Phase 8 alt (Forest Trust)** | Skipjack — PAC signature downgrade (GhostWolfLab 2026-06-23) | ✅ |
+| **Phase 0/3.5/5** | NetExec `coerce_plus` + 5 new modules (`pre2k`, `enum_av`, `get-desc-users`, `winscp`, `rdp`) + `--kdcHost` flag | ✅ |
+| **Exercise (Standalone)** | CVE-2026-41089 Netlogon RCE (PoC available — pre-auth DC crash) | ✅ |
+| **Plan 0.8 + Track H (defensive)** | GitHub Actions Supply-Chain Attack Patterns (cache poisoning + tag pollution analog + AI agent guardrails) — Flatt Security 2026-06-24 | ✅ |
+| **Phase 3 + plan1.7** | Defender Exclusion via PowerShell (T1562.001) — KQL patterns + AI-vs-human finding — Detect FYI 2026-06-24 | ✅ |
 | **Phase 7 + plan1.7** | DCShadow Attack (DRS replication) — Applied Incident Response + Practical-Red-Teaming | ⏳ |
 | **Phase 1/2/7** | Rubeus/Kerberoast/AS-REP playbook cross-validation — Practical-Red-Teaming + Gray Hat Hacking 6th Ed | ⏳ |
 | **Study Ref** | Practical AI Security (2025) — CADRE-Strike LLM Security | ⏳ |
@@ -128,9 +127,35 @@
 | | dirkjanm.io — AD/Azure Research Blog | — |
 | **Skip** | Don't Jump the Turnstile | ⏭️ |
 
-**Counts:** ✅ Adopted: 24 | ⏳ Pending: 59 | 🔬 Research: 4 | ⏭️ Skip: 1 | Reference: 2 | 🆕 New: 12 | **Total: 102**
+**Counts:** ✅ Adopted: 57 | ⏳ Pending: 44 | 🔬 Research: 4 | ⏭️ Skip: 1 | 📋 Tracked: 1 | Reference: 3 | **Total: 110**
 
 ---
+
+## Upgrade Candidates for Campaign v3 (2026-08-02)
+
+> Recommended next additions to `CAMPAIGNS_v3.md`, selected against the current (mostly verified) campaign state. **Tier 1** = strong, testable with credentials the campaign already produces. **Tier 2** = worthwhile, conditional. Detection validation for these stays deferred to the Plan 1 telemetry stage.
+
+### Tier 1 — Post-DA cluster (new sub-phase between Phase 7 and Phase 8)
+
+| Candidate | MITRE | Fits in v3 flow | Prereq (held) |
+|---|---|---|---|
+| KDS Root Key Extraction | T1552 | Post-DA sub-phase start — enabler for the gMSA/dMSA/DPAPI-NG cluster | DA dc01 (`chief_command`) ✅ |
+| Golden gMSA Attack | T1558 | After KDS Root Key; ties to Branch A ACE#10 (`eng_cloud → gmsaTools$`, verified) | KDS key + ACE#10 ✅ |
+| Golden dMSA / BadSuccessor (Server 2025) | T1558 | Branch A (range.local) — `dmsaPrivService$` = ACE#24 | range.local (WT034 / svc_naa) ✅ |
+| LAPS Bulk Extraction | T1552.004 | Phase 3.5 — fills existing `3.5L` stub (mbr01 has LAPS) | DA / post-DA ✅ |
+| DSRM Password Extract & Set | T1098.001 | Phase 7 (post-DA DC persistence) | DA ✅ |
+| DCShadow | T1098 | Phase 7 alt — DRS persistence (inverse of verified WT009) | DA + DRS ✅ |
+| DLL / COM Hijacking, IFEO, LSA SSP | T1574 / T1547 | Phase 5 Persistence — extends 3.5J + invisible-task sections | SYSTEM on mbr01 ✅ |
+
+### Tier 2 — Worthwhile, conditional
+
+| Candidate | MITRE | Fits in v3 flow | Prereq |
+|---|---|---|---|
+| DCOMIllusionist | T1021 | Phase 3 Alternative Execution (fileless DCOM lateral) | ws01 / mbr01 ✅ |
+| ESC16 (CA SID-extension disable) | T1648 | Branch B extension (after ESC7 ManageCA verified) | ManageCA ✅ |
+| DPAPI-NG SID Protector Decryption | T1555 | Post-DA, after KDS Root Key | KDS key ✅ |
+
+**Status:** 🔬 Suggested 2026-08-02 — **not yet adopted** into `CAMPAIGNS_v3.md`. Adopt per operator decision.
 
 ---
 
