@@ -1,9 +1,9 @@
 # CADRE — Attack Campaign (v3)
 
 > **v3 is current.** Per-phase runbooks below are the primary path — full narrative + commands for learning and live testing.
-> **Archived v1:** [`CAMPAIGNS_v1_archived.md`](CAMPAIGNS_v1_archived.md) · **Full v3 reference:** [`CAMPAIGNS_v3.md`](CAMPAIGNS_v3.md)
+> **Archived v1:** [`archive/CAMPAIGNS_v1_archived.md`](archive/CAMPAIGNS_v1_archived.md) · **Full v3 reference:** [`CAMPAIGNS_v3.md`](CAMPAIGNS_v3.md)
 
-**81 campaign attacks + 14 E exercises + 10 F supply-chain scenarios = 105 total.**
+**94 campaign attacks + 14 E exercises + 10 F supply-chain scenarios = 118 total.**
 
 ## Phase runbooks (v3 — read + execute)
 
@@ -24,11 +24,11 @@ Open **one runbook per phase**. Each file contains the full explanation, prerequ
 | **A–D** Branches | [`Runbooks/CAMPAIGNS-RUNBOOK-branch-a.md`](Runbooks/CAMPAIGNS-RUNBOOK-branch-a.md) … [`branch-d`](Runbooks/CAMPAIGNS-RUNBOOK-branch-d.md) | Optional |
 | **E / F / G** | [`e`](Runbooks/CAMPAIGNS-RUNBOOK-e.md) · [`f`](Runbooks/CAMPAIGNS-RUNBOOK-f.md) · [`g`](Runbooks/CAMPAIGNS-RUNBOOK-exercises-g.md) | Standalone |
 
-**Full monolithic reference (search / print):** [`CAMPAIGNS_v2.md`](CAMPAIGNS_v2.md) · **Archived v1:** [`CAMPAIGNS_v1_archived.md`](CAMPAIGNS_v1_archived.md)
+**Full v3 reference (search / print):** [`CAMPAIGNS_v3.md`](CAMPAIGNS_v3.md) · **Archived:** [`archive/CAMPAIGNS_v2.md`](archive/CAMPAIGNS_v2.md) · **v1:** [`archive/CAMPAIGNS_v1_archived.md`](archive/CAMPAIGNS_v1_archived.md)
 
-**Per-attack metadata:** [`CAMPAIGNS-METADATA.md`](CAMPAIGNS-METADATA.md) · **DFIR bridge:** [`DFIR-Nexus-Pioneer-workflow.md`](DFIR-Nexus-Pioneer-workflow.md)
+**Per-attack metadata:** [`CAMPAIGNS-METADATA-v2.md`](CAMPAIGNS-METADATA-v2.md) · **DFIR bridge:** [`DFIR-Nexus-Pioneer-workflow.md`](DFIR-Nexus-Pioneer-workflow.md)
 
-**Editing:** Update the runbook and `CAMPAIGNS_v2.md` together. Run `python tools/split-campaign-runbooks.py --check` after bulk regen.
+**Editing:** Update the runbook and `CAMPAIGNS_v3.md` together. Run `python tools/split-campaign-runbooks.py --check` after bulk regen.
 
 ---
 ## Lab Topology — Attack Surface
@@ -100,6 +100,10 @@ graph LR
         P7["P7: Golden Ticket / SID History<br/>cadre.local root DA"]
     end
 
+    subgraph POST_DA [Post-DA Cluster]
+        PD["Post-DA: KDS Root Key<br/>gMSA/dMSA · DSRM · DCShadow"]
+    end
+
     subgraph RANGE_FOREST [range.local]
         P8["P8: Cross-Forest + SCCM<br/>range.local DA"]
     end
@@ -112,7 +116,8 @@ graph LR
     P4 --> P5
     P5 --> P6
     P6 ==>|"T103: child DA → root EA"| P7
-    P7 ==>|"T104: cross-forest<br/>SID Filter OFF"| P8
+    P7 ==>|"Post-DA: KDS/gMSA/DSRM<br/>offline creds + persistence"| PD
+    PD ==>|"T104: cross-forest<br/>SID Filter OFF"| P8
 
     subgraph BRANCH_A [Branch A: ACL Abuse]
         P4 -.-> A1["ACE#7: ForceChangePassword"]
@@ -138,13 +143,6 @@ graph LR
 
 
 **START HERE.** The main spine begins with **Phase 0.5** (initial access on the `ws01` workstation via phishing/file execution). The campaign is built as a multi-hop chain: `ws01 → mbr01 → dc02 → dc01 → range.local`. Each hop uses a different identity, crosses a different sensor boundary, and leaves distinct telemetry.
-
-- **Branch A** — ACL abuse in cadre.local (ForceChangePassword, WriteDacl, GenericWrite, GPO, gMSA, Shadow Creds)
-- **Branch B** — ADCS certificate template abuse (ESC1–14)
-- **Branch C** — SCCM hierarchy takeover (NAA extraction, PXE, site escalation)
-- **Branch D** — Linux post-exploit (MSSQL link, Podman escape, SSSD tickets, NFS, Keytab)
-
-Branches converge back into the main spine — they earn credentials that accelerate or enable the main chain.
 
 - **Branch A** — ACL abuse in cadre.local (ForceChangePassword, WriteDacl, GenericWrite, GPO, gMSA, Shadow Creds)
 - **Branch B** — ADCS certificate template abuse (ESC1–14)
@@ -185,7 +183,7 @@ The v3 campaign is designed as a realistic red-team engagement within a single V
 
 ## Coverage Summary
 
-> **Status notes:** WT028 (null session) ❌ Invalid. WT031 (password spray) ⏳ Pending relocation. WT018/019/020 (coercion) ❌ Non-functional on Server 2025. The six H vectors (H-01..H-06) are now Phase 0.5 of the main spine. Remaining 81 attacks active.
+> **Status notes:** WT028 (null session) ❌ Invalid. WT031 (password spray) ⏳ Pending relocation. WT018/019/020 (coercion) ❌ Non-functional on Server 2025. The six H vectors (H-01..H-06) are now Phase 0.5 of the main spine. Post-DA cluster (WT097-103) + persistence/exec/Branch B extensions (WT104-109) adopted 2026-08-02. Remaining 94 attacks active.
 
 
 | Phase / Branch                | Primary WT#                      | Alternative                                                                                        | What you earn                |
@@ -198,6 +196,7 @@ The v3 campaign is designed as a realistic red-team engagement within a single V
 | **P5: Coercion + Delegation** | 004, 017                         | 007, 021, 022                                                                                      | `dc02$` TGT                  |
 | **P6: DCSync**                | 009                              | —                                                                                                  | Child DA + krbtgt            |
 | **P7: Forest Trust**          | 010                              | 011, 012                                                                                           | Root EA + krbtgt             |
+| **Post-DA: KDS/gMSA/DSRM**   | 097-103                          | 098, 099, 103 (need 097); 100-102 independent                                                     | Post-DA persistence + offline creds |
 | **P8: Cross-Forest + SCCM**   | 033, 034                         | 035-039, 030, 049                                                                                  | Range DA                     |
 | **Branch A: ACL Abuse**       | 015                              | 013, 014, 016, 023, 024, 027, 008, plus ACE#2/8-14 (direct DCSync), #15-20 (child), #21-26 (range) | cadre.local DA               |
 | **Branch A — Direct DCSync**  | 13+14                            | `eng_agentic` → `DC=cadre`: GetChanges                                                             | **Direct DCSync without DA** |
@@ -205,7 +204,7 @@ The v3 campaign is designed as a realistic red-team engagement within a single V
 | **Branch C: SCCM**            | 034-039                          | 030, 049                                                                                           | Range DA                     |
 | **Branch D: Linux Pivot**     | 044, 048, 045, 047, 046          | —                                                                                                  | Domain creds                 |
 | **G — Post-Exploit**          | 082, 083, 084-089, 090, 091, 092 | —                                                                                                  | Blended inline               |
-| **Total**                     | **81**                           | —                                                                                                  | —                            |
+| **Total**                     | **94**                           | —                                                                                                  | —                            |
 
 
 ---

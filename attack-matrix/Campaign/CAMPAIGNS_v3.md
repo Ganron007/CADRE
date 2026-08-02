@@ -4,11 +4,11 @@
 > **Implements** `[docs/internal/plan01-telemetry-catalog/phase1-source-matrix/five-stream-merge.md](../../docs/internal/plan01-telemetry-catalog/phase1-source-matrix/five-stream-merge.md)` — the unified 100-attack pipeline.
 > **Per-attack metadata:** `[CAMPAIGNS-METADATA-v2.md](CAMPAIGNS-METADATA-v2.md)` — playbook refs, ACE#s, telemetry expectations.
 > **DFIR investigation bridge:** `[DFIR-Nexus-Pioneer-workflow.md](DFIR-Nexus-Pioneer-workflow.md)` — parallel attack + DFIR-Nexus case workflow (Phase 3.5 active).
-> **Index:** [`Runbooks/CAMPAIGNS-RUNBOOK-README.md`](Runbooks/CAMPAIGNS-RUNBOOK-README.md) · **Automation:** [`docs/internal/plan1.1-campaign-automation/`](../../docs/internal/plan1.1-campaign-automation/) · **Archive:** [`archive/CAMPAIGNS.md`](archive/CAMPAIGNS.md) (v2 index) · [`archive/CAMPAIGNS_v2.md`](archive/CAMPAIGNS_v2.md) (v2 monolith) · [`archive/CAMPAIGNS_v1_archived.md`](archive/CAMPAIGNS_v1_archived.md) (v1).
+> **Index:** [`Runbooks/CAMPAIGNS-RUNBOOK-README.md`](Runbooks/CAMPAIGNS-RUNBOOK-README.md) · **Automation:** [`docs/internal/plan1.1-campaign-automation/`](../../docs/internal/plan1.1-campaign-automation/) · **Archive:** [`archive/CAMPAIGNS.md`](archive/CAMPAIGNS.md) (archived v3 index) · [`archive/CAMPAIGNS_v2.md`](archive/CAMPAIGNS_v2.md) (v2 monolith) · [`archive/CAMPAIGNS_v1_archived.md`](archive/CAMPAIGNS_v1_archived.md) (v1).
 
 **94 campaign attacks + 14 E exercises + 10 F supply-chain scenarios = 118 total.**
 
-**Attack-flow reference (moved out for lightness):** [`CADRE CAMPAIGN v3 — COMPLETE ATTACK FLOW.md`](CADRE%20CAMPAIGN%20v3%20%E2%80%94%20COMPLETE%20ATTACK%20FLOW.md)
+**Attack-flow reference (moved out for lightness):** [`CAMPAIGNv3-ATTACK-FLOW.md`](CAMPAIGNv3-ATTACK-FLOW.md)
 
 > ### How to use v3 (read this first)
 

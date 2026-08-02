@@ -15,6 +15,7 @@ ROOT = Path(__file__).resolve().parents[1]
 CAMPAIGN = ROOT / "attack-matrix" / "Campaign"
 SRC = CAMPAIGN / "CAMPAIGNS_v3.md"
 RUNBOOKS = CAMPAIGN / "Runbooks"
+ARCHIVE = CAMPAIGN / "archive"
 
 HEADING_RE = re.compile(r"^(#{2,4})\s+(.+)$")
 
@@ -554,8 +555,8 @@ def main() -> None:
         sec = next(s for s in sections if s["file"] == spec[0])
         print(f"wrote {spec[0]} (L{sec['start']}-{sec['end']})")
 
-    (CAMPAIGN / "CAMPAIGNS.md").write_text(build_index(lines), encoding="utf-8")
-    print("wrote CAMPAIGNS.md (index)")
+    (ARCHIVE / "CAMPAIGNS.md").write_text(build_index(lines), encoding="utf-8")
+    print("wrote archive/CAMPAIGNS.md (index)")
 
     (RUNBOOKS / "CAMPAIGNS-RUNBOOK-README.md").write_text(build_readme(), encoding="utf-8")
     print("wrote CAMPAIGNS-RUNBOOK-README.md")
