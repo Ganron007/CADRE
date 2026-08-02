@@ -39,6 +39,7 @@
 | **Phase 3.5 — Credential Access** | Offensive DPAPI (Nemesis) | ✅ |
 | | ctfmon.exe Password Extraction | ✅ |
 | | LSASS Dump via WerFault | ✅ |
+| | ShadowDumper — LSASS dump without disk + in-memory cred extraction (PracSec 2026-06-29) | ⏳ |
 | | LAPS Extraction | ✅ |
 | | Windows Logon Types (credential location ref) | ✅ |
 | | Credential Guard Bypass (study ref) | ✅ |
@@ -127,7 +128,7 @@
 | | dirkjanm.io — AD/Azure Research Blog | — |
 | **Skip** | Don't Jump the Turnstile | ⏭️ |
 
-**Counts:** ✅ Adopted: 57 | ⏳ Pending: 44 | 🔬 Research: 4 | ⏭️ Skip: 1 | 📋 Tracked: 1 | Reference: 3 | **Total: 110**
+**Counts:** ✅ Adopted: 57 | ⏳ Pending: 45 | 🔬 Research: 4 | ⏭️ Skip: 1 | 📋 Tracked: 1 | Reference: 3 | **Total: 111**
 
 ---
 

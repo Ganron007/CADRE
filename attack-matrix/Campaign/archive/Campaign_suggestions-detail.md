@@ -3681,6 +3681,59 @@ Remove-MpPreference -ExclusionProcess "mimikatz.exe"
 
 ---
 
+## ShadowDumper — LSASS Dump Without Touching Disk (Practical Security Analytics, 2026-06-29)
+
+**Source:** [Dumping LSASS Without Touching Disk: Improvements to ShadowDumper](https://practicalsecurityanalytics.com/dumping-lsass-without-touching-disk-improvements-to-shadowdumper/) by pracsec (Michael Lester), Practical Security Analytics, 2026-06-29. Reference tool: Offensive-Panda's [ShadowDumper](https://github.com/Offensive-Panda/ShadowDumper) — a collection of LSASS dump techniques (Mimikatz, UnhookSyscalls, Simple, Callbacks, Fork, Syscalls, Native, Stealth).
+
+### 116. ShadowDumper — LSASS Dump Without Touching Disk (Phase 3.5 alt + Track A) ⏳
+
+**Status:** ⏳ NEW (2026-08-02). Source: PracSec 2026-06-29 + Offensive-Panda/ShadowDumper. Phase 3.5 Credential Access alternative + Track A (hardened variant) candidate.
+
+**Why relevant for CADRE:**
+- **Phase 3.5 (Credential Access)** — second-generation LSASS dump toolchain: alternative to verified `3.5F` (mimikatz sekurlsa — can fail on Server 2025 token privilege) and `3.5F-alt` (lsassy remote). The **Callbacks** (in-memory dump) and **Native** (hand-built MDMP via syscalls, no `dbghelp.dll`) techniques are directly relevant to **Track A (hardened variant)**.
+- **OPSEC without a C2:** dumps stay in memory or are GZip+XOR'd with per-run random keys — no recognizable MDMP/GZip on disk, no predictable path. Even with CADRE's Defender disabled, this shrinks the disk/exfil footprint vs the plaintext 75 MB dumps the campaign currently produces.
+- **In-memory credential extraction on target** — minidump parse → LSA key → per-SSP finders (MSV1_0, WDigest, Kerberos, TSpkg, SSP, LiveSSP, CredMan, CloudAP/PRT, DPAPI, RDP) → NT hash. Mimikatz-equivalent output without shipping the dump; pairs with DFIR-Nexus ingest (extracted creds, not dumps).
+
+**Improvements over original ShadowDumper (each is a detection lesson):**
+1. **Callbacks stay in memory** — `IoStartCallback` returns `S_FALSE` → dbghelp routes all writes through `IoWriteAllCallback`; throwaway handle (`FILE_ATTRIBUTE_TEMPORARY | FILE_FLAG_DELETE_ON_CLOSE`, zero bytes on disk); dynamic buffer (original's fixed 75 MB heap overflows on multi-session hosts). Original wrote the in-memory buffer back to `C:\Users\Public\callback.elf` anyway.
+2. **Syscall numbers from on-disk `ntdll.dll`** — original resolves via SysWhispers3 runtime scan of the in-memory image (which EDRs inline-hook with `JMP`/`0xE9`); improvement maps the clean on-disk copy (`CreateFileMappingW`/`MapViewOfFile`), skips hooked stubs (first byte `!= 0x4C`), builds the 11-byte RWX stub, patches `mov eax, <syscall number>`.
+3. **Native technique without `dbghelp.dll`** — original `syscallsNative` loads `dbghelp.dll` (`SymInitializeW`/`EnumerateLoadedModulesW64`) — a high-confidence indicator in a process holding an LSASS handle. Improvement builds `SystemInfoStream`/`ModuleListStream`/`Memory64ListStream` via syscalls (`VirtualQueryEx`, `NtReadVirtualMemory`) + PEB/loader-table walk.
+4. **Dynamic key + compression** — original XOR collapsed to a single byte (`0x1C ^ 0x9C = 0x80`) leaving header `0xCD 0xC4 0xCD 0xD0` — trivially signaturizable. Improvement: GZip first (destroys MDMP magic → `1F 8B`), then XOR with a random per-run DWORD key. No MDMP/GZip header, undecodable without the key; mitigated Defender `Trojan:Win32/LsassDump.A` (fires on a memory structure in the plaintext dump).
+5. **No hardcoded paths** — original: `C:\Users\Public\{callback.elf, panda.raw, sysMDWD.file, panda.sense}`. Improvement: caller-supplied path + random default filename.
+
+**MITRE ATT&CK mapping:** T1003.001 (OS Credential Dumping: LSASS Memory) · T1055 (Process Injection — RWX stub allocation) · T1562.001 (Impair Defenses — GZip/XOR signature mitigation).
+
+**Detections (for plan1.7 §17 — held):**
+- File writes to `C:\Users\Public\` with MDMP magic (`4D 44 4D 50`) or GZip magic (`1F 8B`)
+- `dbghelp.dll` module load into a process that has opened an LSASS handle
+- Sysmon EID 10 (ProcessAccess) on `lsass.exe` from a non-standard process (existing rule)
+- Sysmon EID 25 (ProcessTampering) / inline-hook `0xE9` on `ntdll.dll` stubs
+- Defender/AV: `Trojan:Win32/LsassDump.A` on plaintext dumps (validated in the article)
+- No reliable network signature for the in-memory path; exfil detection only if the ~75 MB dump is shipped (anomalous outbound volume)
+
+**Test plan (Phase 3.5 — gated on staging):**
+1. Build/stage ShadowDumper on ws01/mbr01 (Visual Studio build or standalone release) → `C:\Windows\Temp\cadre-tools\` per the GodPotato staging convention, run as SYSTEM (Phase 3.5 context).
+2. **Callbacks** technique → confirm the dump is intercepted in-memory (throwaway handle stays 0 bytes).
+3. **Native** technique → confirm no `dbghelp.dll` load (ProcMon/ETW) and creds extractable.
+4. **Extract** path → compare LSA/SSP output with verified `3.5F` mimikatz output (expected: same secrets).
+5. Detect side: enable plan1.7 §17 rules (file-write to `C:\Users\Public\`, dbghelp-load, MDMP magic) → plaintext path fires, GZip+XOR path does not.
+6. Cleanup: remove staged tool + any dump artifacts.
+
+**Why supersedes nothing:** alternative/refinement of existing LSASS-dump primitives (`3.5F`, `3.5F-alt`, `3.5K`). SpecterInsight (author's commercial C2) is out of scope — we take the techniques + open-source ShadowDumper, not the implant.
+
+**Workflow note (2026-08-02):** Per user direction — added the article + ShadowDumper as Item #116. ⏳ Pending — needs tool staging on mbr01/ws01 before testing. Detection engineering held for plan1.7 §17.
+
+**Status legend for new item:** ⏳ Pending — Phase 3.5 LSASS-dump alternative + Track A (hardened variant) candidate.
+
+**Cross-references:**
+- Phase 3.5 `3.5F` (mimikatz, verified) · `3.5F-alt` (lsassy, #94) · `3.5K` (WerFault) · `3.5G` (DPAPI/Nemesis)
+- Track A — Hardened Environment Variant (syscall + in-memory + encrypted dump relevance)
+- plan1.7 §17 (held) — detection rules above
+- DFIR-Nexus — in-memory credential extraction pairs with the ingest pipeline
+- External reference (held) — add to `docs/internal/plan01-upgrades/external-references.md`
+
+---
+
 ## Next Actions / Parallel Tracks (After Campaign Verification)
 
 These are high-level tracks to pursue **after** the primary campaign (Phases 0-8 + Branches) is fully verified end-to-end. Do not start these until campaign validation is complete.
@@ -3905,5 +3958,7 @@ Phase 4-8: DCSync, RBCD, ADCS, forest trust (all work)
 *Last updated: 2026-06-24 (session 12) — Added item #108 Defender Exclusion via PowerShell (T1562.001) — Detect FYI by Alex Teixeira 2026-06-24. Side-by-side AI vs human KQL test: ChatGPT (GPT-5.5) errored, Claude (Sonnet 4.6) had 9/12 false-negatives, human 15-line query caught 12/12. **KQL patterns port to Elastic:** `arg_max(Timestamp, *)` → `top_hits`, `dcount(DeviceId)` for prevalence (NOT `count()`), `parse_json(AdditionalFields)["X"]` → `JsonProperty(winlog.event_data.X)`. **Meta-finding for CADRE-Strike + DFIR-Nexus:** AI generates "syntactically correct, semantically plausible-looking queries that are completely useless in practice" — use AI to review/improve human queries, not generate from scratch. Runtime `Add-MpPreference -ExclusionPath` as Phase 3 attack primitive; persistence via Group Policy as Phase 5. Counts: 97 → 98 items (24 ✅ / 55 ⏳ / 4 🔬 / 1 ⏭️ / 2 ref / 12 🆕). Tier 3: 32 → 33.*
 
 *Last updated: 2026-06-24 (session 11) — Added item #107 GitHub Actions Supply-Chain Attack Patterns (GMO Flatt Security blog Part 1, Sato 2026-06-24). Maps to Plan 0.8 expansion (F-11 cache poisoning + F-12 tag pollution analog) + Track H (CADRE-Strike defensive guardrails from cline incident). 3 attack patterns: vulnerable trigger injection (Ultralytics, nx), tag pollution + Imposter Commits (tj-actions, trivy), AI agent over-permissioning (cline — uses `anthropics/claude-code-action`). NOT in main AD spine. Counts: 96 → 97 items (24 ✅ / 54 ⏳ / 4 🔬 / 1 ⏭️ / 2 ref / 12 🆕).*
+
+*Last updated: 2026-08-02 — Added item #116 ShadowDumper — LSASS dump without touching disk (Practical Security Analytics / pracsec, 2026-06-29; reference tool Offensive-Panda/ShadowDumper). Phase 3.5 Credential Access alternative + Track A hardened-variant candidate: in-memory callback dump (S_FALSE + DELETE_ON_CLOSE throwaway handle), syscalls resolved from on-disk ntdll (beats EDR inline hooks), hand-built MDMP without dbghelp.dll, GZip+XOR with per-run random key (defeats Defender Trojan:Win32/LsassDump.A), no hardcoded paths, in-memory per-SSP credential extraction. Detection engineering held for plan1.7 §17. Counts: 110 → 111 items (57 ✅ / 45 ⏳ / 4 🔬 / 1 ⏭️ / 1 📋 / 3 ref).*
 
 *Last updated: 2026-06-25 (session 13) — **ebooks survey** of `CADRE-Courses/ebooks/` (75 .txt files). Survey methodology: term-frequency analysis for AD attack vocabulary + DFIR/detection keywords. **Findings:** 11 books identified as Tier 1+2 high-value new content (not duplicates of existing sources). 3 concrete techniques extracted as Items #109-111: **AMSI Bypass** (Gray Hat Hacking 6th Ed, 4 mentions — no other source covers), **DCShadow** (Applied Incident Response + Practical-Red-Teaming, 5+ mentions — inverse of DCSync), **Rubeus/Kerberoast/AS-REP cross-validation** (Practical-Red-Teaming + Gray Hat Hacking). **4 study refs as Items #112-115:** Practical AI Security (2025), Cyber Threat Hunting, Practical Threat Detection Engineering, Windows Internals Part 1 7th Ed. Tier 3 + skip list documented (programming/theory/compliance/wrong-domain). Items 109-111 add 3 new Phase 3/7 attack primitives + plan1.7 detection candidates. Counts: 98 → 102 items (24 ✅ / 59 ⏳ / 4 🔬 / 1 ⏭️ / 2 ref / 12 🆕). Tier 3: 33 → 40.*
