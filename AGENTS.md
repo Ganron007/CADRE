@@ -2,6 +2,13 @@
 
 > **Every session:** first read **`docs/internal/ACTIVE.md`** (which project / writer repo), then `docs/internal/registry.md` (multi-repo index), **`docs/internal/ecosystem-organization.md`** (tracking-doc tiers + proposed folder layout), `docs/internal/roadmap.md` (cross-plan status), and `docs/internal/DOC-MAP.md` (internal doc index). Then the relevant plan state doc.
 
+## Workspace Rigor Contract (read before lab work)
+
+- **Universal (all CADRE-Platform projects):** [`docs/internal/workspace-rigor-contract.md`](docs/internal/workspace-rigor-contract.md) — evidence-before-claims · no fabrication · multi-stage gates · human-approval boundary · target-as-data · honest reporting · verify-before-agreeing.
+- **CADRE-specific (this repo only):** [`docs/internal/cadre-lab-contract.md`](docs/internal/cadre-lab-contract.md) — modes (BUILD/SOLVE/HUNT/VALIDATE) · G0–G7 gates · ledgers bound to campaign docs · CADRE false-completion list. Do **not** apply it to non-CADRE repos.
+- **Umbrella tracker:** [`docs/internal/ACTIVE.md`](docs/internal/ACTIVE.md) — per-project status/next-action; update at session start/end.
+- **Layering rule:** most-specific layer wins for its domain; the universal layer always applies. Per-repo rules = each root's `AGENTS.md`.
+
 ## Architecture
 
 - **Entry point**: `cadre.py` (1435-line CLI — interactive menu + argparse subcommands)
