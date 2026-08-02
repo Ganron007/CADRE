@@ -229,7 +229,7 @@
 | 101 | WinRS lateral pivot ws01 -> mbr01 (T101) | ws01 | child\analyst_t1 / T13r_An@lyst! | ✅ Verified |
 | 3.5F | LSASS/SAM credential dump via mimikatz | SYSTEM on mbr01 | SYSTEM | ✅ Verified |
 | 3.5A | Winlogon plaintext credential extraction | SYSTEM on mbr01 | SYSTEM | ✅ Verified |
-| 3.5G | DPAPI via Nemesis | SYSTEM on mbr01 | SYSTEM | ⚠️ Partial 2026-08-03 |
+| 3.5G | DPAPI via Nemesis | SYSTEM on mbr01 | SYSTEM | ✅ VERIFIED 2026-08-03 (end-to-end) |
 | 3.5H | ctfmon.exe password extraction | SYSTEM on mbr01 | SYSTEM | ⚠️ Partial 2026-08-03 |
 | 3.5I | Token impersonation | mbr01 | SYSTEM | ❌ Rejected |
 | 3.5B | Scheduled Task as analyst_cloud | mbr01 | analyst_cloud | ❌ Rejected for attack chain |
@@ -243,7 +243,7 @@
 
 - [x] **3.5F** mimikatz LSASS/SAM — surface check · attack run · telemetry captured · tracker updated
 - [x] **3.5A** Winlogon plaintext extraction — surface check · attack run · telemetry captured · tracker updated
-- [ ] **3.5G** DPAPI via Nemesis — surface check · attack run · telemetry captured · tracker updated
+- [x] **3.5G** DPAPI via Nemesis — surface check · attack run · telemetry captured · tracker updated
 - [ ] **3.5H** ctfmon.exe extraction — surface check · attack run · telemetry captured · tracker updated
 - [x] **3.5I** Token impersonation — surface check · attack run · telemetry captured · tracker updated
 - [x] **3.5B** Scheduled Task — **REJECTED as execution wrapper (Rule 2: scheduled tasks are persistence-only).** Not a campaign attack. SeBatchLogonRight retained as persistence-prerequisite surface only.

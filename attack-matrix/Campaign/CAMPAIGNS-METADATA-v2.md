@@ -475,7 +475,7 @@ We have `nt authority\system` on mbr01 via GodPotato. `analyst_cloud` has an act
 
 | Field | Value |
 |-------|-------|
-| **Status** | ⚠️ Partial 2026-08-03 (tool-compat) — **chain 80%:** domain DPAPI backup key EXTRACTED (`ntds_capi_0_73eeb965…` RSA PVK + `ntds_legacy_0_71f6589e…` 256B + DER + PFX) via mimikatz `lsadump::backupkeys /export` on dc01 (WinRM, DA); masterkeys ENUMERATED (Administrator / Administrator.CHILD / **analyst_cloud.CADRE** → `6a912b23…` / vagrant). Decryption blocked: SharpDPAPI 1.12.0 + latest throw `Bad Version of provider` importing keys (RSA + legacy, file + base64) — CSP/CryptoAPI quirk on Server 2025. Reopen: latest pypykatz (dpapi) or Nemesis with the extracted keys. |
+| **Status** | ✅ VERIFIED 2026-08-03 (end-to-end, CRTE SharpDPAPI 2026-02-02 build) — domain DPAPI backup key EXTRACTED via mimikatz `lsadump::backupkeys /export` on dc01 (WinRM, DA); **CRTE SharpDPAPI imports the PVK and decrypts cadre masterkeys** (Administrator `{07024635…}:624FE5B4…`, chief_command `{9cdd94c1…}:094F1372…`) → **real blobs decrypted on dc01**: Administrator Credential (WindowsLive PersistedCredential `DFBE70A7…`) + **Web Credentials Vault** (recovered `aes128`/`aes256` vault keys). The `Bad Version of provider` blocker was a **tool-version issue**, not a platform quirk. Tool: CRTE SharpDPAPI merged to ws01 `C:\Tools\ADTools\CRTE-2026\`. |
 | **Att&ck** | T1555 (Credentials from Password Stores) |
 | **Technique** | Nemesis 2.2+ automates DPAPI decryption chain — SYSTEM/user masterkeys → CNG keys → Chromium App-Bound encryption |
 | **What it does** | SYSTEM on mbr01 extracts DPAPI masterkeys for `analyst_cloud` → Nemesis decrypts Chromium App-Bound cookies, saved RDP file credentials, Outlook cached creds, WiFi passwords. |
