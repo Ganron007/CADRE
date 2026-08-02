@@ -530,7 +530,9 @@ The campaign now begins with a realistic initial-access vector against the domai
 
 **Outcome:** A low-privileged beachhead on `ws01` as `child.cadre.local\analyst_t1`. From this session the attacker can run Phase 0 reconnaissance tools from a domain-joined Windows host, discover `intern_blue` (DONT_REQUIRE_PREAUTH), and transition into Phase 1 (AS-REP roast).
 
-### H-01 — Malicious LNK
+> **VALIDATION (2026-08-03):** Delivery stack fully staged + 5/6 vectors verified live. Attacker = **provisioning** (`192.168.77.60`, HTTP `:8081` → `~/www`), target = **ws01** (`analyst_t1`). Artifacts hosted on provisioning:8081 (all HTTP 200): `Invoice.lnk` (H-01), `H-02-evil.msi` (H-02), `H-03-evil.chm` (H-03), `H-04-smuggle.html` (H-04), `payload.exe` (H-06), `AutoIt3.exe` (H-05). **Verified:** H-01 LNK, H-02 MSI (WiX → `msiexec` deferred CA), H-04 builder, H-05 AutoIt3, H-06 EXE — all executed `payload.exe` and hit marker `H-PAYLOAD|executed as CHILD\analyst_t1|WS01`. **H-03:** CHM builds (9306B) + Shortcut object content-verified, but execution blocked by **modern hh.exe ActiveX sandbox** (platform limit — same class as WT012 Rubeus PAC). Builder tooling (WiX/hhw/AutoIt3) staged manually on ws01 `C:\Tools\campaign-h\www\`; deploy/verify playbooks = `ansible/playbooks/19-initial-access.yml` + `-verifyOnly.yml`; automation = `attack-matrix/04-automation/campaign-h/` (wt063-068) + `attack-matrix/04-automation/linux/windows/wt-h-*` (orchestrator `wt-h-run-all.ps1`).
+
+### H-01 — Malicious LNK ✅ VERIFIED 2026-08-03
 
 | Field | Value |
 | --- | --- |
@@ -539,7 +541,7 @@ The campaign now begins with a realistic initial-access vector against the domai
 | **Expected telemetry** | Sysmon EID 1 (`powershell.exe` or `cmd.exe` child of `explorer.exe`), EID 11 (payload write to `%TEMP%`), EID 3 (HTTP egress to `192.168.77.60`), WinSec 4688, MDE `Suspicious LNK file` or `A malicious file was observed` alert, browser download artifact (`%USERPROFILE%\Downloads\*.lnk`), MOTW zone identifier on the LNK |
 | **Outcome** | User-context C2 on `ws01` |
 
-### H-02 — MSI Installer
+### H-02 — MSI Installer ✅ VERIFIED 2026-08-03
 
 | Field | Value |
 | --- | --- |
@@ -548,7 +550,7 @@ The campaign now begins with a realistic initial-access vector against the domai
 | **Expected telemetry** | Sysmon EID 1 (`msiexec.exe` / `msiserver` with `/i`, child `cmd.exe`/`powershell.exe`), EID 11/12, EID 3, WinSec 4688, MDE alert for `msiexec` network activity, MOTW on `.msi` |
 | **Outcome** | User-context C2 on `ws01` |
 
-### H-03 — Compiled HTML Help (.chm)
+### H-03 — Compiled HTML Help (.chm) ⚠️ BUILD+CONTENT VERIFIED / EXEC BLOCKED (hh.exe sandbox)
 
 | Field | Value |
 | --- | --- |
@@ -557,7 +559,7 @@ The campaign now begins with a realistic initial-access vector against the domai
 | **Expected telemetry** | Sysmon EID 1 (`hh.exe` spawning `cmd.exe`/`powershell.exe`), EID 11, EID 3, WinSec 4688, MDE `Suspicious HTML Help Execution`, MOTW on `.chm` |
 | **Outcome** | User-context C2 on `ws01` |
 
-### H-04 — HTML Smuggling
+### H-04 — HTML Smuggling ✅ BUILDER VERIFIED 2026-08-03
 
 | Field | Value |
 | --- | --- |
@@ -566,7 +568,7 @@ The campaign now begins with a realistic initial-access vector against the domai
 | **Expected telemetry** | Browser download history, Sysmon EID 11 (payload write to Downloads), EID 1 (payload execution), EID 3, MDE `HTML smuggling` or `Suspicious download`, MOTW zone identifier on downloaded file |
 | **Outcome** | User-context C2 on `ws01` |
 
-### H-05 — AutoIt3
+### H-05 — AutoIt3 ✅ VERIFIED 2026-08-03
 
 | Field | Value |
 | --- | --- |
@@ -575,7 +577,7 @@ The campaign now begins with a realistic initial-access vector against the domai
 | **Expected telemetry** | Sysmon EID 1 (`AutoIt3.exe` or compiled AutoIt payload with network child), EID 11, EID 3, WinSec 4688, MDE `Suspicious AutoIt execution`, MOTW on dropped file |
 | **Outcome** | User-context C2 on `ws01` |
 
-### H-06 — Malicious EXE
+### H-06 — Malicious EXE ✅ VERIFIED 2026-08-03
 
 | Field | Value |
 | --- | --- |

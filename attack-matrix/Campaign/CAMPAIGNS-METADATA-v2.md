@@ -73,15 +73,15 @@
 
 | Field | Value |
 |-------|-------|
-| **Status** | 🔨 Active |
+| **Status** | ✅ Verified 2026-08-03 (5/6 live; H-03 build+content verified, exec platform-blocked) |
 | **Stream** | Initial Access (ws01 beachhead) |
 | **Att&ck** | T1566.001 (Spearphishing Attachment) / T1204.002 (User Execution: Malicious File) |
 | **Technique** | File-based execution vectors against `ws01` / `analyst_t1` |
 | **What it does** | Six realistic phishing/file-delivery techniques (LNK, MSI, CHM, HTML smuggling, AutoIt3, EXE) establish a user-context C2 beachhead on `ws01`. |
-| **Playbook** | `17-ws01-deploy.yml` — deploys `ws01` domain join, MDE P2, Elastic Agent, Sysmon, DFIR baseline |
-| **Prerequisite** | `ws01` domain-joined; MDE P2 Healthy; Elastic Agent Healthy under `CADRE-WS01` policy; Kali reachable at `192.168.77.60` |
+| **Playbook** | `19-initial-access.yml` + `-verifyOnly.yml` — stages H artifacts on provisioning `~/www` + HTTP :8081 + ws01 staging dir |
+| **Prerequisite** | `ws01` domain-joined; MDE P2 Healthy; Elastic Agent Healthy under `CADRE-WS01` policy; provisioning reachable at `192.168.77.60:8081` |
 | **Target AD object** | `CN=analyst_t1,OU=WS01-MDE,DC=child,DC=cadre,DC=local` (user) |
-| **Source machine** | Kali (`192.168.77.60`) or internal phishing delivery host |
+| **Source machine** | provisioning (`192.168.77.60`, HTTP :8081) — ONLY branch where provisioning is attacker + ws01 is target |
 | **Target machine** | `ws01` (`192.168.77.62`) |
 | **Domain joined?** | Yes (`child.cadre.local`) |
 | **Domain** | `child.cadre.local` |
@@ -97,7 +97,7 @@
 | Field | Value |
 |-------|-------|
 | **WT#** | 063 (relocated to Phase 0.5) |
-| **Status** | ⏳ Not yet tested |
+| **Status** | ✅ VERIFIED 2026-08-03 — Invoice.lnk (1793B) built on ws01; simulated click → marker `H-PAYLOAD|executed as CHILD\analyst_t1|WS01`; hosted provisioning:8081 |
 | **Att&ck** | T1204.002 |
 | **Technique** | `.lnk` with crafted `Target` field invokes `powershell.exe` to download second stage |
 | **What it does** | User double-clicks LNK; `explorer.exe` spawns `powershell.exe -w hidden` which downloads `stager.ps1` from Kali and executes it. |
@@ -118,7 +118,7 @@
 | Field | Value |
 |-------|-------|
 | **WT#** | 064 (relocated to Phase 0.5) |
-| **Status** | ⏳ Not yet tested |
+| **Status** | ✅ VERIFIED 2026-08-03 — WiX candle+light → H-02-evil.msi (32768B); `msiexec /i /qn` → deferred CA (After=InstallFiles, ICE77 fix) ran payload → marker; hosted provisioning:8081 |
 | **Att&ck** | T1218.007 |
 | **Technique** | Weaponized `.msi` custom action launches reverse shell or downloader |
 | **What it does** | `msiexec.exe /i` runs a custom action that executes a payload, yielding user-context code execution. |
@@ -139,7 +139,7 @@
 | Field | Value |
 |-------|-------|
 | **WT#** | 065 (relocated to Phase 0.5) |
-| **Status** | ⏳ Not yet tested |
+| **Status** | ⚠️ BUILD+CONTENT VERIFIED 2026-08-03 — hhc compiled CHM (9306B); decompile confirms Shortcut object + `cmd.exe /c payload.exe`; execution blocked by modern hh.exe ActiveX sandbox (platform limit, same class as WT012) |
 | **Att&ck** | T1218.001 |
 | **Technique** | `.chm` `Shortcut`/`object` tag invokes `cmd.exe` / `powershell.exe` from `hh.exe` |
 | **What it does** | HTML Help viewer executes embedded payload, spawning a hidden shell. |
@@ -160,7 +160,7 @@
 | Field | Value |
 |-------|-------|
 | **WT#** | 066 (relocated to Phase 0.5) |
-| **Status** | ⏳ Not yet tested |
+| **Status** | ✅ BUILDER VERIFIED 2026-08-03 — wt066-html-smuggling.py produced H-04-smuggle.html (5883B) with 4096B payload embedded; hosted provisioning:8081; browser detonation = user practice (Rule 3) |
 | **Att&ck** | T1027.006 |
 | **Technique** | JavaScript assembles blob/executable client-side and triggers download |
 | **What it does** | Browser opens malicious HTML; JS builds an executable from a base64 blob and downloads it, evading simple attachment filters. |
@@ -181,7 +181,7 @@
 | Field | Value |
 |-------|-------|
 | **WT#** | 067 (relocated to Phase 0.5) |
-| **Status** | ⏳ Not yet tested |
+| **Status** | ✅ VERIFIED 2026-08-03 — AutoIt3.exe (980064B) + au3 script pulled from provisioning:8081 → executed → marker `H-PAYLOAD|executed as CHILD\analyst_t1|WS01` |
 | **Att&ck** | T1059.005 |
 | **Technique** | Compiled or interpreted AutoIt3 script downloads and runs second stage |
 | **What it does** | `AutoIt3.exe` or compiled AutoIt binary executes a script that downloads `stager.ps1` and runs it in a hidden shell. |
@@ -202,7 +202,7 @@
 | Field | Value |
 |-------|-------|
 | **WT#** | 068 (relocated to Phase 0.5) |
-| **Status** | ⏳ Not yet tested |
+| **Status** | ✅ VERIFIED 2026-08-03 — payload.exe (4096B) downloaded from provisioning:8081 → executed → marker (22:35:19 UTC) |
 | **Att&ck** | T1204.002 |
 | **Technique** | Executable payload (C2 stager) delivered as fake update or viewer |
 | **What it does** | User runs `Update.exe`; it connects back to Kali, giving a reverse shell. |

@@ -27,7 +27,7 @@
 
 | Phase / Branch | Total | ✅ Done | ⚠️ Partial | ⏳ Pending | 🔬 Deferred | ❌ Invalid |
 |---|---|---:|---:|---:|---:|---:|
-| Phase 0.5 / H (initial access) | 6 | 0 | 0 | 6 | 0 | 0 |
+| Phase 0.5 / H (initial access) | 6 | 5 | 1 | 0 | 0 | 0 |
 | Phase 0 Recon | 4 | 3 | 0 | 0 | 0 | 1 |
 | Phase 0/1 Fallback (WT031) | 1 | 1 | 0 | 0 | 0 | 0 |
 | Phase 1 — AS-REP Roast | 1 | 1 | 0 | 0 | 0 | 0 |
@@ -51,17 +51,18 @@
 | **Branch E** — Network Defense (attack sims WT069-081 + E-10) | 14 | 14 | 0 | 0 | 0 | 0 |
 | **Branch F** — Supply Chain | 13 | 9 | 1 | 0 | 3 | 0 |
 | **Branch G** — CVE-2026-41089 | 1 | 0 | 0 | 1 | 0 | 0 |
-| **TOTAL** | **119** | **77** | **9** | **16** | **11** | **6** |
+| **TOTAL** | **119** | **82** | **10** | **10** | **11** | **6** |
 
 **Rollup notes (2026-08-02, updated 2026-08-03):**
-- **76 items attack-side verified** — full AD spine (Phases 0-8), **Branch A 100%**, **Branch B** (ESC1/2/3/4/7/9 + UnPAC + **WT109 ESC16 config state**), **Branch D 100%**, **Branch C exec chain** (WT037/038/039 FULL EXEC), **Branch E attack sims** (14), Branch F linux scenarios (9). **Post-DA (2026-08-03):** WT097 KDS root key, WT098 gMSA prereqs, WT101 DSRM hash (Rule 3 — extraction), WT105 COM hijack, WT106 IFEO. **Batch 2 (2026-08-03):** WT011 Silver (real-service c$ via impacket `-k`), 3.5D File detonation (SYSTEM drop to analyst_cloud Downloads + active console session). **Push-2 (2026-08-03):** **3.5K LSASS extraction VERIFIED** (procdump 62MB dump + Rubeus dump → analyst_cloud/MBR01$/cross-domain tickets).
+- **76 items attack-side verified** — full AD spine (Phases 0-8), **Branch A 100%**, **Branch B** (ESC1/2/3/4/7/9 + UnPAC + **WT109 ESC16 config state**), **Branch D 100%**, **Branch C exec chain** (WT037/038/039 FULL EXEC), **Branch E attack sims** (14), Branch F linux scenarios (9). **Post-DA (2026-08-03):** WT097 KDS root key, WT098 gMSA prereqs, WT101 DSRM hash (Rule 3 — extraction), WT105 COM hijack, WT106 IFEO. **Batch 2 (2026-08-03):** WT011 Silver (real-service c$ via impacket `-k`), 3.5D File detonation (SYSTEM drop to analyst_cloud Downloads + active console session). **Push-2 (2026-08-03):** **3.5K LSASS extraction VERIFIED** (procdump 62MB dump + Rubeus dump → analyst_cloud/MBR01$/cross-domain tickets). **Campaign H (2026-08-03):** H-01 LNK, H-02 MSI, H-05 AutoIt3, H-06 EXE **VERIFIED live on ws01** (provisioning:8081 → ws01 download → execute → marker `H-PAYLOAD|executed as CHILD\analyst_t1|WS01`); H-04 HTML-smuggling builder verified (H-04-smuggle.html produced); H-03 CHM **build+content verified** (9306B, Shortcut object embedded) but execution blocked by modern hh.exe ActiveX sandbox (platform limit).
 - **9 partial:** 3.5C (RDP script missing), **3.5G DPAPI (chain 80%: backup key + masterkeys extracted; SharpDPAPI decrypt `Bad Version of provider` on Server 2025)**, **3.5H ctfmon (running in session 1; comsvcs dump = 64KB stub — env; procdump/Rubeus path not re-run on ctfmon)**, **3.5J WMI sub (objects create+activate/5861, but permanent-sub delivery blocked on Server 2025 — `WITHIN` rejected 0x80041017 + `TargetInstance ISA` filters never match)**, **WT012 Diamond (process validated to PAC-forge fork; Rubeus 2.2.0 can't parse Server 2025 PAC — no newer prebuilt exists)**, WT035 (surface deep-verified, needs PXE client), WT036 (primitive verified, needs console device), F-05 (env-gated on public npm registry), **WT102 (DCShadow — env-blocked)**.
-- **16 pending:** H-01..06 (needs `19-initial-access.yml`), NTLMv1, 3.5L/N + **3.5O WT104/107**, WT096, **Post-DA WT099/103**, WT108, Branch G (Branch E/F detection validation tracked in `CHECKLIST.md`, telemetry stage).
+- **10 pending:** NTLMv1, 3.5L/N + **3.5O WT104/107**, WT096, **Post-DA WT099/103**, WT108, Branch G (Branch E/F detection validation tracked in `CHECKLIST.md`, telemetry stage).
 - **11 deferred:** WT021/022 (NTLM relay — no SMB coerce on Server 2025), WT094/095 (UnCanny/Onelogon), Skipjack, ESC8/11 (relay family), F-11..F-13 (held expansions), **WT100 (LAPS — not implemented, future suggestion)**, **3.5M (AAD Connect NOT deployed — no ADSync service on dc01; defer to Plan 11)**.
 - **6 invalid/rejected:** WT028 (SAMR null blocked), WT018/019/020 (coercion non-functional), 3.5B (scheduled-task execution — Rule 2), 3.5I (token impersonation, error 1346).
 - **Post-DA cluster validated 2026-08-03** — WT097/098/101 verified (extraction/prereqs, Rule 3: no cracking), WT100 deferred (LAPS not implemented), WT102 blocked (dcshadow env), WT099/103 pending (range.local / DPAPI-NG target).
 - **Batch 2 validated 2026-08-03** — WT011 silver + 3.5D verified; 3.5G/H/J/K partial (env/tool evidence documented); WT012 tool-blocked (Rubeus diamond stub); 3.5M deferred (not deployed); WT096/WT108 still gated (nxc / DCOMIllusionist not staged on ws01).
 - **Push-2 validated 2026-08-03** — **3.5K → ✅** (procdump 62MB dump + Rubeus dump live extraction); **3.5G → ⚠️ upgraded** (domain DPAPI backup key + masterkeys extracted; SharpDPAPI decrypt blocked); **WT012 → ⚠️ upgraded** (process validated to PAC-forge; Rubeus 2.2.0 vs Server 2025 PAC). Downloaded latest procdump, Rubeus (community 2.2.0), SharpDPAPI from internet (lab has NAT).
+- **Campaign H validated 2026-08-03** — **5/6 verified**: H-01 LNK, H-02 MSI (WiX → msiexec deferred CA), H-05 AutoIt3, H-06 EXE all executed payload.exe and hit the marker as `CHILD\analyst_t1`; H-04 HTML-smuggling builder verified. H-03 CHM builds (9306B) + content verified (Shortcut object embedded) but execution blocked by modern hh.exe ActiveX sandbox. Full delivery chain through provisioning:8081 HTTP server verified (all artifacts HTTP 200). H tooling fully staged on ws01 (`C:\Tools\campaign-h\www\`) + provisioning (`~/www`).
 - **Key env findings (Server 2025, mbr01):** WMI permanent event subscriptions register+activate but never deliver to consumer (temp subs work); `WITHIN` polling rejected (0x80041017); `TargetInstance ISA` WHERE never matches; **comsvcs MiniDump yields ~64-76KB stubs, but procdump `-ma` produces a real 62MB dump**; mimikatz 2.2.0 + pypykatz 0.3.15 cannot parse Server 2025 LSASS (procdump + Rubeus dump work); staged Rubeus.exe is obfuscated (diamond broken) — community 2.2.0 build works but cannot forge Server 2025 PAC; SharpDPAPI (1.12.0 + latest) throws `Bad Version of provider` importing DPAPI keys on Server 2025.
 - **Rule 3 (2026-08-03):** validation extracts hashes/keys/blobs + validates the process — password cracking/computation and mutating steps are the USER's practice, never a completion criterion. See `docs/internal/cadre-lab-contract.md`.
 - **Detection validation (Branch E/F)** tracked in `CHECKLIST.md` — deferred to the Plan 1 telemetry catalog stage (monitor `.55`).
@@ -99,12 +100,12 @@
 
 | ID | Attack | Source Machine | Credential | Status | Notes | Re-test Needed |
 |------|--------|----------------|------------|--------|-------|----------------|
-| H-01 | Malicious LNK (WT063) | Kali -> ws01 | User execution (analyst_t1 context) | ⏳ Not tested |  | Excluded from 2026-07-30 run; run from Kali with payload staged on ws01 |
-| H-02 | Malicious MSI (WT064) | Kali -> ws01 | User execution | ⏳ Not tested |  | Excluded |
-| H-03 | Compiled HTML Help (.chm) (WT065) | Kali -> ws01 | User execution | ⏳ Not tested |  | Excluded |
-| H-04 | HTML Smuggling (WT066) | Kali HTTP server -> ws01 | User execution | ⏳ Not tested |  | Excluded |
-| H-05 | AutoIt3 payload (WT067) | Kali -> ws01 | User execution | ⏳ Not tested |  | Excluded |
-| H-06 | Malicious EXE (WT068) | Kali -> ws01 | User execution | ⏳ Not tested |  | Excluded |
+| H-01 | Malicious LNK (WT063) | Kali -> ws01 | User execution (analyst_t1 context) | ✅ Verified 2026-08-03 | Invoice.lnk built on ws01 (1793B); simulated click → marker `H-PAYLOAD|executed as CHILD\analyst_t1|WS01`; artifact hosted on provisioning:8081 | Full chain (provisioning→ws01→execute) |
+| H-02 | Malicious MSI (WT064) | Kali -> ws01 | User execution | ✅ Verified 2026-08-03 | WiX build (candle+light, 32768B) → `msiexec /i /qn` → deferred CA ran payload → marker (22:38:10 UTC); ICE77 fixed via `After=InstallFiles` | Full chain; MSI hosted on provisioning:8081 |
+| H-03 | Compiled HTML Help (.chm) (WT065) | Kali -> ws01 | User execution | ⚠️ Build+content verified 2026-08-03 | hhc compiled CHM (9306B); decompile confirms Shortcut object + `cmd.exe /c payload.exe` embedded; execution blocked by modern hh.exe ActiveX sandbox (platform limit, same class as WT012) | Build side verified; exec = platform-blocked |
+| H-04 | HTML Smuggling (WT066) | Kali HTTP server -> ws01 | User execution | ✅ Verified 2026-08-03 | Builder produced H-04-smuggle.html (5883B) with 4096B payload embedded; hosted on provisioning:8081 | Builder verified; browser detonation = user practice (Rule 3) |
+| H-05 | AutoIt3 payload (WT067) | Kali -> ws01 | User execution | ✅ Verified 2026-08-03 | AutoIt3.exe (980064B) + au3 script pulled from provisioning:8081 → executed → marker `H-PAYLOAD|executed as CHILD\analyst_t1|WS01` | Full chain |
+| H-06 | Malicious EXE (WT068) | Kali -> ws01 | User execution | ✅ Verified 2026-08-03 | payload.exe (4096B) downloaded from provisioning:8081 → executed → marker (22:35:19 UTC) | Full chain |
 
 ## Phase 0 Recon
 
@@ -389,7 +390,7 @@
 3. **E exercises (E-01..14) — detection rule validation only** — attack side COMPLETE (13/13 WT069–081 + E-10 from `ws01`, 2026-08-02). Remaining: confirm rule fires on monitor VM once elk/monitor are online (telemetry phase).
 4. **F supply-chain — detection rule validation only** — environment ✅ VERIFIED on linux01 + mbr01 (2026-08-02) and linux01 attack side run (8/9 scenarios; scenario 4 env-gated on public-registry `npm install`). Remaining: confirm detection fires once monitor/elk are online (telemetry phase).
 5. **Branch G (CVE-2026-41089)** — snapshot DCs + verify dc02 patch level (UBR < 32772), then PoC from Kali.
-6. **H-01..06 (initial access)** — needs `19-initial-access.yml` (currently excluded per operator).
+6. **H-01..06 (initial access)** — **5/6 verified 2026-08-03** (H-01/02/04/05/06); H-03 build+content verified, execution platform-blocked (hh.exe ActiveX sandbox). Tooling staged: `19-initial-access.yml` drafted, artifacts hosted on provisioning:8081.
 
 ---
 *Generated from CAMPAIGNS-METADATA-v2.md and 2026-07-30 validation run.*
@@ -419,5 +420,5 @@
 | E-01..E-14 | E branch | Network defense exercises | ws01 (attack) / monitor (detect) | analyst_t1 / — | ✅ Attack side COMPLETE 2026-08-02 (WT069–081 + E-10) | Rule fire-confirmation + telemetry capture pending (telemetry phase, monitor `.55`). |
 | F-01..F-13 | F branch | npm supply-chain scenarios | linux01 (attack) / mbr01 (env) | — | ✅ Env verified + linux01 attack run 2026-08-02 (8/9; s4 env-gated) | Detection fire-confirmation + telemetry pending (telemetry phase). |
 | G | Branch G | CVE-2026-41089 | Kali | — | 🔬 Deferred | PoC present; depends on dc02 patch state. |
-| H-01..H-06 | Phase 0.5 | Initial access payloads | Kali/ws01 | — | ❌ Missing | No playbook stages payloads; needs `19-initial-access.yml`. |
+| H-01..H-06 | Phase 0.5 | Initial access payloads | Kali/ws01 | 19-initial-access.yml | ✅ 5/6 verified 2026-08-03 | Hosting: provisioning:8081 (Invoice.lnk, H-02-evil.msi, H-03-evil.chm, H-04-smuggle.html, payload.exe, AutoIt3.exe) |
 

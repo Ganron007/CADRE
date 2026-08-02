@@ -1,0 +1,96 @@
+---
+# TYPE: VERIFY-ONLY (read-only; rc=0=pass, rc=1=fail)
+# 19-initial-access-verifyOnly.yml — Campaign H delivery stack verification
+# Matches 19-initial-access.yml deploy state.
+#
+# Checks:
+#   provisioning: ~/www artifact presence + sizes + HTTP 200 on :8081 per artifact
+#   ws01: C:\Tools\campaign-h\www staging dir present
+#   ws01: H builder tooling inventory (informational; wix/hhw/AutoIt3 are manual-staged)
+
+- name: "provisioning — verify H artifacts + HTTP delivery"
+  hosts: provisioning
+  gather_facts: false
+  become: false
+  tasks:
+    - name: "Verify payload artifacts present with expected sizes"
+      ansible.builtin.stat:
+        path: "/home/vagrant/www/{{ item.name }}"
+      register: h_art
+      loop:
+        - { name: "payload.exe",       size: 4096 }
+        - { name: "Invoice.lnk",       size: 1793 }
+        - { name: "H-02-evil.msi",     size: 32768 }
+        - { name: "H-03-evil.chm",     size: 9306 }
+        - { name: "H-04-smuggle.html", size: 5883 }
+        - { name: "AutoIt3.exe",       size: 980064 }
+
+    - name: "Assert all artifacts present with matching size"
+      ansible.builtin.assert:
+        that:
+          - h_art.results | selectattr('stat', 'ne', None) | map(attribute='stat') | map(attribute='exists') | list | select('equalto', true) | list | length == 6
+          - h_art.results | selectattr('stat', 'ne', None) | map(attribute='stat') | map(attribute='size') | list | sort == [1793, 4096, 5883, 9306, 32768, 980064] | list
+        fail_msg: "H artifact presence/size mismatch on provisioning ~/www"
+        success_msg: "All 6 H artifacts present on provisioning ~/www"
+
+    - name: "Verify HTTP server :8081 listening"
+      ansible.builtin.command: "ss -ltn | grep ':8081 '"
+      register: h_listen
+      changed_when: false
+      failed_when: false
+
+    - name: "Assert :8081 listening"
+      ansible.builtin.assert:
+        that:
+          - h_listen.stdout | length > 0
+        fail_msg: "python3 http.server :8081 not listening on provisioning"
+        success_msg: "HTTP :8081 listening on provisioning"
+
+    - name: "HTTP 200 check per artifact (from provisioning itself)"
+      ansible.builtin.command: "curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:8081/{{ item }}"
+      register: h_http
+      loop:
+        - "payload.exe"
+        - "Invoice.lnk"
+        - "H-02-evil.msi"
+        - "H-03-evil.chm"
+        - "H-04-smuggle.html"
+        - "AutoIt3.exe"
+      changed_when: false
+
+    - name: "Assert every artifact returns HTTP 200"
+      ansible.builtin.assert:
+        that:
+          - h_http.results | map(attribute='stdout') | map('trim') | list | select('equalto', '200') | list | length == 6
+        fail_msg: "One or more H artifacts did not return HTTP 200 from :8081"
+        success_msg: "All 6 H artifacts served HTTP 200 from provisioning:8081"
+
+- name: "ws01 — verify H staging dir + tooling inventory"
+  hosts: ws01
+  gather_facts: false
+  tasks:
+    - name: "Verify C:\\Tools\\campaign-h\\www exists"
+      ansible.windows.win_stat:
+        path: "C:\\Tools\\campaign-h\\www"
+      register: h_dir
+
+    - name: "Assert staging dir present"
+      ansible.builtin.assert:
+        that:
+          - h_dir.stat is defined and h_dir.stat.exists
+        fail_msg: "ws01 C:\\Tools\\campaign-h\\www missing"
+        success_msg: "ws01 C:\\Tools\\campaign-h\\www present"
+
+    - name: "H tooling inventory (informational)"
+      ansible.windows.win_shell: |
+        $www = 'C:\Tools\campaign-h\www'
+        "WIX_CANDLE=$(Test-Path "$www\wix\candle.exe")"
+        "HHW_HHC=$(Test-Path "$www\hhw\hhc.exe")"
+        "AUTOIT3=$(Test-Path "$www\AutoIt3.exe")"
+      register: h_tools
+      changed_when: false
+      failed_when: false
+
+    - name: "Show H tooling inventory"
+      ansible.builtin.debug:
+        var: h_tools.stdout_lines

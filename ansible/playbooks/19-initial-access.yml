@@ -1,0 +1,100 @@
+---
+# TYPE: DEPLOY (rc=0=skip, rc=2=applied+verified, rc=1=fail)
+# 19-initial-access.yml — Campaign H (WT063-068) initial-access delivery stack
+# Topology: provisioning (.60 = attacker, HTTP :8081) -> ws01 (.62 = target, analyst_t1)
+# This is the ONLY branch where provisioning is the attacker and ws01 is the target.
+#
+# What this stages:
+#   1. provisioning: H payload artifacts in ~/www (served over HTTP :8081)
+#   2. provisioning: idempotent python3 http.server :8081 (nohup, log to ~/www-server.log)
+#   3. ws01: C:\Tools\campaign-h\www\ staging dir (delivery/test root)
+#
+# What this does NOT stage (third-party binaries, obtained manually per session):
+#   - WiX (candle.exe/light.exe, wix314-binaries.zip) -> ws01 C:\Tools\campaign-h\www\wix\
+#   - HTML Help Workshop (hhc.exe via htmlhelp.exe + 7-Zip) -> ws01 ...\hhw\
+#   - AutoIt3.exe (portable) -> ws01 ...\www\
+#   - python3 on ws01 (already present, 3.12.8) for wt066-html-smuggling.py
+#   These are documented in docs/sccm-integration-guide.md-style H staging notes and in
+#   the H runbook. Builder scripts live in attack-matrix/04-automation/campaign-h/.
+#
+# Verify counterpart: 19-initial-access-verifyOnly.yml
+# Source of truth: live H validation 2026-08-03 (5/6 verified, H-03 build+content verified).
+
+- name: "provisioning — stage H payload artifacts into ~/www"
+  hosts: provisioning
+  gather_facts: false
+  become: true
+  tasks:
+    - name: "Ensure ~/www webroot exists"
+      ansible.builtin.file:
+        path: "/home/vagrant/www"
+        state: directory
+        owner: vagrant
+        group: vagrant
+        mode: "0755"
+
+    - name: "Copy H payload artifacts (idempotent, checksum-guarded)"
+      ansible.builtin.copy:
+        src: "{{ item }}"
+        dest: "/home/vagrant/www/{{ item | basename }}"
+        owner: vagrant
+        group: vagrant
+        mode: "0644"
+      loop:
+        - "campaign-h/payload.exe"        # 4096B marker exe (writes C:\Windows\Temp\H-PAYLOAD-MARKER.txt)
+        - "campaign-h/Invoice.lnk"        # H-01 malicious LNK (cmd /c payload.exe)
+        - "campaign-h/H-02-evil.msi"      # H-02 WiX MSI (deferred CA runs payload)
+        - "campaign-h/H-03-evil.chm"      # H-03 CHM (Shortcut object; exec blocked on modern hh.exe)
+        - "campaign-h/H-04-smuggle.html"  # H-04 HTML-smuggling page (embedded payload)
+
+- name: "provisioning — ensure HTTP delivery server on :8081"
+  hosts: provisioning
+  gather_facts: false
+  become: false
+  tasks:
+    - name: "Check if python3 http.server :8081 is already listening"
+      ansible.builtin.command: "ss -ltn | grep -c ':8081 '"
+      register: h_listen
+      changed_when: false
+      failed_when: false
+
+    - name: "Start python3 http.server :8081 (nohup, from ~/www)"
+      ansible.builtin.shell: >
+        cd /home/vagrant/www
+        && nohup python3 -m http.server 8081 --bind 0.0.0.0 > /home/vagrant/www-server.log 2>&1 &
+      args:
+        executable: /bin/bash
+      when: h_listen.stdout | int == 0
+
+    - name: "Wait for :8081 to accept connections"
+      ansible.builtin.wait_for:
+        port: 8081
+        host: 127.0.0.1
+        timeout: 10
+      when: h_listen.stdout | int == 0
+
+- name: "ws01 — ensure Campaign H staging root"
+  hosts: ws01
+  gather_facts: false
+  tasks:
+    - name: "Ensure C:\\Tools\\campaign-h\\www exists"
+      ansible.windows.win_file:
+        path: "C:\\Tools\\campaign-h\\www"
+        state: directory
+
+    - name: "Report H tooling presence (informational, non-fatal)"
+      ansible.windows.win_shell: |
+        $www = 'C:\Tools\campaign-h\www'
+        $rows = @()
+        $rows += "WIX_CANDLE $(Test-Path "$www\wix\candle.exe")"
+        $rows += "HHW_HHC $(Test-Path "$www\hhw\hhc.exe")"
+        $rows += "AUTOIT3 $(Test-Path "$www\AutoIt3.exe")"
+        $rows += "PYTHON $(Test-Path 'C:\Users\analyst_t1.CHILD\AppData\Local\Programs\Python\Python312\python.exe')"
+        $rows | ForEach-Object { Write-Output $_ }
+      register: h_tools
+      changed_when: false
+      failed_when: false
+
+    - name: "Show H tooling inventory"
+      ansible.builtin.debug:
+        var: h_tools.stdout_lines
