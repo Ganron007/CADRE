@@ -20,16 +20,22 @@
 
 ## Lab Access
 
-When running live campaign attacks, **use the Vagrant-injected SSH key**, not the `vagrant` password, to reach `provisioning` (`.60`). Vagrant boxes ship with an insecure key that the `vagrant` CLI configures automatically; if you invoke `ssh` directly you must point it at the generated private key.
+**Verified SSH keys (2026-08-03)** — dedicated keys live in `C:\Users\Ganro\.ssh\`. The Vagrant-generated per-VM key (`C:\Users\<user>\.vagrant\machines\provisioning\vmware_desktop\private_key`) does **not** exist on this host — use the keys below.
 
-Default paths:
-- Insecure Vagrant key: `C:\Users\<user>\.vagrant.d\insecure_private_key`
-- Per-VM generated key: `C:\Users\<user>\.vagrant\machines\provisioning\vmware_desktop\private_key`
+| Target | User@Host | Key |
+|---|---|---|
+| **ws01** (beachhead / Campaign H target) | `analyst_t1@192.168.77.62` | `C:\Users\Ganro\.ssh\cadre-ws01-key` |
+| **provisioning** (Kali attacker / Campaign H source) | `vagrant@192.168.77.60` | `C:\Users\Ganro\.ssh\cadre-provisioning-key` |
+| RevEng lab `.42` | — | `C:\Users\Ganro\.ssh\cadre-77.42-key` |
+| Eva7ion build01 | — | `C:\Users\Ganro\.ssh\cadre-eva7ion-build01-key` |
 
-Confirmed working direct SSH (when Vagrant key insertion is disabled):
+Confirmed working direct SSH (passwordless):
 ```powershell
-sshpass -p "vagrant" ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=NUL vagrant@192.168.77.60 "<command>"
+ssh -i C:\Users\Ganro\.ssh\cadre-ws01-key analyst_t1@192.168.77.62 "<command>"          # ws01
+ssh -i C:\Users\Ganro\.ssh\cadre-provisioning-key vagrant@192.168.77.60 "<command>"     # provisioning
 ```
+
+Fallback for provisioning (key not inserted): `sshpass -p "vagrant" ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=NUL vagrant@192.168.77.60 "<command>"`.
 
 Use `vagrant ssh provisioning` (from the `Vagrantfile` directory) when available — it resolves the correct key automatically.
 
