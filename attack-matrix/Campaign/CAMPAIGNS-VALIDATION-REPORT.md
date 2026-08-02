@@ -23,7 +23,7 @@
 ## Campaign Status Rollup (2026-08-02)
 
 > **Legend:** ✅ done/verified (attack side) · ⚠️ partial (env-gated / primitive-only / script-runs) · ⏳ pending (not exercised / detection validate / needs prerequisite) · 🔬 deferred (decision) · ❌ invalid/rejected (non-functional / rejected methodology).
-> **Stream E split:** attack sims (WT069-081 + E-10) = 14 rows ✅ complete; the E-01..E-14 rows are the **detection-validation tracker** (pending — Plan 1 telemetry stage). **Stream F:** attack side validated on linux01 (9 rows ✅ / 1 ⚠️ env-gated); detection + mbr01 pending.
+> **Branch E split:** attack sims (WT069-081 + E-10) = 14 rows ✅ complete; the E-01..E-14 rows are the **detection-validation tracker** (pending — Plan 1 telemetry stage). **Branch F:** attack side validated on linux01 (9 rows ✅ / 1 ⚠️ env-gated); detection + mbr01 pending.
 
 | Phase / Branch | Total | ✅ Done | ⚠️ Partial | ⏳ Pending | 🔬 Deferred | ❌ Invalid |
 |---|---|---:|---:|---:|---:|---:|
@@ -42,21 +42,21 @@
 | Phase 6 — DCSync | 1 | 1 | 0 | 0 | 0 | 0 |
 | Phase 7 — Ticket forgery | 3 | 1 | 2 | 0 | 0 | 0 |
 | Phase 8 — Cross-forest | 2 | 2 | 0 | 0 | 0 | 0 |
-| Phase 8 / Branch C — SCCM | 5 | 3 | 2 | 0 | 0 | 0 |
 | Phase 8 Alt — Skipjack | 1 | 0 | 0 | 0 | 1 | 0 |
-| Branch A — ACL Abuse | 10 | 10 | 0 | 0 | 0 | 0 |
-| Branch B — ADCS | 8 | 7 | 0 | 0 | 1 | 0 |
-| Branch D — Linux Pivot | 6 | 6 | 0 | 0 | 0 | 0 |
-| Branch G — CVE-2026-41089 | 1 | 0 | 0 | 1 | 0 | 0 |
-| Stream E — Network Defense (attack sims WT069-081 + E-10) | 14 | 14 | 0 | 0 | 0 | 0 |
-| Stream E — Network Defense (detection validate E-01..E-14) | 14 | 0 | 0 | 14 | 0 | 0 |
-| Stream F — Supply Chain | 13 | 9 | 1 | 0 | 3 | 0 |
+| **Branch A** — ACL Abuse | 10 | 10 | 0 | 0 | 0 | 0 |
+| **Branch B** — ADCS | 8 | 7 | 0 | 0 | 1 | 0 |
+| **Branch C** — SCCM | 5 | 3 | 2 | 0 | 0 | 0 |
+| **Branch D** — Linux Pivot | 6 | 6 | 0 | 0 | 0 | 0 |
+| **Branch E** — Network Defense (attack sims WT069-081 + E-10) | 14 | 14 | 0 | 0 | 0 | 0 |
+| **Branch E** — Network Defense (detection validate E-01..E-14) | 14 | 0 | 0 | 14 | 0 | 0 |
+| **Branch F** — Supply Chain | 13 | 9 | 1 | 0 | 3 | 0 |
+| **Branch G** — CVE-2026-41089 | 1 | 0 | 0 | 1 | 0 | 0 |
 | **TOTAL** | **120** | **68** | **6** | **31** | **9** | **6** |
 
 **Rollup notes (2026-08-02):**
-- **68 items attack-side verified** — full AD spine (Phases 0-8), **Branch A 100%**, **Branch B** (ESC1/2/3/4/7/9 + UnPAC), **Branch D 100%**, **Branch C exec chain** (WT037/038/039 FULL EXEC), **Stream E attack sims** (14), F linux scenarios (9).
+- **68 items attack-side verified** — full AD spine (Phases 0-8), **Branch A 100%**, **Branch B** (ESC1/2/3/4/7/9 + UnPAC), **Branch D 100%**, **Branch C exec chain** (WT037/038/039 FULL EXEC), **Branch E attack sims** (14), Branch F linux scenarios (9).
 - **6 partial:** 3.5C (RDP script missing), WT011/012 (script runs, real-service verify pending), WT035 (surface deep-verified, needs PXE client), WT036 (primitive verified, needs console device), F-05 (env-gated on public npm registry).
-- **31 pending:** H-01..06 (needs `19-initial-access.yml`), NTLMv1, 3.5G/H/D/J/K/L/M/N, WT096, Branch G, **14 Stream E detection rows** + F detection/mbr01 (telemetry stage).
+- **31 pending:** H-01..06 (needs `19-initial-access.yml`), NTLMv1, 3.5G/H/D/J/K/L/M/N, WT096, Branch G, **14 Branch E detection rows** + Branch F detection/mbr01 (telemetry stage).
 - **9 deferred:** WT021/022 (NTLM relay — no SMB coerce on Server 2025), WT094/095 (UnCanny/Onelogon), Skipjack, ESC8/11 (relay family), F-11..F-13 (held expansions).
 - **6 invalid/rejected:** WT028 (SAMR null blocked), WT018/019/020 (coercion non-functional), 3.5B (scheduled-task execution — Rule 2), 3.5I (token impersonation, error 1346).
 - **Detection validation (E/F)** deferred to the Plan 1 telemetry catalog stage (monitor `.55`).
@@ -376,7 +376,7 @@
 
 > Updated: 2026-08-01 (ESC8 v5 + Branch A verified status + corrected ws01 tooling + **WT027 verified / all stale rows synced**)
 
-| ID | Stream | Attack | Source Machine | Credentials | Status | Re-test / Fix Notes |
+| ID | Branch | Attack | Source Machine | Credentials | Status | Re-test / Fix Notes |
 |---|---|---|---|---|---|---|
 | WT015 | Branch A | ACE#7 ForceChangePassword | ws01 | hunter_dfir / DF1R_Hunt3r! | ✅ VERIFIED 2026-07-31 | ACE#7 deployed + verified (`05-ad-attack-surface-verifyOnly.yml` 18/18); hunter_dfir reset chief_command pw via bloodyAD; restored. |
 | WT013 | Branch A | WriteDacl self-escalate | ws01 | chief_command / C0mm@nd_Ch1ef! | ✅ VERIFIED 2026-07-31 | `T013` → hunter_dfir GenericAll on CN=Command-Cadre; ACE read-back verified. |
@@ -394,8 +394,8 @@
 | WT053 | Branch B | UnPAC-the-Hash | ws01 | chief_command / C0mm@nd_Ch1ef! | ✅ VERIFIED 2026-08-01 | `certipy auth` → administrator NT hash. |
 | ESC2/4/7/9 | Branch B | ADCS ESC2/4/7/9 | ws01 | hunter_dfir / lead_engineering | ✅ VERIFIED 2026-08-01 | All verified — see Branch B body table. |
 | WT044..048 | Branch D | MSSQL / SSSD / keytab / NFS / podman | linux01 | mssql-linux01 pivot → root | ✅ VERIFIED 2026-08-01 | All verified — see Branch D body table. |
-| E-01..E-14 | E stream | Network defense exercises | ws01 (attack) / monitor (detect) | analyst_t1 / — | ✅ Attack side COMPLETE 2026-08-02 (WT069–081 + E-10) | Rule fire-confirmation + telemetry capture pending (telemetry phase, monitor `.55`). |
-| F-01..F-13 | F stream | npm supply-chain scenarios | linux01 (attack) / mbr01 (env) | — | ✅ Env verified + linux01 attack run 2026-08-02 (8/9; s4 env-gated) | Detection fire-confirmation + telemetry pending (telemetry phase). |
+| E-01..E-14 | E branch | Network defense exercises | ws01 (attack) / monitor (detect) | analyst_t1 / — | ✅ Attack side COMPLETE 2026-08-02 (WT069–081 + E-10) | Rule fire-confirmation + telemetry capture pending (telemetry phase, monitor `.55`). |
+| F-01..F-13 | F branch | npm supply-chain scenarios | linux01 (attack) / mbr01 (env) | — | ✅ Env verified + linux01 attack run 2026-08-02 (8/9; s4 env-gated) | Detection fire-confirmation + telemetry pending (telemetry phase). |
 | G | Branch G | CVE-2026-41089 | Kali | — | 🔬 Deferred | PoC present; depends on dc02 patch state. |
 | H-01..H-06 | Phase 0.5 | Initial access payloads | Kali/ws01 | — | ❌ Missing | No playbook stages payloads; needs `19-initial-access.yml`. |
 
