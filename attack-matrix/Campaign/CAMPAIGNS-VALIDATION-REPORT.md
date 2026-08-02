@@ -34,32 +34,33 @@
 | Phase 2 — Kerberoast | 1 | 1 | 0 | 0 | 0 | 0 |
 | Phase 2 Alt — NTLMv1 | 1 | 0 | 0 | 1 | 0 | 0 |
 | Phase 3 — SQL + GodPotato | 3 | 2 | 0 | 1 | 0 | 0 |
-| Phase 3.5 — Credential Theft | 18 | 3 | 1 | 12 | 0 | 2 |
+| Phase 3.5 — Credential Theft | 18 | 5 | 1 | 10 | 0 | 2 |
 | Phase 4 — Discovery | 1 | 1 | 0 | 0 | 0 | 0 |
 | Phase 5 — RBCD | 1 | 1 | 0 | 0 | 0 | 0 |
 | Phase 5 Coercion | 9 | 1 | 0 | 1 | 4 | 3 |
 | Phase 5 T102 (unconst. deleg.) | 1 | 1 | 0 | 0 | 0 | 0 |
 | Phase 6 — DCSync | 1 | 1 | 0 | 0 | 0 | 0 |
 | Phase 7 — Ticket forgery | 3 | 1 | 2 | 0 | 0 | 0 |
-| Post-DA — KDS/gMSA/DSRM cluster | 7 | 0 | 0 | 7 | 0 | 0 |
+| Post-DA — KDS/gMSA/DSRM cluster | 7 | 3 | 1 | 2 | 1 | 0 |
 | Phase 8 — Cross-forest | 2 | 2 | 0 | 0 | 0 | 0 |
 | Phase 8 Alt — Skipjack | 1 | 0 | 0 | 0 | 1 | 0 |
 | **Branch A** — ACL Abuse | 10 | 10 | 0 | 0 | 0 | 0 |
-| **Branch B** — ADCS | 9 | 7 | 0 | 1 | 1 | 0 |
+| **Branch B** — ADCS | 9 | 8 | 0 | 0 | 1 | 0 |
 | **Branch C** — SCCM | 5 | 3 | 2 | 0 | 0 | 0 |
 | **Branch D** — Linux Pivot | 6 | 6 | 0 | 0 | 0 | 0 |
 | **Branch E** — Network Defense (attack sims WT069-081 + E-10) | 14 | 14 | 0 | 0 | 0 | 0 |
 | **Branch F** — Supply Chain | 13 | 9 | 1 | 0 | 3 | 0 |
 | **Branch G** — CVE-2026-41089 | 1 | 0 | 0 | 1 | 0 | 0 |
-| **TOTAL** | **119** | **68** | **6** | **30** | **9** | **6** |
+| **TOTAL** | **119** | **74** | **7** | **22** | **10** | **6** |
 
-**Rollup notes (2026-08-02):**
-- **68 items attack-side verified** — full AD spine (Phases 0-8), **Branch A 100%**, **Branch B** (ESC1/2/3/4/7/9 + UnPAC), **Branch D 100%**, **Branch C exec chain** (WT037/038/039 FULL EXEC), **Branch E attack sims** (14), Branch F linux scenarios (9).
-- **6 partial:** 3.5C (RDP script missing), WT011/012 (script runs, real-service verify pending), WT035 (surface deep-verified, needs PXE client), WT036 (primitive verified, needs console device), F-05 (env-gated on public npm registry).
-- **30 pending:** H-01..06 (needs `19-initial-access.yml`), NTLMv1, 3.5G/H/D/J/K/L/M/N + **3.5O (WT104-107)**, WT096, **Post-DA cluster (WT097-103)**, WT108/109, Branch G (Branch E/F detection validation tracked in `CHECKLIST.md`, telemetry stage).
-- **9 deferred:** WT021/022 (NTLM relay — no SMB coerce on Server 2025), WT094/095 (UnCanny/Onelogon), Skipjack, ESC8/11 (relay family), F-11..F-13 (held expansions).
+**Rollup notes (2026-08-02, updated 2026-08-03):**
+- **74 items attack-side verified** — full AD spine (Phases 0-8), **Branch A 100%**, **Branch B** (ESC1/2/3/4/7/9 + UnPAC + **WT109 ESC16 config state**), **Branch D 100%**, **Branch C exec chain** (WT037/038/039 FULL EXEC), **Branch E attack sims** (14), Branch F linux scenarios (9). **Post-DA (2026-08-03):** WT097 KDS root key, WT098 gMSA prereqs, WT101 DSRM hash (Rule 3 — extraction), WT105 COM hijack, WT106 IFEO.
+- **7 partial:** 3.5C (RDP script missing), WT011/012 (script runs, real-service verify pending), WT035 (surface deep-verified, needs PXE client), WT036 (primitive verified, needs console device), F-05 (env-gated on public npm registry), **WT102 (DCShadow — env-blocked)**.
+- **22 pending:** H-01..06 (needs `19-initial-access.yml`), NTLMv1, 3.5G/H/D/J/K/L/M/N + **3.5O WT104/107**, WT096, **Post-DA WT099/103**, WT108, Branch G (Branch E/F detection validation tracked in `CHECKLIST.md`, telemetry stage).
+- **10 deferred:** WT021/022 (NTLM relay — no SMB coerce on Server 2025), WT094/095 (UnCanny/Onelogon), Skipjack, ESC8/11 (relay family), F-11..F-13 (held expansions), **WT100 (LAPS — not implemented, future suggestion)**.
 - **6 invalid/rejected:** WT028 (SAMR null blocked), WT018/019/020 (coercion non-functional), 3.5B (scheduled-task execution — Rule 2), 3.5I (token impersonation, error 1346).
-- **Post-DA cluster (WT097-103) + extensions (WT104-109) adopted 2026-08-02** — new items, all ⏳ not exercised (post-DA KDS/gMSA/dMSA/DSRM/DCShadow/DPAPI-NG; 3.5O persistence; DCOMIllusionist; ESC16).
+- **Post-DA cluster validated 2026-08-03** — WT097/098/101 verified (extraction/prereqs, Rule 3: no cracking), WT100 deferred (LAPS not implemented), WT102 blocked (dcshadow env), WT099/103 pending (range.local / DPAPI-NG target).
+- **Rule 3 (2026-08-03):** validation extracts hashes/keys/blobs + validates the process — password cracking/computation and mutating steps are the USER's practice, never a completion criterion. See `docs/internal/cadre-lab-contract.md`.
 - **Detection validation (Branch E/F)** tracked in `CHECKLIST.md` — deferred to the Plan 1 telemetry catalog stage (monitor `.55`).
 - **Future:** CADRE NPM-Chain upgrade designed (`plan1.8-offensive-upgrades.md` §11), not implemented.
 
@@ -161,7 +162,7 @@
 | 3.5L | LAPS extraction (3.5L) | dc01 | DA | ⏳ Not exercised | ms-Mcs-AdmPwd read | Yes |
 | 3.5M | Azure AD Connect DPAPI dump (3.5M) | dc01 | DA | ⏳ Not exercised | adconnectdump / MSOL credentials | Yes |
 | 3.5N | UnCanny LPE via InstallService (3.5N) | ws01 | local user | ⏳ Not exercised | Requires Developer Mode; deferred | Yes - after Developer Mode decision |
-| 104-107 | Persistence Extensions: DLL/COM/IFEO/LSA SSP (3.5O) | mbr01 (SYSTEM) | SYSTEM | ⏳ Not exercised | Host persistence set (WT104-107) | Yes |
+| 104-107 | Persistence Extensions: DLL/COM/IFEO/LSA SSP (3.5O) | mbr01 (SYSTEM) | SYSTEM | ⚠️ Partial — WT105/106 ✅, WT104/107 ⏳ | **WT105 COM hijack VERIFIED 2026-08-03** (SYSTEM plants `HKCU\Software\Classes\CLSID\{…}\InprocServer32` → attacker DLL; read-back + cleanup). **WT106 IFEO VERIFIED 2026-08-03** (Debugger → notepad → marker `WT106-IFEO`; cleanup). WT104 DLL-hijack needs a target app + WT107 SSP DLL need staging (audit §2.19 gaps). | WT104/107 - after staging |
 
 ## Phase 4
 
@@ -211,17 +212,17 @@
 
 ## Post-DA Sub-Phase — KDS/gMSA/dMSA Cluster (WT097-103)
 
-> Adopted 2026-08-02 — all ⏳ not exercised. Post-DA primitives (run with DA). See `CAMPAIGNS_v3.md` Post-DA sub-phase + `CAMPAIGNS-METADATA-v2.md`.
+> Adopted 2026-08-02; **validated 2026-08-03** (see row statuses). Post-DA primitives (run with DA). **Rule 3:** extraction + prerequisites = VERIFIED; password computation / mutating steps = user practice. See `CAMPAIGNS_v3.md` Post-DA sub-phase + `CAMPAIGNS-METADATA-v2.md`.
 
 | ID | Attack | Source Machine | Credential | Status | Notes | Re-test Needed |
 |------|--------|----------------|------------|--------|-------|----------------|
-| 097 | KDS Root Key Extraction (WT097) | ws01 / dc01 | DA (chief_command) | ⏳ Not exercised | Enabler for WT098/099/103 (KDS root key) | Yes |
-| 098 | Golden gMSA Attack (WT098) | ws01 | DA + ACE#10 (gmsaTools$) | ⏳ Not exercised | Offline gMSA password from KDS key | Yes |
-| 099 | Golden dMSA / BadSuccessor (WT099) | ws01 | DA + ACE#24 (dmsaPrivService$) | ⏳ Not exercised | Server 2025 dMSA offline compute | Yes |
-| 100 | LAPS Bulk Extraction (WT100) | ws01 | DA | ⏳ Not exercised | Domain-wide ms-Mcs-AdmPwd read | Yes |
-| 101 | DSRM Password Extract & Set (WT101) | dc01 | DA | ⏳ Not exercised | DC DSRM persistence | Yes |
-| 102 | DCShadow (WT102) | ws01 | DA + DRS | ⏳ Not exercised | DRS attribute push (inverse of DCSync) | Yes |
-| 103 | DPAPI-NG SID Protector Decryption (WT103) | ws01 | DA + WT097 | ⏳ Not exercised | BitLocker/PFX/DNSSEC/ASP.NET | Yes |
+| 097 | KDS Root Key Extraction (WT097) | ws01 / dc01 | DA (chief_command) | ✅ VERIFIED 2026-08-03 | 2 × 64-byte root-key blobs via LDAPS as chief_command — `ec8f491f-…` (2026-05-21) + `877a6c10-…` (2026-05-22); SP800_108_CTR_HMAC, DH, 512-bit private / 2048-bit public. Note: `Get-KdsRootKey` cmdlet returns null RootKeyData in this env — direct LDAP read is the reliable path. Enabler for WT098/099/103. | No |
+| 098 | Golden gMSA Attack (WT098) | ws01 | DA + ACE#10 (gmsaTools$) | ✅ VERIFIED 2026-08-03 (prereqs — Rule 3) | Prerequisites extracted: KDS key `877a6c10-…` (current-password key from pwdid), gMSA SID S-1-5-21-277764030-1371232215-1561074416-1131, msDS-ManagedPasswordId (L0/L1/L2 indices + RootKeyIdentifier + domain/forest). Offline password computation = user practice. Tool note: GoldenGMSA 1.0.1.0 expects the full `KDS_ROOT_KEY` structure; lab stores a 64-byte blob — use pyGoldenGMSA / SP800-108 impl. Live NT-hash oracle from WT024 (`0c81acad…`). | No |
+| 099 | Golden dMSA / BadSuccessor (WT099) | ws01 | DA + ACE#24 (dmsaPrivService$) | ⏳ Not exercised | Server 2025 dMSA offline compute — needs `range.local` (WT034 / ACE#24 `dmsaPrivService$`). Not in the 2026-08-03 batch. | Yes |
+| 100 | LAPS Bulk Extraction (WT100) | ws01 | DA | 🔬 DEFERRED — LAPS NOT implemented | Live check 2026-08-03: no `ms-Mcs-AdmPwd` (schema absent), no `msLAPS-Password` on any computer in child + root domains; no LAPS playbook. Future suggestion — needs LAPS deployment first. | No |
+| 101 | DSRM Password Extract & Set (WT101) | dc01 | DA | ✅ VERIFIED 2026-08-03 (extraction — Rule 3) | DSRM `Administrator:500` NT hash `81c3b6443f148bf73bb3499791f1eb7b` via secretsdump remote (SAM RID-500) — matches cadre.local Administrator hash (cross-validated via ESC1 UnPAC). `DsrmAdminLogonBehavior` absent on dc01 (default = DSRM network logon blocked). SET + logon-behavior enable = user practice (mutating). | No |
+| 102 | DCShadow (WT102) | ws01 | DA + DRS | ⛔ BLOCKED — env | mimikatz `lsadump::dcshadow` → "computer not found in AD 0x1" on ws01 in all contexts (native, chief_command TGT, child golden forge). Prerequisites validated: EA context, child/krbtgt `b6c370f2…` + child SID S-1-5-21-2616196951-1941128886-767624593 captured, target `intern_blue` + FakeDC `ws01` objects present. Reopen: run from same-domain/SYSTEM context or debug `kuhl_m_lsadump_dcshadow` computer query. | Yes - after fix |
+| 103 | DPAPI-NG SID Protector Decryption (WT103) | ws01 | DA + WT097 | ⏳ Not exercised | BitLocker/PFX/DNSSEC/ASP.NET — needs a DPAPI-NG protected-blob target staged (audit §2.19 gap). Not in the 2026-08-03 batch. | Yes |
 
 ## Phase 8
 

@@ -893,13 +893,13 @@ We have `nt authority\system` on mbr01 via GodPotato. `analyst_cloud` has an act
 
 ## Post-DA Sub-Phase — KDS/gMSA/dMSA Cluster + Extensions (WT097-109)
 
-> Adopted 2026-08-02 from `Campaign_suggestions.md` upgrade candidates (Tier 1/2). All items are post-exploitation primitives run with **Domain Admin**. Detection is host-side only (LSA-secret access / DPAPI blob reads) — no network signature. See `CAMPAIGNS_v3.md` "Post-DA Sub-Phase" + Branch 3.5O + Phase 3 alt + Branch B ESC16.
+> Adopted 2026-08-02; **validated 2026-08-03** (see row statuses). All items are post-exploitation primitives run with **Domain Admin**. Detection is host-side only (LSA-secret access / DPAPI blob reads) — no network signature. **Rule 3:** extraction + prerequisites = VERIFIED; password computation / mutating steps = user practice. See `CAMPAIGNS_v3.md` "Post-DA Sub-Phase" + Branch 3.5O + Phase 3 alt + Branch B ESC16.
 
 #### WT097 — KDS Root Key Extraction
 
 | Field | Value |
 |-------|-------|
-| **Status** | ⏳ Not exercised — post-DA |
+| **Status** | ✅ VERIFIED 2026-08-03 — 2 × 64-byte root-key blobs via LDAPS as DA (`ec8f491f-…` + `877a6c10-…`); SP800_108_CTR_HMAC, DH 512/2048. Note: `Get-KdsRootKey` cmdlet returns null RootKeyData in this env — direct LDAP read is the reliable path |
 | **Att&ck** | T1552 (Unsecured Credentials) |
 | **Technique** | Extract the KDS Root Key (`CN=Master Root Keys,CN=Group Key Distribution Service,CN=Services,CN=Configuration`) — master secret for gMSA/dMSA passwords + DPAPI-NG SID protectors |
 | **Prerequisite** | DA on `cadre.local` (`chief_command`) |
@@ -913,7 +913,7 @@ We have `nt authority\system` on mbr01 via GodPotato. `analyst_cloud` has an act
 
 | Field | Value |
 |-------|-------|
-| **Status** | ⏳ Not exercised — post-DA |
+| **Status** | ✅ VERIFIED 2026-08-03 (prereqs — Rule 3): KDS key `877a6c10-…` (from pwdid), gMSA SID S-1-5-21-277764030-1371232215-1561074416-1131, msDS-ManagedPasswordId (L0/L1/L2 + RootKeyIdentifier). Offline compute = user practice (pyGoldenGMSA / SP800-108; GoldenGMSA 1.0.1.0 expects full KDS_ROOT_KEY, lab stores 64-byte blob). NT-hash oracle from WT024 (`0c81acad…`) |
 | **Att&ck** | T1558 / T1552 |
 | **Technique** | Compute gMSA password offline from KDS root key + `msDS-ManagedPassword` blob |
 | **Prerequisite** | WT097 + blob read (Branch A ACE#10 — `eng_cloud` → `gmsaTools$`, verified WT024) |
@@ -941,7 +941,7 @@ We have `nt authority\system` on mbr01 via GodPotato. `analyst_cloud` has an act
 
 | Field | Value |
 |-------|-------|
-| **Status** | ⏳ Not exercised — post-DA |
+| **Status** | 🔬 DEFERRED 2026-08-03 — LAPS NOT implemented (no `ms-Mcs-AdmPwd` schema, no `msLAPS-Password`, no playbook). Future suggestion — needs LAPS deployment |
 | **Att&ck** | T1552.004 |
 | **Technique** | Bulk-read `ms-Mcs-AdmPwd` / `msLAPS-Password` via LDAP (domain-wide local-admin recovery) |
 | **Prerequisite** | DA; LAPS configured (mbr01 per `04-vulnerabilities.yml`) |
@@ -955,7 +955,7 @@ We have `nt authority\system` on mbr01 via GodPotato. `analyst_cloud` has an act
 
 | Field | Value |
 |-------|-------|
-| **Status** | ⏳ Not exercised — post-DA |
+| **Status** | ✅ VERIFIED 2026-08-03 (extraction — Rule 3): DSRM `Administrator:500` NT hash `81c3b6443f148bf73bb3499791f1eb7b` (SAM RID-500) = cadre.local Administrator hash (cross-validated via ESC1 UnPAC); `DsrmAdminLogonBehavior` absent (default blocked). SET + logon-behavior enable = user practice |
 | **Att&ck** | T1098.001 / T1003 |
 | **Technique** | Extract DC DSRM (local SAM) hash; enable DSRM remote logon (`DsrmAdminLogonBehavior=2`) or set new DSRM password (persistence) |
 | **Prerequisite** | DA on dc01 |
@@ -969,7 +969,7 @@ We have `nt authority\system` on mbr01 via GodPotato. `analyst_cloud` has an act
 
 | Field | Value |
 |-------|-------|
-| **Status** | ⏳ Not exercised — post-DA |
+| **Status** | ⛔ BLOCKED 2026-08-03 — mimikatz dcshadow "computer not found in AD 0x1" (env/computer-resolution on ws01 in all contexts). Prereqs validated (EA, child/krbtgt `b6c370f2…`, child SID, target/FakeDC objects). Reopen: same-domain/SYSTEM context or tooling debug |
 | **Att&ck** | T1098 / T1550.002 |
 | **Technique** | Push malicious attributes (SID history/SPN/membership) via DRS replication from non-DC (inverse of DCSync) |
 | **Prerequisite** | DA + DRS rights (held since Phase 6) |
@@ -997,7 +997,7 @@ We have `nt authority\system` on mbr01 via GodPotato. `analyst_cloud` has an act
 
 | Field | Value |
 |-------|-------|
-| **Status** | ⏳ Not exercised — Branch 3.5O |
+| **Status** | ⚠️ Partial 2026-08-03 — WT105 COM ✅ (SYSTEM plants CLSID InprocServer32 → attacker DLL, verified + cleaned); WT106 IFEO ✅ (Debugger → notepad → marker `WT106-IFEO`, cleaned); WT104/107 ⏳ need staging (audit §2.19) |
 | **Att&ck** | T1574.001 (DLL), T1546.015 (COM), T1546.012 (IFEO), T1547.005 (LSA SSP) |
 | **Technique** | Four host-persistence primitives: trusted-app DLL hijack; COM `LocalServer32`/`InprocServer32` repoint; IFEO `Debugger` key; malicious SSP in LSASS (cleartext capture) |
 | **Prerequisite** | SYSTEM on mbr01 (SQL→GodPotato chain) |
@@ -1025,7 +1025,7 @@ We have `nt authority\system` on mbr01 via GodPotato. `analyst_cloud` has an act
 
 | Field | Value |
 |-------|-------|
-| **Status** | ⏳ Not exercised — Branch B |
+| **Status** | ✅ VERIFIED 2026-08-03 — `DisableExtensionList` ABSENT on cadre-CA → SID extension enabled → ESC16 not configured (default). ManageCA capability exists (ESC7, verified) |
 | **Att&ck** | T1648 (Serverless/CA config abuse) |
 | **Technique** | CA `DisableExtensionList` contains SID OID (`1.3.6.1.4.1.311.25.2`) → issued certs stripped of SID extensions (CA-admin-level misconfig) |
 | **Prerequisite** | ManageCA on cadre-CA (held: `lead_engineering` ESC7 verified) |

@@ -2613,9 +2613,11 @@ impacket-psexec cadre.local/Administrator@192.168.77.10 -k -no-pass
 >
 > **Prerequisite chain:** KDS Root Key (WT097) → enables Golden gMSA (WT098) / Golden dMSA (WT099) / DPAPI-NG decryption (WT103). LAPS bulk (WT100), DSRM (WT101), DCShadow (WT102) are independent DA primitives.
 >
+> **Validated 2026-08-03:** WT097 ✅ (2 root-key blobs) · WT098 ✅ (prereqs: key + SID + pwdid) · WT101 ✅ (DSRM hash + logon-behavior gate) · WT100 🔬 (LAPS **not implemented** — future) · WT102 ⛔ (dcshadow env-blocked) · WT099/103 ⏳ (need range.local / DPAPI-NG target). **Rule 3:** extraction + prerequisites = verified; password computation / mutating steps = user practice.
+>
 > **Source:** Grafnetter TROOPERS26 (KDS/DPAPI-NG) + SpecterOps; `Campaign_suggestions.md` Post-DA items (#84-89).
 
-#### WT097 — KDS Root Key Extraction
+#### WT097 — KDS Root Key Extraction ✅
 
 **MITRE:** T1552 (Unsecured Credentials)
 **Prerequisite:** DA on `cadre.local` (e.g., `chief_command`).
@@ -2634,7 +2636,7 @@ Get-KdsRootKey -Credential (Get-Credential cadre\chief_command) -Domain cadre.lo
 
 **Cross-refs:** `Campaign_suggestions.md` Post-DA #84; prerequisite for WT098/099/103.
 
-#### WT098 — Golden gMSA Attack
+#### WT098 — Golden gMSA Attack ✅ (prereqs)
 
 **MITRE:** T1558 (Steal or Forge Kerberos Tickets) / T1552
 **Prerequisite:** WT097 (KDS root key) + `msDS-ManagedPassword` blob (Branch A ACE#10 already verified: `eng_cloud` reads `gmsaTools$`).
@@ -2676,7 +2678,7 @@ ConvertFrom-DelegatedManagedPasswordBlob -Blob ... -KdsRootKey ...
 
 **Cross-refs:** Branch A ACE#24, `Campaign_suggestions` Post-DA #88.
 
-#### WT100 — LAPS Bulk Extraction
+#### WT100 — LAPS Bulk Extraction 🔬 (not implemented)
 
 **MITRE:** T1552.004 (Unsecured Credentials: Private Keys)
 **Prerequisite:** DA; mbr01 has LAPS configured (`04-vulnerabilities.yml`).
@@ -2694,7 +2696,7 @@ ldapsearch -x -H ldap://dc01.cadre.local -b "DC=cadre,DC=local" "(ms-Mcs-AdmPwd=
 
 **Cross-refs:** Phase 3.5 `3.5L`, `Campaign_suggestions` Post-DA #87.
 
-#### WT101 — DSRM Password Extract & Set
+#### WT101 — DSRM Password Extract & Set ✅ (extraction)
 
 **MITRE:** T1098.001 (Account Manipulation) / T1003
 **Prerequisite:** DA on a DC (dc01).
@@ -2717,7 +2719,7 @@ ntdsutil "set dsrm password" "reset password on server null" q q
 
 **Cross-refs:** `Campaign_suggestions` Post-DA #86.
 
-#### WT102 — DCShadow
+#### WT102 — DCShadow ⛔ (env-blocked)
 
 **MITRE:** T1098 (Account Manipulation) / T1550.002
 **Prerequisite:** DA + DRS rights (replication) — held since Phase 6.
