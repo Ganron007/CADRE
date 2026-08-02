@@ -475,7 +475,7 @@ We have `nt authority\system` on mbr01 via GodPotato. `analyst_cloud` has an act
 
 | Field | Value |
 |-------|-------|
-| **Status** | ⏳ Not yet tested — Nemesis DPAPI extraction not exercised in this run |
+| **Status** | ⚠️ Partial 2026-08-03 — SharpDPAPI 1.12.0 runs as SYSTEM; `masterkeys` gated on domain DPAPI backup key (`/pvk`/`/rpc`/`/password`/`/ntlm`/`/credkey`/`/hashes` — none supplied). Full chain needs DA backup-key extraction. Nemesis not staged (SharpDPAPI = equivalent primitive). |
 | **Att&ck** | T1555 (Credentials from Password Stores) |
 | **Technique** | Nemesis 2.2+ automates DPAPI decryption chain — SYSTEM/user masterkeys → CNG keys → Chromium App-Bound encryption |
 | **What it does** | SYSTEM on mbr01 extracts DPAPI masterkeys for `analyst_cloud` → Nemesis decrypts Chromium App-Bound cookies, saved RDP file credentials, Outlook cached creds, WiFi passwords. |
@@ -493,7 +493,7 @@ We have `nt authority\system` on mbr01 via GodPotato. `analyst_cloud` has an act
 
 | Field | Value |
 |-------|-------|
-| **Status** | ⏳ Not yet tested — ctfmon extraction not exercised in this run |
+| **Status** | ⚠️ Partial 2026-08-03 — ctfmon confirmed running in analyst_cloud session 1 (PID 7072). comsvcs MiniDump = 64KB stub (env — same as 3.5K); procdump not staged; typed-password prerequisite unconfirmed (no strings found in stub). |
 | **Att&ck** | T1003 (OS Credential Dumping) |
 | **Technique** | Typed passwords persist in `ctfmon.exe` memory after app close. Not protected by PPL. |
 | **What it does** | SYSTEM dumps `ctfmon.exe` process memory via procdump. Typed passwords (PuTTY, WinSCP, MySQL, SSH) remain in memory minutes/hours after the application closes. |
@@ -555,7 +555,7 @@ We have `nt authority\system` on mbr01 via GodPotato. `analyst_cloud` has an act
 
 | Field | Value |
 |-------|-------|
-| **Status** | ⏳ Not yet tested |
+| **Status** | ✅ Verified 2026-08-03 — SYSTEM dropped marker to `C:\Users\analyst_cloud\Downloads\wt035d-marker.txt` (content verified, cleaned); `quser` confirms analyst_cloud ACTIVE on console session 1 (autologon). Actual detonation (user opens file) = user practice (Rule 3). |
 | **Att&ck** | T1204.002 (User Execution: Malicious File) |
 | **Technique** | SYSTEM drops payload to `analyst_cloud`'s Downloads. Autologon session exists → user context available. |
 | **What it does** | SYSTEM writes malicious file (LNK/CHM/EXE) to `C:\Users\analyst_cloud\Downloads\`. When `analyst_cloud` opens it, code runs in their context. Telemetry demo for initial access detection. |
@@ -569,7 +569,7 @@ We have `nt authority\system` on mbr01 via GodPotato. `analyst_cloud` has an act
 
 | Field | Value |
 |-------|-------|
-| **Status** | ⏳ Not yet tested — WMI event subscription not exercised in this run |
+| **Status** | ⚠️ Partial 2026-08-03 (env) — MOF compile creates filter+consumer+binding (5861 activation). BUT permanent-sub delivery never reaches consumer on Server 2025: `WITHIN` polling rejected (0x80041017 Invalid query), `TargetInstance ISA 'Win32_Process'` WHERE never matches, bare `__InstanceCreationEvent` works as TEMP sub only. Original staged script (WITHIN) was broken in this env. MOF is the correct creation primitive (Set-WmiInstance/CIM binding creation fails). |
 | **Att&ck** | T1546.003 (Event Triggered Execution: WMI Event Subscription) |
 | **Technique** | SYSTEM creates `__EventFilter` + `CommandLineEventConsumer` + `__FilterToConsumerBinding` |
 | **What it does** | Fileless persistence: WMI subscription triggers payload on system uptime or other event. |
@@ -585,7 +585,7 @@ We have `nt authority\system` on mbr01 via GodPotato. `analyst_cloud` has an act
 
 | Field | Value |
 |-------|-------|
-| **Status** | ⏳ Not yet tested — WerFault LSASS dump not exercised in this run |
+| **Status** | ⚠️ Partial 2026-08-03 (env/tool) — PPL_RunAsPPL=0, SeDebugPrivilege OK (`Privilege '20' OK`). comsvcs MiniDump → 76KB stub (not usable). WerFault `-u -p -ip` → no dump. mimikatz 2.2.0 sekurlsa → `kuhl_m_sekurlsa_acquireLSA` (build too old for Server 2025). procdump not staged. Extraction objective unproven this batch. |
 | **Att&ck** | T1003.001 (OS Credential Dumping: LSASS Memory) |
 | **Technique** | Microsoft-signed `WerFaultSecure.exe` triggers LSASS crash dump via Windows Error Reporting |
 | **What it does** | Stealthier than procdump; trusted binary; not flagged by most EDR. |
@@ -616,7 +616,7 @@ We have `nt authority\system` on mbr01 via GodPotato. `analyst_cloud` has an act
 
 | Field | Value |
 |-------|-------|
-| **Status** | ⏳ Not yet tested — Azure AD Connect DPAPI extraction not exercised in this run |
+| **Status** | 🔬 Deferred 2026-08-03 — **AAD Connect NOT deployed** (no `ADSync` service on dc01; `sc query ADSync` → service does not exist). Defer to Plan 11 when AAD Connect is added. |
 | **Att&ck** | T1555 (Credentials from Password Stores) |
 | **Technique** | Extract MSOL account credentials stored using DPAPI on dc01 |
 | **What it does** | `adconnectdump` extracts Cloud Sync agent credentials. Bridge from on-prem to Entra ID. |
@@ -795,6 +795,7 @@ We have `nt authority\system` on mbr01 via GodPotato. `analyst_cloud` has an act
 
 | Field | Value |
 |-------|-------|
+| **Status** | ✅ VERIFIED 2026-08-03 — forged `cifs/mbr01.child.cadre.local` silver (MBR01$ NT `3a01c6cd…`, Administrator id:500 + group 512) via mimikatz `kerberos::golden /service`; **real-service proof** via impacket `smbclient.py -k` → `use c$` listed full mbr01 C$ (no KDC contact). Windows `dir` client falls back to NTLM (pre-existing session) — use impacket `-k` for explicit-ticket verification. |
 | **Technique** | Forge service-specific TGS — no KDC contact |
 | **Use case** | Target a specific service (e.g., `cifs/dc01.cadre.local`) after obtaining the service account NTLM hash |
 | **Key telemetry** | No AS-REQ/AS-REP traffic; WinSec 4624 Type 3 with anomalous service ticket |
@@ -806,6 +807,7 @@ We have `nt authority\system` on mbr01 via GodPotato. `analyst_cloud` has an act
 
 | Field | Value |
 |-------|-------|
+| **Status** | ⚠️ TOOL-BLOCKED 2026-08-03 — legit TGT obtained (asktgt ✅) + krbtgt AES256 known ✅, but staged Rubeus.exe is an **obfuscated build whose `diamond` action is a stub**: ignores `/service`/`/dc` (hardcodes `cifs/dc.domain.com`), `/ticket:<b64>` not parsed (0xc000000d), `/tgtdeleg` fails over SSH (`SEC_E_NO_CREDENTIALS`). Reopen: official Rubeus build (rubeus-src staged) or mimikatz TGT-modify equivalent. |
 | **Technique** | Modify legit TGT rather than forge |
 | **Use case** | Stealthier than Golden Ticket; requires `krbtgt` AES256 key + a valid TGT |
 | **Key telemetry** | Legit TGT origin — fewer anomalies |

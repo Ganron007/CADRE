@@ -34,13 +34,13 @@
 | Phase 2 — Kerberoast | 1 | 1 | 0 | 0 | 0 | 0 |
 | Phase 2 Alt — NTLMv1 | 1 | 0 | 0 | 1 | 0 | 0 |
 | Phase 3 — SQL + GodPotato | 3 | 2 | 0 | 1 | 0 | 0 |
-| Phase 3.5 — Credential Theft | 18 | 5 | 1 | 10 | 0 | 2 |
+| Phase 3.5 — Credential Theft | 18 | 6 | 5 | 4 | 1 | 2 |
 | Phase 4 — Discovery | 1 | 1 | 0 | 0 | 0 | 0 |
 | Phase 5 — RBCD | 1 | 1 | 0 | 0 | 0 | 0 |
 | Phase 5 Coercion | 9 | 1 | 0 | 1 | 4 | 3 |
 | Phase 5 T102 (unconst. deleg.) | 1 | 1 | 0 | 0 | 0 | 0 |
 | Phase 6 — DCSync | 1 | 1 | 0 | 0 | 0 | 0 |
-| Phase 7 — Ticket forgery | 3 | 1 | 2 | 0 | 0 | 0 |
+| Phase 7 — Ticket forgery | 3 | 2 | 1 | 0 | 0 | 0 |
 | Post-DA — KDS/gMSA/DSRM cluster | 7 | 3 | 1 | 2 | 1 | 0 |
 | Phase 8 — Cross-forest | 2 | 2 | 0 | 0 | 0 | 0 |
 | Phase 8 Alt — Skipjack | 1 | 0 | 0 | 0 | 1 | 0 |
@@ -51,15 +51,17 @@
 | **Branch E** — Network Defense (attack sims WT069-081 + E-10) | 14 | 14 | 0 | 0 | 0 | 0 |
 | **Branch F** — Supply Chain | 13 | 9 | 1 | 0 | 3 | 0 |
 | **Branch G** — CVE-2026-41089 | 1 | 0 | 0 | 1 | 0 | 0 |
-| **TOTAL** | **119** | **74** | **7** | **22** | **10** | **6** |
+| **TOTAL** | **119** | **76** | **10** | **16** | **11** | **6** |
 
 **Rollup notes (2026-08-02, updated 2026-08-03):**
-- **74 items attack-side verified** — full AD spine (Phases 0-8), **Branch A 100%**, **Branch B** (ESC1/2/3/4/7/9 + UnPAC + **WT109 ESC16 config state**), **Branch D 100%**, **Branch C exec chain** (WT037/038/039 FULL EXEC), **Branch E attack sims** (14), Branch F linux scenarios (9). **Post-DA (2026-08-03):** WT097 KDS root key, WT098 gMSA prereqs, WT101 DSRM hash (Rule 3 — extraction), WT105 COM hijack, WT106 IFEO.
-- **7 partial:** 3.5C (RDP script missing), WT011/012 (script runs, real-service verify pending), WT035 (surface deep-verified, needs PXE client), WT036 (primitive verified, needs console device), F-05 (env-gated on public npm registry), **WT102 (DCShadow — env-blocked)**.
-- **22 pending:** H-01..06 (needs `19-initial-access.yml`), NTLMv1, 3.5G/H/D/J/K/L/M/N + **3.5O WT104/107**, WT096, **Post-DA WT099/103**, WT108, Branch G (Branch E/F detection validation tracked in `CHECKLIST.md`, telemetry stage).
-- **10 deferred:** WT021/022 (NTLM relay — no SMB coerce on Server 2025), WT094/095 (UnCanny/Onelogon), Skipjack, ESC8/11 (relay family), F-11..F-13 (held expansions), **WT100 (LAPS — not implemented, future suggestion)**.
+- **76 items attack-side verified** — full AD spine (Phases 0-8), **Branch A 100%**, **Branch B** (ESC1/2/3/4/7/9 + UnPAC + **WT109 ESC16 config state**), **Branch D 100%**, **Branch C exec chain** (WT037/038/039 FULL EXEC), **Branch E attack sims** (14), Branch F linux scenarios (9). **Post-DA (2026-08-03):** WT097 KDS root key, WT098 gMSA prereqs, WT101 DSRM hash (Rule 3 — extraction), WT105 COM hijack, WT106 IFEO. **Batch 2 (2026-08-03):** WT011 Silver (real-service c$ via impacket `-k`), 3.5D File detonation (SYSTEM drop to analyst_cloud Downloads + active console session).
+- **10 partial:** 3.5C (RDP script missing), **3.5G DPAPI (SharpDPAPI validated; chain gated on domain DPAPI backup key `/pvk` — DA step not run; Nemesis not staged)**, **3.5H ctfmon (running in session 1; comsvcs dump = 64KB stub — env; procdump not staged)**, **3.5J WMI sub (objects create+activate/5861, but permanent-sub delivery blocked on Server 2025 — `WITHIN` rejected 0x80041017 + `TargetInstance ISA` filters never match)**, **3.5K LSASS dump (PPL=0, SeDebugPrivilege OK, but comsvcs→76KB stub, WerFault no dump, mimikatz 2.2.0 `kuhl_m_sekurlsa_acquireLSA` — build too old for Server 2025)**, **WT012 Diamond (obfuscated Rubeus build's `diamond` is a stub — ignores /service//dc, hardcodes cifs/dc.domain.com, tgtdeleg fails over SSH; prereqs validated)**, WT035 (surface deep-verified, needs PXE client), WT036 (primitive verified, needs console device), F-05 (env-gated on public npm registry), **WT102 (DCShadow — env-blocked)**.
+- **16 pending:** H-01..06 (needs `19-initial-access.yml`), NTLMv1, 3.5L/N + **3.5O WT104/107**, WT096, **Post-DA WT099/103**, WT108, Branch G (Branch E/F detection validation tracked in `CHECKLIST.md`, telemetry stage).
+- **11 deferred:** WT021/022 (NTLM relay — no SMB coerce on Server 2025), WT094/095 (UnCanny/Onelogon), Skipjack, ESC8/11 (relay family), F-11..F-13 (held expansions), **WT100 (LAPS — not implemented, future suggestion)**, **3.5M (AAD Connect NOT deployed — no ADSync service on dc01; defer to Plan 11)**.
 - **6 invalid/rejected:** WT028 (SAMR null blocked), WT018/019/020 (coercion non-functional), 3.5B (scheduled-task execution — Rule 2), 3.5I (token impersonation, error 1346).
 - **Post-DA cluster validated 2026-08-03** — WT097/098/101 verified (extraction/prereqs, Rule 3: no cracking), WT100 deferred (LAPS not implemented), WT102 blocked (dcshadow env), WT099/103 pending (range.local / DPAPI-NG target).
+- **Batch 2 validated 2026-08-03** — WT011 silver + 3.5D verified; 3.5G/H/J/K partial (env/tool evidence documented); WT012 tool-blocked (Rubeus diamond stub); 3.5M deferred (not deployed); WT096/WT108 still gated (nxc / DCOMIllusionist not staged on ws01).
+- **Key env findings (Server 2025, mbr01):** WMI permanent event subscriptions register+activate but never deliver to consumer (temp subs work); `WITHIN` polling rejected (0x80041017); `TargetInstance ISA` WHERE never matches; comsvcs MiniDump yields ~64-76KB stubs for LSASS/ctfmon (protected/unreadable); mimikatz 2.2.0 (Dec 2022) cannot parse Server 2025 LSASS (`kuhl_m_sekurlsa_acquireLSA`); staged Rubeus.exe is an obfuscated build whose `diamond` action is a stub; procdump not staged.
 - **Rule 3 (2026-08-03):** validation extracts hashes/keys/blobs + validates the process — password cracking/computation and mutating steps are the USER's practice, never a completion criterion. See `docs/internal/cadre-lab-contract.md`.
 - **Detection validation (Branch E/F)** tracked in `CHECKLIST.md` — deferred to the Plan 1 telemetry catalog stage (monitor `.55`).
 - **Future:** CADRE NPM-Chain upgrade designed (`plan1.8-offensive-upgrades.md` §11), not implemented.
@@ -151,16 +153,16 @@
 | 101 | WinRS lateral pivot ws01 -> mbr01 (T101) | ws01 | child\analyst_t1 / T13r_An@lyst! | ✅ Verified | TrustedHosts + WinRM command execution works | No |
 | 3.5F | LSASS/SAM credential dump via mimikatz (3.5F) | SYSTEM on mbr01 | SYSTEM | ✅ Verified | SAM dump works; sekurlsa::logonpasswords may fail due to token privilege | Yes - capture LSASS output reliably |
 | 3.5A | Winlogon plaintext credential extraction (3.5A) | SYSTEM on mbr01 | SYSTEM | ✅ Verified | Extracts CADRE\analyst_cloud:Cl0ud_An@lyst! from registry | No |
-| 3.5G | DPAPI via Nemesis (3.5G) | SYSTEM on mbr01 | SYSTEM | ⏳ Not exercised | Nemesis 2.2+ browser/RDP/WiFi DPAPI extraction | Yes |
-| 3.5H | ctfmon.exe password extraction (3.5H) | SYSTEM on mbr01 | SYSTEM | ⏳ Not exercised | Typed passwords in ctfmon.exe memory | Yes |
+| 3.5G | DPAPI via Nemesis (3.5G) | SYSTEM on mbr01 | SYSTEM | ⚠️ Partial 2026-08-03 | SharpDPAPI 1.12.0 runs as SYSTEM; `masterkeys` gated on domain DPAPI backup key (`/pvk`/`/rpc`/`/password`/`/ntlm`/`/credkey`/`/hashes` — none supplied). Full chain needs DA backup-key extraction. Nemesis not staged (SharpDPAPI = equivalent primitive). | Yes - after DA backup-key extraction (/pvk) |
+| 3.5H | ctfmon.exe password extraction (3.5H) | SYSTEM on mbr01 | SYSTEM | ⚠️ Partial 2026-08-03 | ctfmon.confirmed running in analyst_cloud session 1 (PID 7072). comsvcs MiniDump = 64KB stub (env — same as 3.5K); procdump not staged; typed-password prerequisite unconfirmed (no strings found in stub). | Yes - after procdump/Rubeus dump staging |
 | 3.5I | Token impersonation (3.5I) | mbr01 | SYSTEM | ❌ Rejected | Server 2025 session isolation; error 1346 | No |
 | 3.5B | Scheduled Task as analyst_cloud (3.5B) | — | — | ❌ Rejected | **Rule 2 (no scheduled tasks to run commands).** A scheduled task is a persistence mechanism (Phase 5), not an execution wrapper. The 2026-07-31 re-test (task ran as `cadre\analyst_cloud`, proof written) is **void** as validation evidence for an attack — it validated a rejected method. `SeBatchLogonRight` config on mbr01 retained only as persistence-prerequisite surface. | No |
 | 3.5C | RDP interactive session as analyst_cloud (3.5C) | ws01 -> mbr01 | analyst_cloud / Cl0ud_An@lyst! | ⠿ BLOCKED — script missing | No dedicated `3.5C` execution script found in `attack-matrix/04-automation/`; metadata/routing exist, but test harness is absent | Yes — add/verify script and rerun |
-| 3.5D | File detonation / payload drop (WT063-068) (3.5D) | ws01 / mbr01 | analyst_t1 or analyst_cloud | ⏳ Not exercised | User-context execution | Yes |
-| 3.5J | WMI Event Subscriptions (3.5J) | SYSTEM on mbr01 | SYSTEM | ⏳ Not exercised | Fileless persistence | Yes |
-| 3.5K | LSASS dump via WerFault (3.5K) | SYSTEM on mbr01 | SYSTEM | ⏳ Not exercised | Microsoft-signed WerFaultSecure.exe | Yes |
+| 3.5D | File detonation / payload drop (WT063-068) (3.5D) | ws01 / mbr01 | analyst_t1 or analyst_cloud | ✅ Verified 2026-08-03 | SYSTEM dropped marker to `C:\Users\analyst_cloud\Downloads\wt035d-marker.txt` (content verified, cleaned); `quser` confirms analyst_cloud ACTIVE on console session 1 (autologon). Actual detonation (user opens file) = user practice (Rule 3). | No (drop side verified) |
+| 3.5J | WMI Event Subscriptions (3.5J) | SYSTEM on mbr01 | SYSTEM | ⚠️ Partial 2026-08-03 (env) | MOF compile creates filter+consumer+binding (5861 activation). BUT permanent-sub delivery never reaches consumer on Server 2025: `WITHIN` polling rejected (0x80041017 Invalid query), `TargetInstance ISA 'Win32_Process'` WHERE never matches, bare `__InstanceCreationEvent` works as TEMP sub only. Original staged script (WITHIN) was broken in this env. MOF is the correct creation primitive. | Yes - if WMI delivery is restored / on a non-Server-2025 host |
+| 3.5K | LSASS dump via WerFault (3.5K) | SYSTEM on mbr01 | SYSTEM | ⚠️ Partial 2026-08-03 (env/tool) | PPL_RunAsPPL=0, SeDebugPrivilege OK (`Privilege '20' OK`). comsvcs MiniDump → 76KB stub (not usable). WerFault `-u -p -ip` → no dump. mimikatz 2.2.0 sekurlsa → `kuhl_m_sekurlsa_acquireLSA` (build too old for Server 2025). procdump not staged. Extraction objective unproven this batch. | Yes - after newer mimikatz/Rubeus dump or procdump staging |
 | 3.5L | LAPS extraction (3.5L) | dc01 | DA | ⏳ Not exercised | ms-Mcs-AdmPwd read | Yes |
-| 3.5M | Azure AD Connect DPAPI dump (3.5M) | dc01 | DA | ⏳ Not exercised | adconnectdump / MSOL credentials | Yes |
+| 3.5M | Azure AD Connect DPAPI dump (3.5M) | dc01 | DA | 🔬 Deferred 2026-08-03 | **Not deployed** — no `ADSync` service on dc01 (`sc query ADSync` → service does not exist). Defer to Plan 11 when AAD Connect is added. | No (until AAD Connect deployed) |
 | 3.5N | UnCanny LPE via InstallService (3.5N) | ws01 | local user | ⏳ Not exercised | Requires Developer Mode; deferred | Yes - after Developer Mode decision |
 | 104-107 | Persistence Extensions: DLL/COM/IFEO/LSA SSP (3.5O) | mbr01 (SYSTEM) | SYSTEM | ⚠️ Partial — WT105/106 ✅, WT104/107 ⏳ | **WT105 COM hijack VERIFIED 2026-08-03** (SYSTEM plants `HKCU\Software\Classes\CLSID\{…}\InprocServer32` → attacker DLL; read-back + cleanup). **WT106 IFEO VERIFIED 2026-08-03** (Debugger → notepad → marker `WT106-IFEO`; cleanup). WT104 DLL-hijack needs a target app + WT107 SSP DLL need staging (audit §2.19 gaps). | WT104/107 - after staging |
 
@@ -207,8 +209,8 @@
 | ID | Attack | Source Machine | Credential | Status | Notes | Re-test Needed |
 |------|--------|----------------|------------|--------|-------|----------------|
 | 010 | Golden Ticket (WT010) | ws01 | krbtgt hash (child.cadre.local) | ✅ Verified | **Verified 2026-07-31:** mimikatz `kerberos::golden` with extracted child krbtgt NT + AES256, `/sids:<root EA>` forged + injected (PTT) + saved `EA-aes.kirbi`. Rubeus `golden` binary fails silently on ws01 (non-Defender quirk — persists after full Defender kill) — use mimikatz. Cross-realm DCSync of root via golden hits PAC checksum quirk on dc01 DRSUAPI bind; root EA achieved via fallback paths (Branch A chief_command / WT031). | No (as-written forgery path complete); cross-realm DCSync via golden = known quirk, root access covered by fallback |
-| 011 | Silver Ticket (WT011) | ws01 | Service account hash | ✅ Script executes | Script runs | Yes - verify against actual service |
-| 012 | Diamond Ticket (WT012) | ws01 | krbtgt hash | ✅ Script executes | Script runs | Yes - verify with extracted krbtgt |
+| 011 | Silver Ticket (WT011) | ws01 | Service account hash | ✅ Verified 2026-08-03 | Forged `cifs/mbr01.child.cadre.local` silver (MBR01$ NT `3a01c6cd…`, Administrator id:500 + group 512) via mimikatz `kerberos::golden /service`. **Real-service proof:** impacket `smbclient.py -k` → `use c$` listed full mbr01 C$ (no KDC contact). Windows `dir` client falls back to NTLM (pre-existing session) — use impacket `-k` for explicit-ticket verification. kirbi→ccache via `kirbi2ccache.py`. | No |
+| 012 | Diamond Ticket (WT012) | ws01 | krbtgt hash | ⚠️ Tool-blocked 2026-08-03 | Legit TGT obtained (asktgt ✅), krbtgt AES256 known ✅. But staged Rubeus.exe is an **obfuscated build whose `diamond` action is a stub**: ignores `/service`/`/dc` (hardcodes `cifs/dc.domain.com`), `/ticket:<b64>` not parsed (0xc000000d), `/tgtdeleg` fails over SSH (`SEC_E_NO_CREDENTIALS`). Reopen: use official Rubeus build (rubeus-src staged) or mimikatz TGT-modify equivalent. | Yes - after official Rubeus build |
 
 ## Post-DA Sub-Phase — KDS/gMSA/dMSA Cluster (WT097-103)
 

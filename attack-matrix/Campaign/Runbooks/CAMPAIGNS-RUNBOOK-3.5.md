@@ -42,18 +42,18 @@ We have SYSTEM on mbr01. analyst_cloud has an active console session (auto-logon
 | ------ | -------------------------------- | ---------------------------- | ------------------------------------- |
 | 3.5F   | LSASS credential dump (procdump) | LSASS PPL OFF ✅              | analyst_cloud NTLM + Kerberos         |
 | 3.5A   | Winlogon registry (plaintext)    | Auto-logon ON ✅              | analyst_cloud password                |
-| 3.5G   | Offensive DPAPI (Nemesis)        | Saved creds in profile       | DPAPI-decrypted credentials           |
-| 3.5H   | ctfmon.exe password extraction   | Typed passwords in CLI tools | SSH/WinSCP/MySQL passwords            |
+| 3.5G   | Offensive DPAPI (Nemesis) ⚠️      | Saved creds in profile       | DPAPI-decrypted credentials           |
+| 3.5H   | ctfmon.exe password extraction ⚠️ | Typed passwords in CLI tools | SSH/WinSCP/MySQL passwords            |
 | 3.5C   | RDP interactive session          | Password known               | Full SharpHound data                  |
-| 3.5D   | File detonation (H-01..H-06 / WT063-068) — post-exploit telemetry | User click                   | Telemetry demo                        |
+| 3.5D   | File detonation (H-01..H-06 / WT063-068) — post-exploit telemetry ✅ | User click                   | Telemetry demo                        |
 | 3.5E   | Logon trigger (Startup folder)   | User profile exists          | Auto-execution                        |
 | 3.5I   | Token impersonation ❌            | Session context              | Failed (error 1346)                   |
-| 3.5J   | WMI event subscriptions          | SYSTEM on mbr01              | Fileless persistence                  |
-| 3.5K   | LSASS dump via WerFault ⏳        | SYSTEM on mbr01              | Stealthier LSASS dump (signed binary) |
+| 3.5J   | WMI event subscriptions ⚠️        | SYSTEM on mbr01              | Fileless persistence                  |
+| 3.5K   | LSASS dump via WerFault ⚠️        | SYSTEM on mbr01              | Stealthier LSASS dump (signed binary) |
 | 3.5L   | LAPS extraction ⏳                | Domain user creds            | Local admin password from AD          |
-| 3.5M   | Azure AD Connect DPAPI dump ⏳    | SYSTEM on dc01               | Cloud Sync creds → Entra ID bridge    |
+| 3.5M   | Azure AD Connect DPAPI dump 🔬    | SYSTEM on dc01               | Cloud Sync creds → Entra ID bridge    |
 | 3.5N   | UnCanny LPE (InstallService) 🔬  | Standard user                | Direct SYSTEM via AppX InstallService |
-| 3.5O   | Persistence Extensions (DLL/COM/IFEO/LSA SSP) ⏳ | SYSTEM on mbr01              | Host persistence (WT104-107) |
+| 3.5O   | Persistence Extensions (DLL/COM/IFEO/LSA SSP) ⚠️ | SYSTEM on mbr01              | Host persistence (WT104-107) |
 
 
 ---
@@ -327,7 +327,7 @@ EXEC xp_cmdshell 'C:\Windows\Temp\cadre-tools\GodPotato.exe -cmd "cmd /c reg que
 
 ---
 
-#### 3.5G — Offensive DPAPI (Nemesis)
+#### 3.5G — Offensive DPAPI (Nemesis) ⚠️
 
 **Source:** [https://specterops.io/blog/2026/03/04/offensive-dpapi-with-nemesis/](https://specterops.io/blog/2026/03/04/offensive-dpapi-with-nemesis/)
 **Tool:** Nemesis 2.2+
@@ -348,7 +348,7 @@ Automates DPAPI decryption chain — SYSTEM/user masterkeys → CNG keys → Chr
 
 ---
 
-#### 3.5H — ctfmon.exe Password Extraction (Windows 11 Input Telemetry)
+#### 3.5H — ctfmon.exe Password Extraction (Windows 11 Input Telemetry) ⚠️
 
 **Source:** [https://hexderef.com/windows-11-passwords-in-memory-lsass-ctfmon-analysis](https://hexderef.com/windows-11-passwords-in-memory-lsass-ctfmon-analysis)
 
@@ -443,7 +443,7 @@ xfreerdp /v:192.168.77.22 /u:analyst_cloud /p:'Cl0ud_An@lyst!' /d:CADRE /cert-ig
 
 ---
 
-#### 3.5D — File Detonation (H-01..H-06 / WT063-068) — Post-Exploit Telemetry Demo
+#### 3.5D — File Detonation (H-01..H-06 / WT063-068) — Post-Exploit Telemetry Demo ✅
 
 **Purpose:** The same six file-delivery vectors are now the **main spine Phase 0.5** entry point on `ws01` / `analyst_t1`. This section is the post-exploit telemetry demo — re-running the vectors from an already-compromised `mbr01` (`analyst_cloud`) to generate detection artifacts. It is no longer an alternate or optional entry path.
 
@@ -500,7 +500,7 @@ EXEC xp_cmdshell 'C:\Users\Public\GodPotato.exe -cmd "cmd /c shutdown /r /t 0"';
 
 ---
 
-#### 3.5J — WMI Event Subscriptions — Fileless Persistence (T1546.003)
+#### 3.5J — WMI Event Subscriptions — Fileless Persistence (T1546.003) ⚠️
 
 **Source:** DbgMan — Persistence: Advanced Red Team Persistence Techniques
 
@@ -572,7 +572,7 @@ EXEC xp_cmdshell 'C:\Users\Public\GodPotato.exe -cmd "cmd /c powershell.exe -ep 
 
 ---
 
-#### 3.5K — LSASS Dump via WerFault (T1003.001) ⏳
+#### 3.5K — LSASS Dump via WerFault (T1003.001) ⚠️
 
 **Source:** iPurple.team (2025-11-18)
 **MITRE:** T1003.001 (OS Credential Dumping: LSASS Memory)
@@ -643,7 +643,7 @@ Local Administrator Password Solution (LAPS) manages unique local admin password
 
 ---
 
-#### 3.5M — Azure AD Connect DPAPI Dump (T1555) ⏳
+#### 3.5M — Azure AD Connect DPAPI Dump (T1555) 🔬
 
 **Source:** dirkjanm.io (2019)
 **Tool:** adconnectdump ([https://github.com/fox-it/adconnectdump](https://github.com/fox-it/adconnectdump))
