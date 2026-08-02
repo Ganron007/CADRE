@@ -23,7 +23,7 @@
 ## Campaign Status Rollup (2026-08-02)
 
 > **Legend:** ✅ done/verified (attack side) · ⚠️ partial (env-gated / primitive-only / script-runs) · ⏳ pending (not exercised / detection validate / needs prerequisite) · 🔬 deferred (decision) · ❌ invalid/rejected (non-functional / rejected methodology).
-> **Streams E/F:** attack side validated; the ⏳ counts are the detection-validation tracker rows (Plan 1 telemetry stage). Stream E attack sims (WT069-081 + E-10) are complete but not part of the 106 rows below.
+> **Stream E split:** attack sims (WT069-081 + E-10) = 14 rows ✅ complete; the E-01..E-14 rows are the **detection-validation tracker** (pending — Plan 1 telemetry stage). **Stream F:** attack side validated on linux01 (9 rows ✅ / 1 ⚠️ env-gated); detection + mbr01 pending.
 
 | Phase / Branch | Total | ✅ Done | ⚠️ Partial | ⏳ Pending | 🔬 Deferred | ❌ Invalid |
 |---|---|---:|---:|---:|---:|---:|
@@ -48,12 +48,13 @@
 | Branch B — ADCS | 8 | 7 | 0 | 0 | 1 | 0 |
 | Branch D — Linux Pivot | 6 | 6 | 0 | 0 | 0 | 0 |
 | Branch G — CVE-2026-41089 | 1 | 0 | 0 | 1 | 0 | 0 |
-| Stream E — Network Defense | 14 | 0 | 0 | 14 | 0 | 0 |
+| Stream E — Network Defense (attack sims WT069-081 + E-10) | 14 | 14 | 0 | 0 | 0 | 0 |
+| Stream E — Network Defense (detection validate E-01..E-14) | 14 | 0 | 0 | 14 | 0 | 0 |
 | Stream F — Supply Chain | 13 | 9 | 1 | 0 | 3 | 0 |
-| **TOTAL** | **106** | **54** | **6** | **31** | **9** | **6** |
+| **TOTAL** | **120** | **68** | **6** | **31** | **9** | **6** |
 
 **Rollup notes (2026-08-02):**
-- **54 items attack-side verified** — full AD spine (Phases 0-8), **Branch A 100%**, **Branch B** (ESC1/2/3/4/7/9 + UnPAC), **Branch D 100%**, **Branch C exec chain** (WT037/038/039 FULL EXEC), F linux scenarios (9). Stream E attack sims additionally complete (13/13 + E-10).
+- **68 items attack-side verified** — full AD spine (Phases 0-8), **Branch A 100%**, **Branch B** (ESC1/2/3/4/7/9 + UnPAC), **Branch D 100%**, **Branch C exec chain** (WT037/038/039 FULL EXEC), **Stream E attack sims** (14), F linux scenarios (9).
 - **6 partial:** 3.5C (RDP script missing), WT011/012 (script runs, real-service verify pending), WT035 (surface deep-verified, needs PXE client), WT036 (primitive verified, needs console device), F-05 (env-gated on public npm registry).
 - **31 pending:** H-01..06 (needs `19-initial-access.yml`), NTLMv1, 3.5G/H/D/J/K/L/M/N, WT096, Branch G, **14 Stream E detection rows** + F detection/mbr01 (telemetry stage).
 - **9 deferred:** WT021/022 (NTLM relay — no SMB coerce on Server 2025), WT094/095 (UnCanny/Onelogon), Skipjack, ESC8/11 (relay family), F-11..F-13 (held expansions).
@@ -85,8 +86,9 @@
 - **Branch D**: 6 attacks
 - **Branch G**: 1 attacks
 - **E - Network Defense**: 14 attacks
+- **E attack sims (WT069-081 + E-10)**: 14 attacks
 - **F - Supply Chain**: 13 attacks
-- **Total attacks listed**: 106
+- **Total attacks listed**: 120
 
 ## Phase 0.5 / H
 
