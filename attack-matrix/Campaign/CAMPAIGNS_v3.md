@@ -8,7 +8,7 @@
 
 **94 campaign attacks + 14 E exercises + 10 F supply-chain scenarios = 118 total.**
 
-**Validation batch 2 (2026-08-03):** WT011 Silver ✅ VERIFIED (real-service `c$` via impacket `-k`) · 3.5D File detonation ✅ (SYSTEM drop + active console session) · 3.5G/H/J/K ⚠️ partial (env/tool evidence — see `CAMPAIGNS-VALIDATION-REPORT.md`) · WT012 ⛔ tool-blocked (obfuscated Rubeus `diamond` stub) · 3.5M 🔬 deferred (AAD Connect not deployed). **Key env findings (Server 2025, mbr01):** WMI permanent subs activate but never deliver (temp subs work; `WITHIN` rejected 0x80041017); comsvcs MiniDump → 64-76KB stubs; mimikatz 2.2.0 can't parse Server 2025 LSASS; staged Rubeus is an obfuscated build (diamond = stub). New scripts: `wt011-*`, `wt035d-*`, `wt035g-*`, `wt035h-*`, `wt035j-*`, `wt035k-*` under `04-automation/linux/windows/`.
+**Validation batch 2 (2026-08-03):** WT011 Silver ✅ VERIFIED (real-service `c$` via impacket `-k`) · 3.5D File detonation ✅ (SYSTEM drop + active console session) · **3.5K LSASS extraction ✅** (procdump 62MB dump + Rubeus dump → analyst_cloud/MBR01$/cross-domain tickets) · 3.5G ⚠️ (chain 80%: DPAPI backup key + masterkeys extracted; SharpDPAPI decrypt tool-blocked) · 3.5H/J ⚠️ (env) · WT012 ⚠️ (process validated to PAC-forge; Rubeus 2.2.0 vs Server 2025) · 3.5M 🔬 deferred (AAD Connect not deployed). **Key env findings (Server 2025, mbr01):** WMI permanent subs activate but never deliver (temp subs work; `WITHIN` rejected 0x80041017); comsvcs MiniDump → 64-76KB stubs but **procdump `-ma` → real 62MB dump**; mimikatz 2.2.0/pypykatz 0.3.15 can't parse Server 2025 LSASS (Rubeus dump works); staged Rubeus is obfuscated (community 2.2.0 build works but can't forge Server 2025 PAC); SharpDPAPI `Bad Version of provider` on key import. New scripts: `wt011-*`, `wt035d-*`, `wt035g-*`, `wt035h-*`, `wt035j-*`, `wt035k-*`, `wt012-*` under `04-automation/linux/windows/`.
 
 **Attack-flow reference (moved out for lightness):** [`CAMPAIGNv3-ATTACK-FLOW.md`](CAMPAIGNv3-ATTACK-FLOW.md)
 
@@ -1433,7 +1433,7 @@ We have SYSTEM on mbr01. analyst_cloud has an active console session (auto-logon
 | 3.5E   | Logon trigger (Startup folder)   | User profile exists          | Auto-execution                        |
 | 3.5I   | Token impersonation ❌            | Session context              | Failed (error 1346)                   |
 | 3.5J   | WMI event subscriptions ⚠️        | SYSTEM on mbr01              | Fileless persistence                  |
-| 3.5K   | LSASS dump via WerFault ⚠️        | SYSTEM on mbr01              | Stealthier LSASS dump (signed binary) |
+| 3.5K   | LSASS dump via WerFault ✅        | SYSTEM on mbr01              | Stealthier LSASS dump (signed binary) |
 | 3.5L   | LAPS extraction ⏳                | Domain user creds            | Local admin password from AD          |
 | 3.5M   | Azure AD Connect DPAPI dump 🔬    | SYSTEM on dc01               | Cloud Sync creds → Entra ID bridge    |
 | 3.5N   | UnCanny LPE (InstallService) 🔬  | Standard user                | Direct SYSTEM via AppX InstallService |
@@ -1956,7 +1956,7 @@ EXEC xp_cmdshell 'C:\Users\Public\GodPotato.exe -cmd "cmd /c powershell.exe -ep 
 
 ---
 
-#### 3.5K — LSASS Dump via WerFault (T1003.001) ⚠️
+#### 3.5K — LSASS Dump via WerFault (T1003.001) ✅
 
 **Source:** iPurple.team (2025-11-18)
 **MITRE:** T1003.001 (OS Credential Dumping: LSASS Memory)
@@ -2596,7 +2596,7 @@ impacket-ticketer -nthash <child_krbtgt_hash> -domain child.cadre.local \
 impacket-psexec cadre.local/Administrator@192.168.77.10 -k -no-pass
 ```
 
-**Stealth alternative — Diamond Ticket (WT012):** Modify a legitimate TGT instead of forging one. **⚠️ TOOL-BLOCKED 2026-08-03** — staged (obfuscated) Rubeus `diamond` is a stub (ignores `/service`/`/dc`, hardcodes `cifs/dc.domain.com`, `/tgtdeleg` fails over SSH). Prereqs validated (legit TGT ✅, krbtgt AES256 ✅). Reopen with official Rubeus build.
+**Stealth alternative — Diamond Ticket (WT012):** Modify a legitimate TGT instead of forging one. **⚠️ Partial 2026-08-03 (tool-compat)** — process validated to the PAC-forge fork: legit TGT ✅ (AS-REQ), krbtgt AES256 ✅, service SPN ✅. Rubeus 2.2.0 (community build; no newer prebuilt exists) fails `Unable to decrypt ticket or get PAC` on Server 2025 KDC; `/tgtdeleg` path has an arg bug + fails over SSH. Reopen: compile Rubeus master (2.4.x).
 
 **Targeted alternative — Silver Ticket (WT011):** Forge service-specific TGS for targeted access without DC contact. **✅ VERIFIED 2026-08-03** — forged `cifs/mbr01` silver (MBR01$ NT `3a01c6cd…`, Administrator + group 512) via mimikatz `kerberos::golden /service`; impacket `smbclient.py -k` listed full mbr01 `c$` (no KDC contact). Windows `dir` client falls back to NTLM — use impacket `-k` for explicit-ticket verification.
 

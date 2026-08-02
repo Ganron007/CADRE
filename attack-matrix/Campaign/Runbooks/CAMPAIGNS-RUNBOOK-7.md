@@ -56,7 +56,7 @@ impacket-ticketer -nthash <child_krbtgt_hash> -domain child.cadre.local \
 impacket-psexec cadre.local/Administrator@192.168.77.10 -k -no-pass
 ```
 
-**Stealth alternative — Diamond Ticket (WT012):** Modify a legitimate TGT instead of forging one. **⚠️ TOOL-BLOCKED 2026-08-03** — staged (obfuscated) Rubeus `diamond` is a stub (ignores `/service`/`/dc`, hardcodes `cifs/dc.domain.com`, `/tgtdeleg` fails over SSH). Prereqs validated (legit TGT ✅, krbtgt AES256 ✅). Reopen with official Rubeus build.
+**Stealth alternative — Diamond Ticket (WT012):** Modify a legitimate TGT instead of forging one. **⚠️ Partial 2026-08-03 (tool-compat)** — process validated to the PAC-forge fork: legit TGT ✅ (AS-REQ), krbtgt AES256 ✅, service SPN ✅. Rubeus 2.2.0 (community build; no newer prebuilt exists) fails `Unable to decrypt ticket or get PAC` on Server 2025 KDC; `/tgtdeleg` path has an arg bug + fails over SSH. Reopen: compile Rubeus master (2.4.x).
 
 **Targeted alternative — Silver Ticket (WT011):** Forge service-specific TGS for targeted access without DC contact. **✅ VERIFIED 2026-08-03** — forged `cifs/mbr01` silver (MBR01$ NT `3a01c6cd…`, Administrator + group 512) via mimikatz `kerberos::golden /service`; impacket `smbclient.py -k` listed full mbr01 `c$` (no KDC contact). Windows `dir` client falls back to NTLM — use impacket `-k` for explicit-ticket verification.
 

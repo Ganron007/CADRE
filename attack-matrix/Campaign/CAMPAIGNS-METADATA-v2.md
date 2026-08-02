@@ -475,7 +475,7 @@ We have `nt authority\system` on mbr01 via GodPotato. `analyst_cloud` has an act
 
 | Field | Value |
 |-------|-------|
-| **Status** | ⚠️ Partial 2026-08-03 — SharpDPAPI 1.12.0 runs as SYSTEM; `masterkeys` gated on domain DPAPI backup key (`/pvk`/`/rpc`/`/password`/`/ntlm`/`/credkey`/`/hashes` — none supplied). Full chain needs DA backup-key extraction. Nemesis not staged (SharpDPAPI = equivalent primitive). |
+| **Status** | ⚠️ Partial 2026-08-03 (tool-compat) — **chain 80%:** domain DPAPI backup key EXTRACTED (`ntds_capi_0_73eeb965…` RSA PVK + `ntds_legacy_0_71f6589e…` 256B + DER + PFX) via mimikatz `lsadump::backupkeys /export` on dc01 (WinRM, DA); masterkeys ENUMERATED (Administrator / Administrator.CHILD / **analyst_cloud.CADRE** → `6a912b23…` / vagrant). Decryption blocked: SharpDPAPI 1.12.0 + latest throw `Bad Version of provider` importing keys (RSA + legacy, file + base64) — CSP/CryptoAPI quirk on Server 2025. Reopen: latest pypykatz (dpapi) or Nemesis with the extracted keys. |
 | **Att&ck** | T1555 (Credentials from Password Stores) |
 | **Technique** | Nemesis 2.2+ automates DPAPI decryption chain — SYSTEM/user masterkeys → CNG keys → Chromium App-Bound encryption |
 | **What it does** | SYSTEM on mbr01 extracts DPAPI masterkeys for `analyst_cloud` → Nemesis decrypts Chromium App-Bound cookies, saved RDP file credentials, Outlook cached creds, WiFi passwords. |
@@ -585,7 +585,7 @@ We have `nt authority\system` on mbr01 via GodPotato. `analyst_cloud` has an act
 
 | Field | Value |
 |-------|-------|
-| **Status** | ⚠️ Partial 2026-08-03 (env/tool) — PPL_RunAsPPL=0, SeDebugPrivilege OK (`Privilege '20' OK`). comsvcs MiniDump → 76KB stub (not usable). WerFault `-u -p -ip` → no dump. mimikatz 2.2.0 sekurlsa → `kuhl_m_sekurlsa_acquireLSA` (build too old for Server 2025). procdump not staged. Extraction objective unproven this batch. |
+| **Status** | ✅ VERIFIED 2026-08-03 (extraction) — procdump v12.01 `-ma lsass` → **62MB real full dump**; Rubeus dump (community 2.2.0) live-extracted analyst_cloud (CADRE) / MBR01$ / MSSQL$SQLEXPRESS / cross-domain tickets. Caveats: mimikatz 2.2.0 + pypykatz 0.3.15 can't parse Server 2025 LSASS; WerFault `-u -p -ip` produced no dump. T1003.001 objective achieved via procdump + Rubeus. |
 | **Att&ck** | T1003.001 (OS Credential Dumping: LSASS Memory) |
 | **Technique** | Microsoft-signed `WerFaultSecure.exe` triggers LSASS crash dump via Windows Error Reporting |
 | **What it does** | Stealthier than procdump; trusted binary; not flagged by most EDR. |
@@ -807,7 +807,7 @@ We have `nt authority\system` on mbr01 via GodPotato. `analyst_cloud` has an act
 
 | Field | Value |
 |-------|-------|
-| **Status** | ⚠️ TOOL-BLOCKED 2026-08-03 — legit TGT obtained (asktgt ✅) + krbtgt AES256 known ✅, but staged Rubeus.exe is an **obfuscated build whose `diamond` action is a stub**: ignores `/service`/`/dc` (hardcodes `cifs/dc.domain.com`), `/ticket:<b64>` not parsed (0xc000000d), `/tgtdeleg` fails over SSH (`SEC_E_NO_CREDENTIALS`). Reopen: official Rubeus build (rubeus-src staged) or mimikatz TGT-modify equivalent. |
+| **Status** | ⚠️ Partial 2026-08-03 (tool-compat) — real Rubeus (community 2.2.0, readable stack). Prereqs validated: legit TGT ✅ (AS-REQ), krbtgt AES256 ✅ (`d64da42f…` = WT010 golden key), service SPN ✅. Fork: AS-REQ path gets TGT then `Unable to decrypt ticket or get PAC` (Rubeus 2.2.0 PAC parser vs Server 2025 KDC); `/tgtdeleg` path arg-bug (hardcodes `cifs/dc.domain.com`) + fails over SSH. No newer prebuilt (GhostPack source-only). Reopen: compile Rubeus master (2.4.x). |
 | **Technique** | Modify legit TGT rather than forge |
 | **Use case** | Stealthier than Golden Ticket; requires `krbtgt` AES256 key + a valid TGT |
 | **Key telemetry** | Legit TGT origin — fewer anomalies |

