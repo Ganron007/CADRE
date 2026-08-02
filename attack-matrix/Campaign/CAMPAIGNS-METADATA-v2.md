@@ -2,7 +2,7 @@
 
 **Companion to** [`CAMPAIGNS_v3.md`](CAMPAIGNS_v3.md). One metadata block per attack, aligned with the current v3 campaign design.
 
-**Scope:** 81 campaign attacks (main spine Phases 0.5–8 + 4 branches) + 14 E exercises + 12 F supply-chain scenarios + G standalone CVE exercises = **107+ total**. E/F/G are standalone exercises, not part of the campaign narrative.
+**Scope:** 94 campaign attacks (main spine Phases 0.5–8 + Post-DA sub-phase + 4 branches) + 14 E exercises + 12 F supply-chain scenarios + G standalone CVE exercises = **121 total**. E/F/G are standalone exercises, not part of the campaign narrative.
 
 **Field guide:**
 

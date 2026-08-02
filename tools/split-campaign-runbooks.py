@@ -366,7 +366,7 @@ Open **one runbook per phase**. Each file contains the full explanation, prerequ
 > **v3 is current.** Per-phase runbooks below are the primary path — full narrative + commands for learning and live testing.
 > **Archived v1:** [`archive/CAMPAIGNS_v1_archived.md`](archive/CAMPAIGNS_v1_archived.md) · **Full v3 reference:** [`CAMPAIGNS_v3.md`](CAMPAIGNS_v3.md)
 
-**81 campaign attacks + 14 E exercises + 10 F supply-chain scenarios = 105 total.**
+**94 campaign attacks + 14 E exercises + 10 F supply-chain scenarios = 118 total.**
 
 """
     return header + index_table + topology + "\n---\n\n" + coverage + "\n"

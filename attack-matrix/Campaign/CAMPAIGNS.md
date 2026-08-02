@@ -3,7 +3,7 @@
 > **v3 is current.** Per-phase runbooks below are the primary path — full narrative + commands for learning and live testing.
 > **Archived v1:** [`archive/CAMPAIGNS_v1_archived.md`](archive/CAMPAIGNS_v1_archived.md) · **Full v3 reference:** [`CAMPAIGNS_v3.md`](CAMPAIGNS_v3.md)
 
-**81 campaign attacks + 14 E exercises + 10 F supply-chain scenarios = 105 total.**
+**94 campaign attacks + 14 E exercises + 10 F supply-chain scenarios = 118 total.**
 
 ## Phase runbooks (v3 — read + execute)
 
@@ -100,6 +100,10 @@ graph LR
         P7["P7: Golden Ticket / SID History<br/>cadre.local root DA"]
     end
 
+    subgraph POST_DA [Post-DA Cluster]
+        PD["Post-DA: KDS Root Key<br/>gMSA/dMSA · DSRM · DCShadow"]
+    end
+
     subgraph RANGE_FOREST [range.local]
         P8["P8: Cross-Forest + SCCM<br/>range.local DA"]
     end
@@ -112,7 +116,8 @@ graph LR
     P4 --> P5
     P5 --> P6
     P6 ==>|"T103: child DA → root EA"| P7
-    P7 ==>|"T104: cross-forest<br/>SID Filter OFF"| P8
+    P7 ==>|"Post-DA: KDS/gMSA/DSRM<br/>offline creds + persistence"| PD
+    PD ==>|"T104: cross-forest<br/>SID Filter OFF"| P8
 
     subgraph BRANCH_A [Branch A: ACL Abuse]
         P4 -.-> A1["ACE#7: ForceChangePassword"]

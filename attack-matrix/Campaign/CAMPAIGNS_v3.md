@@ -6,7 +6,7 @@
 > **DFIR investigation bridge:** `[DFIR-Nexus-Pioneer-workflow.md](DFIR-Nexus-Pioneer-workflow.md)` — parallel attack + DFIR-Nexus case workflow (Phase 3.5 active).
 > **Index:** [`Runbooks/CAMPAIGNS-RUNBOOK-README.md`](Runbooks/CAMPAIGNS-RUNBOOK-README.md) · **Automation:** [`docs/internal/plan1.1-campaign-automation/`](../../docs/internal/plan1.1-campaign-automation/) · **Archive:** [`archive/CAMPAIGNS.md`](archive/CAMPAIGNS.md) (v2 index) · [`archive/CAMPAIGNS_v2.md`](archive/CAMPAIGNS_v2.md) (v2 monolith) · [`archive/CAMPAIGNS_v1_archived.md`](archive/CAMPAIGNS_v1_archived.md) (v1).
 
-**81 campaign attacks + 14 E exercises + 10 F supply-chain scenarios = 105 total.**
+**94 campaign attacks + 14 E exercises + 10 F supply-chain scenarios = 118 total.**
 
 ```text
 ================================================================================
@@ -183,6 +183,21 @@ PHASE 7 — GOLDEN TICKET + EXTRASIDS (Root Enterprise Admin)
   Tools:  Rubeus.exe golden /sids:<EA-SID> /ptt
   Alt:    Silver Ticket (WT011) — service-specific, no KDC contact
           Diamond Ticket (WT012) — modify legit TGT, stealthier
+
+
+POST-DA — KDS/gMSA/dMSA + PERSISTENCE CLUSTER (WT097-109)
+═══════════════════════════════════════════════════════════════════════════════
+  Source: ws01 or mbr01 (DA context earned in Phase 6/7)
+  Target: dc01 (.10) / dc02 (.11) — KDS root key, gMSA/dMSA blobs, LAPS, DSRM
+  [CRED] child DA (Phase 6) or cadre EA (Phase 7) — post-DA only
+  [GAIN] KDS root key → offline gMSA/dMSA passwords (Golden gMSA/dMSA, WT098/099)
+         LAPS bulk (WT100), DSRM persistence (WT101), DCShadow (WT102),
+         DPAPI-NG SID-protector decryption (WT103)
+  Tools:  DSIternals, GMSAPasswordReader, bloodyAD, impacket-dcshadow
+  Ext:    Branch 3.5O persistence (WT104-107: DLL/COM/IFEO/LSA SSP),
+          DCOMIllusionist (WT108, Phase 3 alt), ESC16 (WT109, Branch B)
+  Note:   Post-DA capstone — persistence + offline-cred primitives; runs
+          alongside Phase 8, does not require range.local access
 
 
 PHASE 8 — CROSS-FOREST + SCCM (range.local Domain Admin)
@@ -399,6 +414,10 @@ graph LR
         P7["P7: Golden Ticket / SID History<br/>cadre.local root DA"]
     end
 
+    subgraph POST_DA [Post-DA Cluster]
+        PD["Post-DA: KDS Root Key<br/>gMSA/dMSA · DSRM · DCShadow"]
+    end
+
     subgraph RANGE_FOREST [range.local]
         P8["P8: Cross-Forest + SCCM<br/>range.local DA"]
     end
@@ -411,7 +430,8 @@ graph LR
     P4 --> P5
     P5 --> P6
     P6 ==>|"T103: child DA → root EA"| P7
-    P7 ==>|"T104: cross-forest<br/>SID Filter OFF"| P8
+    P7 ==>|"Post-DA: KDS/gMSA/DSRM<br/>offline creds + persistence"| PD
+    PD ==>|"T104: cross-forest<br/>SID Filter OFF"| P8
 
     subgraph BRANCH_A [Branch A: ACL Abuse]
         P4 -.-> A1["ACE#7: ForceChangePassword"]

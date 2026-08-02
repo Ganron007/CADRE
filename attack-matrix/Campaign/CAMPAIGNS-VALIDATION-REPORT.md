@@ -71,8 +71,8 @@
 - **Phase 1**: 1 attacks
 - **Phase 2**: 1 attacks
 - **Phase 2 Alt**: 1 attacks
-- **Phase 3**: 2 attacks
-- **Phase 3.5**: 14 attacks
+- **Phase 3**: 3 attacks
+- **Phase 3.5**: 18 attacks
 - **Phase 4**: 1 attacks
 - **Phase 5**: 1 attacks
 - **Phase 5 Coercion**: 9 attacks
@@ -84,7 +84,7 @@
 - **Phase 8 / Branch C**: 5 attacks
 - **Phase 8 Alt**: 1 attacks
 - **Branch A**: 10 attacks
-- **Branch B**: 8 attacks
+- **Branch B**: 9 attacks
 - **Branch D**: 6 attacks
 - **Branch G**: 1 attacks
 - **E attack sims (WT069-081 + E-10)**: 14 attacks
