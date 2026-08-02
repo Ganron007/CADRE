@@ -3712,7 +3712,7 @@ Remove-MpPreference -ExclusionProcess "mimikatz.exe"
 - No reliable network signature for the in-memory path; exfil detection only if the ~75 MB dump is shipped (anomalous outbound volume)
 
 **Test plan (Phase 3.5 — gated on staging):**
-1. Build/stage ShadowDumper on ws01/mbr01 (Visual Studio build or standalone release) → `C:\Windows\Temp\cadre-tools\` per the GodPotato staging convention, run as SYSTEM (Phase 3.5 context).
+1. **Stage on ws01 only** (all tooling stages on ws01 — the beachhead; per campaign Rule 1 direct-SSH + tool-staging convention). Build/download ShadowDumper onto `ws01` (`C:\Tools\ADTools\` or equivalent), then copy laterally to `mbr01` over SMB `C$`/`ADMIN$` only when the target run needs it (`C:\Windows\Temp\cadre-tools\` per the GodPotato convention), as SYSTEM (Phase 3.5 context).
 2. **Callbacks** technique → confirm the dump is intercepted in-memory (throwaway handle stays 0 bytes).
 3. **Native** technique → confirm no `dbghelp.dll` load (ProcMon/ETW) and creds extractable.
 4. **Extract** path → compare LSA/SSP output with verified `3.5F` mimikatz output (expected: same secrets).
