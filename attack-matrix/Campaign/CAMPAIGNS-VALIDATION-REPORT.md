@@ -23,7 +23,7 @@
 ## Campaign Status Rollup (2026-08-02)
 
 > **Legend:** ✅ done/verified (attack side) · ⚠️ partial (env-gated / primitive-only / script-runs) · ⏳ pending (not exercised / detection validate / needs prerequisite) · 🔬 deferred (decision) · ❌ invalid/rejected (non-functional / rejected methodology).
-> **Branch E split:** attack sims (WT069-081 + E-10) = 14 rows ✅ complete; the E-01..E-14 rows are the **detection-validation tracker** (pending — Plan 1 telemetry stage). **Branch F:** attack side validated on linux01 (9 rows ✅ / 1 ⚠️ env-gated); detection + mbr01 pending.
+> **Branch E:** attack sims (WT069-081 + E-10) = 14 rows ✅ complete. **Branch F:** attack side validated on linux01 (9 rows ✅ / 1 ⚠️ env-gated). **Branch E/F detection validation is tracked in `CHECKLIST.md`** (Plan 1 telemetry stage), not in this rollup.
 
 | Phase / Branch | Total | ✅ Done | ⚠️ Partial | ⏳ Pending | 🔬 Deferred | ❌ Invalid |
 |---|---|---:|---:|---:|---:|---:|
@@ -48,18 +48,17 @@
 | **Branch C** — SCCM | 5 | 3 | 2 | 0 | 0 | 0 |
 | **Branch D** — Linux Pivot | 6 | 6 | 0 | 0 | 0 | 0 |
 | **Branch E** — Network Defense (attack sims WT069-081 + E-10) | 14 | 14 | 0 | 0 | 0 | 0 |
-| **Branch E** — Network Defense (detection validate E-01..E-14) | 14 | 0 | 0 | 14 | 0 | 0 |
 | **Branch F** — Supply Chain | 13 | 9 | 1 | 0 | 3 | 0 |
 | **Branch G** — CVE-2026-41089 | 1 | 0 | 0 | 1 | 0 | 0 |
-| **TOTAL** | **120** | **68** | **6** | **31** | **9** | **6** |
+| **TOTAL** | **106** | **68** | **6** | **17** | **9** | **6** |
 
 **Rollup notes (2026-08-02):**
 - **68 items attack-side verified** — full AD spine (Phases 0-8), **Branch A 100%**, **Branch B** (ESC1/2/3/4/7/9 + UnPAC), **Branch D 100%**, **Branch C exec chain** (WT037/038/039 FULL EXEC), **Branch E attack sims** (14), Branch F linux scenarios (9).
 - **6 partial:** 3.5C (RDP script missing), WT011/012 (script runs, real-service verify pending), WT035 (surface deep-verified, needs PXE client), WT036 (primitive verified, needs console device), F-05 (env-gated on public npm registry).
-- **31 pending:** H-01..06 (needs `19-initial-access.yml`), NTLMv1, 3.5G/H/D/J/K/L/M/N, WT096, Branch G, **14 Branch E detection rows** + Branch F detection/mbr01 (telemetry stage).
+- **17 pending:** H-01..06 (needs `19-initial-access.yml`), NTLMv1, 3.5G/H/D/J/K/L/M/N, WT096, Branch G (Branch E/F detection validation tracked in `CHECKLIST.md`, telemetry stage).
 - **9 deferred:** WT021/022 (NTLM relay — no SMB coerce on Server 2025), WT094/095 (UnCanny/Onelogon), Skipjack, ESC8/11 (relay family), F-11..F-13 (held expansions).
 - **6 invalid/rejected:** WT028 (SAMR null blocked), WT018/019/020 (coercion non-functional), 3.5B (scheduled-task execution — Rule 2), 3.5I (token impersonation, error 1346).
-- **Detection validation (E/F)** deferred to the Plan 1 telemetry catalog stage (monitor `.55`).
+- **Detection validation (Branch E/F)** tracked in `CHECKLIST.md` — deferred to the Plan 1 telemetry catalog stage (monitor `.55`).
 - **Future:** CADRE NPM-Chain upgrade designed (`plan1.8-offensive-upgrades.md` §11), not implemented.
 
 ## Summary Statistics
@@ -85,10 +84,9 @@
 - **Branch B**: 8 attacks
 - **Branch D**: 6 attacks
 - **Branch G**: 1 attacks
-- **E - Network Defense**: 14 attacks
 - **E attack sims (WT069-081 + E-10)**: 14 attacks
 - **F - Supply Chain**: 13 attacks
-- **Total attacks listed**: 120
+- **Total attacks listed**: 106
 
 ## Phase 0.5 / H
 
