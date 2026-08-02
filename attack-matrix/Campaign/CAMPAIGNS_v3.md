@@ -8,7 +8,7 @@
 
 **94 campaign attacks + 14 E exercises + 10 F supply-chain scenarios = 118 total.**
 
-**Validation batch 2 (2026-08-03):** WT011 Silver ✅ VERIFIED (real-service `c$` via impacket `-k`) · 3.5D File detonation ✅ (SYSTEM drop + active console session) · **3.5K LSASS extraction ✅** (procdump 62MB dump + Rubeus dump → analyst_cloud/MBR01$/cross-domain tickets) · 3.5G ⚠️ (chain 80%: DPAPI backup key + masterkeys extracted; SharpDPAPI decrypt tool-blocked) · 3.5H/J ⚠️ (env) · WT012 ⚠️ (process validated to PAC-forge; Rubeus 2.2.0 vs Server 2025) · 3.5M 🔬 deferred (AAD Connect not deployed). **Key env findings (Server 2025, mbr01):** WMI permanent subs activate but never deliver (temp subs work; `WITHIN` rejected 0x80041017); comsvcs MiniDump → 64-76KB stubs but **procdump `-ma` → real 62MB dump**; mimikatz 2.2.0/pypykatz 0.3.15 can't parse Server 2025 LSASS (Rubeus dump works); staged Rubeus is obfuscated (community 2.2.0 build works but can't forge Server 2025 PAC); SharpDPAPI `Bad Version of provider` on key import. New scripts: `wt011-*`, `wt035d-*`, `wt035g-*`, `wt035h-*`, `wt035j-*`, `wt035k-*`, `wt012-*` under `04-automation/linux/windows/`.
+**Validation batch 2 (2026-08-03):** WT011 Silver ✅ VERIFIED (real-service `c$` via impacket `-k`) · 3.5D File detonation ✅ (SYSTEM drop + active console session) · **3.5K LSASS extraction ✅** (procdump 62MB dump + Rubeus dump → analyst_cloud/MBR01$/cross-domain tickets) · 3.5G ✅ VERIFIED end-to-end (DPAPI backup key → masterkeys decrypted → Credential + Web Vault blobs on dc01 via updated SharpDPAPI build) · 3.5H/J ⚠️ (env) · WT012 ⚠️ (process validated to PAC-forge; Rubeus 2.2.0 vs Server 2025) · 3.5M 🔬 deferred (AAD Connect not deployed). **Key env findings (Server 2025, mbr01):** WMI permanent subs activate but never deliver (temp subs work; `WITHIN` rejected 0x80041017); comsvcs MiniDump → 64-76KB stubs but **procdump `-ma` → real 62MB dump**; mimikatz 2.2.0/pypykatz 0.3.15 can't parse Server 2025 LSASS (Rubeus dump works); staged Rubeus is obfuscated (community 2.2.0 build works but can't forge Server 2025 PAC); SharpDPAPI `Bad Version of provider` on key import — **RESOLVED by updated 2026-02-02 build (3.5G ✅)**. New scripts: `wt011-*`, `wt035d-*`, `wt035g-*`, `wt035h-*`, `wt035j-*`, `wt035k-*`, `wt012-*` under `04-automation/linux/windows/`.
 
 **Attack-flow reference (moved out for lightness):** [`CAMPAIGNv3-ATTACK-FLOW.md`](CAMPAIGNv3-ATTACK-FLOW.md)
 
@@ -172,7 +172,7 @@ The v3 campaign is designed as a realistic red-team engagement within a single V
 
 2. **Mandatory lateral movement.** The campaign cannot reach domain admin without moving from `ws01 → mbr01 → dc02`. Each hop crosses a distinct identity boundary: `analyst_t1` (workstation user) → `svc_mssql` (service account) → `dc02$` (machine account) → `krbtgt` (domain tier).
 
-3. **Tool staging on the initial beachhead (`ws01`).** Rubeus, mimikatz, and LPE tools are downloaded once onto `ws01` (the first compromised domain workstation), then copied laterally to `mbr01`/`dc02`/`dc01` over SMB (`C$`/`ADMIN$`). This mirrors real-world CRTP/CAPE operator behavior and avoids C2-to-DC HTTP traffic.
+3. **Tool staging on the initial beachhead (`ws01`).** Rubeus, mimikatz, and LPE tools are downloaded once onto `ws01` (the first compromised domain workstation), then copied laterally to `mbr01`/`dc02`/`dc01` over SMB (`C$`/`ADMIN$`). This mirrors real-world operator staging behavior and avoids C2-to-DC HTTP traffic.
 
 4. **Failure-tolerant paths.** Every major objective has a fallback:
    - If `T101` WinRS is blocked → fallback to `psexec` over SMB or PowerShell remoting.
@@ -859,7 +859,7 @@ $krb5asrep$23$intern_blue@CHILD.CADRE.LOCAL:... → 1nt3rn_Blu3!
 
 **What happened:** An administrator mistakenly flagged `intern_blue`'s account as "Do not require Kerberos preauthentication" — perhaps to support a legacy Unix service or during a troubleshooting session. They never re-enabled it. This single checkbox on one user object gives us our first credential in the child domain.
 
-> ~~**WT028 (null session) removed** — SAMR null bind blocked on Server 2025. **WT031 (password spray) pending relocation** — valid technique, needs a user list source. Kerberos user enumeration (above) replaces the recon function that null session used to serve.~~
+> ~~**WT028 (null session) removed** — SAMR null bind blocked on Server 2025. **WT031 (password spray) relocated — verified (Phase 0/1 Fallback ✅)** — valid technique, needs a user list source. Kerberos user enumeration (above) replaces the recon function that null session used to serve.~~
 
 ---
 
@@ -1292,7 +1292,7 @@ EXEC xp_cmdshell 'whoami /groups';   -- → BUILTIN\Users (NOT admin)
 | **What you earn**       | `nt authority\system` on mbr01 — full control of the machine      |
 
 
-**Why this matters (CRTP/CAPE method):** Real attackers do not download binaries directly onto the target from their C2 HTTP server. They stage tools on the first compromised host (`ws01`), then copy them laterally over SMB (`xcopy`, `Copy-Item`, `net use`) or PowerShell remoting. This keeps C2-to-DC traffic low and blends the tool transfer with normal Windows admin activity.
+**Why this matters (standard tool-staging method):** Real attackers do not download binaries directly onto the target from their C2 HTTP server. They stage tools on the first compromised host (`ws01`), then copy them laterally over SMB (`xcopy`, `Copy-Item`, `net use`) or PowerShell remoting. This keeps C2-to-DC traffic low and blends the tool transfer with normal Windows admin activity.
 
 **MITRE mapping:** T1570 (Lateral Tool Transfer) · T1068 (Exploitation for Privilege Escalation) · T1078 (Valid Accounts).
 
@@ -1644,7 +1644,7 @@ We have SYSTEM on mbr01. analyst_cloud has an active console session (auto-logon
 | ------ | -------------------------------- | ---------------------------- | ------------------------------------- |
 | 3.5F   | LSASS credential dump (procdump) | LSASS PPL OFF ✅              | analyst_cloud NTLM + Kerberos         |
 | 3.5A   | Winlogon registry (plaintext)    | Auto-logon ON ✅              | analyst_cloud password                |
-| 3.5G   | Offensive DPAPI (Nemesis) ⚠️      | Saved creds in profile       | DPAPI-decrypted credentials           |
+| 3.5G   | Offensive DPAPI (Nemesis) ✅        | Saved creds in profile       | DPAPI-decrypted credentials           |
 | 3.5H   | ctfmon.exe password extraction ⚠️ | Typed passwords in CLI tools | SSH/WinSCP/MySQL passwords            |
 | 3.5C   | RDP interactive session          | Password known               | Full SharpHound data                  |
 | 3.5D   | File detonation (H-01..H-06 / WT063-068) — post-exploit telemetry ✅ | User click                   | Telemetry demo                        |
@@ -1929,7 +1929,7 @@ EXEC xp_cmdshell 'C:\Windows\Temp\cadre-tools\GodPotato.exe -cmd "cmd /c reg que
 
 ---
 
-#### 3.5G — Offensive DPAPI (Nemesis) ⚠️
+#### 3.5G — Offensive DPAPI (Nemesis) ✅ VERIFIED 2026-08-03
 
 **Source:** [https://specterops.io/blog/2026/03/04/offensive-dpapi-with-nemesis/](https://specterops.io/blog/2026/03/04/offensive-dpapi-with-nemesis/)
 **Tool:** Nemesis 2.2+
@@ -2198,7 +2198,7 @@ WerFaultSecure is a Microsoft-signed binary that can dump LSASS memory. Stealthi
 
 ---
 
-#### 3.5O — Persistence Extension Set: DLL/COM/IFEO/LSA SSP (WT104-107) ⏳
+#### 3.5O — Persistence Extension Set: DLL/COM/IFEO/LSA SSP (WT104-107) ⚠️ (WT105/106 ✅ 2026-08-03)
 
 **Source:** Zero Point Security RTO — Windows Persistence. Adds four host-persistence primitives to the Branch 3.5 persistence surface (3.5J WMI + invisible tasks). Adopted 2026-08-02 from `Campaign_suggestions.md` upgrade candidates.
 
@@ -2359,7 +2359,7 @@ Session data reveals attack paths invisible from LDAP alone (e.g., a user who's 
 
 ```powershell
 # From ws01 (initial beachhead), copy SharpHound to mbr01 via SMB (T1570).
-# This mirrors the CRTP method: xcopy / Copy-Item C:\AD\Tools\<tool> \\target\C$\... then winrs.
+# This mirrors the standard staging flow: xcopy / Copy-Item <tool> \\target\C$\... then winrs.
 $pass = ConvertTo-SecureString 'T13r_An@lyst!' -AsPlainText -Force
 $cred = New-Object System.Management.Automation.PSCredential('child.cadre.local\analyst_t1', $pass)
 New-Item -ItemType Directory -Path '\\mbr01.child.cadre.local\C$\Tools' -Force -Credential $cred | Out-Null
@@ -2434,7 +2434,7 @@ In the realistic multi-hop flow, **coercion runs from mbr01, not from Kali**. Af
 
 #### T102 — Coerce dc02$ to mbr01 from the mbr01 beachhead
 
-**Automation:** `attack-matrix/04-automation/linux/campaign-a/T102-coerce-dc02-ws01.sh` stages `campaign-a-t102-coerce-dc02.ps1` on `ws01` and runs it as `analyst_t1` via WinRM. The script copies `Rubeus.exe` and `SpoolSample.exe` from `ws01` to `mbr01`, starts `Rubeus monitor` as a background process, triggers `SpoolSample`, and pulls the monitor/spool logs back to `ws01`. Status: script created; execution paused pending user review.
+**Automation:** `attack-matrix/04-automation/linux/campaign-a/T102-coerce-dc02-ws01.sh` stages `campaign-a-t102-coerce-dc02.ps1` on `ws01` and runs it as `analyst_t1` via WinRM. The script copies `Rubeus.exe` and `SpoolSample.exe` from `ws01` to `mbr01`, starts `Rubeus monitor` as a background process, triggers `SpoolSample`, and pulls the monitor/spool logs back to `ws01`. Status: ✅ VERIFIED 2026-07-31 — `dc02$` TGT captured via hostname listener (IP listener falls back to NTLM, no TGT) → kirbi→ccache → Phase 6 DCSync of child/krbtgt.
 
 **Manual run:**
 
@@ -2745,7 +2745,7 @@ bloodyAD --host dc02 -d child.cadre.local -u svc_mssql -p 's3rv1c3_MSSQL!' \
 | **MITRE**         | T1003.006 (DCSync)                                                                   |
 
 
-**Status:** ⚠️ As-written path blocked. Phase 5 T102 coercion did not capture a usable `dc02$` TGT. `child\analyst_t1` authenticates to dc02 but lacks DCSync rights. Campaign pivoted to WT031 password-spray fallback, which yielded `chief_command` (DA+EA in `cadre.local`). Root `krbtgt` was extracted via `chief_command` DCSync against `dc01`.
+**Status:** ✅ VERIFIED 2026-07-31 — as-written path: T102 `dc02$` TGT captured (hostname listener) → kirbi→ccache → `secretsdump.py child.cadre.local/dc02$ -k -no-pass` → child/krbtgt NT + AES256. (Historical note: a pre-fix 2026-07-30 run pivoted to WT031; superseded by the T102 fix.)
 
 **Validated pivot:** root domain `cadre.local` compromise achieved without child `krbtgt`.
 
@@ -2780,7 +2780,7 @@ impacket-secretsdump -just-dc child.cadre.local/ -dc-ip 192.168.77.11 -k
 | **MITRE**         | T1550.002 (Use Alternate Auth Mat: Kerberos) + T1134.005 (SID-History Injection) |
 
 
-**Status:** ⚠️ Bypassed in current run. Phase 7 as-written requires child `krbtgt` from Phase 6. Instead, WT031 password-spray fallback yielded `chief_command` (DA+EA in `cadre.local`), and root `krbtgt` was DCSync'd directly from `dc01`. The EA objective is already satisfied.
+**Status:** ✅ VERIFIED 2026-07-31 — mimikatz `kerberos::golden` with child krbtgt (NT + AES256) + root EA SID PTT verified, `EA-aes.kirbi` saved. Rubeus `golden` silent-fails on ws01 (non-Defender quirk) — use mimikatz.
 
 **Phase 7 remains valid** for a clean main-spine run after Phase 6 is unblocked.
 
@@ -3272,14 +3272,7 @@ bloodyAD --host 192.168.77.10 -d cadre.local -u eng_cloud -p 'Cl0ud_Eng!' \
 
 #### GPP Stored Password (Groups.xml)
 
-A Groups.xml file on `\\dc01\SYSVOL\cadre.local\Policies\` contains a cpassword for `svc_backup`. GPP passwords use AES encryption with a well-known key — decrypt with `gpp-decrypt`.
-
-```bash
-gpp-decrypt "T6Zc9T0qO/pEh+eOXTnxky0jSJvWvPcvAKWwGSpFOqY"
-# → svc_backup password
-```
-
-The `svc_backup` account is created with `acctDisabled=0` (active) and can be used for lateral movement to servers where backup agents run.
+A Groups.xml file on `\\dc01\SYSVOL\cadre.local\Policies\` (Vulnerable-GPO) contains a cpassword. **Surface corrected 2026-07-31** (originally misconfigured with `svc_backup` + malformed cpassword) — the live account is **`svc_ldap` / `s3rv1c3_Ld@p!`**. Verified: `gpp-decrypt` on the cpassword → SMB auth as `svc_ldap` succeeded. Fixes in `02-ad-objects.yml` + `05-ad-attack-surface.yml`.
 
 ```
 
@@ -3375,7 +3368,7 @@ certipy auth -pfx user.pfx -dc-ip 192.168.77.10 -domain cadre.local
 
 **Detection:** Kerberos PKINIT + unusual U2U; WinSec 4768/4769 anomalies; Certipy LDAP noise.
 
-#### ESC16 — CA SID-Extension Disable (WT109) ⏳
+#### ESC16 — CA SID-Extension Disable (WT109) ✅ VERIFIED 2026-08-03
 
 **Source:** SpecterOps ESC16 research. If `DisableExtensionList` on the CA contains the SID OID (`1.3.6.1.4.1.311.25.2`), the CA strips SID extensions from issued certs — a **CA-admin-level** misconfiguration (needs ManageCA, already held by `lead_engineering` — ESC7 verified). Adopted 2026-08-02 from `Campaign_suggestions.md` upgrade candidates.
 
@@ -3454,7 +3447,7 @@ SharpSCCM.exe get naa -s mbr02.range.local
 
 ### Branch D: Linux Pivot
 
-> **Verification note (2026-07-29):** MSSQL linked-server pivot from `mbr01` to `linux01` is verified. `impacket-mssqlclient` as `child\analyst_t1` / `T13r_An@lyst!` connected to `mbr01.child.cadre.local`, and the query `EXECUTE('SELECT name FROM LINUX01.master.sys.databases')` returned linux01 databases. This confirms the Branch D entry point; subsequent SSSD ticket/keytab/NFS/Podman steps were not exercised in this run.
+> **Verification note (2026-08-01):** Branch D fully verified. MSSQL linked-server pivot (entry) verified; **WT045-048 VERIFIED 2026-08-01** — SSSD (keytab recreated), keytab extraction, NFS krb5p mount, Podman escape. Config gaps fixed live + propagated to `07-linux-config.yml` (+verifyOnly) + `sql-integration-guide.md` §3.4/3.5.
 
 **Diverges from:** Phase 3 (MSSQL linked-server recon discovers linux01).  
 **Converges to:** Phase 6 (domain credentials from linux01 help accelerate child DA).  
@@ -3781,7 +3774,7 @@ Survey of `C:\STUDY\Github\CADRE-Platform\CADRE-Courses\ebooks\` (75 .txt files)
 
 ## Coverage Summary
 
-> **Status notes:** WT028 (null session) ❌ Invalid. WT031 (password spray) ⏳ Pending relocation. WT018/019/020 (coercion) ❌ Non-functional on Server 2025. The six H vectors (H-01..H-06) are now Phase 0.5 of the main spine. Post-DA cluster (WT097-103) + persistence/exec/Branch B extensions (WT104-109) adopted 2026-08-02. Remaining 94 attacks active.
+> **Status notes:** WT028 (null session) ❌ Invalid. WT031 (password spray) relocated — verified. WT018/019/020 (coercion) ❌ Non-functional on Server 2025. The six H vectors (H-01..H-06) are now Phase 0.5 of the main spine. Post-DA cluster (WT097-103) + persistence/exec/Branch B extensions (WT104-109) adopted 2026-08-02. Remaining 94 attacks active.
 
 
 | Phase / Branch                | Primary WT#                      | Alternative                                                                                        | What you earn                |

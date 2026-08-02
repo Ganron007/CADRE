@@ -475,7 +475,7 @@ We have `nt authority\system` on mbr01 via GodPotato. `analyst_cloud` has an act
 
 | Field | Value |
 |-------|-------|
-| **Status** | ✅ VERIFIED 2026-08-03 (end-to-end, CRTE SharpDPAPI 2026-02-02 build) — domain DPAPI backup key EXTRACTED via mimikatz `lsadump::backupkeys /export` on dc01 (WinRM, DA); **CRTE SharpDPAPI imports the PVK and decrypts cadre masterkeys** (Administrator `{07024635…}:624FE5B4…`, chief_command `{9cdd94c1…}:094F1372…`) → **real blobs decrypted on dc01**: Administrator Credential (WindowsLive PersistedCredential `DFBE70A7…`) + **Web Credentials Vault** (recovered `aes128`/`aes256` vault keys). The `Bad Version of provider` blocker was a **tool-version issue**, not a platform quirk. Tool: CRTE SharpDPAPI merged to ws01 `C:\Tools\ADTools\CRTE-2026\`. |
+| **Status** | ✅ VERIFIED 2026-08-03 (end-to-end, updated SharpDPAPI 2026-02-02 build) — domain DPAPI backup key EXTRACTED via mimikatz `lsadump::backupkeys /export` on dc01 (WinRM, DA); **updated SharpDPAPI imports the PVK and decrypts cadre masterkeys** (Administrator `{07024635…}:624FE5B4…`, chief_command `{9cdd94c1…}:094F1372…`) → **real blobs decrypted on dc01**: Administrator Credential (WindowsLive PersistedCredential `DFBE70A7…`) + **Web Credentials Vault** (recovered `aes128`/`aes256` vault keys). The `Bad Version of provider` blocker was a **tool-version issue**, not a platform quirk. Tool: updated SharpDPAPI merged to ws01 `C:\Tools\ADTools\tools-2026\`. |
 | **Att&ck** | T1555 (Credentials from Password Stores) |
 | **Technique** | Nemesis 2.2+ automates DPAPI decryption chain — SYSTEM/user masterkeys → CNG keys → Chromium App-Bound encryption |
 | **What it does** | SYSTEM on mbr01 extracts DPAPI masterkeys for `analyst_cloud` → Nemesis decrypts Chromium App-Bound cookies, saved RDP file credentials, Outlook cached creds, WiFi passwords. |
@@ -680,7 +680,7 @@ We have `nt authority\system` on mbr01 via GodPotato. `analyst_cloud` has an act
 
 | Field | Value |
 |-------|-------|
-| **Status** | ⏳ Trigger verified / capture pending — `SpoolSample` coercion from ws01→mbr01 path triggers successfully against dc02, but Rubeus capture produced 0 Kirbi markers for `DC02$` in current test run. Playbook now ensures Print Spooler + SMB/RPC firewall prerequisites on dc02; revisit capture path next. |
+| **Status** | ✅ VERIFIED 2026-07-31 — dc02 Spooler/RPC prerequisites configured; hostname listener used for Kerberos (IP listener falls back to NTLM, no TGT); `dc02$` TGT captured → kirbi→ccache → Phase 6 DCSync child/krbtgt. |
 | **Stream** | Core AD |
 | **Att&ck** | T1187 (Forced Authentication) + T1550.002 (Use Alternate Authentication Material: Kerberos) |
 | **Technique** | Coerce `dc02$` to authenticate to `mbr01`, capture TGT via Rubeus monitor |
@@ -699,7 +699,7 @@ We have `nt authority\system` on mbr01 via GodPotato. `analyst_cloud` has an act
 | **Step 4** | Collect captured TGT from monitor output |
 | **Key telemetry** | WinSec 4662 (RPC); Zeek dce_rpc.log (opnum 1,65); Suri SID:1000050 (PrinterBug) |
 | **Script** | `attack-matrix/04-automation/linux/campaign-a/T102-coerce-dc02-ws01.sh` + `campaign-a-t102-coerce-dc02.ps1` |
-| **Status** | Tested 2026-07-30 — trigger verified, capture pending. `SpoolSample` runs and Rubeus dump is generated, but no Kirbi markers captured for `DC02$`. Re-test after playbook-enforced spooler/RPC prerequisites are verified on dc02. |
+| **Status** | ✅ VERIFIED 2026-07-31 — dc02 Spooler/RPC prerequisites configured; hostname listener used for Kerberos (IP listener falls back to NTLM, no TGT); `dc02$` TGT captured → kirbi→ccache → Phase 6 DCSync child/krbtgt. |
 
 #### Alternative Coercion Techniques
 
@@ -718,7 +718,7 @@ We have `nt authority\system` on mbr01 via GodPotato. `analyst_cloud` has an act
 | Field | Value |
 |-------|-------|
 | **WT#** | 007 |
-| **Status** | ⚠️ BLOCKED — PowerView LDAP query from ws01 fails with "An operations error occurred"; script/DC connectivity issue needs fix |
+| **Status** | ✅ VERIFIED 2026-07-31 — FakePC$ created via `addcomputer` + `bloodyAD` rbcd set on mbr01 → getST S4U2Proxy → SYSTEM on mbr01. (PowerView LDAP query from ws01 had a tooling quirk; the bloodyAD path is what verified.) |
 | **Technique** | Resource-Based Constrained Delegation |
 | **What it does** | Create fake computer, set RBCD on target, S4U2Proxy as DA |
 | **Playbook** | N/A — RBCD abuse; requires GenericWrite on target computer |
@@ -734,8 +734,8 @@ We have `nt authority\system` on mbr01 via GodPotato. `analyst_cloud` has an act
 
 | WT# | Technique | Status | Notes |
 |-----|-----------|--------|-------|
-| WT021 | NTLM Relay to LDAP (Shadow Credentials) | ✅ Active | Requires LDAP signing not enforced |
-| WT022 | NTLM Relay to SMB | ✅ Active | SMB signing disabled on mbr02 (`04-vulnerabilities.yml`) |
+| WT021 | NTLM Relay to LDAP (Shadow Credentials) | 🔬 Deferred | No SMB-authenticated coerce on Server 2025 (see ESC8 root cause) |
+| WT022 | NTLM Relay to SMB | 🔬 Deferred | Same blocker as WT021/ESC8 |
 | **Key telemetry** | WinSec 4624 (relayed); Zeek ldap.log / smb.log | | |
 | **Script** | `T021-ntlmrelay-ldap-ws01.sh`, `T022-ntlmrelay-smb-ws01.sh` | | |
 
@@ -763,7 +763,7 @@ We have `nt authority\system` on mbr01 via GodPotato. `analyst_cloud` has an act
 | **Command** | `Rubeus.exe ptt /ticket:<dc02$ TGT>` then `impacket-secretsdump 'child.cadre.local/dc02$@dc02.child.cadre.local' -k -no-pass` or `mimikatz # lsadump::dcsync /domain:child.cadre.local /user:krbtgt` |
 | **Key telemetry** | WinSec 4662 (DS Replication); Sysmon EID 3; Zeek dce_rpc.log (DRSUAPI); Suri SID:1000002 (63 fires) |
 | **Script** | `attack-matrix/04-automation/linux/campaign-a/T009-dcsync-ws01.sh` |
-| **Note** | ⚠️ As-written path blocked — Phase 5 `dc02$` TGT not captured, and `child\analyst_t1` lacks DCSync rights. Pivot: root `krbtgt` extracted via Phase 8 fallback (`chief_command` EA). Root DA/EA achieved without child `krbtgt`. |
+| **Note** | ✅ VERIFIED 2026-07-31 — as-written path (T102 dc02$ TGT → secretsdump `-k` → child/krbtgt) verified. |
 
 ---
 
@@ -789,7 +789,7 @@ We have `nt authority\system` on mbr01 via GodPotato. `analyst_cloud` has an act
 | **Step 3** | `lsadump::dcsync /domain:cadre.local /user:krbtgt` |
 | **Key telemetry** | WinSec 4624/4672 (EA logon); Zeek kerberos.log (cross-realm TGS) |
 | **Script** | `attack-matrix/04-automation/linux/campaign-a/T010-golden-ws01.sh` (Golden), `T011-silver-ws01.sh`, `T012-diamond-ws01.sh` |
-| **Note** | ⚠️ Bypassed in current run — root `krbtgt` and EA access achieved directly via WT031 fallback (`chief_command` DA+EA). Phase 7 as-written remains valid for a pure main-spine run. |
+| **Note** | ✅ VERIFIED 2026-07-31 — mimikatz golden (child krbtgt + root EA SID) PTT verified, `EA-aes.kirbi` saved; Rubeus `golden` silent-fails on ws01 (use mimikatz). |
 
 #### WT011 — Silver Ticket
 
@@ -1574,9 +1574,9 @@ A batch of campaign scripts was executed from `provisioning` (`192.168.77.60`) v
 
 ### Blocked Items Requiring Fixes
 
-1. **Phase 5 / T102 coercion** — Print Spooler on dc02 must be running/exposed. Verify `04-vulnerabilities.yml` and `04-vulnerabilities-verifyOnly.yml`.
-2. **Phase 5 / WT007 RBCD** — PowerView LDAP query fails from ws01. Fix script or verify dc02 LDAP connectivity.
-3. **Branch B / ADCS ESC1/ESC3/ESC8/UnPAC** — Certify from ws01 fails with DirectoryServices operations error. Run from a `cadre.local` domain-joined machine or provide explicit DC/domain credentials.
+1. ~~**Phase 5 / T102 coercion**~~ — **RESOLVED 2026-07-31** (dc02 Spooler/RPC prerequisites in `04-vulnerabilities.yml` + verifyOnly; `dc02$` TGT captured via hostname listener).
+2. ~~**Phase 5 / WT007 RBCD**~~ — **RESOLVED 2026-07-31** (verified via addcomputer + bloodyAD; the PowerView LDAP quirk is tooling, not connectivity).
+3. ~~**Branch B / ADCS ESC1/ESC3/ESC8/UnPAC**~~ — **RESOLVED 2026-08-01** (ESC1/3/UnPAC verified from ws01 with `-dynamic-endpoint` + explicit DC/domain creds; ESC8 deferred as relay-family).
 4. **Branch C / WT035-039 SCCM chain** — ~~Requires running from a SCCM client/site system (e.g., mbr02) or with SCCM PowerShell module; not exercisable from ws01.~~ **SUPERSEDED 2026-08-02** — WS01 is now a managed SCCM client (ResourceID 16777220); WT037 CMPivot + WT038 app deploy + WT039 script-as-SYSTEM **FULL EXEC VERIFIED** from ws01 as `range\svc_sccm`.
 5. **Branch D / WT045-048** — Linux pivot scripts do not exist; manual execution required.
 6. **Branch 3.5 / 3.5G, 3.5H, 3.5J, 3.5K, 3.5L, 3.5M** — Not exercised in this run.
