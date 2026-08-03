@@ -6,7 +6,7 @@
 > **Plan:** [`docs/internal/plan1.1-campaign-automation/CAMPAIGN-AUTOMATION-PLAN.md`](../../docs/internal/plan1.1-campaign-automation/CAMPAIGN-AUTOMATION-PLAN.md)  
 > **Graph:** [`automation/campaign-graph.yaml`](automation/campaign-graph.yaml) · **Campaign:** [`CAMPAIGNS_v3.md`](CAMPAIGNS_v3.md)
 
-**Status:** Plan 1.1 **complete** (M0–M5 + P11.6 dry-run on `.60`). Product: [`red-strike-product.md`](../../docs/internal/integrations/red-strike-product.md). Engine **0.5.0**. Live `--execute` remains operator-gated (HITL).
+**Status:** Plan 1.1 **complete** (M0–M5 + P11.6). Engine **0.5.1** — ws01 SSH transport for typed intents + graph v8. Live `--execute` operator-gated (HITL). **Campaign v3 full run:** engagement `camp-v3-20260803` on `.60` (2026-08-03).
 
 ---
 
@@ -82,9 +82,35 @@ redstrike-campaign run --phase 1-3 --beachhead linux --engage lab1
 - **Phase 8 T033** ✅ — cross-forest Kerberoast from `ws01` to `range.local` captured `svc_mssql` and `svc_sccm` TGS hashes.
 - **Phase 8 SCCM branch** ⚠️ BLOCKED — no SCCM site server on `mbr02`.
 
-**Engine note:** RedStrike M5 intent builders (`rubeus.asreproast`, etc.) currently invoke the local `CommandRunner` instead of routing `ws01` path nodes through `ws01-exec.sh`. Use `--prefer-script` for live CADRE campaign execution until M4 routing is fixed.
+**Engine note (2026-08-03):** **0.5.1** routes typed intents on `path: ws01` through OpenSSH → PowerShell (`ws01_transport.py`). Bash harness scripts (`mechanism: ws01-exec`) still run locally on provisioning and call `ws01-exec.sh` themselves. Use `--prefer-script` when graph nodes point at verified `campaign-a/*.sh` wrappers. Ensure `PATH` includes `/usr/bin` when invoking `redstrike-campaign` from minimal SSH sessions (or rely on 0.5.1 `resolve_executable` fallback).
 
 ---
+
+## RedStrike Campaign v3 full run (2026-08-03)
+
+**Engagement:** `camp-v3-20260803` · **Host:** provisioning `192.168.77.60` · **Log:** `~/redstrike-runs/camp-v3-20260803-20260803T064441Z.log`  
+**Harness:** `attack-matrix/04-automation/linux/redstrike-campaign-v3-full-run.sh`  
+**Flags:** `--execute --prefer-script --no-stop-on-hitl` (all gates pre-approved for automation pass)
+
+```bash
+export CADRE_ROOT=$HOME/CADRE
+export CADRE_AUTOMATION_ROOT=$HOME/CADRE/attack-matrix/04-automation/linux
+export REDSTRIKE_WS01_SSH_KEY=$HOME/.ssh/cadre-ws01-key
+export PATH=/usr/bin:/bin:$HOME/RedStrike/.venv/bin:$PATH
+bash ~/CADRE/attack-matrix/04-automation/linux/redstrike-campaign-v3-full-run.sh
+```
+
+| Result | Nodes |
+|--------|--------|
+| **OK** | Spine P1–3: T003, T002, T041; P3.5–4: T035-CREDS, T035A, T101, T004-MBR01-BH, T004-BH; P5–8: T017, T009, T010, T011, T033, T042; Branch A: T023, T008, T024; Branch B: T050, T051, **T056** (ESC8 surface); Branch C: T034–T039; Stream E: WT069–WT081; Stream F: F01–F10 |
+| **FAIL** | T043 (GodPotato/LPE), T102-COERCE-DC02, T012 (diamond ticket); Branch D: T045, T047, T048 |
+| **SKIP (stub)** | H-ASSUME, H-01..H-06, T097–T109, T100, T103, T104, T107, T108, T109, T-UNPAC, WT093 |
+
+**ESC8 / krbrelayx (WT052 / graph T056):** krbrelayx HTTP listener verified on ws01; full Kerberos-relay chain **not achieved** (no coerce → krb HTTP). RedStrike **T056** runs `T052-esc8-ws01.sh` — web-enrollment surface check only → **OK** after ledger seed sync (`chief_command` in `lab-seed-creds.json`).
+
+**Known FAIL class (same as manual spine):** T102 coercion (KIRBI capture), T012 obfuscated Rubeus diamond, Branch D linux01 scripts (env/creds), T043 GodPotato path.
+
+**Final state:** `status: complete`, `pending_gate: null`. **Validation report:** [`REDSTRIKE-VALIDATION-REPORT.md`](REDSTRIKE-VALIDATION-REPORT.md). **Next:** Plan 1 telemetry (operator review).
 
 ## MCP tools
 

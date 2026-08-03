@@ -1,12 +1,12 @@
 # CADRE-owned campaign graph (Plan 1.1 M5 / v7 lateral-movement update).
 # Engine is generic RedStrike; this file + seeds + lab-profiles are CADRE glue.
-# branch: spine | A | B | C | D | E | F | G | sql-ai
+# branch: spine | A | B | C | D | E | F | G | H | sql-ai
 # path: ws01 | linux60 | stage_mbr01 | external60_phase0
 # hitl_gate: dcsync | ticket | forest | persistence | acl_write | site_takeover
 # pivot_to: target machine/role for lateral movement (ws01 -> mbr01 -> dc02 -> dc01 -> range.local)
 # produces_beachhead: credential or machine beachhead created by this node
 # Streams: E = phase 9 (network defense), F = phase 10 (supply-chain) — no ws01 routing
-version: 7
+version: 8
 name: cadre-campaign-m5
 # M4+: prefer typed `intent` when set; `script` remains harness fallback (--prefer-script).
 nodes:
@@ -171,11 +171,6 @@ nodes:
     path: ws01
     beachheads: [windows, linux]
     script: campaign-a/T102-coerce-dc02-ws01.sh
-    intent: rubeus.monitor
-    intent_args:
-      target_user: DC02$
-      capture_server: mbr01.child.cadre.local
-      coerce_method: spoolsample
     requires_cred: analyst_t1
     produces_cred: null
     pivot_to: mbr01
@@ -349,7 +344,7 @@ nodes:
     path: ws01
     beachheads: [windows, linux]
     script: campaign-a/T050-esc1-ws01.sh
-    intent: certify.find
+    intent: certipy.find
     cred: analyst_t1
     intent_args:
       target: dc01.cadre.local
@@ -371,11 +366,178 @@ nodes:
   - id: T056
     phase: 5
     branch: B
-    title: ADCS ESC8 (NTLM relay)
+    title: ADCS ESC8 — deferred (krbrelayx/NTLM relay blocked; surface check only)
     path: ws01
     beachheads: [windows, linux]
     script: campaign-a/T052-esc8-ws01.sh
-    requires_cred: analyst_t1
+    requires_cred: chief_command
+    produces_cred: null
+
+  # ========== BRANCH H — Initial access (Rule 4: provisioning attacker, ws01 target) ==========
+  - id: H-01
+    phase: 0.5
+    branch: H
+    title: Malicious LNK (WT063) — delivery on provisioning, detonation ws01
+    path: external60_phase0
+    beachheads: [linux]
+    script: ""
+    stub: true
+    requires_cred: null
+    produces_cred: null
+
+  - id: H-02
+    phase: 0.5
+    branch: H
+    title: Malicious MSI (WT064)
+    path: external60_phase0
+    beachheads: [linux]
+    script: ""
+    stub: true
+    requires_cred: null
+    produces_cred: null
+
+  - id: H-03
+    phase: 0.5
+    branch: H
+    title: Malicious CHM (WT065)
+    path: external60_phase0
+    beachheads: [linux]
+    script: ""
+    stub: true
+    requires_cred: null
+    produces_cred: null
+
+  - id: H-04
+    phase: 0.5
+    branch: H
+    title: HTML smuggling (WT066)
+    path: external60_phase0
+    beachheads: [linux]
+    script: ""
+    stub: true
+    requires_cred: null
+    produces_cred: null
+
+  - id: H-05
+    phase: 0.5
+    branch: H
+    title: AutoIt3 (WT067)
+    path: external60_phase0
+    beachheads: [linux]
+    script: ""
+    stub: true
+    requires_cred: null
+    produces_cred: null
+
+  - id: H-06
+    phase: 0.5
+    branch: H
+    title: Malicious EXE (WT068)
+    path: external60_phase0
+    beachheads: [linux]
+    script: ""
+    stub: true
+    requires_cred: null
+    produces_cred: null
+
+  # ========== POST-DA cluster (WT097–109) — stubs until harness wired ==========
+  - id: T097
+    phase: 7
+    branch: spine
+    title: KDS Root Key extraction (WT097)
+    path: ws01
+    beachheads: [windows, linux]
+    script: ""
+    stub: true
+    requires_cred: chief_command
+    produces_cred: null
+
+  - id: T098
+    phase: 7
+    branch: spine
+    title: Golden gMSA (WT098)
+    path: ws01
+    beachheads: [windows, linux]
+    script: ""
+    stub: true
+    requires_cred: chief_command
+    produces_cred: null
+
+  - id: T099
+    phase: 7
+    branch: spine
+    title: Golden dMSA / BadSuccessor prereqs (WT099)
+    path: ws01
+    beachheads: [windows, linux]
+    script: ""
+    stub: true
+    requires_cred: chief_command
+    produces_cred: null
+
+  - id: T100
+    phase: 3.5
+    branch: spine
+    title: LAPS bulk extraction (WT100)
+    path: ws01
+    beachheads: [windows, linux]
+    script: ""
+    stub: true
+    requires_cred: null
+    produces_cred: null
+
+  - id: T103
+    phase: 3.5
+    branch: spine
+    title: DPAPI-NG SID Protector (WT103)
+    path: ws01
+    beachheads: [windows, linux]
+    script: ""
+    stub: true
+    requires_cred: chief_command
+    produces_cred: null
+
+  - id: T104
+    phase: 5
+    branch: spine
+    title: DLL hijack persistence app (WT104)
+    path: ws01
+    beachheads: [windows, linux]
+    script: ""
+    stub: true
+    requires_cred: null
+    produces_cred: null
+
+  - id: T107
+    phase: 5
+    branch: spine
+    title: LSA SSP DLL (WT107)
+    path: ws01
+    beachheads: [windows, linux]
+    script: ""
+    stub: true
+    requires_cred: null
+    produces_cred: null
+
+  - id: T108
+    phase: 5
+    branch: spine
+    title: DCOMIllusionist lateral (WT108)
+    path: ws01
+    beachheads: [windows, linux]
+    script: ""
+    stub: true
+    requires_cred: null
+    produces_cred: null
+
+  - id: T109
+    phase: 7
+    branch: spine
+    title: DCShadow (WT109)
+    path: ws01
+    beachheads: [windows, linux]
+    script: ""
+    stub: true
+    requires_cred: chief_command
     produces_cred: null
     hitl_gate: persistence
 
@@ -482,7 +644,7 @@ nodes:
     title: Linux SSSD ticket extraction
     path: linux60
     beachheads: [linux]
-    script: campaign-a/T040-mssql-linked-server-hop-ws01.sh
+    script: attacks/WT045-linux-sssd-ticket-extraction.sh
     requires_cred: null
     produces_cred: null
 
@@ -492,7 +654,7 @@ nodes:
     title: NFS Kerberos mount
     path: linux60
     beachheads: [linux]
-    script: campaign-a/T040-mssql-linked-server-hop-ws01.sh
+    script: attacks/WT047-nfs-kerberos-mount.sh
     requires_cred: null
     produces_cred: null
 
@@ -502,7 +664,7 @@ nodes:
     title: Podman container escape
     path: linux60
     beachheads: [linux]
-    script: campaign-a/T040-mssql-linked-server-hop-ws01.sh
+    script: attacks/WT048-podman-container-escape.sh
     requires_cred: null
     produces_cred: null
 

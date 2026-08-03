@@ -17,10 +17,11 @@
 
 > ### ⛔ HARD RULES — Campaign Run Rules (2026-08-03, operator-locked)
 >
-> **RULE 1 — Direct SSH to ws01 only.** Every attack in this campaign runs from `ws01` via direct SSH only.
+> **RULE 1 — Direct SSH to ws01 only; provisioning is for lab configuration.** Every attack in this campaign runs from `ws01` via direct SSH only.
 > - **Attack origin:** `localhost → ws01` direct SSH (`analyst_t1` @ `192.168.77.62`) using `C:\Users\Ganro\.ssh\cadre-ws01-key`. No wrapper scripts, no provisioning bridge, no `ws01-exec.sh` / `ws01-stage-file.sh` indirection.
-> - **Provisioning (`.60`) is config-only** — apply/verify playbooks, deploy config, Ansible runs. It is **never** an attack origin.
+> - **Provisioning (`.60`) and the `vagrant` account are config-only** — they are used to configure the lab, apply/verify playbooks, deploy config, and run Ansible; they are **never** an attack origin.
 > - **Tool staging:** tools/scripts are copied `localhost → ws01` via `scp` with the ws01 key, then executed by SSH-ing into ws01.
+> - **Exception:** Rule 4’s H branch is the only case where provisioning hosts the initial-access delivery assets and `ws01` is the target.
 >
 > **RULE 2 — No scheduled tasks to run commands.** Scheduled tasks are **never** used as an execution wrapper just to run commands/tools. That is not how an attacker operates on a compromised machine; this campaign simulates real-world attack methodology. Scheduled tasks are legitimate **only as persistence mechanisms** (Phase 5) on an already-compromised machine.
 > - The former "3.5B execution wrapper" use is **REJECTED**. Any validation evidence produced by running a command via a scheduled task is **invalid**.
@@ -540,7 +541,7 @@ We have `nt authority\system` on mbr01 via GodPotato. `analyst_cloud` has an act
 
 | Field | Value |
 |-------|-------|
-| **Status** | ⏳ Not yet tested |
+| **Status** | ✅ VERIFIED 2026-08-03 (prereqs — Rule 3): `wt035c-rdp-prereq.ps1` — mbr01 :3389 open; `CADRE\analyst_cloud` SMB IPC$ auth OK. Full `mstsc` Type-10 session / SharpHound `-c Session` = user practice |
 | **Att&ck** | T1021.001 (Remote Services: Remote Desktop Protocol) |
 | **Technique** | Full interactive RDP logon as `analyst_cloud` using extracted plaintext password |
 | **What it does** | From `ws01`, `mstsc /v:192.168.77.22 /u:analyst_cloud /p:'Cl0ud_An@lyst!' /d:CADRE`. Cross-domain auth works via cadre.local ↔ child.cadre.local trust. Type 10 logon produces highest-fidelity SharpHound data (DCOM users, local group edges, sessions). |
@@ -933,7 +934,7 @@ We have `nt authority\system` on mbr01 via GodPotato. `analyst_cloud` has an act
 
 | Field | Value |
 |-------|-------|
-| **Status** | ⏳ Not exercised — post-DA |
+| **Status** | ✅ VERIFIED 2026-08-03 (prereqs — Rule 3): range KDS root key 64B (`dc09b2f5-…`) + dMSA `dmsaPrivService$` SID + `msDS-ManagedPasswordId` 100B via DirectoryEntry on dc03 from ws01 (`wt099-dmsa-prereq.ps1`). Offline BadSuccessor compute = user practice |
 | **Att&ck** | T1558 / T1552 |
 | **Technique** | Compute delegated-MSA (dMSA) password offline from KDS root key (BadSuccessor) / post-patch BetterSuccessor |
 | **Prerequisite** | WT097 + dMSA in `range.local` (`dmsaPrivService$` — Branch A ACE#24) |
@@ -989,7 +990,7 @@ We have `nt authority\system` on mbr01 via GodPotato. `analyst_cloud` has an act
 
 | Field | Value |
 |-------|-------|
-| **Status** | ⏳ Not exercised — post-DA |
+| **Status** | 🔬 DEFERRED 2026-08-03 — no DPAPI-NG protected blob staged in lab (audit §2.19). WT097 KDS extraction ✅; decrypt exercise needs BitLocker/PFX/DNSSEC/ASP.NET target |
 | **Att&ck** | T1555 |
 | **Technique** | Decrypt DPAPI-NG SID-protected blobs (BitLocker/PFX/DNSSEC/ASP.NET) with KDS root key |
 | **Prerequisite** | WT097 + protected blob |
@@ -1003,7 +1004,7 @@ We have `nt authority\system` on mbr01 via GodPotato. `analyst_cloud` has an act
 
 | Field | Value |
 |-------|-------|
-| **Status** | ⚠️ Partial 2026-08-03 — WT105 COM ✅ (SYSTEM plants CLSID InprocServer32 → attacker DLL, verified + cleaned); WT106 IFEO ✅ (Debugger → notepad → marker `WT106-IFEO`, cleaned); WT104/107 ⏳ need staging (audit §2.19) |
+| **Status** | ⚠️ Partial 2026-08-03 — WT105 COM ✅; WT106 IFEO ✅; **WT104/107 🔬 deferred** (DLL-hijack app + SSP DLL not staged — audit §2.19) |
 | **Att&ck** | T1574.001 (DLL), T1546.015 (COM), T1546.012 (IFEO), T1547.005 (LSA SSP) |
 | **Technique** | Four host-persistence primitives: trusted-app DLL hijack; COM `LocalServer32`/`InprocServer32` repoint; IFEO `Debugger` key; malicious SSP in LSASS (cleartext capture) |
 | **Prerequisite** | SYSTEM on mbr01 (SQL→GodPotato chain) |

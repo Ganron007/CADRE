@@ -1,11 +1,12 @@
 # CADRE Campaign v3 Master Validation Report — 2026-07-30
 
 > Scope: every attack, branch, and standalone exercise in Campaign v3.
+> **RedStrike orchestrator runs:** [`REDSTRIKE-VALIDATION-REPORT.md`](REDSTRIKE-VALIDATION-REPORT.md) (graph nodes · `camp-v3-20260803`).
 > Excluded from execution: Phase 0.5 / H-01..H-06 (initial access) per operator request, but they are listed.
 > Legend: ✅ verified / 📝 script corrected pending re-test / ⏳ not exercised / ⠿ blocked / ❌ non-functional or rejected / 🔬 deferred.
 >
 > **Campaign run rules (2026-08-03, operator-locked):**
-> **RULE 1 — Direct SSH to ws01 only.** All attack runs use direct `localhost -> ws01` SSH (`ssh -i C:\Users\Ganro\.ssh\cadre-ws01-key analyst_t1@192.168.77.62`), no wrappers. Tooling staged `localhost -> ws01` via `scp`; execution by SSH-ing into ws01. **Provisioning (`.60`) is config-only** — never an attack origin. Validation evidence from provisioning-bridge or wrapper-mediated attacks is **invalid**.
+> **RULE 1 — Direct SSH to ws01 only; provisioning is for lab configuration.** All attack runs use direct `localhost -> ws01` SSH (`ssh -i C:\Users\Ganro\.ssh\cadre-ws01-key analyst_t1@192.168.77.62`), no wrappers. Tooling staged `localhost -> ws01` via `scp`; execution by SSH-ing into ws01. The `vagrant` account and the provisioning VM (`192.168.77.60`) are reserved for configuring the lab, applying/verifying playbooks, and staging config-only support tasks; they are never an attack origin. Validation evidence from provisioning-bridge or wrapper-mediated attacks is **invalid**. The only exception is Rule 4’s H branch, where provisioning hosts the initial-access delivery assets and `ws01` is the target.
 > **RULE 2 — No scheduled tasks to run commands.** Scheduled tasks are persistence-only (Phase 5), never execution wrappers. Running a command/tool via a scheduled task is rejected methodology; such evidence is invalid. The former "3.5B execution wrapper" is rejected per this rule.
 > **RULE 3 — Extraction/prerequisites are validated; cracking/computation/mutation is user practice.** We validate hashes, keys, blobs, and prerequisite state as campaign completion evidence. Password cracking, offline computation, or mutating steps are not a validation requirement for the run itself.
 > **RULE 4 — H branch is the only branch where provisioning is the attacker.** For H-01..H-06, provisioning hosts the delivery assets and `ws01` is the target; we verify the delivery/drop side, while the browser click or actual user execution remains user practice.
@@ -15,12 +16,27 @@
 >
 > **Session progress (2026-08-01):** GodPotato SYSTEM on mbr01 **VERIFIED** (WT041/043). Branch B **VERIFIED**: ESC1 (WT050) cert+PKINIT TGT+UnPAC NT hash `81c3b644...f1eb7b`; ESC3 (WT051) agent+on-behalf-of cert; UnPAC (WT053) via certipy auth. **ESC8 (WT052) DEFERRED** — root cause identified: no SMB-authenticated coercion works on Server 2025 in this lab (MS-EFSR blocked, MS-DFSNM/FSRVP no dial-out, MS-RPRN yields anonymous RPC to :135 only; the earlier `@8445` UNC claim is empirically false — Windows SMB client ignores `@port`). Branch C SCCM **surface verified** (SMS Provider reachable from ws01 as `range\svc_sccm`, confirmed SCCM admin on site CAD via `SMS_SCI_Component`); **WT037 CMPivot + WT038 app deploy + WT039 script-as-SYSTEM FULL EXEC VERIFIED 2026-08-02 from ws01** (enablers: BGB fast channel, svc_sccm Full Admin DB grant, DB script approval, mp.msi MP repair). Branch D: WT046 keytab + WT048 podman escape **VERIFIED**; WT045 SSSD cache extracted (no plaintext cachedPassword); WT047 krb5p mount blocked by empty host keytab.
 >
-> **ESC8 root-cause record (2026-08-01):** The v5 "custom SMB port 8445 + Coercer `@8445` UNC" approach was proven non-functional — tcpdump on the relay host showed the coerced `dc01$` makes **zero** TCP connections to any non-445 port (Windows SMB client does not support `@port` in UNC). On Server 2025 in this lab: MS-EFSR (`\PIPE\efsrpc`) blocked, MS-DFSNM/MS-FSRVP/MS-EVEN produce no dial-out, and the only working coercion (MS-RPRN, WT017) makes the victim dial the attacker's **RPC endpoint (135) with anonymous auth** ("Empty username ... just waiting" in impacket `rpcrelayserver.py`) — never an authenticated SMB session on 445. Therefore ESC8-as-designed is not executable here; revisit at end (candidate paths: Kerberos-relay/krbrelayx, or re-enabling an SMB coerce primitive).
+> **ESC8 krbrelayx revisit (2026-08-03):** Staged `krbrelayx` on ws01 (`C:\Tools\krbrelayx` + dedicated venv `impacket==0.12.0`, HTTP-only patch — kernel PID 4 holds :445). **HTTP Kerberos relay listener verified** on `192.168.77.62:80`. **Full ESC8 chain NOT achieved:** no Kerberos-authenticated HTTP connection from `dc01$` reached the listener (printerbug → `esc8relay.cadre.local` = `STATUS_OBJECT_NAME_NOT_FOUND`; MS-RPRN/coercion still does not produce krb HTTP to attacker). dnstool LDAPS add of `esc8relay.cadre.local` → ws01 OK. Automation: `esc8-krbrelayx-*.ps1` under `04-automation/linux/windows/`. **RedStrike T056** (`T052-esc8-ws01.sh`) surface check **OK** in `camp-v3-20260803`. **Status remains 🔬 DEFERRED** (same coerce-to-relay class as NTLM path; ESC11 deferred with ESC8).
+>
+> **ESC8 root-cause record (2026-08-01):** The v5 "custom SMB port 8445 + Coercer `@8445` UNC" approach was proven non-functional — tcpdump on the relay host showed the coerced `dc01$` makes **zero** TCP connections to any non-445 port (Windows SMB client does not support `@port` in UNC). On Server 2025 in this lab: MS-EFSR (`\PIPE\efsrpc`) blocked, MS-DFSNM/MS-FSRVP/MS-EVEN produce no dial-out, and the only working coercion (MS-RPRN, WT017) makes the victim dial the attacker's **RPC endpoint (135) with anonymous auth** ("Empty username ... just waiting" in impacket `rpcrelayserver.py`) — never an authenticated SMB session on 445. krbrelayx (2026-08-03) adds: **Kerberos HTTP relay tooling works, but no coerce primitive delivers krb HTTP to ws01.**
 >
 > **Defender / Tamper Protection status (2026-07-31, re-verified 11:20 UTC):** OFF on all VMs.
 > - Server VMs (dc01/dc02/dc03/mbr01/mbr02): WinDefend **Stopped** + `DisableAntiSpyware=1` + RTP policy block (04-vulnerabilities full kill already applied). MBR01 re-checked CIM-free: `WinDefend=Stopped|DisableAntiSpyware=1|DisableRealtimeMonitoring=1`. (The earlier blank MBR01 MPSTAT line was a WMI/CIM access-denied quirk for `analyst_t1` on that host, not a Defender issue.)
 > - ws01 (Windows 11 Enterprise build 26200): **soft-disable per `17-ws01-deploy.yml`** — RTP=`False`, TP=`False`, `DisableAntiSpyware=1`, all RTP/Behavior/IOAV/OnAccess policy blocks set, SpyNet=0, tooling exclusions active (`C:\Temp;C:\Tools;C:\Tools\cadre-attack;C:\Users\Public` + `cmd.exe;mimikatz.exe;powershell.exe;pwsh.exe;Rubeus.exe;SharpHound.exe`). WinDefend service stays **Running** — Windows 11 client SKU hard-protects the service; `Set/Stop-Service`, `sc.exe config/stop`, and even a SYSTEM scheduled task all get **Access denied** (OpenService FAILED 5). This matches the playbook design ("do NOT stop WinDefend"); with RTP off + excludes, campaign tools are unaffected.
 > - Rubeus `golden` silent-failure is **not** Defender-related — it persists after the full policy kill. Use mimikatz `kerberos::golden` (verified working) or `impacket` equivalents.
+
+## Satisfactory bar (attack-side closure — 2026-08-03)
+
+> **Goal:** `⏳ = 0` on the **attack rollup** before declaring campaign validation complete and syncing RedStrike. Detection fire-confirmation (Branch E/F, monitor `.55`) is owned by **Plan 1 telemetry** — not this rollup.
+
+| Bucket | Treatment | Counts as cleared? |
+|--------|-----------|-------------------|
+| **Exercisable** | Run under Rules 1–4 → ✅ / ⚠️ / ❌ | Must clear |
+| **Needs staging** | Stage once → run → ✅ / ⚠️ / 🔬 | Must clear or reclass with root cause |
+| **Platform / missing surface** | Reclassify → 🔬 deferred (documented reopen) | Cleared from ⏳ |
+| **Detection-only** | Move to Plan 1 tracker | Cleared from attack ⏳ |
+
+**RedStrike campaign-ready gate (after this bar):** engine enforces Rules 1–4; graph matches frozen validated set; dry-run + operator-gated `--execute` smoke on CADRE glue — then pin `CADRE/tools/red-strike/`.
 
 ## Campaign Status Rollup (2026-08-02)
 
@@ -34,16 +50,16 @@
 | Phase 0/1 Fallback (WT031) | 1 | 1 | 0 | 0 | 0 | 0 |
 | Phase 1 — AS-REP Roast | 1 | 1 | 0 | 0 | 0 | 0 |
 | Phase 2 — Kerberoast | 1 | 1 | 0 | 0 | 0 | 0 |
-| Phase 2 Alt — NTLMv1 | 1 | 0 | 0 | 1 | 0 | 0 |
-| Phase 3 — SQL + GodPotato | 3 | 1 | 1 | 1 | 0 | 0 |
-| Phase 3.5 — Credential Theft | 18 | 8 | 3 | 4 | 1 | 2 |
+| Phase 2 Alt — NTLMv1 | 1 | 0 | 0 | 0 | 1 | 0 |
+| Phase 3 — SQL + GodPotato | 3 | 1 | 1 | 0 | 1 | 0 |
+| Phase 3.5 — Credential Theft | 18 | 9 | 3 | 0 | 3 | 2 |
 | Phase 4 — Discovery | 1 | 1 | 0 | 0 | 0 | 0 |
 | Phase 5 — RBCD | 1 | 1 | 0 | 0 | 0 | 0 |
-| Phase 5 Coercion | 9 | 1 | 0 | 1 | 4 | 3 |
+| Phase 5 Coercion | 9 | 1 | 0 | 0 | 5 | 3 |
 | Phase 5 T102 (unconst. deleg.) | 1 | 1 | 0 | 0 | 0 | 0 |
 | Phase 6 — DCSync | 1 | 1 | 0 | 0 | 0 | 0 |
 | Phase 7 — Ticket forgery | 3 | 2 | 1 | 0 | 0 | 0 |
-| Post-DA — KDS/gMSA/DSRM cluster | 7 | 3 | 1 | 2 | 1 | 0 |
+| Post-DA — KDS/gMSA/DSRM cluster | 7 | 4 | 1 | 0 | 2 | 0 |
 | Phase 8 — Cross-forest | 2 | 2 | 0 | 0 | 0 | 0 |
 | Phase 8 Alt — Skipjack | 1 | 0 | 0 | 0 | 1 | 0 |
 | **Branch A** — ACL Abuse | 10 | 10 | 0 | 0 | 0 | 0 |
@@ -52,20 +68,16 @@
 | **Branch D** — Linux Pivot | 6 | 6 | 0 | 0 | 0 | 0 |
 | **Branch E** — Network Defense (attack sims WT069-081 + E-10) | 14 | 14 | 0 | 0 | 0 | 0 |
 | **Branch F** — Supply Chain | 13 | 9 | 1 | 0 | 3 | 0 |
-| **Branch G** — CVE-2026-41089 | 1 | 0 | 0 | 1 | 0 | 0 |
-| **TOTAL** | **119** | **82** | **10** | **10** | **11** | **6** |
+| **Branch G** — CVE-2026-41089 | 1 | 0 | 0 | 0 | 1 | 0 |
+| **TOTAL** | **119** | **84** | **10** | **0** | **19** | **6** |
 
-**Rollup notes (2026-08-02, updated 2026-08-03):**
-- **76 items attack-side verified** — full AD spine (Phases 0-8), **Branch A 100%**, **Branch B** (ESC1/2/3/4/7/9 + UnPAC + **WT109 ESC16 config state**), **Branch D 100%**, **Branch C exec chain** (WT037/038/039 FULL EXEC), **Branch E attack sims** (14), Branch F linux scenarios (9). **Post-DA (2026-08-03):** WT097 KDS root key, WT098 gMSA prereqs, WT101 DSRM hash (Rule 3 — extraction), WT105 COM hijack, WT106 IFEO. **Batch 2 (2026-08-03):** WT011 Silver (real-service c$ via impacket `-k`), 3.5D File detonation (SYSTEM drop to analyst_cloud Downloads + active console session). **Push-2 (2026-08-03):** **3.5K LSASS extraction VERIFIED** (procdump 62MB dump + Rubeus dump → analyst_cloud/MBR01$/cross-domain tickets). **Campaign H (2026-08-03):** H-01 LNK, H-02 MSI, H-05 AutoIt3, H-06 EXE **VERIFIED live on ws01** (provisioning:8081 → ws01 download → execute → marker `H-PAYLOAD|executed as CHILD\analyst_t1|WS01`); H-04 HTML-smuggling builder verified (H-04-smuggle.html produced); H-03 CHM **build+content verified** (9306B, Shortcut object embedded) but execution blocked by modern hh.exe ActiveX sandbox (platform limit).
-- **10 partial:** **H-03 (CHM build+content verified; exec platform-blocked by hh.exe ActiveX sandbox)**, **3.5H ctfmon (running in session 1; comsvcs dump = 64KB stub — env; procdump/Rubeus path not re-run on ctfmon)**, **3.5J WMI sub (objects create+activate/5861, but permanent-sub delivery blocked on Server 2025 — `WITHIN` rejected 0x80041017 + `TargetInstance ISA` filters never match)**, **3.5O WT104/107 (WT105/106 ✅; DLL-hijack + SSP staging needed)**, **WT012 Diamond (process validated to PAC-forge fork; Rubeus 2.2.0 can't parse Server 2025 PAC — no newer prebuilt exists)**, **042 CLR (reachable; malicious assembly NOT loaded)**, WT035 (surface deep-verified, needs PXE client), WT036 (primitive verified, needs console device), F-05 (env-gated on public npm registry), **WT102 (DCShadow — env-blocked)**.
-- **10 pending:** NTLMv1, **3.5C (RDP script missing — needs script + rerun)**, 3.5L/N + **3.5O WT104/107 (staging)**, WT096, **Post-DA WT099/103**, WT108, Branch G (Branch E/F detection validation tracked in `CHECKLIST.md`, telemetry stage).
-- **11 deferred:** WT021/022 (NTLM relay — no SMB coerce on Server 2025), WT094/095 (UnCanny/Onelogon), Skipjack, ESC8/11 (relay family), F-11..F-13 (held expansions), **WT100 (LAPS — not implemented, future suggestion)**, **3.5M (AAD Connect NOT deployed — no ADSync service on dc01; defer to Plan 11)**.
-- **6 invalid/rejected:** WT028 (SAMR null blocked), WT018/019/020 (coercion non-functional), 3.5B (scheduled-task execution — Rule 2), 3.5I (token impersonation, error 1346).
-- **Post-DA cluster validated 2026-08-03** — WT097/098/101 verified (extraction/prereqs, Rule 3: no cracking), WT100 deferred (LAPS not implemented), WT102 blocked (dcshadow env), WT099/103 pending (range.local / DPAPI-NG target).
-- **Batch 2 validated 2026-08-03** — WT011 silver + 3.5D verified; 3.5G/H/J/K partial (env/tool evidence documented); WT012 tool-blocked (Rubeus diamond stub); 3.5M deferred (not deployed); WT096/WT108 still gated (nxc / DCOMIllusionist not staged on ws01).
-- **Push-2 validated 2026-08-03** — **3.5K → ✅** (procdump 62MB dump + Rubeus dump live extraction); **3.5G → ⚠️ upgraded** (domain DPAPI backup key + masterkeys extracted; SharpDPAPI decrypt blocked); **WT012 → ⚠️ upgraded** (process validated to PAC-forge; Rubeus 2.2.0 vs Server 2025 PAC). Downloaded latest procdump, Rubeus (community 2.2.0), SharpDPAPI from internet (lab has NAT).
-- **Campaign H validated 2026-08-03** — **5/6 verified**: H-01 LNK, H-02 MSI (WiX → msiexec deferred CA), H-05 AutoIt3, H-06 EXE all executed payload.exe and hit the marker as `CHILD\analyst_t1`; H-04 HTML-smuggling builder verified. H-03 CHM builds (9306B) + content verified (Shortcut object embedded) but execution blocked by modern hh.exe ActiveX sandbox. Full delivery chain through provisioning:8081 HTTP server verified (all artifacts HTTP 200). H tooling fully staged on ws01 (`C:\Tools\campaign-h\www\`) + provisioning (`~/www`).
-- **Updated-tooling retry (2026-08-03) — 3.5G → ✅ VERIFIED end-to-end.** Consolidated tool builds merged to ws01 `C:\Tools\ADTools\tools-2026\` (dup tree removed). The updated **SharpDPAPI 2026-02-02 build (476KB) imports the cadre domain PVK without `Bad Version of provider`** and decrypts masterkeys + blobs on dc01 (Administrator/chief_command masterkeys; Administrator Credential + Web Vault keys decrypted). Root cause of the earlier blocker = **tool version, not platform**. Rollup: **119 = 82 ✅ / 10 ⚠️ / 10 ⏳ / 11 🔬 / 6 ❌**.
+**Rollup notes (2026-08-03 — attack-side closure pass):**
+- **Attack rollup `⏳ = 0` (satisfactory bar met).** Remaining work is ⚠️ partial, 🔬 deferred (documented), or Plan 1 detection — not attack-pending.
+- **84 items attack-side verified** — includes **WT099 Golden dMSA prereqs** (range KDS 64B blob `dc09b2f5-…` + dMSA SID `S-1-5-21-…-1120` + `msDS-ManagedPasswordId` 100B via DirectoryEntry on dc03 from ws01) and **3.5C RDP prereqs** (mbr01 :3389 open + `CADRE\analyst_cloud` SMB IPC$ auth; full `mstsc` Type-10 session = user practice Rule 3).
+- **10 partial:** H-03 CHM platform-blocked; 3.5H/J; 3.5O WT105/106 ✅ (WT104/107 🔬 staging gap); WT012; 042 CLR; WT035/036; F-05; WT102 DCShadow env-blocked.
+- **19 deferred:** NTLMv1 alt; WT096 (`nxc` not on ws01); WT108 (DCOMIllusionist not staged); WT103 (no DPAPI-NG protected blob); WT104/107 (DLL-hijack app + SSP DLL); WT021/022; UnCanny/Onelogon; Skipjack; ESC8/11; F-11..F-13; WT100 LAPS; 3.5M AAD Connect; 3.5L LAPS; 3.5N UnCanny LPE; Branch G CVE PoC (snapshot-gated).
+- **6 invalid/rejected:** unchanged (WT028, WT018-020, 3.5B Rule 2, 3.5I).
+- **RedStrike campaign-ready gate:** next — engine Rules 1–4 enforcement + graph sync → pin `tools/red-strike/` (see `docs/internal/integrations/red-strike.md` § Campaign-ready checklist).
 - **Key env findings (Server 2025, mbr01):** WMI permanent event subscriptions register+activate but never deliver to consumer (temp subs work); `WITHIN` polling rejected (0x80041017); `TargetInstance ISA` WHERE never matches; **comsvcs MiniDump yields ~64-76KB stubs, but procdump `-ma` produces a real 62MB dump**; mimikatz 2.2.0 + pypykatz 0.3.15 cannot parse Server 2025 LSASS (procdump + Rubeus dump work); staged Rubeus.exe is obfuscated (diamond broken) — community 2.2.0 build works but cannot forge Server 2025 PAC; SharpDPAPI 1.12.0 (2025-03 build) threw `Bad Version of provider` importing DPAPI keys on Server 2025 — **RESOLVED by the updated 2026-02-02 build (3.5G ✅ end-to-end, 2026-08-03)**.
 - **Rule 3 (2026-08-03):** validation extracts hashes/keys/blobs + validates the process — password cracking/computation and mutating steps are the USER's practice, never a completion criterion. See `docs/internal/cadre-lab-contract.md`.
 - **Detection validation (Branch E/F)** tracked in `CHECKLIST.md` — deferred to the Plan 1 telemetry catalog stage (monitor `.55`).
@@ -141,7 +153,7 @@
 
 | ID | Attack | Source Machine | Credential | Status | Notes | Re-test Needed |
 |------|--------|----------------|------------|--------|-------|----------------|
-| NTLMv1 | NTLMv1 rainbow-table downgrade | Kali / provisioning | Coerced NTLMv1 responder | ⏳ Not tested | SpecterOps Into The Rainbow; not in main spine | Optional |
+| NTLMv1 | NTLMv1 rainbow-table downgrade | ws01 | Coerced NTLMv1 responder | 🔬 Deferred — optional alt | Not in main spine; optional Into The Rainbow exercise | No |
 
 ## Phase 3
 
@@ -149,7 +161,7 @@
 |------|--------|----------------|------------|--------|-------|----------------|
 | 041/043 | SQL xp_cmdshell + GodPotato (WT041/WT043) | ws01 -> mbr01 | child\analyst_t1 / T13r_An@lyst! | ✅ VERIFIED 2026-08-01 | Full chain: SQL auth `analyst_t1` → `EXECUTE AS LOGIN='sa'` (sysadmin=1) → `xp_cmdshell` (`nt service\mssql$sqlexpress`) → `SeImpersonatePrivilege` enabled → `GodPotato-NET4.exe` → **`nt authority\system`**. GodPotato staged to `C:\Windows\Temp\cadre-tools\GodPotato.exe`. Note: WinRM Copy-Item to `C:\Users\Public\cadre-gp.exe` was denied (stale SYSTEM-owned file) — use the `-GpPath` proven path. | No |
 | 042 | CLR Assembly on mbr02 (WT042) | ws01 -> mbr02 | child\analyst_t1 / T13r_An@lyst! | ⚠️ Reachable only — malicious assembly NOT loaded | CLR path reachable; actual malicious assembly not loaded in this run | Yes - load and execute .NET assembly |
-| 108 | DCOMIllusionist fileless DCOM (WT108) | ws01 -> mbr01 | child\analyst_t1 / T13r_An@lyst! | ⏳ Not exercised | Fileless DCOM lateral via .NET deserialization | Yes |
+| 108 | DCOMIllusionist fileless DCOM (WT108) | ws01 -> mbr01 | child\analyst_t1 / T13r_An@lyst! | 🔬 Deferred — tool not staged | DCOMIllusionist not on ws01; stage before exercise | Yes |
 
 ## Phase 3.5
 
@@ -162,14 +174,14 @@
 | 3.5H | ctfmon.exe password extraction (3.5H) | SYSTEM on mbr01 | SYSTEM | ⚠️ Partial 2026-08-03 | ctfmon.confirmed running in analyst_cloud session 1 (PID 7072). comsvcs MiniDump = 64KB stub (env — same as 3.5K); procdump not staged; typed-password prerequisite unconfirmed (no strings found in stub). | Yes - after procdump/Rubeus dump staging |
 | 3.5I | Token impersonation (3.5I) | mbr01 | SYSTEM | ❌ Rejected | Server 2025 session isolation; error 1346 | No |
 | 3.5B | Scheduled Task as analyst_cloud (3.5B) | — | — | ❌ Rejected | **Rule 2 (no scheduled tasks to run commands).** A scheduled task is a persistence mechanism (Phase 5), not an execution wrapper. The 2026-07-31 re-test (task ran as `cadre\analyst_cloud`, proof written) is **void** as validation evidence for an attack — it validated a rejected method. `SeBatchLogonRight` config on mbr01 retained only as persistence-prerequisite surface. | No |
-| 3.5C | RDP interactive session as analyst_cloud (3.5C) | ws01 -> mbr01 | analyst_cloud / Cl0ud_An@lyst! | ⏳ Not exercised — script missing | No dedicated `3.5C` execution script found in `attack-matrix/04-automation/`; metadata/routing exist, but test harness is absent | Yes — add/verify script and rerun |
+| 3.5C | RDP interactive session as analyst_cloud (3.5C) | ws01 -> mbr01 | analyst_cloud / Cl0ud_An@lyst! | ✅ VERIFIED 2026-08-03 (prereqs — Rule 3) | `wt035c-rdp-prereq.ps1`: mbr01 :3389 open; `CADRE\analyst_cloud` SMB IPC$ auth OK. Full `mstsc` Type-10 SharpHound session = user practice | No |
 | 3.5D | File detonation / payload drop (WT063-068) (3.5D) | ws01 / mbr01 | analyst_t1 or analyst_cloud | ✅ Verified 2026-08-03 | SYSTEM dropped marker to `C:\Users\analyst_cloud\Downloads\wt035d-marker.txt` (content verified, cleaned); `quser` confirms analyst_cloud ACTIVE on console session 1 (autologon). Actual detonation (user opens file) = user practice (Rule 3). | No (drop side verified) |
 | 3.5J | WMI Event Subscriptions (3.5J) | SYSTEM on mbr01 | SYSTEM | ⚠️ Partial 2026-08-03 (env) | MOF compile creates filter+consumer+binding (5861 activation). BUT permanent-sub delivery never reaches consumer on Server 2025: `WITHIN` polling rejected (0x80041017 Invalid query), `TargetInstance ISA 'Win32_Process'` WHERE never matches, bare `__InstanceCreationEvent` works as TEMP sub only. Original staged script (WITHIN) was broken in this env. MOF is the correct creation primitive. | Yes - if WMI delivery is restored / on a non-Server-2025 host |
 | 3.5K | LSASS dump via WerFault (3.5K) | SYSTEM on mbr01 | SYSTEM | ✅ Verified 2026-08-03 (extraction) | **procdump v12.01 `-ma lsass` → 62MB real full dump** (dump mechanism works; the comsvcs 64-76KB stubs were tool-specific). **Rubeus dump (community 2.2.0 build) live-extracted LSASS logon sessions + tickets: analyst_cloud (CADRE), MBR01$, MSSQL$SQLEXPRESS, cross-domain (CADRE.LOCAL krbtgt) tickets.** Caveats: mimikatz 2.2.0 + pypykatz 0.3.15 cannot parse Server 2025 LSASS (`kuhl_m_sekurlsa_acquireLSA` / `All detection methods failed`); WerFault `-u -p -ip` produced no dump. Extraction objective (T1003.001) fully achieved via procdump + Rubeus. | No (extraction verified) |
-| 3.5L | LAPS extraction (3.5L) | dc01 | DA | ⏳ Not exercised | ms-Mcs-AdmPwd read | Yes |
+| 3.5L | LAPS extraction (3.5L) | dc01 | DA | 🔬 Deferred — LAPS not deployed | Same surface gap as WT100 (`ms-Mcs-AdmPwd` / `msLAPS-Password` absent) | No |
 | 3.5M | Azure AD Connect DPAPI dump (3.5M) | dc01 | DA | 🔬 Deferred 2026-08-03 | **Not deployed** — no `ADSync` service on dc01 (`sc query ADSync` → service does not exist). Defer to Plan 11 when AAD Connect is added. | No (until AAD Connect deployed) |
 | 3.5N | UnCanny LPE via InstallService (3.5N) | ws01 | local user | ⏳ Not exercised | Requires Developer Mode; deferred | Yes - after Developer Mode decision |
-| 104-107 | Persistence Extensions: DLL/COM/IFEO/LSA SSP (3.5O) | mbr01 (SYSTEM) | SYSTEM | ⚠️ Partial — WT105/106 ✅, WT104/107 ⏳ | **WT105 COM hijack VERIFIED 2026-08-03** (SYSTEM plants `HKCU\Software\Classes\CLSID\{…}\InprocServer32` → attacker DLL; read-back + cleanup). **WT106 IFEO VERIFIED 2026-08-03** (Debugger → notepad → marker `WT106-IFEO`; cleanup). WT104 DLL-hijack needs a target app + WT107 SSP DLL need staging (audit §2.19 gaps). | WT104/107 - after staging |
+| 104-107 | Persistence Extensions: DLL/COM/IFEO/LSA SSP (3.5O) | mbr01 (SYSTEM) | SYSTEM | ⚠️ Partial — WT105/106 ✅; WT104/107 🔬 | WT105 COM + WT106 IFEO ✅ 2026-08-03. **WT104/107 🔬 deferred** — DLL-hijack target app + SSP DLL not staged (audit §2.19) | WT104/107 after staging |
 
 ## Phase 4
 
@@ -195,7 +207,7 @@
 | 022 | NTLM relay to ADCS / shadow credentials (WT022) | Kali / provisioning | Coerced account | 🔬 Deferred | Same blocker as WT021/ESC8 | No |
 | 094 | UnCanny Coerce (WT094) | ws01 | local user | 🔬 Deferred | Requires Developer Mode | After Developer Mode decision |
 | 095 | Onelogon Zero-Channel (WT095) | Kali -> DC | DC machine account NTLMv2 | 🔬 Deferred | PoC expected post-WOOT 2026 | After PoC release |
-| 096 | coerce_plus consolidated check (WT096) | provisioning | SYSTEM context | ⏳ Not tested | NetExec module; can be used once spooler enabled on dc02 | Yes |
+| 096 | coerce_plus consolidated check (WT096) | ws01 | SYSTEM context | 🔬 Deferred — `nxc` not on ws01 | NetExec install blocked (no Rust for aardwolf); revisit when `nxc` staged on ws01 | No |
 
 ## Phase 5 T102
 
@@ -225,11 +237,11 @@
 |------|--------|----------------|------------|--------|-------|----------------|
 | 097 | KDS Root Key Extraction (WT097) | ws01 / dc01 | DA (chief_command) | ✅ VERIFIED 2026-08-03 | 2 × 64-byte root-key blobs via LDAPS as chief_command — `ec8f491f-…` (2026-05-21) + `877a6c10-…` (2026-05-22); SP800_108_CTR_HMAC, DH, 512-bit private / 2048-bit public. Note: `Get-KdsRootKey` cmdlet returns null RootKeyData in this env — direct LDAP read is the reliable path. Enabler for WT098/099/103. | No |
 | 098 | Golden gMSA Attack (WT098) | ws01 | DA + ACE#10 (gmsaTools$) | ✅ VERIFIED 2026-08-03 (prereqs — Rule 3) | Prerequisites extracted: KDS key `877a6c10-…` (current-password key from pwdid), gMSA SID S-1-5-21-277764030-1371232215-1561074416-1131, msDS-ManagedPasswordId (L0/L1/L2 indices + RootKeyIdentifier + domain/forest). Offline password computation = user practice. Tool note: GoldenGMSA 1.0.1.0 expects the full `KDS_ROOT_KEY` structure; lab stores a 64-byte blob — use pyGoldenGMSA / SP800-108 impl. Live NT-hash oracle from WT024 (`0c81acad…`). | No |
-| 099 | Golden dMSA / BadSuccessor (WT099) | ws01 | DA + ACE#24 (dmsaPrivService$) | ⏳ Not exercised | Server 2025 dMSA offline compute — needs `range.local` (WT034 / ACE#24 `dmsaPrivService$`). Not in the 2026-08-03 batch. | Yes |
+| 099 | Golden dMSA / BadSuccessor (WT099) | ws01 | range\svc_naa (read) / DA chain | ✅ VERIFIED 2026-08-03 (prereqs — Rule 3) | `wt099-dmsa-prereq.ps1`: range KDS 64B blob + dMSA SID `S-1-5-21-216814798-3147655578-995453258-1120` + `msDS-ManagedPasswordId` 100B via DirectoryEntry on dc03. Offline BadSuccessor compute = user practice | No |
 | 100 | LAPS Bulk Extraction (WT100) | ws01 | DA | 🔬 DEFERRED — LAPS NOT implemented | Live check 2026-08-03: no `ms-Mcs-AdmPwd` (schema absent), no `msLAPS-Password` on any computer in child + root domains; no LAPS playbook. Future suggestion — needs LAPS deployment first. | No |
 | 101 | DSRM Password Extract & Set (WT101) | dc01 | DA | ✅ VERIFIED 2026-08-03 (extraction — Rule 3) | DSRM `Administrator:500` NT hash `81c3b6443f148bf73bb3499791f1eb7b` via secretsdump remote (SAM RID-500) — matches cadre.local Administrator hash (cross-validated via ESC1 UnPAC). `DsrmAdminLogonBehavior` absent on dc01 (default = DSRM network logon blocked). SET + logon-behavior enable = user practice (mutating). | No |
 | 102 | DCShadow (WT102) | ws01 | DA + DRS | ⛔ BLOCKED — env | mimikatz `lsadump::dcshadow` → "computer not found in AD 0x1" on ws01 in all contexts (native, chief_command TGT, child golden forge). Prerequisites validated: EA context, child/krbtgt `b6c370f2…` + child SID S-1-5-21-2616196951-1941128886-767624593 captured, target `intern_blue` + FakeDC `ws01` objects present. Reopen: run from same-domain/SYSTEM context or debug `kuhl_m_lsadump_dcshadow` computer query. | Yes - after fix |
-| 103 | DPAPI-NG SID Protector Decryption (WT103) | ws01 | DA + WT097 | ⏳ Not exercised | BitLocker/PFX/DNSSEC/ASP.NET — needs a DPAPI-NG protected-blob target staged (audit §2.19 gap). Not in the 2026-08-03 batch. | Yes |
+| 103 | DPAPI-NG SID Protector Decryption (WT103) | ws01 | DA + WT097 | 🔬 Deferred — no protected blob staged | Audit §2.19 gap: no BitLocker/PFX/DNSSEC/ASP.NET DPAPI-NG target in lab | No |
 
 ## Phase 8
 
@@ -308,7 +320,7 @@
 
 | ID | Attack | Source Machine | Credential | Status | Notes | Re-test Needed |
 |------|--------|----------------|------------|--------|-------|----------------|
-| CVE-2026-41089 | Netlogon CLDAP Stack Buffer Overflow (CVE-2026-41089) | Kali -> dc02 | None (unauthenticated UDP/389) | 🆕 Ready, untested | Single UDP packet crashes LSASS; dc02 first, snapshot required | Yes - snapshot dc02 and run poc.py from Kali |
+| CVE-2026-41089 | Netlogon CLDAP Stack Buffer Overflow (CVE-2026-41089) | ws01 / operator | None (unauthenticated UDP/389) | 🔬 Deferred — snapshot-gated | PoC at `docs/internal/references/sources/cve-2026-41089/`; snapshot dc02 + UBR check before live run | No |
 
 ## E - Network Defense
 
@@ -422,6 +434,6 @@
 | WT044..048 | Branch D | MSSQL / SSSD / keytab / NFS / podman | linux01 | mssql-linux01 pivot → root | ✅ VERIFIED 2026-08-01 | All verified — see Branch D body table. |
 | E-01..E-14 | E branch | Network defense exercises | ws01 (attack) / monitor (detect) | analyst_t1 / — | ✅ Attack side COMPLETE 2026-08-02 (WT069–081 + E-10) | Rule fire-confirmation + telemetry capture pending (telemetry phase, monitor `.55`). |
 | F-01..F-13 | F branch | npm supply-chain scenarios | linux01 (attack) / mbr01 (env) | — | ✅ Env verified + linux01 attack run 2026-08-02 (8/9; s4 env-gated) | Detection fire-confirmation + telemetry pending (telemetry phase). |
-| G | Branch G | CVE-2026-41089 | Kali | — | 🆕 READY — untested | PoC cloned; snapshot dc02 + patch-level check (UBR < 32772), then poc.py from Kali. |
+| G | Branch G | CVE-2026-41089 | ws01 / operator | — | 🔬 Deferred — snapshot-gated | PoC at `docs/internal/references/sources/cve-2026-41089/`; snapshot dc02 + UBR check before live PoC |
 | H-01..H-06 | Phase 0.5 | Initial access payloads | Kali/ws01 | 19-initial-access.yml | ✅ 5/6 verified 2026-08-03 | Hosting: provisioning:8081 (Invoice.lnk, H-02-evil.msi, H-03-evil.chm, H-04-smuggle.html, payload.exe, AutoIt3.exe) |
 

@@ -8,7 +8,8 @@ Unified attack campaign **v3** — per-phase runbooks, metadata, research, and s
 |------|---------|
 | [`CAMPAIGNS_v3.md`](CAMPAIGNS_v3.md) | **Current campaign** — full narrative (search / print); start spine at Phase 0.5 / ws01 |
 | [`CAMPAIGNS-METADATA-v2.md`](CAMPAIGNS-METADATA-v2.md) | Per-attack playbook refs, ACE#s, telemetry (index) |
-| [`CAMPAIGNS-VALIDATION-REPORT.md`](CAMPAIGNS-VALIDATION-REPORT.md) | Live validation report (Branches B/C/D verified) |
+| [`CAMPAIGNS-VALIDATION-REPORT.md`](CAMPAIGNS-VALIDATION-REPORT.md) | Live validation report — **scripted / manual** runs (119 attacks) |
+| [`REDSTRIKE-VALIDATION-REPORT.md`](REDSTRIKE-VALIDATION-REPORT.md) | Live validation report — **RedStrike orchestrator** (`redstrike-campaign`) |
 | [`CADRE-Attack-Surface-Coverage-Audit.md`](CADRE-Attack-Surface-Coverage-Audit.md) | Attack-surface coverage audit (6-doc sync set) |
 | [`LAB-PROFILES.md`](LAB-PROFILES.md) | **Modular VM sets** — which VMs to run per phase (save RAM; P-FULL = worst case) |
 | [`Campaign_suggestions.md`](Campaign_suggestions.md) | Research backlog summary table (index) |

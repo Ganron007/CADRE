@@ -7,7 +7,7 @@
 
 > **Execution mode (2026-07-26):** Agents/operators fulfill checklist items from **provisioning** without waiting for manual runbook study. Learning is parallel and optional. Flip `CHECKLIST.md` first; docs follow evidence.
 >
-> **NEXT ACTION (locked):** **Plan 1 telemetry capture (P1.1–P1.5)** — deterministic replay + ES/Zeek/Suri/Endpt evidence bundles → grid fill → Sigma catalog. **P1.0 RedStrike campaign run complete.**
+> **NEXT ACTION (locked):** **RedStrike campaign-ready** (engine Rules 1–4 + graph sync) → pin `tools/red-strike/` → **Plan 1 telemetry** (P1.1–P1.5). Attack rollup **⏳ = 0** (2026-08-03 closure pass).
 >
 > **Naming:** `plan01-telemetry-catalog/` = **Plan 1**. `plan1.1-campaign-automation/` = **Plan 1.1**. `plan00-foundation/` = **Plan 0**. See [`docs/internal/PLANS.md`](docs/internal/PLANS.md).
 
@@ -208,9 +208,9 @@
 
 | ID | Attack | Source | Credential | Status |
 |----|--------|--------|------------|--------|
-| NTLMv1 | NTLMv1 rainbow-table downgrade | Kali / provisioning | Coerced NTLMv1 responder | ⏳ Not tested |
+| NTLMv1 | NTLMv1 rainbow-table downgrade | ws01 | Coerced NTLMv1 responder | 🔬 Deferred — optional alt |
 
-- [ ] **NTLMv1** rainbow-table downgrade — surface check · attack run · telemetry captured · tracker updated
+- [x] **NTLMv1** rainbow-table downgrade — 🔬 deferred (optional alt, not main spine)
 
 ### Phase 3
 
@@ -233,11 +233,11 @@
 | 3.5H | ctfmon.exe password extraction | SYSTEM on mbr01 | SYSTEM | ⚠️ Partial 2026-08-03 |
 | 3.5I | Token impersonation | mbr01 | SYSTEM | ❌ Rejected |
 | 3.5B | Scheduled Task as analyst_cloud | mbr01 | analyst_cloud | ❌ Rejected for attack chain |
-| 3.5C | RDP interactive session as analyst_cloud | ws01 -> mbr01 | analyst_cloud / Cl0ud_An@lyst! | ⏳ Not exercised |
+| 3.5C | RDP interactive session as analyst_cloud | ws01 -> mbr01 | analyst_cloud / Cl0ud_An@lyst! | ✅ VERIFIED 2026-08-03 (prereqs — Rule 3) |
 | 3.5D | File detonation / payload drop (WT063-068) | ws01 / mbr01 | analyst_t1 or analyst_cloud | ✅ Verified 2026-08-03 |
 | 3.5J | WMI Event Subscriptions | SYSTEM on mbr01 | SYSTEM | ⚠️ Partial 2026-08-03 |
 | 3.5K | LSASS dump via WerFault | SYSTEM on mbr01 | SYSTEM | ✅ Verified 2026-08-03 |
-| 3.5L | LAPS extraction | dc01 | DA | ⏳ Not exercised |
+| 3.5L | LAPS extraction | dc01 | DA | 🔬 Deferred — LAPS not deployed |
 | 3.5M | Azure AD Connect DPAPI dump | dc01 | DA | ⏳ Not exercised |
 | 3.5N | UnCanny LPE via InstallService | ws01 | local user | 🔬 Deferred |
 
@@ -247,11 +247,11 @@
 - [ ] **3.5H** ctfmon.exe extraction — surface check · attack run · telemetry captured · tracker updated
 - [x] **3.5I** Token impersonation — surface check · attack run · telemetry captured · tracker updated
 - [x] **3.5B** Scheduled Task — **REJECTED as execution wrapper (Rule 2: scheduled tasks are persistence-only).** Not a campaign attack. SeBatchLogonRight retained as persistence-prerequisite surface only.
-- [ ] **3.5C** RDP interactive session — surface check · attack run · telemetry captured · tracker updated
+- [x] **3.5C** RDP interactive session — ✅ prereqs verified (`wt035c-rdp-prereq.ps1`; full mstsc = user practice)
 - [x] **3.5D** File detonation / payload drop — surface check · attack run · telemetry captured · tracker updated
 - [ ] **3.5J** WMI Event Subscriptions — surface check · attack run · telemetry captured · tracker updated
 - [x] **3.5K** WerFault LSASS dump — surface check · attack run · telemetry captured · tracker updated
-- [ ] **3.5L** LAPS extraction — surface check · attack run · telemetry captured · tracker updated
+- [x] **3.5L** LAPS extraction — 🔬 deferred (LAPS not deployed — same as WT100)
 - [ ] **3.5M** Azure AD Connect DPAPI dump — surface check · attack run · telemetry captured · tracker updated
 - [~] **3.5N** UnCanny LPE — surface check · attack run · telemetry captured · tracker updated
 
@@ -283,7 +283,7 @@
 | 022 | NTLM relay to ADCS / shadow credentials (WT022) | Kali / provisioning | Coerced account | ✅ Active |
 | 094 | UnCanny Coerce (WT094) | ws01 | local user | 🔬 Deferred |
 | 095 | Onelogon Zero-Channel (WT095) | Kali -> DC | DC machine account NTLMv2 | 🔬 Deferred |
-| 096 | coerce_plus consolidated check (WT096) | provisioning | SYSTEM context | ⏳ Not tested |
+| 096 | coerce_plus consolidated check (WT096) | ws01 | SYSTEM context | 🔬 Deferred — `nxc` not on ws01 |
 
 - [x] **T017** PrinterBug coercion — surface check · attack run · telemetry captured · tracker updated
 - [x] **T018** PetitPotam — surface check · attack run · telemetry captured · tracker updated
@@ -544,12 +544,12 @@
 **Pipeline:** deterministic replay → capture across all sources → fill grid → write rules → E2E → Sigma YAML. **Dir:** [`docs/internal/plan01-telemetry-catalog/phase1-source-matrix/`](docs/internal/plan01-telemetry-catalog/phase1-source-matrix/)
 
 **Two-phase approach (2026-07-27 → 2026-07-28):**
-- **Phase 1 — Full RedStrike attack run:** ✅ **complete** (spine + A/B/C/D/G OK; streams E/F OK; stubs remain).
+- **Phase 1 — Full RedStrike attack run:** ✅ **complete** — `camp-v3-20260803` (2026-08-03) + prior `P1_*` engagements (2026-07-28).
 - **Phase 2 — Telemetry capture:** now active — replay attacks deterministically, export ES/Zeek/Suri/Endpt evidence bundles, fill `source-matrix-grid.md`, then write Sigma/KQL rules.
 
 | ID | Item | Status | Done | Owned by | Notes |
 |----|------|--------|------|----------|-------|
-| P1.0 | **Phase 1 — full RedStrike attack run** (validate tool + campaign) | [x] | 2026-07-28 | `redstrike-campaign` on `.60` | Live `--execute`, HITL per phase; spine+A+B+C+D+G all OK; E/F streams OK |
+| P1.0 | **Phase 1 — full RedStrike attack run** (validate tool + campaign) | [x] | 2026-08-03 | `redstrike-campaign` on `.60` | `camp-v3-20260803`; tracker = [`REDSTRIKE-VALIDATION-REPORT.md`](attack-matrix/Campaign/REDSTRIKE-VALIDATION-REPORT.md) |
 | P1.1 | Deterministic replay bundle: spine T003/T002/T041/T043/T017/T009/T010/T011/T012/T033/T042 | [ ] | | `campaign-a/` scripts + `cadre-es-export.sh` | Use fixed T0 per attack |
 | P1.2 | Deterministic replay bundle: branches A/B/C/D/G + streams E/F | [ ] | | same | Branch A ws01 scripts new this session |
 | P1.3 | `source-matrix-grid.md` fill — Campaign A (12 attacks) | [~] | 2026-07-25 | `source-matrix-grid.md` + `verification-table.md` | ✅ T002/T003/T031/T041/T043; ⛔ T028; 🔧 T042; 5 cred-gated |

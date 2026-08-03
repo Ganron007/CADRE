@@ -14,7 +14,7 @@
 
 > ### Campaign run rules (operator-locked)
 >
-> 1. **Rule 1 — Direct SSH to ws01 only.** All attack runs originate from `ws01` via direct SSH; provisioning is config-only.
+> 1. **Rule 1 — Direct SSH to ws01 only; provisioning is for lab configuration.** All attack runs originate from `ws01` via direct SSH. The `vagrant` account and the provisioning VM (`192.168.77.60`) are used only to configure the lab, apply/verify playbooks, and stage config-only support tasks; they are never an attack origin. The only exception is Rule 4’s H branch, where provisioning hosts the initial-access delivery assets and `ws01` is the target.
 > 2. **Rule 2 — No scheduled tasks to run commands.** Scheduled tasks are persistence-only; they are never used as execution wrappers.
 > 3. **Rule 3 — Extraction/prerequisites are validated; cracking/computation/mutation is user practice.** We verify hashes, keys, blobs, and prerequisite state; password cracking or mutating steps are not completion criteria.
 > 4. **Rule 4 — H branch is the only branch where provisioning is the attacker.** For H-01..H-06, provisioning hosts the delivery assets and `ws01` is the target; we verify the delivery/drop side, while real browser clicks remain user practice.
