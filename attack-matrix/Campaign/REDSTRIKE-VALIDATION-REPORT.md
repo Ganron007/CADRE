@@ -1,9 +1,10 @@
 # RedStrike Campaign Validation Report — 2026-08-03
 
-> **Scope:** Live results from `redstrike-campaign` / `CampaignOrchestrator` driving [`automation/campaign-graph.yaml`](automation/campaign-graph.yaml) (v8) on provisioning (`192.168.77.60`).
+> **Scope:** Live results from `redstrike-campaign` / `CampaignOrchestrator` driving [`automation/campaign-graph.yaml`](automation/campaign-graph.yaml).
 > **Companion doc:** scripted/manual ground truth = [`CAMPAIGNS-VALIDATION-REPORT.md`](CAMPAIGNS-VALIDATION-REPORT.md) (119 campaign attacks).
-> **Workflow:** [`Red-Strike-workflow.md`](Red-Strike-workflow.md) · **Engine:** RedStrike **0.5.1** (`RedStrike\` SSoT · pin `tools/red-strike/`).
+> **Workflow:** [`Red-Strike-workflow.md`](Red-Strike-workflow.md) · **Engine:** RedStrike **0.5.2** · **Graph:** **v9** (full coverage).
 >
+> **Graph v9 (2026-08-03):** 90 nodes. Former “by design SKIP” gaps **wired** to harness scripts (H-01..H-06, Post-DA T097–099/105/106/109, T035C, Branch D T044–T048 via `linux01-exec`, UnPAC, ESC2/4/7/9, T031). **Remaining stubs (deferred only):** T100, T103, T104, T107, T108, T-SQL-AI, WT093. Dual harnesses: provisioning hybrid + native ws01. Re-run after sync to refresh OK/FAIL below.
 > **Legend (orchestrator):**
 > | Symbol | Meaning |
 > |--------|---------|
@@ -22,15 +23,17 @@
 
 | Rule | RedStrike implementation |
 |------|---------------------------|
-| **Beachhead** | `--beachhead windows` → ws01 egress via `ws01-exec.sh` / `REDSTRIKE_WS01_SSH_KEY` |
-| **Harness** | `--prefer-script` → graph `script:` paths under `04-automation/linux/` |
-| **Intents** | 0.5.1 `ws01_transport.py` wraps typed argv when `--prefer-script` off |
+| **Operator (dual)** | `--operator provisioning` = orchestrator on `.60` → SSH/`ws01-exec` · `--operator ws01` = native on domain-joined host (`local-ws01`, no SSH) |
+| **Beachhead** | `--beachhead windows` → path ws01 · `--beachhead linux` → `.60` direct |
+| **Harness** | Hybrid: `linux/redstrike-campaign-v3-full-run.sh` · Native: `windows/redstrike-campaign-v3-ws01-native.ps1` |
+| **Intents** | 0.5.2: SSH-wrap only under `provisioning`; native runs argv locally |
 | **HITL** | Gates pre-approved for full harness (`--no-stop-on-hitl`); production runs should pause |
 | **Ledger** | Seeds from `automation/lab-seed-creds.json` on engagement open |
-| **E / F streams** | `path: external60_phase0` on provisioning (no ws01) |
-| **Branch H** | Graph stubs only — scripted H-01..H-06 validated separately (Rule 4) |
+| **E / F streams** | `path: external60_phase0` on provisioning (no ws01) — use hybrid harness |
+| **Branch H** | Rule 4: provisioning attacker → use `--operator provisioning` |
 
-**Full v3 harness:** `attack-matrix/04-automation/linux/redstrike-campaign-v3-full-run.sh`
+**Hybrid harness:** `attack-matrix/04-automation/linux/redstrike-campaign-v3-full-run.sh`  
+**Native harness:** `attack-matrix/04-automation/windows/redstrike-campaign-v3-ws01-native.ps1`
 
 ```bash
 export CADRE_ROOT=$HOME/CADRE

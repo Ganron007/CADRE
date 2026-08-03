@@ -1,5 +1,9 @@
 
 
+## [Unreleased] — 2026-08-03 (RedStrike graph v9 full coverage)
+
+- **Campaign graph v9** + full harness: wire H-01..H-06, Post-DA (T097–099/105/106/109), T035C, Branch D T044–T048 (`linux01-exec`), UnPAC, ESC2/4/7/9, T031 spray. Stubs remain only for deferred surfaces (T100/103/104/107/108, T-SQL-AI, WT093). New scripts under `04-automation/linux/campaign-h/` + `campaign-a/T0*.sh`. Seed adds `lead_engineering`. Update `REDSTRIKE-VALIDATION-REPORT.md` / `Red-Strike-workflow.md`.
+
 ## [Unreleased] — 2026-08-03 (RedStrike camp-v3 full run)
 
 - **RedStrike Campaign v3 full run** on provisioning (`camp-v3-20260803`, log `~/redstrike-runs/camp-v3-20260803-20260803T064441Z.log`). Spine + branches A/B/C + streams E/F **OK**; known FAILs: T043, T102, T012, Branch D T045/047/048; stubs skipped (H, Post-DA). **T056 ESC8 surface OK** via `T052-esc8-ws01.sh` after `lab-seed-creds.json` sync. Harness: `redstrike-campaign-v3-full-run.sh`. Docs: **`REDSTRIKE-VALIDATION-REPORT.md`**, `Red-Strike-workflow.md`, `red-strike.md` checklist #7 ✅. **Next:** Plan 1 telemetry.

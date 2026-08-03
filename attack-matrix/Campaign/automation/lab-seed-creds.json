@@ -56,6 +56,13 @@
       "source": "spray",
       "notes": "WT031 password spray against dc01; Branch A ACE#13+14 source"
     },
+    "lead_engineering": {
+      "username": "lead_engineering",
+      "password": "Eng_L3ad!",
+      "domain": "cadre.local",
+      "source": "seed",
+      "notes": "Branch A/B — ESC4/ESC7 identity"
+    },
     "krbtgt": {
       "username": "krbtgt",
       "password": null,

@@ -6,17 +6,44 @@
 > **Plan:** [`docs/internal/plan1.1-campaign-automation/CAMPAIGN-AUTOMATION-PLAN.md`](../../docs/internal/plan1.1-campaign-automation/CAMPAIGN-AUTOMATION-PLAN.md)  
 > **Graph:** [`automation/campaign-graph.yaml`](automation/campaign-graph.yaml) · **Campaign:** [`CAMPAIGNS_v3.md`](CAMPAIGNS_v3.md)
 
-**Status:** Plan 1.1 **complete** (M0–M5 + P11.6). Engine **0.5.1** — ws01 SSH transport for typed intents + graph v8. Live `--execute` operator-gated (HITL). **Campaign v3 full run:** engagement `camp-v3-20260803` on `.60` (2026-08-03).
+**Status:** Plan 1.1 **complete**. Engine **0.5.2**. Graph **v9** — full CampaignOrchestrator coverage (stubs only for deferred surfaces). Dual operator modes: **provisioning** (hybrid) + **ws01** (native).
+
+---
+
+## Dual operator modes (simulate both)
+
+| Mode | Flag | Where process runs | Attack egress | Use when |
+|------|------|--------------------|---------------|----------|
+| **Hybrid** | `--operator provisioning` | Kali / provisioning `.60` | SSH / `ws01-exec` → ws01 | Full graph incl. H, E, F, Branch D linux01 |
+| **Native** | `--operator ws01` | Domain-joined **ws01** | Local tools (`local-ws01`) — no SSH wrap | Rule 1–strict spine / A / B / C |
+
+Defaults: win32 → `ws01`; Linux → `provisioning`. Override with `REDSTRIKE_OPERATOR`.
+
+```bash
+# Hybrid (current) — on provisioning
+redstrike-campaign start --beachhead windows --operator provisioning --engage lab-hybrid
+bash ~/CADRE/attack-matrix/04-automation/linux/redstrike-campaign-v3-full-run.sh
+```
+
+```powershell
+# Native — on ws01 (RedStrike installed there)
+$env:CADRE_ROOT = "C:\path\to\CADRE"   # or clone/sync
+redstrike-campaign start --beachhead windows --operator ws01 --engage lab-native
+.\attack-matrix\04-automation\windows\redstrike-campaign-v3-ws01-native.ps1 -DryRun
+# then: -Execute  (HITL still required for privilege jumps)
+```
+
+**Beachhead** still selects attack identity / path preference (`windows`→ws01 path, `linux`→`.60` direct). **Operator** selects where the orchestrator itself runs.
 
 ---
 
 ## Routing (locked)
 
-| Beachhead | Egress | Telemetry |
-|-----------|--------|-----------|
-| `--beachhead windows` | **ws01** (`ws01-exec`) | Full (Elastic on CADRE-All) |
-| `--beachhead linux` | provisioning `.60` direct | Blind origin OK |
-| `stage_mbr01` | **Exception only** (`--allow-mbr01-stage`) | Not default post-P3 home |
+| Beachhead | Egress (operator=provisioning) | Egress (operator=ws01) | Telemetry |
+|-----------|--------------------------------|------------------------|-----------|
+| `--beachhead windows` | **ws01** (`ws01-exec` / SSH intents) | **local-ws01** | Full (Elastic on CADRE-All) |
+| `--beachhead linux` | provisioning `.60` direct | N/A for native spine | Blind origin OK |
+| `stage_mbr01` | **Exception only** (`--allow-mbr01-stage`) | same | Not default post-P3 home |
 
 Attack identity = `analyst_t1` (or earned creds). **Never** `vagrant` for WT# steps.
 
@@ -32,8 +59,8 @@ export CADRE_ROOT=$HOME/CADRE
 export CADRE_AUTOMATION_ROOT=$HOME/CADRE/attack-matrix/04-automation/linux
 # or: source ~/.bashrc  (aliases redstrike-env / PATH wrapper)
 
-redstrike-campaign start --beachhead windows --engage lab1
-redstrike-campaign run --phase 1-3 --beachhead windows --engage lab1          # spine dry-run
+redstrike-campaign start --beachhead windows --operator provisioning --engage lab1
+redstrike-campaign run --phase 1-3 --beachhead windows --operator provisioning --engage lab1          # spine dry-run
 redstrike-campaign run --phase 4-5 --beachhead windows --engage lab1 --branch A
 redstrike-campaign run --phase 5 --beachhead windows --engage lab1 --branch B
 redstrike-campaign run --phase 8 --beachhead windows --engage lab1 --branch C --profile P-FOREST
@@ -59,6 +86,12 @@ Linux beachhead (no ws01-exec):
 redstrike-campaign run --phase 1-3 --beachhead linux --engage lab1
 ```
 
+Harnesses:
+
+| Harness | Mode |
+|---------|------|
+| `04-automation/linux/redstrike-campaign-v3-full-run.sh` | `--operator provisioning` |
+| `04-automation/windows/redstrike-campaign-v3-ws01-native.ps1` | `--operator ws01` |
 ---
 
 ## HITL gates
@@ -86,7 +119,26 @@ redstrike-campaign run --phase 1-3 --beachhead linux --engage lab1
 
 ---
 
-## RedStrike Campaign v3 full run (2026-08-03)
+## Graph v9 + full harness (2026-08-03)
+
+**Graph:** `automation/campaign-graph.yaml` **v9** — 90 nodes. Wired scripts for H-01..H-06, Post-DA T097–099/T105/T106/T109, T035C, Branch D T044–T048 (linux01-exec), UnPAC, ESC2/4/7/9, T031 spray. **Stubs only (deferred):** T100, T103, T104, T107, T108, T-SQL-AI, WT093.
+
+**Harness:** `04-automation/linux/redstrike-campaign-v3-full-run.sh` now schedules spine + A (4–5) + B + C + D + G + H + E/F.
+
+```bash
+export CADRE_ROOT=$HOME/CADRE
+export CADRE_AUTOMATION_ROOT=$HOME/CADRE/attack-matrix/04-automation/linux
+export REDSTRIKE_WS01_SSH_KEY=$HOME/.ssh/cadre-ws01-key
+export REDSTRIKE_SEED=$HOME/CADRE/attack-matrix/Campaign/automation/lab-seed-creds.json
+export PATH=/usr/bin:/bin:$HOME/RedStrike/.venv/bin:$PATH
+bash ~/CADRE/attack-matrix/04-automation/linux/redstrike-campaign-v3-full-run.sh
+```
+
+**Seed:** includes `chief_command`, `hunter_dfir`, `lead_engineering`, `analyst_cloud` for gated nodes.
+
+---
+
+## RedStrike Campaign v3 full run (2026-08-03 — pre-v9 baseline)
 
 **Engagement:** `camp-v3-20260803` · **Host:** provisioning `192.168.77.60` · **Log:** `~/redstrike-runs/camp-v3-20260803-20260803T064441Z.log`  
 **Harness:** `attack-matrix/04-automation/linux/redstrike-campaign-v3-full-run.sh`  
