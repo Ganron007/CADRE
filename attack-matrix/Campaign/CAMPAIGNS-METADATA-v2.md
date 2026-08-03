@@ -15,7 +15,7 @@
 
 **Topology / Machine Roles** (from `CAMPAIGNS_v3.md` lines 41-86)
 
-> ### ⛔ HARD RULES — Attack Origin & Execution Methodology (2026-07-31, operator-locked)
+> ### ⛔ HARD RULES — Campaign Run Rules (2026-08-03, operator-locked)
 >
 > **RULE 1 — Direct SSH to ws01 only.** Every attack in this campaign runs from `ws01` via direct SSH only.
 > - **Attack origin:** `localhost → ws01` direct SSH (`analyst_t1` @ `192.168.77.62`) using `C:\Users\Ganro\.ssh\cadre-ws01-key`. No wrapper scripts, no provisioning bridge, no `ws01-exec.sh` / `ws01-stage-file.sh` indirection.
@@ -26,7 +26,11 @@
 > - The former "3.5B execution wrapper" use is **REJECTED**. Any validation evidence produced by running a command via a scheduled task is **invalid**.
 > - If a scheduled task appears in the campaign, it must be a genuine persistence artifact (e.g. invisible-task via TaskCache SD deletion), not a "run this once" shortcut.
 >
-> Violations of either rule are treated as invalid validation evidence.
+> **RULE 3 — Extraction/prerequisites are validated; cracking/computation/mutation is user practice.** We verify hashes, keys, blobs, and prerequisite state as completion criteria. Password cracking, offline computation, or mutating steps are not a validation requirement for the campaign run itself.
+>
+> **RULE 4 — H branch is the only branch where provisioning is the attacker.** For H-01..H-06, provisioning hosts the initial-access delivery assets and `ws01` is the target. We verify the delivery/drop side; a real browser click or execution by the user remains user practice.
+>
+> Violations of any of these rules are treated as invalid validation evidence.
 
 | Machine | IP | Role | Beachhead? | Notes |
 |---------|----|------|------------|-------|

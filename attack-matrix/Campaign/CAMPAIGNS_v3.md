@@ -12,6 +12,13 @@
 
 **Attack-flow reference (moved out for lightness):** [`CAMPAIGNv3-ATTACK-FLOW.md`](CAMPAIGNv3-ATTACK-FLOW.md)
 
+> ### Campaign run rules (operator-locked)
+>
+> 1. **Rule 1 — Direct SSH to ws01 only.** All attack runs originate from `ws01` via direct SSH; provisioning is config-only.
+> 2. **Rule 2 — No scheduled tasks to run commands.** Scheduled tasks are persistence-only; they are never used as execution wrappers.
+> 3. **Rule 3 — Extraction/prerequisites are validated; cracking/computation/mutation is user practice.** We verify hashes, keys, blobs, and prerequisite state; password cracking or mutating steps are not completion criteria.
+> 4. **Rule 4 — H branch is the only branch where provisioning is the attacker.** For H-01..H-06, provisioning hosts the delivery assets and `ws01` is the target; we verify the delivery/drop side, while real browser clicks remain user practice.
+>
 > ### How to use v3 (read this first)
 
 > **Primary path:** Open the runbook for your current phase — **[`Runbooks/CAMPAIGNS-RUNBOOK-README.md`](Runbooks/CAMPAIGNS-RUNBOOK-README.md)**. Each runbook contains the **full phase narrative** (theory, prerequisites, detection, tables) **plus** commands to run live.

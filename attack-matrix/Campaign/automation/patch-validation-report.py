@@ -37,8 +37,8 @@ if old_phase2 in text:
 else:
     print('NO_PHASE2_MATCH')
 
-old_phase3 = '| 041/043 | SQL xp_cmdshell + GodPotato (WT041/WT043) | ws01 -> mbr01 | child\\analyst_t1 / T13r_An@lyst! | ⠿ Partial | `xp_cmdshell 'whoami'` returns `nt service\\mssql$sqlexpress`; GodPotato escalation blocked because `C:\\Windows\\Temp\\cadre-tools\\GodPotato.exe` is missing on `mbr01` | Yes — stage GodPotato on `mbr01` and rerun |\n'
-new_phase3 = '| 041/043 | SQL xp_cmdshell + GodPotato (WT041/WT043) | ws01 -> mbr01 | child\\analyst_t1 / T13r_An@lyst! | ⠿ Partial | `xp_cmdshell 'whoami'` returned `nt service\\mssql$sqlexpress`; SYSTEM escalation is blocked because `C:\\Windows\\Temp\\cadre-tools\\GodPotato.exe` is missing on `mbr01` | Yes — stage `GodPotato-NET4.exe` on `mbr01` and rerun |\n'
+old_phase3 = "| 041/043 | SQL xp_cmdshell + GodPotato (WT041/WT043) | ws01 -> mbr01 | child\\analyst_t1 / T13r_An@lyst! | ⠿ Partial | `xp_cmdshell 'whoami'` returns `nt service\\mssql$sqlexpress`; GodPotato escalation blocked because `C:\\Windows\\Temp\\cadre-tools\\GodPotato.exe` is missing on `mbr01` | Yes — stage GodPotato on `mbr01` and rerun |\n"
+new_phase3 = "| 041/043 | SQL xp_cmdshell + GodPotato (WT041/WT043) | ws01 -> mbr01 | child\\analyst_t1 / T13r_An@lyst! | ⠿ Partial | `xp_cmdshell 'whoami'` returned `nt service\\mssql$sqlexpress`; SYSTEM escalation is blocked because `C:\\Windows\\Temp\\cadre-tools\\GodPotato.exe` is missing on `mbr01` | Yes — stage `GodPotato-NET4.exe` on `mbr01` and rerun |\n"
 if old_phase3 in text:
     text = text.replace(old_phase3, new_phase3)
     print('UPDATED_PHASE3')
