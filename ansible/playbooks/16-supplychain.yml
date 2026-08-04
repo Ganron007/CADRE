@@ -3,7 +3,7 @@
 # Layer 16: Supply-Chain Emulation — NPM-Threat-Emulation (Shai-Hulud)
 # Post-install configuration for linux01 and mbr01.
 # Manual installation required BEFORE running this playbook — see:
-#   docs/internal/plan00-upgrades/plan0.8-supplychain.md §4 (Manual Installation Guide)
+#   docs/internal/plan00-foundation/plan00-upgrades/plan0.8-supplychain.md §4 (Manual Installation Guide)
 #
 # What this playbook does:
 #   - Verifies prerequisites (Node.js, repo, Python)

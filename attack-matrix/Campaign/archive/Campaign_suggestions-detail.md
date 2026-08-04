@@ -3279,7 +3279,7 @@ npm dist-tag add malicious-pkg@1.0.0 stable  # move to known-good tag
 - **Plan 0.8** (`docs/internal/npm-supplychain-installation-guide.md`) — F-01 through F-10 already deployed. F-11/F-12 expand the chain.
 - **Track H** (Campaign_suggestions.md §"Track H - CADRE-Strike") — defensive guardrails when sister repo created
 - **Item #98 (NetExec)** — `--kdcHost` flag fixes Phase 1/2 Kerberos routes (unrelated but adjacent tool class)
-- **External reference #124+** (held) — add to `docs/internal/plan01-upgrades/external-references.md`
+- **External reference #124+** (held) — add to `docs/internal/plan01-telemetry-catalog/plan01-upgrades/external-references.md`
 - **plan1.7 §17** (held) — detection rules for cache poisoning + tag pollution
 
 ---
@@ -3730,7 +3730,7 @@ Remove-MpPreference -ExclusionProcess "mimikatz.exe"
 - Track A — Hardened Environment Variant (syscall + in-memory + encrypted dump relevance)
 - plan1.7 §17 (held) — detection rules above
 - DFIR-Nexus — in-memory credential extraction pairs with the ingest pipeline
-- External reference (held) — add to `docs/internal/plan01-upgrades/external-references.md`
+- External reference (held) — add to `docs/internal/plan01-telemetry-catalog/plan01-upgrades/external-references.md`
 
 ---
 

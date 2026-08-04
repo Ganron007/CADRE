@@ -2,7 +2,7 @@
 # TYPE: VERIFY-ONLY (rc=0=pass, rc=1=fail)
 # Layer 16: Supply-Chain Emulation — Verify-only counterpart of 16-supplychain.yml
 # Checks that manual installation + post-install config is complete.
-# Reference: docs/internal/plan00-upgrades/plan0.8-supplychain.md §4 (Manual Installation Guide)
+# Reference: docs/internal/plan00-foundation/plan00-upgrades/plan0.8-supplychain.md §4 (Manual Installation Guide)
 
 - name: "linux01 — Verify supply-chain emulation setup"
   hosts: linux01

@@ -210,7 +210,7 @@ Use `vagrant ssh provisioning` (from the `Vagrantfile` directory) when available
 - **What was done this session:**
   - **plan1.7-defense-deepening.md §16 added** (~12 KB) — full detection engineering: 5 Sigma rules + Elastic KQL `cadre-010-amsi-bypass` + Sysmon EID 10/8 additions + memory forensics + native patch detection + 6 architectural findings + root cause mitigations.
   - **Campaign_suggestions.md Item #109 FULLY REMOVED** (per user direction: "Remove AMSI from campaign_suggestions entirely as it has nothing to do with campaign (we disabled defender - no relevance now) and remove any mistaken defense work from this doc as well"). 6 places cleaned: Phase mapping table, Testing Checklist table, Tier 3 Summary table, Cross-Reference Index (with replacement marker), source-style entry, full mechanics section. Item count 102 → 101.
-  - **AMSИ bypass AD-specific tracking** — kept in `docs/internal/plan01-upgrades/ad-evasion-gap-analysis.md` reference doc (sister project integration; AMSI IS AD-specific since PowerShell bypass is core to AD attack chains).
+  - **AMSИ bypass AD-specific tracking** — kept in `docs/internal/plan01-telemetry-catalog/plan01-upgrades/ad-evasion-gap-analysis.md` reference doc (sister project integration; AMSI IS AD-specific since PowerShell bypass is core to AD attack chains).
 - **Critical findings (now in plan1.7 §16 only):**
   - **6 null-pointer guards** in `AmsiScanBuffer` each fail-open to `AMSI_RESULT_NOT_DETECTED` — 6 detection opportunities
   - **PS 7 has TWO scan paths** (Path A `ScanContent` + Path B `ReportContent`) — all 6 new techniques disable BOTH
@@ -558,7 +558,7 @@ Use `vagrant ssh provisioning` (from the `Vagrantfile` directory) when available
   8. Plan 1.7 — Run `Locksmith` + `certipy find` as defender view after each Phase 5 attack
 - **Confirmed deprecated/absorbed tools (do NOT use in new docs):** `crackmapexec` (use `nxc`), `Certify.exe` (use `Certipy`), `aclpwn.py` (absorbed into bloodyAD + Certipy + Impacket), `pyWhisker` (absorbed into `Certipy shadow auto` + `Whisker.exe`).
 - **Counts updated:** 77 → 86 items (24 ✅ / 51 ⏳ / 4 🔬 / 1 ⏭️ / 2 ref / 4 🆕). Tier 3 total: 19 → 26.
-- **Held (per user scope):** External references #123-137 update held (tools to add to `docs/internal/plan01-upgrades/external-references.md`). plan1.7 detection engineering for new tools (NetExec rate-limit KQL, KrbRelayUp 4742 detection, DonPAPI 4663 DPAPI detection) held.
+- **Held (per user scope):** External references #123-137 update held (tools to add to `docs/internal/plan01-telemetry-catalog/plan01-upgrades/external-references.md`). plan1.7 detection engineering for new tools (NetExec rate-limit KQL, KrbRelayUp 4742 detection, DonPAPI 4663 DPAPI detection) held.
 - **Workflow note (2026-06-24 session 2):** Per user clarification, scope was narrowed to 3 campaign docs + CHANGELOG.md + AGENTS.md. external-references.md held for next session. The new analysis doc at `docs/internal/references/ad-tools-landscape-2026-06-24.md` is the source of truth for the 60+ tool inventory.
 
 **Current Session (2026-06-24 — Onelogon WOOT 2026 Paper Analysis + Campaign Updates):**
@@ -847,15 +847,15 @@ python cadre.py status / start / stop / destroy
   - **9 iPurple.team articles added** to Campaign_suggestions.md (#19-#28). ADWS, WerFault, Cross-Session, SharpHound, BadSuccessor, WinGet, EntryPoint, SpeechRuntime, GAC, Credential Guard.
   - **UnPAC-the-Hash (#29):** SpecterOps U2U deep-dive. Cert → NT hash via U2U. Chains with ADCS. Study guide saved.
   - **ETW Internals (#30):** kernullist blog. Detection engineering reference.
-  - **External references master index created:** `docs/internal/plan01-upgrades/external-references.md` — 50+ references.
+  - **External references master index created:** `docs/internal/plan01-telemetry-catalog/plan01-upgrades/external-references.md` — 50+ references.
   - **4 study guides saved:** ref-adws-enumeration, ref-lsass-werfault, ref-cross-session-activation, ref-sharphound-detection.
 - **Previous Session (2026-06-08 — Branch 3.5 Execution + Study Guide + Impacket IoCs):**
   - **`05-study-guide/` restructured:** Old cert-specific content moved to `10-cert-map/`. New `05-study-guide/` now holds deep-dive attack reference per campaign phase. Phase 0 (Reconnaissance), Phase 1 (Initial Access), Phase 2 (Credential Harvesting) study guides written. Remaining phases created after each phase is tested.
   - **Branch 3.5 metadata added to CAMPAIGNS-METADATA.md:** 3.5F (SAM dump), 3.5A (Winlogon registry), 3.5H (ctfmon.exe), 3.5I (Token impersonation ❌), 3.5B (Scheduled Task), 3.5D (File Detonation), 3.5J (WMI Persistence) — all with full theory, prerequisites, telemetry.
   - **Branch 3.5 expanded in CAMPAIGNS.md:** WMI Event Subscriptions (3.5J) added as new branch. Invisible Scheduled Tasks (SD deletion) added to 3.5B. Execution order updated to 10 techniques.
-  - **Impacket protocol-level IoCs documented:** 73 Impacket IoCs mapped to CADRE phases in `docs/internal/plan01-upgrades/plan1.7-defense-deepening.md`. Tier 1: 9 Suricata rules + 3 Zeek scripts to build. Tier 2: 4 cluster models. Tier 3: 4 hunting queries.
-  - **npm supply-chain upgrade planned:** TanStack Shai-Hulud evolution (May 2026) analyzed. 3 new scenarios (F-11 IDE persistence, F-12 dead-man switch, F-13 prepare hook) documented in `docs/internal/plan01-upgrades/plan1.8-npm-upgrade.md`.
-  - **VMware escape research:** `docs/internal/plan01-upgrades/vmware-escape-research.md` — 4 escape writeups (2024-2025), risk assessment, hardening recommendations.
+  - **Impacket protocol-level IoCs documented:** 73 Impacket IoCs mapped to CADRE phases in `docs/internal/plan01-telemetry-catalog/plan1.7-defense-engineering/plan1.7-defense-deepening.md`. Tier 1: 9 Suricata rules + 3 Zeek scripts to build. Tier 2: 4 cluster models. Tier 3: 4 hunting queries.
+  - **npm supply-chain upgrade planned:** TanStack Shai-Hulud evolution (May 2026) analyzed. 3 new scenarios (F-11 IDE persistence, F-12 dead-man switch, F-13 prepare hook) documented in `docs/internal/plan01-telemetry-catalog/plan01-upgrades/plan1.8-npm-upgrade.md`.
+  - **VMware escape research:** `docs/internal/plan01-telemetry-catalog/plan01-upgrades/vmware-escape-research.md` — 4 escape writeups (2024-2025), risk assessment, hardening recommendations.
   - **RAPTOR v3.0.0 reviewed** — autonomous code vulnerability scanner. Not relevant to CADRE (different tool class).
   - **Workflow locked in:** Execute attack → update CAMPAIGNS-METADATA.md. Phase complete → capture telemetry → update tracker.md. Before next phase → review Campaign_suggestions.md.
 - **Previous Session (2026-06-04 — Campaign Verification: Phase 1-3 End-to-End):**

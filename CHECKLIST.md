@@ -9,7 +9,7 @@
 >
 > **NEXT ACTION (locked):** **RedStrike campaign-ready** (engine Rules 1–4 + graph sync) → pin `tools/red-strike/` → **Plan 1 telemetry** (P1.1–P1.5). Attack rollup **⏳ = 0** (2026-08-03 closure pass).
 >
-> **Naming:** `plan01-telemetry-catalog/` = **Plan 1**. `plan1.1-campaign-automation/` = **Plan 1.1**. `plan00-foundation/` = **Plan 0**. See [`docs/internal/PLANS.md`](docs/internal/PLANS.md).
+> **Naming:** `plan01-telemetry-catalog/` = **Plan 1**. `plan01-telemetry-catalog/plan1.1-campaign-automation/` = **Plan 1.1**. `plan00-foundation/` = **Plan 0**. See [`docs/internal/PLANS.md`](docs/internal/PLANS.md).
 
 **Status legend:**
 
@@ -29,7 +29,7 @@
 | [`Tools/vm-access.md`](Tools/vm-access.md) | SSH to provisioning + ES query templates |
 | [`attack-matrix/Campaign/LAB-PROFILES.md`](attack-matrix/Campaign/LAB-PROFILES.md) | Which VMs to power |
 | [`attack-matrix/Campaign/Runbooks/CAMPAIGNS-RUNBOOK-README.md`](attack-matrix/Campaign/Runbooks/CAMPAIGNS-RUNBOOK-README.md) | Phase runbook index |
-| [`docs/internal/plan1.1-campaign-automation/README.md`](docs/internal/plan1.1-campaign-automation/README.md) | **Plan 1.1** — RedStrike campaign automation (**next**) |
+| [`docs/internal/plan01-telemetry-catalog/plan1.1-campaign-automation/README.md`](docs/internal/plan01-telemetry-catalog/plan1.1-campaign-automation/README.md) | **Plan 1.1** — RedStrike campaign automation (**next**) |
 | [`docs/internal/plan01-telemetry-catalog/phase1-source-matrix/README.md`](docs/internal/plan01-telemetry-catalog/phase1-source-matrix/README.md) | Plan 1 telemetry pipeline |
 | [`attack-matrix/Campaign/DFIR-Nexus-Pioneer-workflow.md`](attack-matrix/Campaign/DFIR-Nexus-Pioneer-workflow.md) | Attack ↔ DFIR bridge |
 | [`DFIR-Nexus/Docs/internal/LEARN-TEST-SHOWCASE-PUBLISH.md`](../DFIR-Nexus/Docs/internal/LEARN-TEST-SHOWCASE-PUBLISH.md) | DFIR golden path (CADRE = evidence source) |
@@ -520,13 +520,13 @@
 
 ## P11 — Plan 1.1 campaign automation (RedStrike) — **NEXT**
 
-**Plan:** [`docs/internal/plan1.1-campaign-automation/`](docs/internal/plan1.1-campaign-automation/) · **Sister:** [`RedStrike/CAMPAIGN-AUTOMATION-PLAN.md`](../RedStrike/CAMPAIGN-AUTOMATION-PLAN.md) · **Routing:** [`WS01-ROUTING.md`](attack-matrix/04-automation/linux/lib/WS01-ROUTING.md)
+**Plan:** [`docs/internal/plan01-telemetry-catalog/plan1.1-campaign-automation/`](docs/internal/plan01-telemetry-catalog/plan1.1-campaign-automation/) · **Sister:** [`RedStrike/CAMPAIGN-AUTOMATION-PLAN.md`](../RedStrike/CAMPAIGN-AUTOMATION-PLAN.md) · **Routing:** [`WS01-ROUTING.md`](attack-matrix/04-automation/linux/lib/WS01-ROUTING.md)
 
 > Plan 1.1 **complete** (M0–M5 + P11.6). Automates spine + Branches A–D/G + E/F streams under provisioning→ws01 rules so Plan 1 telemetry can scale.
 
 | ID | Item | Status | Done | Owned by | Notes |
 |----|------|--------|------|----------|-------|
-| P11.0 | Plan docs committed (CADRE plan1.1 + RedStrike mirror) | [x] | 2026-07-25 | `plan1.1-campaign-automation/` · `RedStrike/CAMPAIGN-AUTOMATION-PLAN.md` | Registered in `PLANS.md` |
+| P11.0 | Plan docs committed (CADRE plan1.1 + RedStrike mirror) | [x] | 2026-07-25 | `plan01-telemetry-catalog/plan1.1-campaign-automation/` · `RedStrike/CAMPAIGN-AUTOMATION-PLAN.md` | Registered in `PLANS.md` |
 | P11.0a | **M0** — lab beachhead + playbooks + live verify | [x] | 2026-07-25 | `17-ws01-deploy.yml` · `12-elk-fleet.yml` · `WS01-ROUTING.md` · `CAMPAIGNS_v3.md` | Live: WinRM, T042, `analyst_t1` Admin, Elastic **CADRE-All**, soft Defender, **no MDE**; CADRE-WS01 policy removed |
 | P11.1 | **M1** — BeachheadRouter + CredentialLedger + `cadre-campaign` + Phases 1–3 graph | [x] | 2026-07-25 | `RedStrike\` → sync `tools/red-strike/` | dry-run + 10 unit tests; graph at `Campaign/automation/campaign-graph.yaml` |
 | P11.2 | **M2** — Full spine Phase 0.5–8 + HITL gates + MCP `campaign_*` | [x] | 2026-07-25 | `RedStrike\` + `Red-Strike-workflow.md` | Gates: dcsync/ticket/forest/persistence; API `/campaign/*` |
@@ -581,7 +581,7 @@
 
 ## P17 — Plan 1.7 defense engineering (deploy with Plan 1)
 
-**Folder:** [`docs/internal/plan1.7-defense-engineering/`](docs/internal/plan1.7-defense-engineering/) · **Specs:** [`plan01-upgrades/plan1.7-defense-deepening.md`](docs/internal/plan01-upgrades/plan1.7-defense-deepening.md) · **Exercises:** [`plan01-upgrades/plan1.7-exercises.md`](docs/internal/plan01-upgrades/plan1.7-exercises.md)
+**Folder:** [`docs/internal/plan01-telemetry-catalog/plan1.7-defense-engineering/`](docs/internal/plan01-telemetry-catalog/plan1.7-defense-engineering/) · **Specs:** [`plan01-telemetry-catalog/plan1.7-defense-engineering/plan1.7-defense-deepening.md`](docs/internal/plan01-telemetry-catalog/plan1.7-defense-engineering/plan1.7-defense-deepening.md) · **Exercises:** [`plan01-telemetry-catalog/plan1.7-defense-engineering/plan1.7-exercises.md`](docs/internal/plan01-telemetry-catalog/plan1.7-defense-engineering/plan1.7-exercises.md)
 
 | ID | Item | Status | Owned by | Notes |
 |----|------|--------|----------|-------|
@@ -596,7 +596,7 @@
 
 ## P18 — Plan 1.8 offensive upgrades (deploy with verified attacks)
 
-**Folder:** [`docs/internal/plan1.8-offensive-upgrades/`](docs/internal/plan1.8-offensive-upgrades/) · **Specs:** [`plan01-upgrades/plan1.8-offensive-upgrades.md`](docs/internal/plan01-upgrades/plan1.8-offensive-upgrades.md)
+**Folder:** [`docs/internal/plan01-telemetry-catalog/plan1.8-offensive-upgrades/`](docs/internal/plan01-telemetry-catalog/plan1.8-offensive-upgrades/) · **Specs:** [`plan01-telemetry-catalog/plan1.8-offensive-upgrades/plan1.8-offensive-upgrades.md`](docs/internal/plan01-telemetry-catalog/plan1.8-offensive-upgrades/plan1.8-offensive-upgrades.md)
 
 | ID | Item | Status | Owned by | Notes |
 |----|------|--------|----------|-------|

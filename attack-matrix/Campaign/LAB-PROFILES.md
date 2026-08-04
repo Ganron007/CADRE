@@ -26,7 +26,7 @@ RAM figures below match `lab/providers/vmware/Vagrantfile` for Vagrant-managed V
 | **vr** | `.51` | 4 GB | Velociraptor *(extension)* |
 | **monitor** | `.55` | 8 GB | Zeek / Suricata / Arkime *(extension)* |
 
-\* `docs/internal/plan01-upgrades/win11-workstation.md` plans **4 GB**. If MDE + browser feel tight, bump to **6–8 GB** in VMware settings — do not drop below 4 GB for Phase 0.5 / evasion work.
+\* `docs/internal/plan01-telemetry-catalog/plan01-upgrades/win11-workstation.md` plans **4 GB**. If MDE + browser feel tight, bump to **6–8 GB** in VMware settings — do not drop below 4 GB for Phase 0.5 / evasion work.
 
 **Attacker station:** Campaign v3 marks the attacker as `192.168.77.60` (provisioning / Kali tools). If you run a **separate personal Kali** on the same `vmnet2` lab net, count its RAM on top of the table. Profiles below say **Kali** = wherever you run Impacket / NetExec / payload hosting (usually `.60`).
 

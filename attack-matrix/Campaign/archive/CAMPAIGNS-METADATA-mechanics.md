@@ -3715,7 +3715,7 @@ jobs:
 - Plan 0.8 (`docs/internal/npm-supplychain-installation-guide.md`) — F-01 through F-10 deployed, F-11/F-12 to add
 - Track H (`Campaign_suggestions.md §"Track H"`) — CADRE-Strike defensive guardrails
 - Item #98 NetExec — different tool class but adjacent supply-chain adjacent
-- External reference #124+ (held) — add to `docs/internal/plan01-upgrades/external-references.md`
+- External reference #124+ (held) — add to `docs/internal/plan01-telemetry-catalog/plan01-upgrades/external-references.md`
 - plan1.7 §17 (held) — detection rules for cache poisoning + tag pollution
 
 ---

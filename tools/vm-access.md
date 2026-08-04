@@ -13,7 +13,7 @@
 
 **Rule:** Do not diagnose lab setup from the Windows host alone (vmnet2 often not routed to Cursor). Always configurator-hop via provisioning.
 
-**ws01 (non-Vagrant, `.62`):** same `vagrant`/`vagrant` WinRM. If `:5985` is **filtered**, service alone is not enough — open inbound FW (see [`WS01-WINRM-CONSOLE.md`](../docs/internal/plan1.1-campaign-automation/WS01-WINRM-CONSOLE.md)); Play 0 in `17-ws01-deploy.yml` encodes the lasting config.
+**ws01 (non-Vagrant, `.62`):** same `vagrant`/`vagrant` WinRM. If `:5985` is **filtered**, service alone is not enough — open inbound FW (see [`WS01-WINRM-CONSOLE.md`](../docs/internal/plan01-telemetry-catalog/plan1.1-campaign-automation/WS01-WINRM-CONSOLE.md)); Play 0 in `17-ws01-deploy.yml` encodes the lasting config.
 
 ## The attacker / orchestrator machines
 

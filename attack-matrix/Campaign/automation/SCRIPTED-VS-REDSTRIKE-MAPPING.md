@@ -1,6 +1,6 @@
 # Campaign Execution Matrix — Scripted vs RedStrike
 
-**Path:** `docs/internal/plan1.1-campaign-automation/SCRIPTED-VS-REDSTRIKE-MAPPING.md`  
+**Path:** `docs/internal/plan01-telemetry-catalog/plan1.1-campaign-automation/SCRIPTED-VS-REDSTRIKE-MAPPING.md`  
 **Last updated:** 2026-07-28  
 **Scope:** Every node in `attack-matrix/Campaign/automation/campaign-graph.yaml` v7 (multi-hop lateral movement update).  
 **Legend:**

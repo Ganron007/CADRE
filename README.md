@@ -39,20 +39,11 @@ MIT licensed. $0 baseline cost.
 >
 > ---
 >
-> **Sibling tools CADRE fuels**
+> **Sibling tools CADRE fuels:**
 >
-> - Telemetry (Elastic / Sysmon / Endpoint, Zeek, Suricata, PCAP) → **DFIR-Nexus**
-> - Campaign automation / orchestration → **RedStrike**
-> - Malware / sample pipelines → **RevAI**
-> - C2 frameworks (Sliver, Havoc, Mythic, Adaptix) with lab callbacks → **C2Stack**
-> - GRC / CISSP risk practice against the live AD-DFIR estate → **Risk**
->
-> ---
->
-> **Plan 12 (parallel — not AD-fed)**
->
-> - Isolated Docker AI red-team lab → **DarkAI**
-> - DarkAI’s scan → remediate → verify CLI (also standalone) → **Praxis**
+> <p align="left">
+>   <img src="docs/img/repos-Ganron007-descriptions.svg" alt="CADRE-related repositories and one-line descriptions" width="420">
+> </p>
 
 ---
 

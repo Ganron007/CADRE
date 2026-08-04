@@ -4,7 +4,7 @@
 > **Implements** `[docs/internal/plan01-telemetry-catalog/phase1-source-matrix/five-stream-merge.md](../../docs/internal/plan01-telemetry-catalog/phase1-source-matrix/five-stream-merge.md)` — the unified 100-attack pipeline.
 > **Per-attack metadata:** `[CAMPAIGNS-METADATA-v2.md](CAMPAIGNS-METADATA-v2.md)` — playbook refs, ACE#s, telemetry expectations.
 > **DFIR investigation bridge:** `[DFIR-Nexus-Pioneer-workflow.md](DFIR-Nexus-Pioneer-workflow.md)` — parallel attack + DFIR-Nexus case workflow (Phase 3.5 active).
-> **Index:** [`Runbooks/CAMPAIGNS-RUNBOOK-README.md`](Runbooks/CAMPAIGNS-RUNBOOK-README.md) · **Automation:** [`docs/internal/plan1.1-campaign-automation/`](../../docs/internal/plan1.1-campaign-automation/) · **Archive:** [`archive/CAMPAIGNS.md`](archive/CAMPAIGNS.md) (archived v3 index) · [`archive/CAMPAIGNS_v2.md`](archive/CAMPAIGNS_v2.md) (v2 monolith) · [`archive/CAMPAIGNS_v1_archived.md`](archive/CAMPAIGNS_v1_archived.md) (v1).
+> **Index:** [`Runbooks/CAMPAIGNS-RUNBOOK-README.md`](Runbooks/CAMPAIGNS-RUNBOOK-README.md) · **Automation:** [`docs/internal/plan01-telemetry-catalog/plan1.1-campaign-automation/`](../../docs/internal/plan01-telemetry-catalog/plan1.1-campaign-automation/) · **Archive:** [`archive/CAMPAIGNS.md`](archive/CAMPAIGNS.md) (archived v3 index) · [`archive/CAMPAIGNS_v2.md`](archive/CAMPAIGNS_v2.md) (v2 monolith) · [`archive/CAMPAIGNS_v1_archived.md`](archive/CAMPAIGNS_v1_archived.md) (v1).
 
 **94 campaign attacks + 14 E exercises + 10 F supply-chain scenarios = 118 total.**
 
@@ -1466,7 +1466,7 @@ Global Assembly Cache (GAC) is a .NET system-wide repository. Hijacking GAC asse
 **Source:** SpecterOps (2026-06-10)  
 **PoC:** [https://github.com/gershsec/mssql2025-poc](https://github.com/gershsec/mssql2025-poc)  
 **Study guide:** `study-guide/ref-mssql2025-ai-abuse.md`  
-**Graph:** `alt-sql-ai` after mbr02 SQL access (linked server / Branch C adjacency). Re-verify T042 reachability first ([`T042-REVERIFY.md`](../../docs/internal/plan1.1-campaign-automation/T042-REVERIFY.md)).
+**Graph:** `alt-sql-ai` after mbr02 SQL access (linked server / Branch C adjacency). Re-verify T042 reachability first ([`T042-REVERIFY.md`](../../docs/internal/plan01-telemetry-catalog/plan1.1-campaign-automation/T042-REVERIFY.md)).
 
 mbr02 runs SQL Server 2025 Developer Edition. Three new AI features can be weaponized:
 
@@ -3813,7 +3813,7 @@ Survey of `C:\STUDY\Github\CADRE-Platform\CADRE-Courses\ebooks\` (75 .txt files)
 
 ### E — Network Defense (14 exercises)
 
-> **Status (2026-08-02):** Attack side **✅ COMPLETE** — all 13 simulated attacks (WT069–081) + E-10 SNI validated from `ws01` (scripts `04-automation/campaign-e/ws01-campaign-e.ps1` / `-fix.ps1`). Detection rules are **already deployed** in ELK/Suricata/Zeek (`13-net-monitor.yml`: `cadre-ad.rules`, `cadre-phaseb.rules`, `cadre-et-lab.rules`, `cadre-coercion.rules` + `cadre-outbound.zeek` / `cadre-conn-beacon.zeek`). **Fire-confirmation ⏳ PENDING** — deferred to the telemetry catalog stage (monitor `.55` unreachable during the ws01 run). **WT093 Ransomware** tracked separately → future Branch R (see [`plan1.8-offensive-upgrades.md`](../../docs/internal/plan01-upgrades/plan1.8-offensive-upgrades.md) §7).
+> **Status (2026-08-02):** Attack side **✅ COMPLETE** — all 13 simulated attacks (WT069–081) + E-10 SNI validated from `ws01` (scripts `04-automation/campaign-e/ws01-campaign-e.ps1` / `-fix.ps1`). Detection rules are **already deployed** in ELK/Suricata/Zeek (`13-net-monitor.yml`: `cadre-ad.rules`, `cadre-phaseb.rules`, `cadre-et-lab.rules`, `cadre-coercion.rules` + `cadre-outbound.zeek` / `cadre-conn-beacon.zeek`). **Fire-confirmation ⏳ PENDING** — deferred to the telemetry catalog stage (monitor `.55` unreachable during the ws01 run). **WT093 Ransomware** tracked separately → future Branch R (see [`plan1.8-offensive-upgrades.md`](../../docs/internal/plan01-telemetry-catalog/plan1.8-offensive-upgrades/plan1.8-offensive-upgrades.md) §7).
 
 Attack-side scripts run from `ws01` (beachhead) as `analyst_t1`; each triggers a Suricata SID or Zeek notice. See `04-automation/campaign-e/` and `docs/internal/plan01-telemetry-catalog/phase0.7-defense-deepening/`.
 
@@ -3835,12 +3835,12 @@ Attack-side scripts run from `ws01` (beachhead) as `analyst_t1`; each triggers a
 | 081 | Outbound Anomaly           | Connection to unknown external IP      | Z1 — `cadre-outbound.zeek`                |
 | 093 | Ransomware Simulation      | AES-256 file encryption on disk        | Sysmon EID 11 + Elastic Defend file event |
 
-> **Ransomware Simulation (WT093) — future standalone campaign.** Tracked here in E for now as a single exercise (AES-256 file encryption on disk → Sysmon EID 11 + Elastic Defend file event). It is deliberately **not** re-purposed into the `ws01-campaign-e` scripts — it is a disk-level Impact simulation, not a network trigger. **Planned as a separate Branch R (Ransomware) campaign** with dedicated scripts + more items (shadow-copy deletion T1490, service stop T1489, ransom-note drop, lateral mass-encryption, backup destruction, encryption beacon). See [`plan1.8-offensive-upgrades.md`](../../docs/internal/plan01-upgrades/plan1.8-offensive-upgrades.md) §7.
+> **Ransomware Simulation (WT093) — future standalone campaign.** Tracked here in E for now as a single exercise (AES-256 file encryption on disk → Sysmon EID 11 + Elastic Defend file event). It is deliberately **not** re-purposed into the `ws01-campaign-e` scripts — it is a disk-level Impact simulation, not a network trigger. **Planned as a separate Branch R (Ransomware) campaign** with dedicated scripts + more items (shadow-copy deletion T1490, service stop T1489, ransom-note drop, lateral mass-encryption, backup destruction, encryption beacon). See [`plan1.8-offensive-upgrades.md`](../../docs/internal/plan01-telemetry-catalog/plan1.8-offensive-upgrades/plan1.8-offensive-upgrades.md) §7.
 
 
 ### F — Supply-Chain Simulation (10 scenarios)
 
-> **Status (2026-08-02):** Environment **✅ VERIFIED** on both VMs (`16-supplychain-verifyOnly.yml`: linux01 15/15, mbr01 6/6 — mbr01 scenario-path check fixed to canonical `C:\Tools\npm-threat-emulation\scenarios` + `windows\scenarios` fallback). **Attack side ⚠️ PARTIAL on linux01:** 8/9 scenarios execute clean (1,2,3,5,6,7,8,9) — mock sink captured **+4 exfil payloads**, auditd `npm_node_exec` events firing; **scenario 4 (package patching) env-gated** — `npm install ethers` to the public registry hangs in the offline lab. **Detection fire-confirmation ⏳ PENDING** — deferred to the telemetry catalog stage. Deployed copies on linux01/mbr01 have upstream author references **stripped**. **Future:** independent **CADRE NPM-Chain** upgrade — see [`plan1.8-offensive-upgrades.md`](../../docs/internal/plan01-upgrades/plan1.8-offensive-upgrades.md) §11 + [`cadre_npm_chain_upgrade.md`](../../docs/internal/plan01-upgrades/cadre_npm_chain_upgrade.md).
+> **Status (2026-08-02):** Environment **✅ VERIFIED** on both VMs (`16-supplychain-verifyOnly.yml`: linux01 15/15, mbr01 6/6 — mbr01 scenario-path check fixed to canonical `C:\Tools\npm-threat-emulation\scenarios` + `windows\scenarios` fallback). **Attack side ⚠️ PARTIAL on linux01:** 8/9 scenarios execute clean (1,2,3,5,6,7,8,9) — mock sink captured **+4 exfil payloads**, auditd `npm_node_exec` events firing; **scenario 4 (package patching) env-gated** — `npm install ethers` to the public registry hangs in the offline lab. **Detection fire-confirmation ⏳ PENDING** — deferred to the telemetry catalog stage. Deployed copies on linux01/mbr01 have upstream author references **stripped**. **Future:** independent **CADRE NPM-Chain** upgrade — see [`plan1.8-offensive-upgrades.md`](../../docs/internal/plan01-telemetry-catalog/plan1.8-offensive-upgrades/plan1.8-offensive-upgrades.md) §11 + [`cadre_npm_chain_upgrade.md`](../../docs/internal/plan01-telemetry-catalog/plan01-upgrades/cadre_npm_chain_upgrade.md).
 
 npm threat emulation on linux01 (Bash) + mbr01 (PowerShell). Detected via auditd (process/file) + Zeek (network). See `docs/internal/npm-supplychain-installation-guide.md`. Upstream reference (current deployment): MHaggis/NPM-Threat-Emulation (Shai-Hulud worm emulation) — deployed copies stripped of author refs on the VMs.
 

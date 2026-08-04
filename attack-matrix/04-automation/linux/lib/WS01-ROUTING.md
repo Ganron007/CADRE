@@ -1,7 +1,7 @@
 # Beachhead routing — Plan 1.1 (ws01-primary)
 
 **Operator:** SSH to **provisioning** `.60` (Kali / Ansible config host).  
-**Campaign plan:** [`docs/internal/plan1.1-campaign-automation/CAMPAIGN-AUTOMATION-PLAN.md`](../../../../docs/internal/plan1.1-campaign-automation/CAMPAIGN-AUTOMATION-PLAN.md)
+**Campaign plan:** [`docs/internal/plan01-telemetry-catalog/plan1.1-campaign-automation/CAMPAIGN-AUTOMATION-PLAN.md`](../../../../docs/internal/plan01-telemetry-catalog/plan1.1-campaign-automation/CAMPAIGN-AUTOMATION-PLAN.md)
 
 ## Locked policy (2026-07-25)
 

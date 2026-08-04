@@ -3,7 +3,7 @@
 > **Purpose:** Run the CADRE campaign spine via RedStrike (`CampaignOrchestrator`) with dual beachheads, credential ledger, and HITL gates — parallel to manual runbooks and to [`DFIR-Nexus-Pioneer-workflow.md`](DFIR-Nexus-Pioneer-workflow.md).
 >
 > **Engine SSoT:** `C:\STUDY\Github\CADRE-Platform\RedStrike\` · **Pin:** `CADRE/tools/red-strike/`  
-> **Plan:** [`docs/internal/plan1.1-campaign-automation/CAMPAIGN-AUTOMATION-PLAN.md`](../../docs/internal/plan1.1-campaign-automation/CAMPAIGN-AUTOMATION-PLAN.md)  
+> **Plan:** [`docs/internal/plan01-telemetry-catalog/plan1.1-campaign-automation/CAMPAIGN-AUTOMATION-PLAN.md`](../../docs/internal/plan01-telemetry-catalog/plan1.1-campaign-automation/CAMPAIGN-AUTOMATION-PLAN.md)  
 > **Graph:** [`automation/campaign-graph.yaml`](automation/campaign-graph.yaml) · **Campaign:** [`CAMPAIGNS_v3.md`](CAMPAIGNS_v3.md)
 
 **Status:** Plan 1.1 **complete**. Engine **0.5.2**. Graph **v9** — full CampaignOrchestrator coverage (stubs only for deferred surfaces). Dual operator modes: **provisioning** (hybrid) + **ws01** (native).

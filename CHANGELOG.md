@@ -39,7 +39,7 @@
 - **Rigor contract layer created (2026-08-02, local-only under `docs/internal/`).** (1) [`workspace-rigor-contract.md`](docs/internal/workspace-rigor-contract.md) — thin **universal** contract applying to all 12 CADRE-Platform projects (evidence-before-claims · no fabrication · multi-stage gates · human-approval boundary · target-as-data · honest reporting · verify-before-agreeing). (2) [`cadre-lab-contract.md`](docs/internal/cadre-lab-contract.md) — **CADRE-specific** contract distilled from `PROMPT.md` (modes BUILD/SOLVE/HUNT/VALIDATE, G0–G7 gates, ledgers bound to campaign docs, CADRE false-completion list, doc-update order). (3) [`PROMPT.md`](docs/internal/PROMPT.md) — canonical generic contract moved from `attack-matrix/Campaign/` (local-only). (4) [`ACTIVE.md`](docs/internal/ACTIVE.md) — refreshed as the **umbrella sync tracker**: contract-applicability matrix (universal → CADRE → per-repo), per-project status + next-action for all 12 roots, handoff entries 07-29→08-02, C2Stack added, CADRE-Risk corrected to active. **Wiring:** VS Code user-prompt `cadre-workspace.instructions.md` (applyTo `**`, auto-loaded); `AGENTS.md` updated in **CADRE** (commit `b5986a0`) and **DFIR-Nexus** (commit `f009b4e` — also swept in pre-staged REVAMP doc renames, flagged) pointing at the contract layer; new `AGENTS.md` created on disk for Praxis / RedStrike / RevEng / RevAI / DarkAI / Eva7ion / C2Stack / Risk (**local-only** — gitignored by the global `.gitignore_global` rule, left uncommitted per user decision). CADRE-Courses + CADRE-Integrations skipped (read-only corpora).
 - **Post-DA cluster + extension attacks adopted into campaign (WT097-109, 2026-08-02).** From `Campaign_suggestions.md` upgrade candidates (Tier 1/2). **New Post-DA sub-phase (WT097-103)** between Phase 7 and Phase 8 — KDS Root Key (097) → Golden gMSA (098, ties to ACE#10 `gmsaTools$`) → Golden dMSA/BadSuccessor (099, ACE#24 `dmsaPrivService$`) → LAPS Bulk (100) → DSRM Extract&Set (101) → DCShadow (102) → DPAPI-NG SID Protector (103). **Branch 3.5O persistence extensions (WT104-107)** — DLL/COM hijack, IFEO, LSA SSP. **Phase 3 alt** DCOMIllusionist (WT108). **Branch B** ESC16 (WT109, ManageCA held via ESC7). **Docs updated:** `CAMPAIGNS_v3.md` (Post-DA section + 3.5O + DCOM + ESC16 + coverage summary 81→94), `CAMPAIGNS-METADATA-v2.md` (mechanics stubs WT097-109), `CAMPAIGNS-VALIDATION-REPORT.md` (Post-DA table + rows + rollup 106→119 = 68/6/30/9/6), `CADRE-Attack-Surface-Coverage-Audit.md` (2.19 surface assessment — 3 genuine gaps: DPAPI-NG target, DLL-hijack app, SSP DLL). Runbooks regenerated from v3 (coverage OK). All 13 items ⏳ not exercised.
 - **Validation report — Campaign Status Rollup added (2026-08-02).** `CAMPAIGNS-VALIDATION-REPORT.md` now opens with a full status rollup table: per phase/branch ✅ done / ⚠️ partial / ⏳ pending / 🔬 deferred / ❌ invalid with counts (**106 total = 68 verified / 6 partial / 17 pending / 9 deferred / 6 invalid**). Rollup lists **attack-side status only** — Branch E row = attack sims (WT069-081 + E-10) ✅ 14; **E/F detection validation is tracked in `CHECKLIST.md`** (Plan 1 telemetry stage), not the rollup. Branches ordered A→G. Rollup notes: Branch A + D 100%, Branch B 7/8, Branch C exec chain FULL EXEC, E attack complete, F 9/10 linux. Also **fixed stale summary counts** (Branch B 4→8, Branch D 5→6, E attack sims added, total 101→106) and **stale WT027 row** (⏳ → ✅ VERIFIED 2026-08-01, SPN jacking live-verified).
-- **Campaign F (npm supply-chain) — environment verified + linux01 attack-side validated (2026-08-02).** Environment **✅ VERIFIED** on both VMs via `16-supplychain-verifyOnly.yml`: linux01 **15/15**, mbr01 **6/6**. mbr01 fixes: windows scenario scripts staged to canonical `C:\Tools\npm-threat-emulation\scenarios\` (9 scenarios + 7 support scripts); **16-supplychain.yml + -verifyOnly.yml scenario-path checks corrected** to the canonical folder + `windows\scenarios` fallback (previously checked the Linux-layout `scenarios\*.ps1` — false FAIL). **Author references stripped** on deployed copies (linux01 `/opt/NPM-Threat-Emulation-main` + mbr01 canonical: MHaggis URLs/badge removed — 0 remaining). **Attack-side validation (linux01):** 8/9 scenarios execute clean (1,2,3,5,6,7,8,9); mock sink captured **+4 exfil payloads** (75→79); auditd `npm_node_exec` events confirmed firing (25+ events; rule works — earlier "0" was `ausearch` hanging on the 85 MB log). **Scenario 4 (package patching) env-gated** — `npm install ethers` to the public registry hangs in the offline lab. Detection fire-confirmation deferred to telemetry catalog. **Upgrade design written:** `docs/internal/plan01-upgrades/cadre_npm_chain_upgrade.md` + `plan1.8-offensive-upgrades.md` §11 — independent **CADRE NPM-Chain** (attacker/target separation, Verdaccio registry, act CI, kill-chain F-01..F-13+, detection-first) — deferred, current simulator stays. Docs synced: `CAMPAIGNS_v3.md` F, `CAMPAIGNS-RUNBOOK-f.md`, `CAMPAIGNS-VALIDATION-REPORT.md`, `CHECKLIST.md` Stream F.
+- **Campaign F (npm supply-chain) — environment verified + linux01 attack-side validated (2026-08-02).** Environment **✅ VERIFIED** on both VMs via `16-supplychain-verifyOnly.yml`: linux01 **15/15**, mbr01 **6/6**. mbr01 fixes: windows scenario scripts staged to canonical `C:\Tools\npm-threat-emulation\scenarios\` (9 scenarios + 7 support scripts); **16-supplychain.yml + -verifyOnly.yml scenario-path checks corrected** to the canonical folder + `windows\scenarios` fallback (previously checked the Linux-layout `scenarios\*.ps1` — false FAIL). **Author references stripped** on deployed copies (linux01 `/opt/NPM-Threat-Emulation-main` + mbr01 canonical: MHaggis URLs/badge removed — 0 remaining). **Attack-side validation (linux01):** 8/9 scenarios execute clean (1,2,3,5,6,7,8,9); mock sink captured **+4 exfil payloads** (75→79); auditd `npm_node_exec` events confirmed firing (25+ events; rule works — earlier "0" was `ausearch` hanging on the 85 MB log). **Scenario 4 (package patching) env-gated** — `npm install ethers` to the public registry hangs in the offline lab. Detection fire-confirmation deferred to telemetry catalog. **Upgrade design written:** `docs/internal/plan01-telemetry-catalog/plan01-upgrades/cadre_npm_chain_upgrade.md` + `plan1.8-offensive-upgrades.md` §11 — independent **CADRE NPM-Chain** (attacker/target separation, Verdaccio registry, act CI, kill-chain F-01..F-13+, detection-first) — deferred, current simulator stays. Docs synced: `CAMPAIGNS_v3.md` F, `CAMPAIGNS-RUNBOOK-f.md`, `CAMPAIGNS-VALIDATION-REPORT.md`, `CHECKLIST.md` Stream F.
 - **Stream E — attack side COMPLETE + rules deployed; detection validation pending (2026-08-02).** All 13 simulated attacks (WT069–081) + E-10 SNI validated from `ws01` as `analyst_t1` (`04-automation/campaign-e/ws01-campaign-e.ps1` / `-fix.ps1`; WT079 SSH-brute fixed via stdin-fed `ProcessStartInfo`, WT080 long-conn re-targeted to `mbr02:443` — elk:443 has no listener). **Detection rules were already deployed** via `13-net-monitor.yml` (`cadre-ad.rules`, `cadre-phaseb.rules`, `cadre-et-lab.rules`, `cadre-coercion.rules` + `cadre-outbound.zeek` / `cadre-conn-beacon.zeek`). **Pending (only this remains):** per-item rule fire-confirmation + telemetry capture + tracker update — deferred to **Plan 1 telemetry catalog** (monitor `.55` unreachable during the ws01 run). **WT093 Ransomware** separated → future **Branch R** (`plan1.8-offensive-upgrades.md` §7, 8 planned items R-01..R-08). Marked attack-side complete / validation-pending in `CAMPAIGNS_v3.md`, `CAMPAIGNS-RUNBOOK-e.md`, and `CHECKLIST.md` (Stream E — the master tracker).
 - **WT038 Application Deployment FULL EXEC VERIFIED (2026-08-02) — Branch C chain COMPLETE.** Live from ws01 as `range\svc_sccm`: app (CI 16777510) + DeploymentType (16777511) + assignment (16777217, Required) created via the **AdminService wmi passthrough** (`POST /AdminService/wmi/SMS_Application` with SCCMHunter-exact AppMgmtDigest). Two model-document gotchas fixed: (1) the XML needed the `<CustomData>` wrapper + `<ExecutionContext>` at `<Installer>` level (hand-rebuilt XML without them → `Failed to initialize from Model document 0x80004005`); (2) the `InstallCommandLine` payload had to be **XML-escaped** (`>`/`&` in `cmd /c "..."` broke the parser). **Delivery blocker root-caused (NOT the collection schedule, NOT the app config):** the **MP web handlers were missing** — `C:\Program Files\SMS_CCM\SMS_MP` and `ServiceData\System` were EMPTY (same class as the empty `SMS_BGB` dir) → MP health check `/SMS_MP/.sms_aut?MPLIST` → **HTTP 500** → client `Post http://<mp>/ccm_system/request` → `0x8000000A` → client never received policy → no assignment. **Fix (config channel):** `msiexec /i ...\bin\x64\mp.msi REINSTALL=ALL REINSTALLMODE=vmaus CCMINSTALLDIR=... CCMSERVERDATAROOT=... USESMSPORTS=TRUE SMSPORTS=80 ...` (exact site reinstall cmd from `MPSetup.log`) → health check **200** → client received assignment → `AppEnforce.log` executed payload **with system context**, exit 0 → **`C:\Windows\Temp\wt038-system.txt` = `nt authority\system` + `wt038-marker.txt` = `WT038-PROOF-APP-DEPLOY` on WS01**. **Branch C status:** WT034 ✅, WT035 ⏳ (needs PXE client), WT036 ⏳ (needs console device), WT037 ✅, WT038 ✅, WT039 ✅. Recipes: `docs/sccm-integration-guide.md` Phase 6B/6C/6C.4.
 - **Docs renamed (2026-08-02, per user direction):** `CAMPAIGNS-VALIDATION-REPORT-20260730.md` → `CAMPAIGNS-VALIDATION-REPORT.md` and `CADRE-Attack-Surface-Coverage-Audit-20260730.md` → `CADRE-Attack-Surface-Coverage-Audit.md` (daily updates live in CHANGELOG, not filenames). All references updated (`attack-matrix/README.md`, `Campaign/README.md`, `CHECKLIST.md`, `AGENTS.md`, `tools/build_campaign_validation_report.py`, `Campaign/automation/patch-validation-report.py`). **Full stale-status sweep:** every Branch C / SCCM reference synced to the 2026-08-02 verified state across `CAMPAIGNS_v3.md`, `CAMPAIGNS-METADATA-v2.md`, `CAMPAIGNS-VALIDATION-REPORT.md`, `CADRE-Attack-Surface-Coverage-Audit.md`, `Runbooks/CAMPAIGNS-RUNBOOK-branch-c.md`, and `CHECKLIST.md` (WT037/038/039 FULL EXEC VERIFIED; the 2026-07-30 "SCCM client not present on ws01" rows marked historical; WT038 "needs console/pending MP repair" claims corrected).
@@ -163,7 +163,7 @@ All notable changes to CADRE are documented here. Format: [Keep a Changelog](htt
 
 **New attack scripts:** 20 `attack-matrix/04-automation/linux/campaign-a/*-ws01.sh` files plus Windows PowerShell helpers under `attack-matrix/04-automation/linux/windows/`.
 
-**Docs:** `attack-matrix/Campaign/automation/SCRIPTED-VS-REDSTRIKE-MAPPING.md` — full per-node scripted vs RedStrike matrix; copied to `docs/internal/plan1.1-campaign-automation/` for convenience.
+**Docs:** `attack-matrix/Campaign/automation/SCRIPTED-VS-REDSTRIKE-MAPPING.md` — full per-node scripted vs RedStrike matrix; copied to `docs/internal/plan01-telemetry-catalog/plan1.1-campaign-automation/` for convenience.
 
 **Next:** Plan 1.1 telemetry capture (P1.1–P1.5) — deterministic replay + ES/Zeek/Suri/Endpt bundles → grid fill.
 
@@ -301,7 +301,7 @@ All notable changes to CADRE are documented here. Format: [Keep a Changelog](htt
 > **Scope:** Establish **Plan 1.1** (RedStrike-driven campaign automation) as the next execution track ahead of / with Plan 1 telemetry, so attack runs can scale instead of staying hand-driven. Docs + checklist only — RedStrike M1 code not started.
 
 **What was done:**
-- Created [`docs/internal/plan1.1-campaign-automation/`](docs/internal/plan1.1-campaign-automation/) — `README.md` router + `CAMPAIGN-AUTOMATION-PLAN.md` (mirror of RedStrike plan: M1–M5, ws01 routing, HITL gates, Branches A–D/G).
+- Created [`docs/internal/plan01-telemetry-catalog/plan1.1-campaign-automation/`](docs/internal/plan01-telemetry-catalog/plan1.1-campaign-automation/) — `README.md` router + `CAMPAIGN-AUTOMATION-PLAN.md` (mirror of RedStrike plan: M1–M5, ws01 routing, HITL gates, Branches A–D/G).
 - Updated [`docs/internal/PLANS.md`](docs/internal/PLANS.md) — Plan **1.1** in naming table, folder table, and execution order (1.1 before/with Plan 1).
 - Updated root [`CHECKLIST.md`](CHECKLIST.md) — new **P11.*** section (P11.0 docs done; P11.1–P11.6 pending); top priorities lead with Plan 1.1; `I.1` redirected to P11; companion-doc + NEXT ACTION banner.
 - Updated [`docs/internal/ACTIVE.md`](docs/internal/ACTIVE.md) — next action = CHECKLIST **P11.1** (RedStrike M1).
@@ -417,7 +417,7 @@ All notable changes to CADRE are documented here. Format: [Keep a Changelog](htt
 
 ### Fixed (2026-06-27 — CADRE-Platform folder migration repair)
 
-- **Filesystem:** Merged accidental nested `CADRE/CADRE/` into repo root — restored `lab/`, `tools/` (regen-config, campaign scripts, dfir-nexus), `docs/internal/plan01-upgrades/`, `_canonical/`, `process/`, `references/sources`, `tests/`. Removed nested folder and old `Github\CADRE\NUL` stub (replaced with README pointer).
+- **Filesystem:** Merged accidental nested `CADRE/CADRE/` into repo root — restored `lab/`, `tools/` (regen-config, campaign scripts, dfir-nexus), `docs/internal/plan01-telemetry-catalog/plan01-upgrades/`, `_canonical/`, `process/`, `references/sources`, `tests/`. Removed nested folder and old `Github\CADRE\NUL` stub (replaced with README pointer).
 - **Docs:** Updated `registry.md`, `ACTIVE.md`, `ecosystem-organization.md` (Option B executed), `DOC-MAP.md` (ACTIVE + registry entries). Path sweep across platform to `C:\STUDY\Github\CADRE-Platform\`.
 - **Workspace:** Canonical entry `CADRE-Platform\CADRE-ALL.code-workspace` + `CADRE-Platform\README.md`.
 
@@ -427,7 +427,7 @@ All notable changes to CADRE are documented here. Format: [Keep a Changelog](htt
 
 **What changed:**
 - **plan1.7-defense-deepening.md §16 AMSI Bypass Detection Engineering added (~12 KB)** — 5 Sigma rules + Elastic KQL `cadre-010-amsi-bypass` + memory forensics + 6 architectural findings + root cause mitigations. See plan1.7 §16 for full content.
-- **AMSИ bypass AD-specific tracking** — kept in `docs/internal/plan01-upgrades/ad-evasion-gap-analysis.md` reference doc (sister project integration; per user: "AMSI goes int this if you thin its rlevant to AD only" — AMSI IS AD-specific since PowerShell bypass is core to AD attack chains).
+- **AMSИ bypass AD-specific tracking** — kept in `docs/internal/plan01-telemetry-catalog/plan01-upgrades/ad-evasion-gap-analysis.md` reference doc (sister project integration; per user: "AMSI goes int this if you thin its rlevant to AD only" — AMSI IS AD-specific since PowerShell bypass is core to AD attack chains).
 
 **Removed (session 16 — partial revert):**
 - **Campaign_suggestions.md Item #109 (AMSI Bypass) FULLY REMOVED** — per user direction (2026-06-25):
@@ -440,7 +440,7 @@ All notable changes to CADRE are documented here. Format: [Keep a Changelog](htt
 
 **Files updated (2 total):**
 
-1. **`docs/internal/plan01-upgrades/plan1.7-defense-deepening.md`** — §16 AMSI Bypass Detection Engineering added (~12 KB):
+1. **`docs/internal/plan01-telemetry-catalog/plan1.7-defense-engineering/plan1.7-defense-deepening.md`** — §16 AMSI Bypass Detection Engineering added (~12 KB):
    - §16.1 Why the previous 3 Gray Hat techniques failed (live-tested)
    - §16.2 The 6 new confirmed techniques (all reverse-shell verified)
    - §16.3 Architectural findings (6 null-pointer guards, PS 7 two-path, initonly inconsistency on `s_amsiNotifyFailed`, Defender RVA 0x8160 watch, JIT heap + vtable + InternalScan/InternalNotify unmonitored, Event 4104 NOT suppressed by any bypass)
@@ -541,7 +541,7 @@ All notable changes to CADRE are documented here. Format: [Keep a Changelog](htt
 
 **Files updated (3 total — focused scope per user "b"):**
 
-1. **`docs/internal/plan01-upgrades/plan1.7-exercises.md`** (EX-60 + cross-cutting tool section):
+1. **`docs/internal/plan01-telemetry-catalog/plan1.7-defense-engineering/plan1.7-exercises.md`** (EX-60 + cross-cutting tool section):
    - **EX-60 added**: "PCAP + Log Analysis with SO-CRATES (Cross-Cutting Analyst Tool)"
      - 7-step plan: deploy + analyze EX-47 PCAP + analyze sample log + validate plan1.7 Sigma rules pre-deployment + PCAP validation workflow + cross-check with deployed Suricata + use as Plan 2 design reference
    - **Source table updated**: +SO-CRATES (cross-cutting) row
@@ -559,7 +559,7 @@ All notable changes to CADRE are documented here. Format: [Keep a Changelog](htt
 **Status legend:** SO-CRATES is now in scope as a **cross-cutting analyst tool** for Plan 9 (PCAP/log analysis) + plan1.7 EX-47 (PCAP validation) + plan1.7 §10 (PCAP workflow) + Plan 2 design reference. No active deployment in this session — just reference + EX-60 spec.
 
 **Cross-references:**
-- `docs/internal/plan01-upgrades/plan1.7-exercises.md` "Cross-Cutting Tool: SO-CRATES" section + EX-60
+- `docs/internal/plan01-telemetry-catalog/plan1.7-defense-engineering/plan1.7-exercises.md` "Cross-Cutting Tool: SO-CRATES" section + EX-60
 - `docs/internal/roadmapv2.md` Plan 9 line + per-plan table + file references
 - Held for next session: actual deployment of SO-CRATES Docker container on monitor VM
 
@@ -582,7 +582,7 @@ All notable changes to CADRE are documented here. Format: [Keep a Changelog](htt
 
 **Files updated (4 total):**
 
-1. **`docs/internal/plan01-upgrades/plan1.7-exercises.md`** (+Category H, ~15 KB):
+1. **`docs/internal/plan01-telemetry-catalog/plan1.7-defense-engineering/plan1.7-exercises.md`** (+Category H, ~15 KB):
    - **EX-49 to EX-59** added (11 new Linux forensics exercises):
      - EX-49: Sysmon for Linux Configuration and Analysis
      - EX-50: Linux Persistence via init.d and systemd Services
@@ -598,7 +598,7 @@ All notable changes to CADRE are documented here. Format: [Keep a Changelog](htt
    - Total: **48 → 59 exercises** (+11)
    - New source: **13Cubed Linux** (added to "Exercise Count by Source" table)
 
-2. **`docs/internal/plan01-upgrades/plan1.8-exercises.md`** (+Category I, ~11 KB):
+2. **`docs/internal/plan01-telemetry-catalog/plan1.8-offensive-upgrades/plan1.8-exercises.md`** (+Category I, ~11 KB):
    - **EX-OFF-32 to EX-OFF-37** added (6 new Linux offensive exercises):
      - EX-OFF-32: Linux Persistence via systemd Service (T1543.002)
      - EX-OFF-33: Linux SSH Authorized Keys Backdoor (T1098.004)
@@ -608,7 +608,7 @@ All notable changes to CADRE are documented here. Format: [Keep a Changelog](htt
      - EX-OFF-37: WSL Persistence — Cross-OS Attack Chain
    - Total: **31 → 37 exercises** (+6)
 
-3. **`docs/internal/plan01-upgrades/plan1.7-defense-deepening.md`** (+§15, ~12 KB):
+3. **`docs/internal/plan01-telemetry-catalog/plan1.7-defense-engineering/plan1.7-defense-deepening.md`** (+§15, ~12 KB):
    - **§15 13Cubed Linux Forensics Integration** added
    - 11 sections covering 13Cubed course library, critical new tools (Sysmon for Linux, AVML, UAC, Plaso, TSK, debugfs, WSL2), Sysmon for Linux deployment plan, AVML+UAC as Plan 9 stack, 7 Linux Sigma rules to port, 3 Suricata SID proposals, action items for 07-linux-config.yml + extension rules
 
@@ -638,9 +638,9 @@ All notable changes to CADRE are documented here. Format: [Keep a Changelog](htt
 **Status legend:** 13Cubed Linux content now fills the **Linux DFIR gap** that SANS courses (FOR500/508/608) cover only briefly. Direct fit for Plan 9 + linux01 lab VM.
 
 **Cross-references:**
-- `docs/internal/plan01-upgrades/plan1.7-exercises.md` Category H
-- `docs/internal/plan01-upgrades/plan1.8-exercises.md` Category I
-- `docs/internal/plan01-upgrades/plan1.7-defense-deepening.md` §15
+- `docs/internal/plan01-telemetry-catalog/plan1.7-defense-engineering/plan1.7-exercises.md` Category H
+- `docs/internal/plan01-telemetry-catalog/plan1.8-offensive-upgrades/plan1.8-exercises.md` Category I
+- `docs/internal/plan01-telemetry-catalog/plan1.7-defense-engineering/plan1.7-defense-deepening.md` §15
 - `docs/internal/roadmapv2.md` §7 + §8
 - Held for next session: update `07-linux-config.yml` to add Sysmon for Linux, deploy 7 Linux Sigma rules, add 3 Suricata SIDs
 
@@ -1672,7 +1672,7 @@ The SANS tools integration plan was updated to add a "Distinction from CADRE Pla
 
 - **Dirk-jan Mollema blog (https://dirkjanm.io/) analyzed (24 posts, 5 pages, 2018-2025):** Primary research authority for both on-prem AD (forest trusts, ADCS, RBCD, unconstrained delegation) and Azure/Entra ID (PRT, Cloud Kerberos Trust, Actor tokens, Intune ADCS, TAP, Federated Credentials, App Admin escalation). 16 new campaign suggestions added (Items 43-58).
 - **Campaign_suggestions.md Tier 3 (Dirk-jan):** 16 new items grouped by phase — adidnsdump (#43, Phase 0), RBCD+Relay (#44, Phase 6), Unconstrained Delegation krbrelayx (#45, Phase 6 — mbr01 has unconstrained delegation), NTLM Relay to ADCS ESC8 (#46, Branch B), CVE-2019-1040 SMB-to-LDAP (#47, study ref), Zerologon alt (#48, study ref), Forest Trust SID Filtering (#49, Phase 8 study), CVE-2020-0665 Trust Bypass (#50, Phase 8 study), Azure AD Connect DPAPI Dump (#51, Phase 3.5 — Cloud Sync on dc01), Actor Tokens → Global Admin (#52, P11.1), Cloud Kerberos Trust → DA (#53, P11.2), PRT Phishing (#54, P11.3), Intune ADCS ESC1 (#55, P11.4), Temporary Access Pass Lateral (#56, P11.5), Federated Credentials Persistence (#57, P11.6), Application Admin → Global Admin (#58, P11.7). Summary table counts: 9 adopted, 49 pending, 1 research, 1 skip, 3 reference, total 63.
-- **External references master index expanded:** `docs/internal/plan01-upgrades/external-references.md` — 24 new entries (#80-#103) for full Dirk-jan blog post list. Total references: 79 → 103.
+- **External references master index expanded:** `docs/internal/plan01-telemetry-catalog/plan01-upgrades/external-references.md` — 24 new entries (#80-#103) for full Dirk-jan blog post list. Total references: 79 → 103.
 - **plan1.7-defense-deepening.md §11 added (ADCS/Forest Trust/Relay Defense):** 8 detection areas — ADCS ESC8 (Suricata SID:1000070, Elastic EID 4886/4887), Forest Trust SID Filtering (Zeek cross-realm TGS with ExtraSid), CVE-2020-0665 (study ref), Unconstrained Delegation abuse (Suricata SID:1000071 + Elastic EID 4624 Type 3 Network), RBCD modification (Elastic EID 5137), NTLM Relay foundational (Suricata SID:1000072), Kerberos Relay over DNS (Suricata SID:1000073), adconnectdump (Sysmon EID 1). Implementation ~8.5hr. Pairs Phase 6/8/Branch B execution with detection.
 - **plan1.8-offensive-upgrades.md §10 added (Dirk-jan Plan 11 offensive):** 8 Plan 11 offensive techniques (P11.1-P11.8) — Actor Tokens (highest impact Entra ID vuln), Cloud Kerberos Trust (hybrid chain via Cloud Sync on dc01), PRT Phishing (MFA bypass), Intune ADCS ESC1 (cloud → on-prem), Temporary Access Pass (TAP abuse), Federated Credentials Persistence, Application Admin → Global Admin (unpatched since 2019), adconnectdump (Phase 3 SYSTEM → Plan 11 bridge). Priority: **P11.8 (adconnectdump) first** — bridges Phase 3 SYSTEM to Plan 11 hybrid chain. Total ~23hr for all 8 techniques.
 - **Dirk-jan is #1 reference for AD/Azure research** going forward. Future blog posts by him should be triaged into plan1.7 (defense) or plan1.8 (offense).
@@ -1681,7 +1681,7 @@ The SANS tools integration plan was updated to add a "Distinction from CADRE Pla
 
 - **SANS SEC503/FOR572 analyzed for CADRE relevance:** 3 major network detection gaps identified: DNS analytics (no DNS tunneling/exfil detection), SMB forensics (no NTLM relay/named pipe detection), TLS deep inspection (no cert chain validation). 6 high-value detection rules documented in plan1.7 §9: DNS tunneling (Zeek), DNS TXT exfil (Zeek), NTLM relay (Suricata), SMB signing alerts (Suricata), TLS self-signed cert (Suricata), SiLK beaconing. ~7hr implementation.
 - **Malware-traffic-analysis.net workflow proposed:** plan1.7 §10 — Download real malware PCAPs → OhMyPCAP + cadre-* rules → verify detection → build missing rules → update source matrix. 6 recommended PCAPs (Lumma, XLoader, njRAT, Remcos, GuLoader, ClickFix). Do AFTER campaign validation complete.
-- **External references master index updated:** `docs/internal/plan01-upgrades/external-references.md` — 71 references total. SEC503 (#69), FOR572 (#70), malware-traffic-analysis.net (#71) added.
+- **External references master index updated:** `docs/internal/plan01-telemetry-catalog/plan01-upgrades/external-references.md` — 71 references total. SEC503 (#69), FOR572 (#70), malware-traffic-analysis.net (#71) added.
 - **Campaign_suggestions.md lifecycle restructured:** Phase 3.5 (Credential Access) split from Phase 5 (Persistence). Summary table grouped by MITRE ATT&CK lifecycle. Phase 5 now contains only persistence techniques.
 
 ### Changed (2026-06-11 — DCOMIllusionist + CVE-2026-41089 + RTO Courses)
@@ -1703,7 +1703,7 @@ The SANS tools integration plan was updated to add a "Distinction from CADRE Pla
 - **9 iPurple.team articles added to Campaign_suggestions.md:** ADWS Enumeration (#19), LSASS Dump via WerFault (#20), Cross-Session Activation (#21), SharpHound Detection (#22), BadSuccessor + Golden dMSA (#23), WinGet Proxy Execution (#24), EntryPoint Hijacking (#25), SpeechRuntime Lateral (#26), GAC Hijacking (#27), Credential Guard Bypass (#28).
 - **UnPAC-the-Hash added (#29):** SpecterOps deep-dive on Kerberos U2U authentication. Extract NT hash from PKINIT TGT via U2U service ticket. Chains with ADCS ESC attacks (Branch B). Study guide saved: `05-study-guide/kerberos-u2u-unpac-the-hash.md`.
 - **ETW Internals added (#30):** kernullist blog — ETW architecture, hooking, tampering, detection. Detection engineering reference for understanding how attackers blind EDR/Sysmon telemetry.
-- **External references master index created:** `docs/internal/plan01-upgrades/external-references.md` — tracks all 50+ external sources referenced in CADRE.
+- **External references master index created:** `docs/internal/plan01-telemetry-catalog/plan01-upgrades/external-references.md` — tracks all 50+ external sources referenced in CADRE.
 - **4 iPurple.team study guides saved:** `05-study-guide/ref-adws-enumeration.md`, `ref-lsass-werfault.md`, `ref-cross-session-activation.md`, `ref-sharphound-detection.md`.
 
 ### Changed (2026-06-08 — Branch 3.5 Expansion: WMI Persistence + Invisible Tasks + VMware Escape Research)
@@ -1713,12 +1713,12 @@ The SANS tools integration plan was updated to add a "Distinction from CADRE Pla
   - **3.5B enhanced — Invisible Scheduled Tasks**: Security Descriptor deletion technique added to existing Scheduled Task branch. Deleting `Security` subkey from `HKLM\...\TaskCache\Tree\<task>\Security` makes task invisible to `schtasks /query`, Task Scheduler GUI, PowerShell `Get-ScheduledTask`, and Autoruns. Task still executes on schedule. Detection: Sysmon 12/13 + raw registry enumeration under SYSTEM.
 - **Branch 3.5 summary table updated** — execution order: `3.5F → 3.5A → 3.5G → 3.5H → 3.5B → 3.5C → 3.5D → 3.5E → 3.5I → 3.5J`. New rows: `3.5B†` (invisible tasks), `3.5J` (WMI subscriptions).
 - **Campaign_suggestions.md updated** — Items 8 (WMI Event Subscriptions) and 10 (Invisible Scheduled Tasks) marked ✅ adopted. DLL Sideloading removed (evasion techniques covered in separate project). Phase mapping table, testing checklist, integration priority, and near-term additions all updated.
-- **VMware escape research doc created** — `docs/internal/plan01-upgrades/vmware-escape-research.md`. 4 VMware escape writeups (2024-2025): Synacktiv Pwn2Own Berlin, NCC Group, Theori chain, Bug Tamer. Risk assessment table for CADRE's VMware setup. Hardening recommendations with `.vmx` settings (disable shared folders, clipboard, drag-and-drop, vmci). Phase mapping showing highest risk at Phase 3 (code exec on guest) and Branch 3.5 (SYSTEM on mbr01).
+- **VMware escape research doc created** — `docs/internal/plan01-telemetry-catalog/plan01-upgrades/vmware-escape-research.md`. 4 VMware escape writeups (2024-2025): Synacktiv Pwn2Own Berlin, NCC Group, Theori chain, Bug Tamer. Risk assessment table for CADRE's VMware setup. Hardening recommendations with `.vmx` settings (disable shared folders, clipboard, drag-and-drop, vmci). Phase mapping showing highest risk at Phase 3 (code exec on guest) and Branch 3.5 (SYSTEM on mbr01).
 - **RAPTOR v3.0.0 reviewed** — Autonomous offensive/defensive research framework (Semgrep/CodeQL scanning + exploit generation). Not relevant to CADRE — it audits codebases for software vulnerabilities, not AD attack simulation.
 - **`05-study-guide/` restructured** — Old cert-specific content moved to `10-cert-map/`. New `05-study-guide/` now holds deep-dive attack reference per campaign phase. Phase 0 (Reconnaissance), Phase 1 (Initial Access), Phase 2 (Credential Harvesting) study guides written. Remaining phases created after each phase is tested.
 - **CAMPAIGNS-METADATA.md updated with Branch 3.5 entries** — 3.5F (SAM dump), 3.5A (Winlogon registry), 3.5H (ctfmon.exe), 3.5I (Token impersonation ❌), 3.5B (Scheduled Task), 3.5D (File Detonation), 3.5J (WMI Persistence) — all with full theory, prerequisites, telemetry expectations.
-- **Impacket protocol-level IoCs mapped** — 73 Impacket IoCs mapped to CADRE phases in `docs/internal/plan01-upgrades/plan1.7-defense-deepening.md`. Tier 1: 9 Suricata rules + 3 Zeek scripts. Tier 2: 4 cluster models. Tier 3: 4 hunting queries.
-- **npm supply-chain upgrade planned** — TanStack Shai-Hulud evolution (May 2026) analyzed. 3 new scenarios (F-11 IDE persistence, F-12 dead-man switch, F-13 prepare hook) documented in `docs/internal/plan01-upgrades/plan1.8-npm-upgrade.md`. `plan0.8-supplychain.md` restored to original location.
+- **Impacket protocol-level IoCs mapped** — 73 Impacket IoCs mapped to CADRE phases in `docs/internal/plan01-telemetry-catalog/plan1.7-defense-engineering/plan1.7-defense-deepening.md`. Tier 1: 9 Suricata rules + 3 Zeek scripts. Tier 2: 4 cluster models. Tier 3: 4 hunting queries.
+- **npm supply-chain upgrade planned** — TanStack Shai-Hulud evolution (May 2026) analyzed. 3 new scenarios (F-11 IDE persistence, F-12 dead-man switch, F-13 prepare hook) documented in `docs/internal/plan01-telemetry-catalog/plan01-upgrades/plan1.8-npm-upgrade.md`. `plan0.8-supplychain.md` restored to original location.
 
 ### Changed (2026-06-04 — Campaign Verification: Phase 1-3 End-to-End from Kali + Recon Section + SQL Auth Fix)
 
