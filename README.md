@@ -39,6 +39,9 @@ MIT licensed. $0 baseline cost.
 > - Malware / sample pipelines → **RevAI**
 > - C2 frameworks (Sliver, Havoc, Mythic, Adaptix) with lab callbacks → **C2Stack**
 > - GRC / CISSP risk practice against the live AD-DFIR estate → **Risk**
+>
+> ---
+>
 > - Parallel Plan 12 AI red-team lab (isolated Docker; not AD-fed) → **DarkAI**
 > - DarkAI’s scan → remediate → verify CLI (also standalone) → **Praxis**
 
