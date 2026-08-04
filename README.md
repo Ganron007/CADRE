@@ -36,7 +36,9 @@ MIT licensed. $0 baseline cost.
 > - Shared AD range + evidence generator for sibling projects — not a polished XDR product
 > - Telemetry (Elastic / Sysmon / Endpoint, Zeek, Suricata, PCAP) → **DFIR-Nexus**
 > - Campaign automation / orchestration → **RedStrike**
-> - Malware / sample pipelines → **CADRE-RevAI**
+> - Malware / sample pipelines → **RevAI**
+> - C2 frameworks (Sliver, Havoc, Mythic, Adaptix) with lab callbacks → **C2Stack**
+> - GRC / CISSP risk practice against the live AD–SOC estate → **Risk**
 
 ---
 
