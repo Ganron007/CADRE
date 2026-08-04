@@ -26,9 +26,10 @@ An open-source lab combining red-team practice, agentic AI investigation, DFIR t
 
 MIT licensed. $0 baseline cost.
 
+> [!NOTE]
 > **Work in progress — and the fuel for the rest of the stack.** CADRE is an active research and training lab, not a finished product. Core AD deploy and many campaign attacks are already usable for practice, but detection rules, telemetry cataloging, agentic wiring, and docs are still evolving. Prefer campaign runbooks and live lab behavior over any claim that a path is fully validated end-to-end.
 >
-> In parallel, this main lab is the **source substrate** for sibling projects: attack runs produce host + network telemetry (Elastic / Sysmon / Endpoint, Zeek, Suricata, PCAP) that feed **DFIR-Nexus**; campaign automation and orchestration exercise **RedStrike**; malware and sample pipelines sit in **CADRE-RevEng** / **CADRE-RevAI**. Treat CADRE as the shared AD range and evidence generator those tools consume — not as a polished XDR product on its own.
+> In parallel, this main lab is the **source substrate** for sibling projects: attack runs produce host + network telemetry (Elastic / Sysmon / Endpoint, Zeek, Suricata, PCAP) that feed **DFIR-Nexus**; campaign automation and orchestration exercise **RedStrike**; malware and sample pipelines sit in **CADRE-RevAI**. Treat CADRE as the shared AD range and evidence generator those tools consume — not as a polished XDR product on its own.
 
 ---
 
