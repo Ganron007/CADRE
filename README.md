@@ -29,11 +29,18 @@ MIT licensed. $0 baseline cost.
 > [!NOTE]
 > **Work in progress — and the fuel for the rest of the stack.**
 >
+> **CADRE (this lab)**
+>
 > - Research/training lab, not a finished product
 > - Core AD + many campaign attacks are usable for practice
 > - Detection rules, telemetry catalog, agentic wiring, and docs still evolving
 > - Prefer campaign runbooks and live lab behavior over “fully validated” claims
-> - Shared AD range + evidence generator for sibling tools — not a polished XDR product
+> - Shared AD range + evidence generator — not a polished XDR product
+>
+> ---
+>
+> **Sibling tools CADRE fuels**
+>
 > - Telemetry (Elastic / Sysmon / Endpoint, Zeek, Suricata, PCAP) → **DFIR-Nexus**
 > - Campaign automation / orchestration → **RedStrike**
 > - Malware / sample pipelines → **RevAI**
@@ -42,7 +49,9 @@ MIT licensed. $0 baseline cost.
 >
 > ---
 >
-> - Parallel Plan 12 AI red-team lab (isolated Docker; not AD-fed) → **DarkAI**
+> **Plan 12 (parallel — not AD-fed)**
+>
+> - Isolated Docker AI red-team lab → **DarkAI**
 > - DarkAI’s scan → remediate → verify CLI (also standalone) → **Praxis**
 
 ---
