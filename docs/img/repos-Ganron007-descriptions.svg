@@ -1,14 +1,14 @@
 <svg
   width="420"
-  height="490"
-  viewBox="0 0 420 490"
+  height="444"
+  viewBox="0 0 420 444"
   fill="none"
   xmlns="http://www.w3.org/2000/svg"
   role="img"
   aria-labelledby="descId"
 >
-  <title id="titleId">CADRE platform repositories</title>
-  <desc id="descId">List of 8 CADRE-related repositories</desc>
+  <title id="titleId">CADRE connected repositories</title>
+  <desc id="descId">List of 7 CADRE-related connected repositories</desc>
   <style>
     .header {
       font: 600 16px 'Segoe UI', -apple-system, BlinkMacSystemFont, Roboto, Sans-Serif;
@@ -43,7 +43,7 @@
     x="0.5"
     y="0.5"
     width="419"
-    height="489"
+    height="443"
     rx="6"
     stroke="#30363d"
     fill="#0d1117"
@@ -54,27 +54,15 @@
     <svg class="icon" x="0" y="0" viewBox="0 0 16 16" version="1.1" width="16" height="16">
       <path fill-rule="evenodd" d="M2 2.5A2.5 2.5 0 014.5 0h8.75a.75.75 0 01.75.75v12.5a.75.75 0 01-.75.75h-2.5a.75.75 0 110-1.5h1.75v-2h-8a1 1 0 00-.714 1.7.75.75 0 01-1.072 1.05A2.495 2.495 0 012 11.5v-9zm10.5-1V9h-8c-.356 0-.694.074-1 .208V2.5a1 1 0 011-1h8zM5 12.25v3.25a.25.25 0 00.4.2l1.45-1.087a.25.25 0 01.3 0L8.6 15.7a.25.25 0 00.4-.2v-3.25a.25.25 0 00-.25-.25h-3.5a.25.25 0 00-.25.25z"/>
     </svg>
-    <text x="24" y="13" class="header" data-testid="header">CADRE Platform Repositories</text>
+    <text x="24" y="13" class="header" data-testid="header">CADRE Connected Repositories</text>
   </g>
 
   <line x1="25" y1="52" x2="395" y2="52" stroke="#21262d" stroke-width="1" />
 
   <!-- Body -->
   <g data-testid="main-card-body">
-    <!-- Repo 1: CADRE -->
+    <!-- Repo 1: DFIR-Nexus -->
     <g transform="translate(0, 75)" data-testid="repo-row" class="repo-row">
-      <text class="repo-name" x="25" y="0" data-testid="repo-name">CADRE</text>
-      <g transform="translate(290, 0)">
-        <g data-testid="primary-lang">
-          <circle data-testid="lang-color" cx="0" cy="-4" r="5" fill="#385bf0" />
-          <text data-testid="lang-name" class="gray" x="12" y="0">PowerShell</text>
-        </g>
-      </g>
-      <text class="description" x="25" y="18">Cloud &#183; Agentic &#183; DFIR &#183; Red-team &#183; Environment</text>
-    </g>
-
-    <!-- Repo 2: DFIR-Nexus -->
-    <g transform="translate(0, 121)" data-testid="repo-row" class="repo-row">
       <text class="repo-name" x="25" y="0" data-testid="repo-name">DFIR-Nexus</text>
       <g transform="translate(290, 0)">
         <g data-testid="primary-lang">
@@ -85,8 +73,8 @@
       <text class="description" x="25" y="18">AI-Assisted Forensics &#38; IR Orchestrator</text>
     </g>
 
-    <!-- Repo 3: RevAI -->
-    <g transform="translate(0, 167)" data-testid="repo-row" class="repo-row">
+    <!-- Repo 2: RevAI -->
+    <g transform="translate(0, 121)" data-testid="repo-row" class="repo-row">
       <text class="repo-name" x="25" y="0" data-testid="repo-name">RevAI</text>
       <g transform="translate(290, 0)">
         <g data-testid="primary-lang">
@@ -97,8 +85,8 @@
       <text class="description" x="25" y="18">Malware RE powered by LLM</text>
     </g>
 
-    <!-- Repo 4: RedStrike -->
-    <g transform="translate(0, 213)" data-testid="repo-row" class="repo-row">
+    <!-- Repo 3: RedStrike -->
+    <g transform="translate(0, 167)" data-testid="repo-row" class="repo-row">
       <text class="repo-name" x="25" y="0" data-testid="repo-name">RedStrike</text>
       <g transform="translate(290, 0)">
         <g data-testid="primary-lang">
@@ -109,8 +97,8 @@
       <text class="description" x="25" y="18">Policy-aware Active Directory assessment</text>
     </g>
 
-    <!-- Repo 5: C2Stack -->
-    <g transform="translate(0, 259)" data-testid="repo-row" class="repo-row">
+    <!-- Repo 4: C2Stack -->
+    <g transform="translate(0, 213)" data-testid="repo-row" class="repo-row">
       <text class="repo-name" x="25" y="0" data-testid="repo-name">C2Stack</text>
       <g transform="translate(290, 0)">
         <g data-testid="primary-lang">
@@ -121,8 +109,8 @@
       <text class="description" x="25" y="18">Docker-first C2 Framework Training Environment</text>
     </g>
 
-    <!-- Repo 6: Risk -->
-    <g transform="translate(0, 305)" data-testid="repo-row" class="repo-row">
+    <!-- Repo 5: Risk -->
+    <g transform="translate(0, 259)" data-testid="repo-row" class="repo-row">
       <text class="repo-name" x="25" y="0" data-testid="repo-name">Risk</text>
       <g transform="translate(290, 0)">
         <g data-testid="primary-lang">
@@ -135,8 +123,8 @@
 
     <!-- AI Section Divider & Header -->
     <g data-testid="section-ai-lab">
-      <line x1="25" y1="345" x2="395" y2="345" stroke="#30363d" stroke-width="1" />
-      <g transform="translate(25, 358)">
+      <line x1="25" y1="299" x2="395" y2="299" stroke="#30363d" stroke-width="1" />
+      <g transform="translate(25, 312)">
         <svg class="icon-sub" x="0" y="0" viewBox="0 0 16 16" version="1.1" width="14" height="14">
           <path fill-rule="evenodd" d="M2 2.5A2.5 2.5 0 014.5 0h8.75a.75.75 0 01.75.75v12.5a.75.75 0 01-.75.75h-2.5a.75.75 0 110-1.5h1.75v-2h-8a1 1 0 00-.714 1.7.75.75 0 01-1.072 1.05A2.495 2.495 0 012 11.5v-9zm10.5-1V9h-8c-.356 0-.694.074-1 .208V2.5a1 1 0 011-1h8zM5 12.25v3.25a.25.25 0 00.4.2l1.45-1.087a.25.25 0 01.3 0L8.6 15.7a.25.25 0 00.4-.2v-3.25a.25.25 0 00-.25-.25h-3.5a.25.25 0 00-.25.25z"/>
         </svg>
@@ -144,8 +132,8 @@
       </g>
     </g>
 
-    <!-- Repo 7: DarkAI -->
-    <g transform="translate(0, 395)" data-testid="repo-row" class="repo-row">
+    <!-- Repo 6: DarkAI -->
+    <g transform="translate(0, 349)" data-testid="repo-row" class="repo-row">
       <text class="repo-name" x="25" y="0" data-testid="repo-name">DarkAI</text>
       <g transform="translate(290, 0)">
         <g data-testid="primary-lang">
@@ -156,8 +144,8 @@
       <text class="description" x="25" y="18">AI Red Team &#38; Forensics Lab</text>
     </g>
 
-    <!-- Repo 8: Praxis -->
-    <g transform="translate(0, 441)" data-testid="repo-row" class="repo-row">
+    <!-- Repo 7: Praxis -->
+    <g transform="translate(0, 395)" data-testid="repo-row" class="repo-row">
       <text class="repo-name" x="25" y="0" data-testid="repo-name">Praxis</text>
       <g transform="translate(290, 0)">
         <g data-testid="primary-lang">
