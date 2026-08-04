@@ -33,14 +33,14 @@ MIT licensed. $0 baseline cost.
 > - Core AD + many campaign attacks are usable for practice
 > - Detection rules, telemetry catalog, agentic wiring, and docs still evolving
 > - Prefer campaign runbooks and live lab behavior over “fully validated” claims
-> - Shared AD range + evidence generator for sibling projects — not a polished XDR product
+> - Shared AD range + evidence generator for sibling tools — not a polished XDR product
 > - Telemetry (Elastic / Sysmon / Endpoint, Zeek, Suricata, PCAP) → **DFIR-Nexus**
 > - Campaign automation / orchestration → **RedStrike**
 > - Malware / sample pipelines → **RevAI**
 > - C2 frameworks (Sliver, Havoc, Mythic, Adaptix) with lab callbacks → **C2Stack**
 > - GRC / CISSP risk practice against the live AD-DFIR estate → **Risk**
-> - AI red-team / LLM attack lab (isolated Docker range) → **DarkAI**
-> - AI-security scan → remediate → verify loop for agent/code stacks → **Praxis**
+> - Parallel Plan 12 AI red-team lab (isolated Docker; not AD-fed) → **DarkAI**
+> - DarkAI’s scan → remediate → verify CLI (also standalone) → **Praxis**
 
 ---
 
