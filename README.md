@@ -38,7 +38,7 @@ MIT licensed. $0 baseline cost.
 > - Campaign automation / orchestration → **RedStrike**
 > - Malware / sample pipelines → **RevAI**
 > - C2 frameworks (Sliver, Havoc, Mythic, Adaptix) with lab callbacks → **C2Stack**
-> - GRC / CISSP risk practice against the live AD–SOC estate → **Risk**
+> - GRC / CISSP risk practice against the live AD-DFIR estate → **Risk**
 
 ---
 
