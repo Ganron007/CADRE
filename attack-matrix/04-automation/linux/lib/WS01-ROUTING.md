@@ -1,7 +1,7 @@
 # Beachhead routing — Plan 1.1 (ws01-primary)
 
 **Operator:** SSH to **provisioning** `.60` (Kali / Ansible config host).  
-**Campaign plan:** [`docs/internal/plan01-telemetry-catalog/plan1.1-campaign-automation/CAMPAIGN-AUTOMATION-PLAN.md`](../../../../docs/internal/plan01-telemetry-catalog/plan1.1-campaign-automation/CAMPAIGN-AUTOMATION-PLAN.md)
+**Campaign plan:** `docs/internal/plan01-telemetry-catalog/plan1.1-campaign-automation/CAMPAIGN-AUTOMATION-PLAN.md` (local maintainers)
 
 ## Locked policy (2026-07-25)
 
@@ -95,4 +95,4 @@ Use only when ws01 fails (MDE block, session death, tool cannot run). Record rea
 | `ws01-stage-file.sh` | Config lane — drop files to `C:\Tools\cadre-attack\` |
 | `install-nxc-provisioning.sh` | NetExec on `.60` |
 
-See [`CAMPAIGN-ATTACK-PATH.md`](../../../../docs/internal/plan01-telemetry-catalog/phase1-source-matrix/CAMPAIGN-ATTACK-PATH.md).
+See `CAMPAIGN-ATTACK-PATH.md` (local maintainers).

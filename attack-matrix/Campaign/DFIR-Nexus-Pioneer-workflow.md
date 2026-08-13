@@ -4,7 +4,7 @@
 >
 > **Attack narrative:** [`CAMPAIGNS_v3.md`](CAMPAIGNS_v3.md) · **Playbook refs:** [`CAMPAIGNS-METADATA-v2.md`](CAMPAIGNS-METADATA-v2.md) · **Research backlog:** [`Campaign_suggestions.md`](Campaign_suggestions.md)
 >
-> **DFIR tool:** [`tools/dfir-nexus/`](../../tools/dfir-nexus/) (v1.0.0 E.0 Constellation) · **Release docs:** [`E0-CONSTELLATION.md`](../../tools/dfir-nexus/docs/E0-CONSTELLATION.md) · [`D0-STELLAR.md`](../../tools/dfir-nexus/docs/D0-STELLAR.md) · [`C0-VOYAGER.md`](../../tools/dfir-nexus/docs/C0-VOYAGER.md) · **Roadmap:** [`dfir-nexus-source-assessment-3-roadmap.md`](../../docs/internal/integrations/dfir-nexus-source-assessment-3-roadmap.md)
+> **DFIR tool:** [`tools/dfir-nexus/`](../../tools/dfir-nexus/) (v1.0.0 E.0 Constellation) · **Release docs:** [`E0-CONSTELLATION.md`](../../tools/dfir-nexus/docs/E0-CONSTELLATION.md) · [`D0-STELLAR.md`](../../tools/dfir-nexus/docs/D0-STELLAR.md) · [`C0-VOYAGER.md`](../../tools/dfir-nexus/docs/C0-VOYAGER.md) · **Roadmap:** `dfir-nexus-source-assessment-3-roadmap.md` (local maintainers)
 >
 > **Telemetry log:** `docs/internal/plan01-telemetry-catalog/phase1-source-matrix/tracker.md` (internal)
 
@@ -218,7 +218,7 @@ python smoke_test.py
 dfir-nexus serve
 ```
 
-Optional: Eric Zimmerman tools for `ez_tool_run` — set `DFIR_NEXUS_EZ_TOOLS_DIR` to the directory containing EvtxECmd/MFTECmd/PECmd. **Note:** `ez_tool_run` needs an allowlist before internet-facing use (see [`dfir-nexus-codebase-review.md`](../../docs/internal/integrations/dfir-nexus-codebase-review.md) §6).
+Optional: Eric Zimmerman tools for `ez_tool_run` — set `DFIR_NEXUS_EZ_TOOLS_DIR` to the directory containing EvtxECmd/MFTECmd/PECmd. **Note:** `ez_tool_run` needs an allowlist before internet-facing use (see `dfir-nexus-codebase-review.md` (local maintainers) §6).
 
 See [`DATA.md`](../../tools/dfir-nexus/docs/DATA.md), [`STUDY-GUIDE.md`](../../tools/dfir-nexus/docs/STUDY-GUIDE.md), and [`E0-CONSTELLATION.md`](../../tools/dfir-nexus/docs/E0-CONSTELLATION.md).
 Evidence bundle directory (convention for this workflow):
@@ -960,7 +960,7 @@ shutil.make_archive(
 | [`tools/dfir-nexus/docs/C0-VOYAGER.md`](../../tools/dfir-nexus/docs/C0-VOYAGER.md) | C.0 RAG, triage, GraphRAG, deobfuscation |
 | [`tools/dfir-nexus/docs/B0-PATHFINDER.md`](../../tools/dfir-nexus/docs/B0-PATHFINDER.md) | Gateway, Portal, LangGraph agents |
 | [`tools/dfir-nexus/docs/STUDY-GUIDE.md`](../../tools/dfir-nexus/docs/STUDY-GUIDE.md) | Full tool reference (every MCP tool, every module) |
-| [`docs/internal/integrations/dfir-nexus.md`](../../docs/internal/integrations/dfir-nexus.md) | CADRE integration 1-pager |
+| `docs/internal/integrations/dfir-nexus.md` (local maintainers) | CADRE integration 1-pager |
 | [`docs/forensic-workflow.md`](../../docs/forensic-workflow.md) | Lab forensic tooling overview |
 | `docs/internal/plan01-telemetry-catalog/phase1-source-matrix/tracker.md` | PRIMARY source matrix (Plan 1) |
 

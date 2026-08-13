@@ -1,6 +1,6 @@
 # CADRE — Attack Campaigns (v2)
 
-> **Implements** `[docs/internal/plan01-telemetry-catalog/phase1-source-matrix/five-stream-merge.md](../../docs/internal/plan01-telemetry-catalog/phase1-source-matrix/five-stream-merge.md)` — the unified 100-attack pipeline.
+> **Implements** `docs/internal/plan01-telemetry-catalog/phase1-source-matrix/five-stream-merge.md (local maintainers)` — the unified 100-attack pipeline.
 > **Per-attack metadata:** `[CAMPAIGNS-METADATA.md](CAMPAIGNS-METADATA.md)` — playbook refs, ACE#s, telemetry expectations.
 > **DFIR investigation bridge:** `[DFIR-Nexus-Pioneer-workflow.md](DFIR-Nexus-Pioneer-workflow.md)` — parallel attack + DFIR-Nexus case workflow (Phase 3.5 active).
 > **v2 index (start here):** `[CAMPAIGNS.md](CAMPAIGNS.md)` · **Archived v1:** `[CAMPAIGNS_v1_archived.md](CAMPAIGNS_v1_archived.md)`.

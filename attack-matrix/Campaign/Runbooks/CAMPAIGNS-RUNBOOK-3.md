@@ -259,7 +259,7 @@ Global Assembly Cache (GAC) is a .NET system-wide repository. Hijacking GAC asse
 **Source:** SpecterOps (2026-06-10)  
 **PoC:** [https://github.com/gershsec/mssql2025-poc](https://github.com/gershsec/mssql2025-poc)  
 **Study guide:** `study-guide/ref-mssql2025-ai-abuse.md`  
-**Graph:** `alt-sql-ai` after mbr02 SQL access (linked server / Branch C adjacency). Re-verify T042 reachability first ([`T042-REVERIFY.md`](../../docs/internal/plan01-telemetry-catalog/plan1.1-campaign-automation/T042-REVERIFY.md)).
+**Graph:** `alt-sql-ai` after mbr02 SQL access (linked server / Branch C adjacency). Re-verify T042 reachability first (`T042-REVERIFY.md` (local maintainers)).
 
 mbr02 runs SQL Server 2025 Developer Edition. Three new AI features can be weaponized:
 

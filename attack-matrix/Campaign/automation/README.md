@@ -1,6 +1,6 @@
 # Campaign automation (CADRE glue)
 
-CADRE-owned assets for Plan 1.1. **Not** part of standalone RedStrike product identity — see [`red-strike-product.md`](../../../docs/internal/integrations/red-strike-product.md).
+CADRE-owned assets for Plan 1.1. **Not** part of standalone RedStrike product identity — see `red-strike-product.md` (local maintainers).
 
 | File | Role |
 |------|------|

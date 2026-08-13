@@ -1,7 +1,7 @@
 # CADRE Main Lab — VM Access (Quick Reference)
 
 > For agents/scripts that drive the **main CADRE lab** from the Windows host or from **provisioning** (Kali role, `.60`).
-> **Tracking:** flip items in [`CHECKLIST.md`](../CHECKLIST.md) first each session.
+> **Tracking:** flip items in local maintainer checklist (`docs/internal/CHECKLIST.md`) first each session.
 > Last updated 2026-07-26 (P11.6 RedStrike paths).
 
 ## Configurator vs attacker (locked)
@@ -13,7 +13,7 @@
 
 **Rule:** Do not diagnose lab setup from the Windows host alone (vmnet2 often not routed to Cursor). Always configurator-hop via provisioning.
 
-**ws01 (non-Vagrant, `.62`):** same `vagrant`/`vagrant` WinRM. If `:5985` is **filtered**, service alone is not enough — open inbound FW (see [`WS01-WINRM-CONSOLE.md`](../docs/internal/plan01-telemetry-catalog/plan1.1-campaign-automation/WS01-WINRM-CONSOLE.md)); Play 0 in `17-ws01-deploy.yml` encodes the lasting config.
+**ws01 (non-Vagrant, `.62`):** same `vagrant`/`vagrant` WinRM. If `:5985` is **filtered**, service alone is not enough — open inbound FW (see `WS01-WINRM-CONSOLE.md` (local maintainers)); Play 0 in `17-ws01-deploy.yml` encodes the lasting config.
 
 ## The attacker / orchestrator machines
 
@@ -198,7 +198,7 @@ Repo paths (edit on host; attacks run from provisioning):
 
 | Doc | Path |
 |---|---|
-| **CHECKLIST** | `CHECKLIST.md` (flip items first) |
+| **CHECKLIST** | `docs/internal/CHECKLIST.md` (local maintainers; flip items first) |
 | **Attack status / workflow** | `docs/internal/plan01-telemetry-catalog/phase1-source-matrix/ATTACK-STATUS.md` |
 | Pipeline README | `docs/internal/plan01-telemetry-catalog/phase1-source-matrix/README.md` |
 | **SQL setup (manual SSoT)** | `docs/sql-integration-guide.md` |

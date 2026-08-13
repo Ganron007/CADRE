@@ -3,7 +3,7 @@
 **Path:** `C:\STUDY\Github\CADRE-Platform\CADRE\tools\`  
 **Last updated:** 2026-07-26
 
-> **Policy:** Plan **1.1** (RedStrike campaign automation) is **done**. Focus **Plan 1** telemetry. In-tree pins here mirror sister repos — see [`docs/internal/PLANS.md`](../docs/internal/PLANS.md).
+> **Policy:** Plan **1.1** (RedStrike campaign automation) is **done**. Focus **Plan 1** telemetry. In-tree pins here mirror sister repos — see `docs/internal/PLANS.md` (local maintainers).
 
 ---
 
@@ -47,6 +47,6 @@ Plan 10   → C2Stack (Integrations clone) — C2 traffic into telemetry
 
 | Doc | Role |
 |-----|------|
-| [`docs/internal/PLANS.md`](../docs/internal/PLANS.md) | Plan index + naming (`plan01-telemetry-catalog` = Plan 1) |
-| [`docs/internal/core-plan.md`](../docs/internal/core-plan.md) | Vision + integration map |
-| [`CHECKLIST.md`](../CHECKLIST.md) | P1.* now; D7.* deferred |
+| `docs/internal/PLANS.md` (local maintainers) | Plan index + naming (`plan01-telemetry-catalog` = Plan 1) |
+| `docs/internal/core-plan.md` (local maintainers) | Vision + integration map |
+| `CHECKLIST.md` (local maintainers) | P1.* now; D7.* deferred |
