@@ -1,5 +1,10 @@
 
 
+## [Unreleased] — 2026-08-18 (RedStrike Plan 01 pin)
+
+- **Plan 01 campaign engine is `CADRE/tools/red-strike/`.** Sister/public RedStrike evolves independently; new features are adopted into the pin. Standalone RedStrike may still practice against CADRE VMs with operator-owned graph/scope (not the integrated path).
+- Operator docs: `Red-Strike-workflow.md` (install + env, pin PATH), `tools/README.md`, `tools/vm-access.md`, `Campaign/automation/README.md`. Redacted published lab password/hash from the workflow verified-run notes.
+
 ## [Unreleased] — 2026-08-13 (docs boundary)
 
 - **Public vs internal boundary cleanup.** Untracked `AGENTS.md` and `CHECKLIST.md` from git (files remain local; `CHECKLIST.md` moved to `docs/internal/CHECKLIST.md`). `.gitignore` already covered `docs/internal/` + `AGENTS.md`; added root `CHECKLIST.md`. Scrubbed markdown links from public tracked docs that pointed at `docs/internal/` (CHANGELOG, campaign runbooks/CAMPAIGNS_v3, RedStrike/DFIR workflows, `tools/README.md`, `tools/vm-access.md`, etc.) — replaced with `` `name` (local maintainers) `` prose per DOC-MAP leak contract. Internal Plan 1 reset plan stays gitignored (never published).

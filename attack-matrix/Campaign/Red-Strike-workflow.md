@@ -1,12 +1,43 @@
 # RedStrike Workflow — Campaign Orchestration Bridge
 
-> **Purpose:** Run the CADRE campaign spine via RedStrike (`CampaignOrchestrator`) with dual beachheads, credential ledger, and HITL gates — parallel to manual runbooks and to [`DFIR-Nexus-Pioneer-workflow.md`](DFIR-Nexus-Pioneer-workflow.md).
+> **Purpose:** Run the CADRE campaign spine via the **CADRE-integrated RedStrike pin** (`CampaignOrchestrator`) with dual beachheads, credential ledger, and HITL gates — parallel to manual runbooks and to [`DFIR-Nexus-Pioneer-workflow.md`](DFIR-Nexus-Pioneer-workflow.md).
 >
-> **Engine SSoT:** `C:\STUDY\Github\CADRE-Platform\RedStrike\` · **Pin:** `CADRE/tools/red-strike/`  
-> **Plan:** `docs/internal/plan01-telemetry-catalog/plan1.1-campaign-automation/CAMPAIGN-AUTOMATION-PLAN.md` (local maintainers)  
+> **Plan 01 engine (required):** `CADRE/tools/red-strike/` — install and run **this** copy for campaign runs.
+> **Upstream product:** sister `RedStrike\` / [github.com/Ganron007/RedStrike](https://github.com/Ganron007/RedStrike) — features land there first, then are **adopted into this pin**. Do not run Plan 01 from a standalone clone.
+> **Standalone practice:** a standalone RedStrike install may still target CADRE VMs with operator-owned graph/scope; that is **not** the integrated campaign path.
+> **Plan:** `CAMPAIGN-AUTOMATION-PLAN.md` (local maintainers)
 > **Graph:** [`automation/campaign-graph.yaml`](automation/campaign-graph.yaml) · **Campaign:** [`CAMPAIGNS_v3.md`](CAMPAIGNS_v3.md)
 
-**Status:** Plan 1.1 **complete**. Engine **0.5.2**. Graph **v9** — full CampaignOrchestrator coverage (stubs only for deferred surfaces). Dual operator modes: **provisioning** (hybrid) + **ws01** (native).
+**Status:** Plan 1.1 **complete**. Pin tracks RedStrike **0.6.0**. Graph **v9** — full CampaignOrchestrator coverage (stubs only for deferred surfaces). Dual operator modes: **provisioning** (hybrid) + **ws01** (native).
+
+---
+
+## Install the pin (Plan 01)
+
+Do this once on the operator host (provisioning for hybrid, or ws01 for native). Graph, seeds, and attack scripts stay in CADRE — only the engine is this pin.
+
+```bash
+cd "$HOME/CADRE/tools/red-strike"   # Windows: C:\STUDY\Github\CADRE-Platform\CADRE\tools\red-strike
+python3 -m venv .venv
+source .venv/bin/activate           # Windows: .\.venv\Scripts\Activate.ps1
+python -m pip install --upgrade pip
+pip install -e ".[dev,mcp]"
+redstrike check
+```
+
+Then set CADRE glue (never commit API keys, SSH private keys, or seed passwords):
+
+```bash
+export CADRE_ROOT=$HOME/CADRE
+export CADRE_AUTOMATION_ROOT=$HOME/CADRE/attack-matrix/04-automation/linux
+export PATH="$HOME/CADRE/tools/red-strike/.venv/bin:$PATH"
+# export REDSTRIKE_SEED=...          # local seed JSON
+# export REDSTRIKE_WS01_SSH_KEY=...  # local private key path
+```
+
+`redstrike check` core must be `ok` before a campaign dry-run. Live `--execute` also needs operator tools on PATH (`nxc`, Certipy, bloodyAD) — `redstrike check --execute-ready`.
+
+After a feature lands in public/sister RedStrike, copy the engine into this pin and re-run `pip install -e .` in the pin venv.
 
 ---
 
@@ -52,12 +83,16 @@ Attack identity = `analyst_t1` (or earned creds). **Never** `vagrant` for WT# st
 ## Operator loop
 
 ```bash
-# On provisioning (.60) — layout after P11.6:
-#   ~/RedStrike/.venv   (pip install -e .)
-#   ~/CADRE/            (graph + seeds + 04-automation/linux)
+# Plan 01 — on provisioning: use the CADRE pin, not ~/RedStrike
+#   python3 -m venv ~/CADRE/tools/red-strike/.venv
+#   source ~/CADRE/tools/red-strike/.venv/bin/activate
+#   pip install -e ~/CADRE/tools/red-strike
 export CADRE_ROOT=$HOME/CADRE
 export CADRE_AUTOMATION_ROOT=$HOME/CADRE/attack-matrix/04-automation/linux
-# or: source ~/.bashrc  (aliases redstrike-env / PATH wrapper)
+export PATH="$HOME/CADRE/tools/red-strike/.venv/bin:$PATH"
+# Seed and SSH key stay on the operator host (never commit). Example:
+#   export REDSTRIKE_SEED=$HOME/CADRE/attack-matrix/Campaign/automation/lab-seed-creds.json
+#   export REDSTRIKE_WS01_SSH_KEY=$HOME/.ssh/<your-ws01-key>
 
 redstrike-campaign start --beachhead windows --operator provisioning --engage lab1
 redstrike-campaign run --phase 1-3 --beachhead windows --operator provisioning --engage lab1          # spine dry-run
@@ -108,10 +143,10 @@ Harnesses:
 ## RedStrike verified run (2026-07-29)
 
 - **Phases 1-3** ✅ — T003 AS-REP, T002 Kerberoast, T041 SQL xp_cmdshell, T043 GodPotato LPE all executed via `redstrike-campaign run --phase 1-3 --beachhead windows --engage lab1 --execute --prefer-script`.
-- **Phase 3.5** ✅ — T035-CREDS (mimikatz on mbr01 as SYSTEM), T035A (Winlogon auto-logon extracted `CADRE\analyst_cloud:Cl0ud_An@lyst!`), T101 (WinRS pivot ws01 → mbr01).
+- **Phase 3.5** ✅ — T035-CREDS (mimikatz on mbr01 as SYSTEM), T035A (Winlogon auto-logon for `CADRE\analyst_cloud`; password not published here), T101 (WinRS pivot ws01 → mbr01).
 - **Phase 4** skipped per user instruction.
 - **Phase 5** ⚠️ — T102 coercion produced `T102_KIRBI_COUNT=0` (blocked, same as scripted run); T017 paused at HITL `persistence` gate.
-- **Phase 6/7** ⚠️ bypassed — WT031 password spray validated `chief_command` (DA+EA) and root `krbtgt` was DCSync'd (`7676f125332e45f4482e4eafc8c4a917`).
+- **Phase 6/7** ⚠️ bypassed — WT031 password spray validated `chief_command` (DA+EA) and root `krbtgt` was DCSync'd (NT hash captured; not published here).
 - **Phase 8 T033** ✅ — cross-forest Kerberoast from `ws01` to `range.local` captured `svc_mssql` and `svc_sccm` TGS hashes.
 - **Phase 8 SCCM branch** ⚠️ BLOCKED — no SCCM site server on `mbr02`.
 
@@ -128,11 +163,13 @@ Harnesses:
 ```bash
 export CADRE_ROOT=$HOME/CADRE
 export CADRE_AUTOMATION_ROOT=$HOME/CADRE/attack-matrix/04-automation/linux
-export REDSTRIKE_WS01_SSH_KEY=$HOME/.ssh/cadre-ws01-key
 export REDSTRIKE_SEED=$HOME/CADRE/attack-matrix/Campaign/automation/lab-seed-creds.json
-export PATH=/usr/bin:/bin:$HOME/RedStrike/.venv/bin:$PATH
+export REDSTRIKE_WS01_SSH_KEY=$HOME/.ssh/<your-ws01-key>
+export PATH=/usr/bin:/bin:$HOME/CADRE/tools/red-strike/.venv/bin:$PATH
 bash ~/CADRE/attack-matrix/04-automation/linux/redstrike-campaign-v3-full-run.sh
 ```
+
+The 2026-08-03 live pass used a standalone `~/RedStrike` venv. **Plan 01 now uses the pin** (`CADRE/tools/red-strike/`). Keep `REDSTRIKE_WS01_*` and seed paths in the environment; do not commit keys.
 
 **Seed:** includes `chief_command`, `hunter_dfir`, `lead_engineering`, `analyst_cloud` for gated nodes.
 
@@ -147,8 +184,8 @@ bash ~/CADRE/attack-matrix/04-automation/linux/redstrike-campaign-v3-full-run.sh
 ```bash
 export CADRE_ROOT=$HOME/CADRE
 export CADRE_AUTOMATION_ROOT=$HOME/CADRE/attack-matrix/04-automation/linux
-export REDSTRIKE_WS01_SSH_KEY=$HOME/.ssh/cadre-ws01-key
-export PATH=/usr/bin:/bin:$HOME/RedStrike/.venv/bin:$PATH
+export REDSTRIKE_WS01_SSH_KEY=$HOME/.ssh/<your-ws01-key>
+export PATH=/usr/bin:/bin:$HOME/CADRE/tools/red-strike/.venv/bin:$PATH
 bash ~/CADRE/attack-matrix/04-automation/linux/redstrike-campaign-v3-full-run.sh
 ```
 
@@ -166,7 +203,7 @@ bash ~/CADRE/attack-matrix/04-automation/linux/redstrike-campaign-v3-full-run.sh
 
 ## MCP tools
 
-With API up (`redstrike-api --profile cadre-campaign`):
+With API up (`redstrike-api --profile campaign`):
 
 | Tool | Role |
 |------|------|

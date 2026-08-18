@@ -3,7 +3,7 @@
 **Path:** `C:\STUDY\Github\CADRE-Platform\CADRE\tools\`  
 **Last updated:** 2026-07-26
 
-> **Policy:** Plan **1.1** (RedStrike campaign automation) is **done**. Focus **Plan 1** telemetry. In-tree pins here mirror sister repos — see `docs/internal/PLANS.md` (local maintainers).
+> **Policy:** Plan **1.1** (RedStrike campaign automation) is **done**. **Plan 01 campaigns use `tools/red-strike/`** (the in-tree pin). Sister `RedStrike\` is the public product; sync features into this pin. Focus **Plan 1** telemetry. See `docs/internal/PLANS.md` (local maintainers).
 
 ---
 
@@ -18,7 +18,7 @@
 | [`vm-access.md`](vm-access.md) | **0 / 1** | ✅ In use | Operator + agent SSH/ES reference |
 | [`dfir-nexus/`](dfir-nexus/) | **7** | ⏸ Incubator | After Plan 1 + Plan 2 exporter; Ansible on provisioning |
 | [`dfir-nexus-extension/`](dfir-nexus-extension/) | **7** | ⏸ Scaffold | With Plan 7 portal/push |
-| [`red-strike/`](red-strike/) | **1.1** | ✅ Pin 0.5.0 | SSoT = `RedStrike\`; live on `.60` (see `integrations/red-strike.md`) |
+| [`red-strike/`](red-strike/) | **1.1 / Plan 01** | ✅ Pin 0.6.0 | **Plan 01 campaign engine.** Adopt features from sister `RedStrike\`; do not run Plan 01 from a standalone clone. |
 | [`regen-config/`](regen-config/) | **0** | ✅ | `config.json` regen from ansible |
 | [`deploy-harness/`](deploy-harness/) | **0** | ✅ | Config drift tests |
 | [`split-campaign-runbooks.py`](split-campaign-runbooks.py) | Campaign | ✅ | Runbook split/check |

@@ -125,21 +125,30 @@ Domain Windows targets use **WinRM / Ansible / impacket** from provisioning — 
 | `/home/vagrant/ansible/ansible/inventories/group_vars/all.yml` | Includes `elastic_password` default |
 | `/home/vagrant/attack-matrix/` | Staged campaign / automation copies (if present) |
 | `/home/vagrant/CADRE/` | Plan 1.1 glue (graph, seeds, `04-automation/linux`) — **P11.6** |
-| `/home/vagrant/RedStrike/` | RedStrike engine + `.venv` — **P11.6** |
+| `/home/vagrant/CADRE/tools/red-strike/` | **Plan 01** RedStrike pin + `.venv` (required for campaign runs) |
+| `/home/vagrant/RedStrike/` | Optional **standalone** practice clone — not the Plan 01 engine |
 | `/home/vagrant/cadre_passwords.txt` | Wordlist for hashcat / cracking drills |
 | `/tmp/users-cadre.txt` | cadre.local spray wordlist — copy from `ansible/files/users-cadre-spray.txt` |
 
-### RedStrike on provisioning (P11.6)
+### RedStrike on provisioning (Plan 01 pin)
 
 ```bash
+# Install once (from the CADRE tree on provisioning)
+python3 -m venv $HOME/CADRE/tools/red-strike/.venv
+source $HOME/CADRE/tools/red-strike/.venv/bin/activate
+pip install -e "$HOME/CADRE/tools/red-strike"
+
 export CADRE_ROOT=$HOME/CADRE
 export CADRE_AUTOMATION_ROOT=$HOME/CADRE/attack-matrix/04-automation/linux
-# PATH wrapper: ~/.local/bin/redstrike-campaign → ~/RedStrike/.venv/bin/...
+export PATH="$HOME/CADRE/tools/red-strike/.venv/bin:$PATH"
+redstrike check
 redstrike-campaign run --phase 1-3 --beachhead windows --engage lab1
 redstrike-campaign stream E --engage lab1
 ```
 
-Re-sync from Windows host after engine/glue changes (tar+scp of `RedStrike/` + `CADRE/attack-matrix/Campaign/automation` + `04-automation/linux`). See [`Red-Strike-workflow.md`](../attack-matrix/Campaign/Red-Strike-workflow.md).
+After engine features land in sister `RedStrike\`, copy them into `CADRE/tools/red-strike/` and re-install the pin venv. Campaign graph/seeds stay in CADRE. See [`Red-Strike-workflow.md`](../attack-matrix/Campaign/Red-Strike-workflow.md).
+
+A standalone `~/RedStrike` clone is optional for **practice** against lab VMs; do not use it for Plan 01 campaign runs.
 
 ### Attack tools (verified on lab)
 
@@ -147,7 +156,7 @@ Re-sync from Windows host after engine/glue changes (tar+scp of `RedStrike/` + `
 |---|---|
 | impacket | `/usr/local/bin/impacket-GetNPUsers`, `impacket-getTGT`, `impacket-GetUserSPNs`, `impacket-mssqlclient` |
 | bloodyAD | `/usr/local/bin/bloodyAD` |
-| redstrike-campaign | `~/RedStrike/.venv` + `~/.local/bin` wrapper (0.5.0+) |
+| redstrike-campaign | `~/CADRE/tools/red-strike/.venv` (Plan 01 pin, 0.6.0+) |
 | nmap, curl, jq, python3 | system PATH |
 
 NetExec (`nxc`) may not be installed on older provisioning snapshots — check with `which nxc` before Phase 0 NetExec runbooks.
