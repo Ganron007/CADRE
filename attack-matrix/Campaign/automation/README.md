@@ -8,4 +8,6 @@ CADRE-owned assets for Plan 1.1. **Not** part of standalone RedStrike product id
 | `lab-seed-creds.json` | Lab credential seed (never commit real prod secrets) |
 | `lab-profiles.yaml` | Machine-readable LAB-PROFILES preflight |
 
-Engine for Plan 01: **`CADRE/tools/red-strike/`** (integrated pin). Upstream features land in sister **`RedStrike\`** and are copied into the pin. Standalone RedStrike may still practice against CADRE VMs with operator-owned graph/scope — that is not this glue.
+This directory is the **only** home for CADRE missions, graph, and lab seeds. Do not copy these files into standalone RedStrike.
+
+Engine for Plan 01 / CADRE assessment: **`CADRE/tools/red-strike/`** (integrated pin) — run **only** that copy. Upstream features land in sister **`RedStrike\`** and are copied into the pin as needed.

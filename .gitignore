@@ -1,5 +1,8 @@
-# ───────────────────────── In-tree tools (nested git) ───────────────────────
-# Same pattern as CADRE-DarkAI/tools/praxis — commit inside each tool's .git
+# ───────────────────────── Nested sister-product pins (never CADRE parent) ──
+# These trees are synced locally from their own git (RedStrike, DFIR-Nexus).
+# CADRE parent must not track or push them — that would publish the same
+# product twice. Commit inside each pin's .git only.
+# CADRE-owned helpers (tools/*.sh, regen-config, vm-access.md, …) stay tracked.
 tools/dfir-nexus/
 tools/red-strike/
 

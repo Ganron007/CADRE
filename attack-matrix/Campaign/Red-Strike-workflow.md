@@ -8,7 +8,7 @@
 > **Plan:** `CAMPAIGN-AUTOMATION-PLAN.md` (local maintainers)
 > **Graph:** [`automation/campaign-graph.yaml`](automation/campaign-graph.yaml) · **Campaign:** [`CAMPAIGNS_v3.md`](CAMPAIGNS_v3.md)
 
-**Status:** Plan 1.1 **complete**. Pin tracks RedStrike **0.6.0**. Graph **v9** — full CampaignOrchestrator coverage (stubs only for deferred surfaces). Dual operator modes: **provisioning** (hybrid) + **ws01** (native).
+**Status:** Plan 1.1 **complete**. Pin tracks standalone RedStrike **0.6.0** (`bd3aa96`, adopted 2026-08-19). Graph **v9** lives in this CADRE tree only. Dual operator modes: **provisioning** (hybrid) + **ws01** (native). **CADRE assessment uses the pin only** — not a standalone clone.
 
 ---
 

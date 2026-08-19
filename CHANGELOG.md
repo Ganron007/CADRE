@@ -1,5 +1,15 @@
 
 
+## [Unreleased] — 2026-08-19 (RedStrike pin re-sync)
+
+- **Pin `CADRE/tools/red-strike/` re-synced from standalone `bd3aa96` (0.6.0).** Adopts Phase 6 engine pieces (shadow-creds builder, teardown queue, TUI console, MCP graph tools, Docker) plus CI/`rich` and docs. Graph/missions stay in CADRE. Assessment still uses the pin only.
+- **`.gitignore`:** nested sister pins `tools/red-strike/` and `tools/dfir-nexus/` stay out of CADRE parent git (local sync only; each pin has its own `.git`).
+
+## [Unreleased] — 2026-08-19 (RedStrike pin = Plan 01 engine)
+
+- **Pin `CADRE/tools/red-strike/` adopted from standalone RedStrike `7aeb28c` (0.6.0).** Dropped leftover `cadre_strike/` shim; public `docs/CADRE-PIN.md` removed from the pin (local `docs/internal/CADRE-PIN.md` instead).
+- **Locked split:** standalone = feature SSoT (copy into the pin as needed). **CADRE Plan 01 / assessment uses only the pin.** Missions, campaign graph, seeds, and attack scripts stay in CADRE (`Campaign/automation/`, `04-automation/`) — never in standalone.
+
 ## [Unreleased] — 2026-08-18 (RedStrike Plan 01 pin)
 
 - **Plan 01 campaign engine is `CADRE/tools/red-strike/`.** Sister/public RedStrike evolves independently; new features are adopted into the pin. Standalone RedStrike may still practice against CADRE VMs with operator-owned graph/scope (not the integrated path).
