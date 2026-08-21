@@ -517,13 +517,11 @@ python cadre.py install -e velociraptor
 3. Start Velociraptor frontend (systemd, port 8889)
 4. Create admin user (`admin` / `VelociraptorDefault!`)
 5. Generate client config + repack MSI with embedded server URL
-6. Deploy Windows MSI client on all 5 Windows VMs (via Ansible push, not VR auto-download)
+6. Deploy Windows MSI client on **dc01, dc02, dc03, mbr01, mbr02, and ws01** (Ansible push of the repacked MSI; msiexec **fail-closed**). ws01 is also enrolled by `17-ws01-deploy.yml` so the launcher can be added without re-running the full Windows inventory.
 7. Deploy Linux client on linux01
-8. Import 10 pre-built hunt collections (cadre-process-tree, cadre-credential-access,
-   cadre-network-state, cadre-fs-timeline, cadre-registry-snapshot, cadre-event-logs,
-   cadre-adcs-snapshot, cadre-sccm-snapshot, cadre-linux-triage, cadre-full-breach)
-9. Import the `CADRE.Linux.KeytabFingerprints` custom artifact
-10. Start MCP server (Python Flask, port 8002) for Plan 7 agentic pipeline
+8. Load 10 pre-built hunt collections into the **live** server catalog via `defaults.artifact_definitions_directories` (`/opt/cadre-hunts`, `/opt/cadre-artifacts`). Velociraptor 0.76 has `artifacts`, not `artifact add`.
+9. Import the `CADRE.Linux.KeytabFingerprints` custom artifact (same catalog path)
+10. Generate `config api_client` YAML and start the MCP HTTP front (`velociraptor-mcp`, port 8002) for Plan 7 / DFIR-Nexus. Health: `GET /health`. VQL: `POST /vql` with Bearer from `/etc/velociraptor/mcp.env`. **Do not** point `NEXUS_VR_ENDPOINT` at `:8001` (gRPC).
 
 ### Verify Stage D
 
@@ -531,11 +529,14 @@ python cadre.py install -e velociraptor
 # Web GUI reachable
 # Open https://192.168.77.51:8889 (accept self-signed cert)
 # Login: admin / VelociraptorDefault!
-# Dashboard → "Show all" should show 6 clients connected (5 Win + 1 Linux)
+# Dashboard → "Show all" should list campaign clients: 6 Windows (dc01–dc03, mbr01, mbr02, **ws01**) + linux01 (+ vr self-enrolled)
 
 # MCP endpoint healthy
 curl http://192.168.77.51:8002/health
-# {"status":"ok"}
+# {"status":"ok","ok":true,...}
+
+# Live hunt catalog (no --definitions)
+ssh vagrant@192.168.77.51 "sudo velociraptor -c /etc/velociraptor/server.config.yaml artifacts list | grep CADRE.Hunts.FullBreach"
 ```
 
 ---

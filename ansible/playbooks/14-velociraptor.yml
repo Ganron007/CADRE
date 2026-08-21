@@ -17,6 +17,10 @@
     vr_api_port: 8001
     vr_frontend_port: 8000
     vr_admin_password: "VelociraptorDefault!"
+    vr_mcp_port: 8002
+    # Lab MCP bearer for DFIR-Nexus RemoteVRMCPClient (NEXUS_VR_MCP_URL + NEXUS_VR_MCP_API_KEY).
+    # Do not point NEXUS_VR_ENDPOINT at :8001 — that port is gRPC, not HTTP Query.
+    vr_mcp_api_key: "CadreVrMcp!Lab2026"
   tasks:
     - name: Install system dependencies
       ansible.builtin.apt:
@@ -25,6 +29,7 @@
           - curl
           - python3
           - python3-pip
+          - python3-yaml
           - wget
         state: present
         update_cache: true
@@ -143,14 +148,11 @@
         dest: /opt/cadre-artifacts/
         mode: "0644"
 
-    - name: Import custom artifacts into Velociraptor
-      ansible.builtin.shell: |
-        for f in /opt/cadre-artifacts/*.yaml; do
-          [ -f "$f" ] || continue
-          /usr/local/bin/velociraptor --config /etc/velociraptor/server.config.yaml \
-            artifact add "$f"
-        done
-        touch /var/lib/velociraptor/.artifacts_imported
+    - name: Mark custom artifacts copied (loaded via artifact_definitions_directories)
+      ansible.builtin.file:
+        path: /var/lib/velociraptor/.artifacts_imported
+        state: touch
+        mode: "0644"
 
     - name: Copy pre-built hunt artifacts to vr VM
       ansible.builtin.copy:
@@ -158,14 +160,112 @@
         dest: /opt/cadre-hunts/
         mode: "0644"
 
-    - name: Import pre-built hunt artifacts into Velociraptor
+    - name: Mark hunts copied (loaded via artifact_definitions_directories)
+      ansible.builtin.file:
+        path: /var/lib/velociraptor/.hunts_imported
+        state: touch
+        mode: "0644"
+
+    - name: Create MCP install directory
+      ansible.builtin.file:
+        path: /opt/cadre-vr-mcp
+        state: directory
+        mode: "0755"
+
+    - name: Point server catalog at CADRE hunts and artifacts (0.76 has no artifact add)
+      ansible.builtin.copy:
+        src: ../files/vr-mcp/patch_catalog.py
+        dest: /opt/cadre-vr-mcp/patch_catalog.py
+        mode: "0755"
+
+    - name: Apply artifact_definitions_directories to server config
       ansible.builtin.shell: |
-        for f in /opt/cadre-hunts/*.yaml; do
-          [ -f "$f" ] || continue
-          /usr/local/bin/velociraptor --config /etc/velociraptor/server.config.yaml \
-            artifact add "$f"
-        done
-        touch /var/lib/velociraptor/.hunts_imported
+        python3 /opt/cadre-vr-mcp/patch_catalog.py /etc/velociraptor/server.config.yaml
+        chmod 600 /etc/velociraptor/server.config.yaml
+      register: vr_extra_defs
+      changed_when: "'CHANGED' in vr_extra_defs.stdout"
+
+    - name: Generate gRPC api_client YAML for MCP (administrator)
+      ansible.builtin.shell: |
+        /usr/local/bin/velociraptor --config /etc/velociraptor/server.config.yaml \
+          config api_client --name cadre-mcp --role administrator \
+          /etc/velociraptor/api_client.yaml
+        chmod 600 /etc/velociraptor/api_client.yaml
+      args:
+        creates: /etc/velociraptor/api_client.yaml
+      register: vr_api_client
+
+    - name: Ensure cadre-mcp API user exists in the datastore
+      ansible.builtin.shell: |
+        /usr/local/bin/velociraptor --config /etc/velociraptor/server.config.yaml \
+          user add --role administrator cadre-mcp "{{ vr_mcp_api_key }}"
+        /usr/local/bin/velociraptor --config /etc/velociraptor/server.config.yaml \
+          acl grant cadre-mcp --role administrator
+      register: vr_mcp_user
+      failed_when: false
+      changed_when: false
+
+    - name: Restart Velociraptor to load catalog dirs and API user
+      ansible.builtin.systemd:
+        name: velociraptor
+        state: restarted
+      when: vr_extra_defs.changed or vr_api_client.changed
+
+    - name: Wait for Velociraptor GUI after restart
+      ansible.builtin.wait_for:
+        port: "{{ vr_gui_port }}"
+        delay: 8
+        timeout: 60
+      when: vr_extra_defs.changed or vr_api_client.changed
+
+    - name: Install Velociraptor MCP HTTP front
+      ansible.builtin.copy:
+        src: ../files/vr-mcp/mcp_server.py
+        dest: /opt/cadre-vr-mcp/mcp_server.py
+        mode: "0755"
+
+    - name: Write MCP environment (API key + api_client path)
+      ansible.builtin.copy:
+        dest: /etc/velociraptor/mcp.env
+        mode: "0600"
+        content: |
+          VR_MCP_BIND=0.0.0.0
+          VR_MCP_PORT={{ vr_mcp_port }}
+          VR_MCP_API_KEY={{ vr_mcp_api_key }}
+          VR_API_CONFIG=/etc/velociraptor/api_client.yaml
+          VR_BIN=/usr/local/bin/velociraptor
+
+    - name: Create Velociraptor MCP systemd unit
+      ansible.builtin.copy:
+        dest: /etc/systemd/system/velociraptor-mcp.service
+        mode: "0644"
+        content: |
+          [Unit]
+          Description=Velociraptor MCP HTTP front (Nexus RemoteVRMCPClient)
+          After=network.target velociraptor.service
+          Wants=velociraptor.service
+          [Service]
+          Type=simple
+          User=root
+          EnvironmentFile=/etc/velociraptor/mcp.env
+          ExecStart=/usr/bin/python3 /opt/cadre-vr-mcp/mcp_server.py
+          Restart=always
+          RestartSec=3
+          [Install]
+          WantedBy=multi-user.target
+
+    - name: Start Velociraptor MCP
+      ansible.builtin.systemd:
+        name: velociraptor-mcp
+        state: started
+        enabled: true
+        daemon_reload: true
+
+    - name: Wait for MCP port
+      ansible.builtin.wait_for:
+        port: "{{ vr_mcp_port }}"
+        delay: 2
+        timeout: 30
 
     - name: Open firewall ports
       ansible.builtin.ufw:
@@ -176,7 +276,7 @@
         - "{{ vr_frontend_port }}"
         - "{{ vr_gui_port }}"
         - "{{ vr_api_port }}"
-        - 8002
+        - "{{ vr_mcp_port }}"
 
     - name: Enroll vr server as its own client
       ansible.builtin.shell: |
@@ -245,19 +345,18 @@
         dest: "C:\\Tools\\velociraptor-client.msi"
 
     - name: Install Velociraptor client on Windows
-      ansible.windows.win_shell: msiexec /i "C:\Tools\velociraptor-client.msi" /quiet
+      ansible.windows.win_package:
+        path: C:\Tools\velociraptor-client.msi
+        arguments: /qn /norestart
+        state: present
+        expected_return_code: [0, 1641, 3010]
       register: vr_install
-      changed_when: false
-      failed_when: false
 
     - name: Ensure Velociraptor service is running
-      ansible.windows.win_shell: |
-        $binPath = '"C:\Program Files\Velociraptor\velociraptor.exe" --config "C:\Program Files\Velociraptor\client.config.yaml" service run'
-        if (-not (Get-Service -Name "Velociraptor" -ErrorAction SilentlyContinue)) {
-            New-Service -Name "Velociraptor" -BinaryPathName $binPath -StartupType Automatic
-        }
-        Start-Service -Name "Velociraptor" -ErrorAction SilentlyContinue
-        Get-Service -Name "Velociraptor" | Select-Object Name,Status,StartType
+      ansible.windows.win_service:
+        name: Velociraptor
+        state: started
+        start_mode: auto
 
 - name: "Play 3 — Enroll Velociraptor client on linux01"
   hosts: linux_members

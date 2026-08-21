@@ -128,9 +128,9 @@ Provides on-demand forensic artifact collection from all Windows + Linux VMs. Al
 | Component | Purpose | Access |
 |-----------|---------|--------|
 | **Velociraptor server** | Hunt management, artifact collection, web GUI | `https://192.168.77.51:8889` |
-| **Windows clients (MSI)** | Agent on dc01, dc02, dc03, mbr01, mbr02 — live forensics | Auto-enrolled via config |
+| **Windows clients (MSI)** | Agent on dc01, dc02, dc03, mbr01, mbr02, **ws01** — live forensics | Auto-enrolled via repacked MSI |
 | **Linux client** | Agent on linux01 — Linux forensics | Auto-enrolled via config |
-| **MCP server (Python)** | Natural-language endpoint queries for Plan 7 agents | `http://192.168.77.51:8002` |
+| **MCP server (Python)** | HTTP `/health` + `/vql` for Plan 7 / Nexus `RemoteVRMCPClient` | `http://192.168.77.51:8002` |
 
 ### Pre-Built Hunt Collections
 
@@ -151,14 +151,16 @@ Ready-to-use artifact bundles for each investigation scenario:
 
 ### MCP Endpoint (Plan 7)
 
-The MCP server translates natural-language queries from LangGraph agents into VQL:
+The MCP server is an HTTP front on `:8002`. It does **not** translate natural language; Nexus (or an operator) sends VQL. Backend is `velociraptor --api_config` against gRPC `:8001`.
 
 ```
-Agent: "Show me all processes on dc01 that accessed lsass.exe in the last 5 minutes"
-  → MCP translates to VQL
-  → Executes against dc01 client
-  → Returns structured result to agent
+Agent / nexus collect
+  → POST http://192.168.77.51:8002/vql  {"vql": "SELECT * FROM collect_client(...)"}
+  → MCP runs query via api_client.yaml
+  → Returns {"rows":[...]}
 ```
+
+Do **not** set `NEXUS_VR_ENDPOINT` to `:8001`. Use `NEXUS_VR_MCP_URL=http://192.168.77.51:8002` and `NEXUS_VR_MCP_API_KEY` from `/etc/velociraptor/mcp.env`.
 
 ### Credentials
 

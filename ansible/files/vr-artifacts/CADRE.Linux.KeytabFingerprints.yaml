@@ -5,32 +5,25 @@ description: |
 parameters:
   - name: keytabPaths
     description: Glob paths to search for keytab files
-    default: /etc/krb5.keytab /var/opt/mssql/secrets/mssql.keytab
+    default: /etc/krb5.keytab,/var/opt/mssql/secrets/mssql.keytab
 sources:
-  - precondition: |
+  - name: Inventory
+    precondition: |
       SELECT OS FROM info()
       WHERE OS = 'linux'
-    queries:
-      - name: keytab_inventory
-        query: |
-          LET keytabs = glob(globs=split(string=keytabPaths, sep=" "))
-          SELECT FullPath,
-                 timestamp(epoch=Sys.Strftime!["Mtime"]) as Modified,
-                 Size
-          FROM keytabs
-      - name: keytab_principals
-        query: |
-          LET klist_results = SELECT * FROM foreach(
-            row={
-              SELECT FullPath FROM glob(globs=split(string=keytabPaths, sep=" "))
-            },
-            query={
-              SELECT FullPath, Stdout as KeytabOutput
-              FROM exec(argv=["klist", "-ke", "-t", FullPath])
-            })
-          SELECT FullPath,
-             parse_string_with_regex(
-               string=KeytabOutput,
-               regex=["(?P<Principal>[^ ]+@[^ ]+) \\((?P<KVNO>\\d+)\\)"]
-             ) as Principals
-          FROM klist_results
+    query: |
+      SELECT OSPath AS FullPath, Mtime AS Modified, Size
+      FROM glob(globs=split(string=keytabPaths, sep=","))
+  - name: Principals
+    precondition: |
+      SELECT OS FROM info()
+      WHERE OS = 'linux'
+    query: |
+      SELECT * FROM foreach(
+        row={
+          SELECT OSPath AS FullPath FROM glob(globs=split(string=keytabPaths, sep=","))
+        },
+        query={
+          SELECT FullPath, Stdout AS KeytabOutput
+          FROM execve(argv=["klist", "-ke", "-t", FullPath])
+        })

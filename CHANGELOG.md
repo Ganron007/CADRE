@@ -1,4 +1,11 @@
 
+## [Unreleased] — 2026-08-21 (Velociraptor MCP + ws01 client)
+
+- **Playbook 14** now loads CADRE hunts via `defaults.artifact_definitions_directories` (Velociraptor 0.76 has `artifacts`, not `artifact add`), generates `config api_client`, and starts `velociraptor-mcp` on `:8002` (`GET /health`, `POST /vql` Bearer). Windows MSI install is fail-closed.
+- **Playbook 17** enrolls the Velociraptor client on ws01 from the repacked MSI on vr (same path as Elastic, independent of elk).
+- **Verify-only** checks live `artifacts list` for `CADRE.Hunts.FullBreach` / `LinuxTriage` / `CADRE.Linux.KeytabFingerprints`, MCP health, and WS01 in `clients()`.
+- **Live (vr+ws01 only):** catalog + MCP proven; ws01 client id `C.0c83142b7f7ca56b`. Do not set `NEXUS_VR_ENDPOINT` to `:8001` (gRPC).
+
 ## [Unreleased] — 2026-08-20 (RedStrike pin always follows standalone)
 
 - **Sync rule:** standalone `RedStrike\` is the engine SSoT. Always adopt its HEAD into `CADRE/tools/red-strike/`, then onto provisioning. Script: `tools/sync-redstrike-pin.ps1` (`-PushKali` installs on `.60`).

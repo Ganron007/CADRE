@@ -308,3 +308,23 @@
         if ($svc.Status -ne 'Running') { throw 'Elastic Agent is not Running' }
         if ($svc.StartType -ne 'Automatic') { throw "Elastic Agent StartType is $($svc.StartType), expected Automatic" }
         Write-Output 'OK: Elastic Agent Running/Auto'
+
+# =============================================================================
+# Play 8: Velociraptor client on ws01 (does not need elk)
+# =============================================================================
+- name: "ws01 — Verify Velociraptor client"
+  hosts: ws01
+  gather_facts: false
+  tasks:
+    - name: "[VERIFY] Velociraptor MSI staged"
+      ansible.windows.win_shell: |
+        if (-not (Test-Path 'C:\Tools\velociraptor-client.msi')) { throw 'missing C:\Tools\velociraptor-client.msi' }
+        Write-Output 'OK: MSI present'
+
+    - name: "[VERIFY] Velociraptor service Running/Auto"
+      ansible.windows.win_shell: |
+        $svc = Get-Service 'Velociraptor' -ErrorAction Stop
+        if ($svc.Status -ne 'Running') { throw "Velociraptor is $($svc.Status)" }
+        if ($svc.StartType -ne 'Automatic') { throw "Velociraptor StartType is $($svc.StartType)" }
+        Write-Output 'OK: Velociraptor Running/Auto'
+

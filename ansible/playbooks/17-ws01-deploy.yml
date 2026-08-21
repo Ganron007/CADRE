@@ -6,6 +6,8 @@
 #
 # EDR: Elastic Agent on Fleet policy CADRE-All (same as other Windows lab VMs) —
 #      Elastic Defend detect/telemetry only. NO Microsoft Defender for Endpoint (MDE).
+# VR: last play enrolls the Velociraptor Windows client from vr `.51` (fail-closed
+#      msiexec). Independent of elk — run that play when only ws01+vr are up.
 # Defender: soft-disable RTP + path/process excludes (do NOT stop WinDefend).
 #          Do NOT run 04-vulnerabilities.yml hard Defender-kill against ws01.
 # OU/GPO: still OU=WS01-MDE today — migrate to normal workstation OU later (deferred).
@@ -659,3 +661,43 @@
         name: "Elastic Agent"
         state: started
         start_mode: auto
+
+# =============================================================================
+# Play: Enroll Velociraptor client (MSI from vr .51). Independent of elk.
+# Same fail-closed path as 14-velociraptor.yml Play 2, dedicated to ws01 so
+# 17 can enroll the launcher without re-running the full Windows inventory.
+# =============================================================================
+- name: "ws01 — Enroll Velociraptor client from vr MSI"
+  hosts: ws01
+  gather_facts: true
+  tasks:
+    - name: Create Tools directory
+      ansible.windows.win_file:
+        path: C:\Tools
+        state: directory
+
+    - name: Pull repacked MSI from vr server to controller
+      ansible.builtin.fetch:
+        src: /var/lib/velociraptor/files/velociraptor-client-cadre.msi
+        dest: /tmp/vr-client-cadre.msi
+        flat: true
+      delegate_to: vr
+
+    - name: Push repacked MSI to ws01
+      ansible.windows.win_copy:
+        src: /tmp/vr-client-cadre.msi
+        dest: "C:\\Tools\\velociraptor-client.msi"
+
+    - name: Install Velociraptor client on ws01
+      ansible.windows.win_package:
+        path: C:\Tools\velociraptor-client.msi
+        arguments: /qn /norestart
+        state: present
+        expected_return_code: [0, 1641, 3010]
+
+    - name: Ensure Velociraptor service is running on ws01
+      ansible.windows.win_service:
+        name: Velociraptor
+        state: started
+        start_mode: auto
+

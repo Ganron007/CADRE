@@ -13,9 +13,11 @@
     vr_api_port: 8001
     vr_frontend_port: 8000
     vr_admin_password: "VelociraptorDefault!"
+    vr_mcp_port: 8002
+    vr_mcp_api_key: "CadreVrMcp!Lab2026"
   tasks:
     - name: Verify system dependencies installed
-      ansible.builtin.shell: dpkg -l ca-certificates curl python3 python3-pip wget
+      ansible.builtin.shell: dpkg -l ca-certificates curl python3 python3-pip python3-yaml wget
       changed_when: false
       failed_when: result.rc == 1
       register: result
@@ -125,9 +127,53 @@
       failed_when: result.rc == 1
       register: result
 
+    - name: Verify live catalog has CADRE.Hunts.FullBreach (no --definitions)
+      ansible.builtin.shell: |
+        /usr/local/bin/velociraptor --config /etc/velociraptor/server.config.yaml \
+          artifacts list 2>/dev/null | grep -qx 'CADRE.Hunts.FullBreach'
+      changed_when: false
+      failed_when: result.rc == 1
+      register: result
+
+    - name: Verify live catalog has CADRE.Linux.KeytabFingerprints (no --definitions)
+      ansible.builtin.shell: |
+        /usr/local/bin/velociraptor --config /etc/velociraptor/server.config.yaml \
+          artifacts list 2>/dev/null | grep -qx 'CADRE.Linux.KeytabFingerprints'
+      changed_when: false
+      failed_when: result.rc == 1
+      register: result
+
+    - name: Verify gRPC api_client YAML exists
+      ansible.builtin.shell: test -f /etc/velociraptor/api_client.yaml
+      changed_when: false
+      failed_when: result.rc == 1
+      register: result
+
+    - name: Verify MCP env and unit exist
+      ansible.builtin.shell: |
+        test -f /etc/velociraptor/mcp.env
+        test -f /etc/systemd/system/velociraptor-mcp.service
+        test -f /opt/cadre-vr-mcp/mcp_server.py
+      changed_when: false
+      failed_when: result.rc == 1
+      register: result
+
+    - name: Verify MCP service is active and enabled
+      ansible.builtin.shell: systemctl is-active velociraptor-mcp && systemctl is-enabled velociraptor-mcp
+      changed_when: false
+      failed_when: result.rc == 1
+      register: result
+
+    - name: Verify MCP /health returns ok
+      ansible.builtin.shell: |
+        curl -fsS http://127.0.0.1:{{ vr_mcp_port }}/health | grep -q '"ok": true'
+      changed_when: false
+      failed_when: result.rc == 1
+      register: result
+
     - name: Verify UFW ports are allowed
       ansible.builtin.shell: |
-        for port in {{ vr_frontend_port }} {{ vr_gui_port }} {{ vr_api_port }} 8002; do
+        for port in {{ vr_frontend_port }} {{ vr_gui_port }} {{ vr_api_port }} {{ vr_mcp_port }}; do
           ufw status | grep -q "${port}.*ALLOW" || { echo "Port $port not allowed in UFW"; exit 1; }
         done
       changed_when: false
@@ -231,3 +277,42 @@
       changed_when: false
       failed_when: result.rc == 1
       register: result
+
+- name: "Play 4 — Verify WS01 is an enrolled Velociraptor client"
+  hosts: vr
+  gather_facts: false
+  become: yes
+  vars:
+    vr_mcp_port: 8002
+    vr_mcp_api_key: "CadreVrMcp!Lab2026"
+  tasks:
+    - name: Query MCP clients() for WS01 hostname
+      ansible.builtin.shell: |
+        set -euo pipefail
+        key=$(grep '^VR_MCP_API_KEY=' /etc/velociraptor/mcp.env | cut -d= -f2-)
+        body=$(curl -fsS -H "Authorization: Bearer ${key}" \
+          -H "Content-Type: application/json" \
+          -d '{"vql":"SELECT client_id, os_info.hostname AS Hostname FROM clients()","timeout_seconds":20}' \
+          "http://127.0.0.1:{{ vr_mcp_port }}/vql")
+        echo "$body"
+        echo "$body" | python3 -c '
+        import json,sys
+        d=json.load(sys.stdin)
+        if d.get("error"):
+            sys.stderr.write("clients() error: %s\n" % d["error"])
+            sys.exit(1)
+        rows=d.get("rows") or []
+        names=[]
+        for r in rows:
+            h=str(r.get("Hostname") or r.get("os_info.hostname") or r.get("hostname") or "")
+            names.append(h)
+        blob=" ".join(names).upper()
+        if "WS01" not in blob:
+            sys.stderr.write("WS01 not in clients(): %s\n" % names)
+            sys.exit(1)
+        print("OK: WS01 enrolled")
+        '
+      changed_when: false
+      register: result
+      failed_when: result.rc != 0
+
