@@ -3,18 +3,59 @@
 > **Purpose:** Run the CADRE campaign spine via the **CADRE-integrated RedStrike pin** (`CampaignOrchestrator`) with dual beachheads, credential ledger, and HITL gates — parallel to manual runbooks and to [`DFIR-Nexus-Pioneer-workflow.md`](DFIR-Nexus-Pioneer-workflow.md).
 >
 > **Plan 01 engine (required):** `CADRE/tools/red-strike/` — install and run **this** copy for campaign runs.
-> **Upstream product:** sister `RedStrike\` / [github.com/Ganron007/RedStrike](https://github.com/Ganron007/RedStrike) — features land there first, then are **adopted into this pin**. Do not run Plan 01 from a standalone clone.
+> **Upstream product:** sister `RedStrike\` / [github.com/Ganron007/RedStrike](https://github.com/Ganron007/RedStrike) — features land there first. **Always** adopt standalone HEAD into this pin and provisioning (`tools/sync-redstrike-pin.ps1 -PushKali`). Do not run Plan 01 from a standalone clone.
 > **Standalone practice:** a standalone RedStrike install may still target CADRE VMs with operator-owned graph/scope; that is **not** the integrated campaign path.
 > **Plan:** `CAMPAIGN-AUTOMATION-PLAN.md` (local maintainers)
 > **Graph:** [`automation/campaign-graph.yaml`](automation/campaign-graph.yaml) · **Campaign:** [`CAMPAIGNS_v3.md`](CAMPAIGNS_v3.md)
 
-**Status:** Plan 1.1 **complete**. Pin tracks standalone RedStrike **0.6.0** (`bd3aa96`, adopted 2026-08-19). Graph **v9** lives in this CADRE tree only. Dual operator modes: **provisioning** (hybrid) + **ws01** (native). **CADRE assessment uses the pin only** — not a standalone clone.
+**Status:** Plan 1.1 **complete**. Pin tracks standalone RedStrike **0.6.0** (`d39922e` + CADRE overlay, always-sync 2026-08-20). Graph **v9** lives in this CADRE tree only. Dual operator modes: **provisioning** (hybrid) + **ws01** (native). **CADRE assessment uses the pin only** — not a standalone clone.
+
+---
+
+## DFIR full graph (current)
+
+Fresh DFIR telemetry uses **graph v9, all 90 nodes**, from provisioning (hybrid `ws01-exec` + Kali-only paths). This **is** the collection case (ws01 + linux01 on-box + Velociraptor across the lab). It is not a 30-node spine.
+
+**Live order (locked):** soft-reboot every running CADRE VM + WS01 → wait healthy → wipe logs → `--execute`. **No snapshots.** Dry-run does **not** fire attacks and is **not** between wipe and execute.
+
+| Do | Do not |
+|----|--------|
+| `tools/dfir-full-live.ps1` (reboot + wipe; add `-Execute` only to start attacks) | Treat the retired 30-node spine dry-run as this case |
+| `tools/lab-vm-reboot.ps1` then `tools/lab-log-reset.ps1` | `--execute` on dirty logs or without a post-reboot wipe |
+| Pin venv `$HOME/CADRE/tools/red-strike/.venv` on **provisioning** | `~/RedStrike` standalone venv |
+| `--operator provisioning` | Pin on this Windows laptop (defaults to `local-ws01`) |
+| Phased beachheads in `redstrike-dfir-full.sh` (`--profile P-DFIR --prefer-script`) | Native `--operator ws01` until the pin is installed on ws01 (it is not) |
+| `--execute` only after `DFIR_FULL_READY=YES` **and** reboot+wipe | Claim “say go” from docs or a second check-pass |
+
+HITL gates (execute wrapper pre-approves **all** of these for the 90-node collection): `dcsync`, `ticket`, `forest`, `persistence`, `acl_write`, `site_takeover`. Stubs still skip: T100, T103, T104, T107, T108, T-SQL-AI, WT093. Seed `krbtgt` hashes stay null until T009 actually dumps them.
+
+**ws01 vs Kali:** Windows AD/SCCM/ACL/ADCS/Post-DA nodes originate on **ws01** (`analyst_t1`, `ws01-exec`). Provisioning simulates Kali **only** where the graph path is not ws01: T028, H-01..H-06 (Rule 4), T031, E/F, and linux01 T045–T048.
+
+```powershell
+# Prelude only (no attacks): graceful reboot + wait + log wipe
+.\tools\dfir-full-live.ps1
+
+# Live DFIR full graph — same prelude, then --execute
+.\tools\dfir-full-live.ps1 -Execute
+```
+
+```bash
+# On provisioning, after the pin venv exists
+export CADRE_ROOT=$HOME/CADRE
+bash "$CADRE_ROOT/attack-matrix/04-automation/linux/redstrike-dfir-full.sh"
+```
 
 ---
 
 ## Install the pin (Plan 01)
 
-Do this once on the operator host (provisioning for hybrid, or ws01 for native). Graph, seeds, and attack scripts stay in CADRE — only the engine is this pin.
+**Always-sync** from the Windows CADRE tree (copies sister HEAD → pin + overlay → pytest → provisioning):
+
+```powershell
+.\tools\sync-redstrike-pin.ps1 -PushKali
+```
+
+Manual install (only if the script is unavailable). Graph, seeds, and attack scripts stay in CADRE — only the engine is this pin.
 
 ```bash
 cd "$HOME/CADRE/tools/red-strike"   # Windows: C:\STUDY\Github\CADRE-Platform\CADRE\tools\red-strike
@@ -37,7 +78,7 @@ export PATH="$HOME/CADRE/tools/red-strike/.venv/bin:$PATH"
 
 `redstrike check` core must be `ok` before a campaign dry-run. Live `--execute` also needs operator tools on PATH (`nxc`, Certipy, bloodyAD) — `redstrike check --execute-ready`.
 
-After a feature lands in public/sister RedStrike, copy the engine into this pin and re-run `pip install -e .` in the pin venv.
+After sister RedStrike moves, re-run `.\tools\sync-redstrike-pin.ps1 -PushKali`. Do not wait for a Plan 01 feature request. `~/RedStrike` on provisioning is an overlay of the pin, not a second source of truth.
 
 ---
 
@@ -53,7 +94,7 @@ Defaults: win32 → `ws01`; Linux → `provisioning`. Override with `REDSTRIKE_O
 ```bash
 # Hybrid (current) — on provisioning
 redstrike-campaign start --beachhead windows --operator provisioning --engage lab-hybrid
-bash ~/CADRE/attack-matrix/04-automation/linux/redstrike-campaign-v3-full-run.sh
+bash ~/CADRE/attack-matrix/04-automation/linux/redstrike-dfir-full.sh
 ```
 
 ```powershell
@@ -125,7 +166,7 @@ Harnesses:
 
 | Harness | Mode |
 |---------|------|
-| `04-automation/linux/redstrike-campaign-v3-full-run.sh` | `--operator provisioning` |
+| `04-automation/linux/redstrike-dfir-full.sh` | `--operator provisioning` (90-node DFIR; dry-run default) |
 | `04-automation/windows/redstrike-campaign-v3-ws01-native.ps1` | `--operator ws01` |
 ---
 
@@ -158,7 +199,7 @@ Harnesses:
 
 **Graph:** `automation/campaign-graph.yaml` **v9** — 90 nodes. Wired scripts for H-01..H-06, Post-DA T097–099/T105/T106/T109, T035C, Branch D T044–T048 (linux01-exec), UnPAC, ESC2/4/7/9, T031 spray. **Stubs only (deferred):** T100, T103, T104, T107, T108, T-SQL-AI, WT093.
 
-**Harness:** `04-automation/linux/redstrike-campaign-v3-full-run.sh` now schedules spine + A (4–5) + B + C + D + G + H + E/F.
+**Harness:** `04-automation/linux/redstrike-dfir-full.sh` schedules spine + A (4–5) + B + C + D + G + H + E/F + sql-ai (pin PATH, dry-run default; `--execute` after reboot+wipe). `redstrike-campaign-v3-full-run.sh` forwards here.
 
 ```bash
 export CADRE_ROOT=$HOME/CADRE
@@ -166,7 +207,7 @@ export CADRE_AUTOMATION_ROOT=$HOME/CADRE/attack-matrix/04-automation/linux
 export REDSTRIKE_SEED=$HOME/CADRE/attack-matrix/Campaign/automation/lab-seed-creds.json
 export REDSTRIKE_WS01_SSH_KEY=$HOME/.ssh/<your-ws01-key>
 export PATH=/usr/bin:/bin:$HOME/CADRE/tools/red-strike/.venv/bin:$PATH
-bash ~/CADRE/attack-matrix/04-automation/linux/redstrike-campaign-v3-full-run.sh
+bash ~/CADRE/attack-matrix/04-automation/linux/redstrike-dfir-full.sh
 ```
 
 The 2026-08-03 live pass used a standalone `~/RedStrike` venv. **Plan 01 now uses the pin** (`CADRE/tools/red-strike/`). Keep `REDSTRIKE_WS01_*` and seed paths in the environment; do not commit keys.
@@ -178,7 +219,7 @@ The 2026-08-03 live pass used a standalone `~/RedStrike` venv. **Plan 01 now use
 ## RedStrike Campaign v3 full run (2026-08-03 — pre-v9 baseline)
 
 **Engagement:** `camp-v3-20260803` · **Host:** provisioning `192.168.77.60` · **Log:** `~/redstrike-runs/camp-v3-20260803-20260803T064441Z.log`  
-**Harness:** `attack-matrix/04-automation/linux/redstrike-campaign-v3-full-run.sh`  
+**Harness:** `attack-matrix/04-automation/linux/redstrike-campaign-v3-full-run.sh` (historical name; now forwards to `redstrike-dfir-full.sh`)  
 **Flags:** `--execute --prefer-script --no-stop-on-hitl` (all gates pre-approved for automation pass)
 
 ```bash
@@ -186,7 +227,7 @@ export CADRE_ROOT=$HOME/CADRE
 export CADRE_AUTOMATION_ROOT=$HOME/CADRE/attack-matrix/04-automation/linux
 export REDSTRIKE_WS01_SSH_KEY=$HOME/.ssh/<your-ws01-key>
 export PATH=/usr/bin:/bin:$HOME/CADRE/tools/red-strike/.venv/bin:$PATH
-bash ~/CADRE/attack-matrix/04-automation/linux/redstrike-campaign-v3-full-run.sh
+bash ~/CADRE/attack-matrix/04-automation/linux/redstrike-dfir-full.sh
 ```
 
 | Result | Nodes |

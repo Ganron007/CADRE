@@ -77,6 +77,7 @@ Legend: **R** = required · **O** = optional · **—** = leave suspended/off ·
 | **P-CREDS** | Kali, dc01, dc02, **mbr01** | ws01; T: elk/monitor | ~16–20 GB | Phase 3.5 creds |
 | **P-DELEG** | Kali, dc01, dc02, **mbr01** | ws01; T: elk/monitor | ~16–20 GB | Phase 4–6 |
 | **P-FOREST** | Kali, dc01, dc02, **dc03**, mbr01, **mbr02** | ws01; T: elk/monitor | ~28–32 GB | Phase 7–8 / Branch C |
+| **P-DFIR** | Kali, **ws01**, dc01–03, mbr01–02, **linux01**, **elk**, **monitor**, **vr** | — | ~56–60 GB | Full-graph DFIR collection (90 nodes) |
 | **P-LINUX** | Kali, **dc01**, **mbr01**, **linux01** | dc02; T: elk/monitor | ~16–20 GB | Branch D |
 | **P-PURPLE** | **elk**, **monitor** + offense subset | vr; **ws01** if MDE logs | subset +12–24 GB | Detection / plan1.7 |
 | **P-EVADE** | **ws01**, **dc02** | dc01; Eva7ion ops hosts | ~8–12 GB | MDE / evasion only |
@@ -174,6 +175,25 @@ Detail per profile below.
 | elk / monitor | **T** |
 
 **Approx:** ~28–32 GB (+ telemetry) — heaviest offense-only profile before extensions
+
+---
+
+### P-DFIR — full-graph DFIR collection (90 nodes)
+
+**Use for:** Fresh Elastic/Zeek/Velociraptor case after lab log reset. RedStrike **graph v9, all 90 nodes**, phased beachheads (no snapshots). Attack identity is `analyst_t1` on **ws01** except Kali-only paths (H, E/F, T028, T031, linux01 T045–T048). Orchestrator stays on provisioning and SSH-wraps Windows via `ws01-exec`.
+
+| VM | State | Why |
+|----|-------|-----|
+| Kali / provisioning `.60` | **R** | Plan 01 pin + hybrid orchestrator + Kali-only paths |
+| **ws01** `.62` | **R** | Attack origin (Rule 1) + on-box triage |
+| dc01, dc02, **dc03** | **R** | Child + forest (T033) |
+| mbr01, **mbr02** | **R** | SQL / SCCM / laterals |
+| **linux01** `.40` | **R** | Branch D + on-box Linux triage |
+| **elk** `.50` | **R** | DFIR ingest |
+| **monitor** `.55` | **R** | Zeek / Suricata |
+| **vr** `.51` | **R** | Velociraptor across the lab |
+
+**Harness:** `04-automation/linux/redstrike-dfir-full.sh` (host wrapper `tools/redstrike-dfir-full.ps1`). Default is dry-run. Live prelude: `tools/dfir-full-live.ps1`. Old `*-spine*` names forward here.
 
 ---
 

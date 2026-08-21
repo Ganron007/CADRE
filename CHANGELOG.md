@@ -1,4 +1,18 @@
 
+## [Unreleased] — 2026-08-20 (RedStrike pin always follows standalone)
+
+- **Sync rule:** standalone `RedStrike\` is the engine SSoT. Always adopt its HEAD into `CADRE/tools/red-strike/`, then onto provisioning. Script: `tools/sync-redstrike-pin.ps1` (`-PushKali` installs on `.60`).
+- **Adopted 2026-08-20:** sister `d39922e` (hostname/lab-IP decoupling) + overlay. Pin pytest 96 passed / 14 skipped. Provisioning pin `0.6.0` with `StepResult.started_at`; login wrappers exec the pin venv; `KALI_PIN_SYNC_OK`.
+- CADRE-only overlay (`tools/red-strike-pin-overlay.patch`): DFIR `StepResult` ISO timestamps + `P-DFIR` preflight. Re-applied after each copy so sister hostname decoupling is not reverted.
+
+## [Unreleased] — 2026-08-20 (DFIR full graph v9)
+
+- **DFIR case is the full 90-node graph**, not a 30-node spine. ws01 + linux01 on-box triage plus Velociraptor across the lab needs Branch D/C/H/E/F, not spine-only.
+- **Harness:** `attack-matrix/04-automation/linux/redstrike-dfir-full.sh` (phased beachheads, pin PATH, dry-run default). Host wrapper `tools/redstrike-dfir-full.ps1`. Live prelude `tools/dfir-full-live.ps1` (reboot → wipe → `--execute`). **No snapshots.** Old `*-spine*` names and `redstrike-campaign-v3-full-run.sh` forward here.
+- **Ready-check:** `tools/dfir-full-ready-check.py` requires 90 unique node ids, ws01-exec + linux60 + external60_phase0, refuses demo-graph / native-ws01.
+- **P-DFIR** now includes **linux01** and **vr** (plus elk/monitor) so VR collection and linux01 triage are in the same case.
+- **Live order:** soft reboot CADRE+WS01 → wait healthy → log wipe → `--execute`. Attacks stay operator-gated.
+- **Pin `StepResult`:** ISO `started_at` / `finished_at` on campaign JSON for DFIR join (local pin; not sister RedStrike).
 
 ## [Unreleased] — 2026-08-19 (RedStrike pin re-sync)
 

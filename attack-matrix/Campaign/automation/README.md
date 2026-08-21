@@ -4,9 +4,9 @@ CADRE-owned assets for Plan 1.1. **Not** part of standalone RedStrike product id
 
 | File | Role |
 |------|------|
-| `campaign-graph.yaml` | Spine + branches A/B/C/D/G/sql-ai (v3) |
+| `campaign-graph.yaml` | Full graph v9 (90 nodes: spine + A/B/C/D/E/F/G/H/sql-ai) |
 | `lab-seed-creds.json` | Lab credential seed (never commit real prod secrets) |
-| `lab-profiles.yaml` | Machine-readable LAB-PROFILES preflight |
+| `lab-profiles.yaml` | Machine-readable LAB-PROFILES preflight (`P-DFIR` = full DFIR collection: ws01 + linux01 + VR + elk/monitor) |
 
 This directory is the **only** home for CADRE missions, graph, and lab seeds. Do not copy these files into standalone RedStrike.
 

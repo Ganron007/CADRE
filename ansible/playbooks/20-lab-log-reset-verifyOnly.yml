@@ -1,0 +1,128 @@
+---
+# Verify counterpart for 20-lab-log-reset.yml — counts only, no deletes.
+# Non-zero counts after a wipe are live refill (Sysmon/auditd/Fleet). Do not fail on that.
+
+- name: "Verify Windows DFIR channel counts (refill expected)"
+  hosts: windows_servers
+  gather_facts: false
+  vars:
+    ansible_user: vagrant
+    ansible_connection: winrm
+    ansible_winrm_transport: basic
+    ansible_winrm_scheme: http
+    ansible_winrm_port: 5985
+    ansible_winrm_server_cert_validation: ignore
+    ansible_winrm_connection_timeout: 30
+  tasks:
+    - name: "Report record counts for DFIR channels"
+      ansible.windows.win_shell: |
+        $chs = @(
+          'Security',
+          'Microsoft-Windows-Sysmon/Operational',
+          'Microsoft-Windows-PowerShell/Operational',
+          'Windows PowerShell',
+          'Microsoft-Windows-NTLM/Operational',
+          'Microsoft-Windows-WinRM/Operational',
+          'Microsoft-Windows-TaskScheduler/Operational',
+          'Microsoft-Windows-WMI-Activity/Operational',
+          'Microsoft-Windows-DNS-Client/Operational',
+          'Microsoft-Windows-Kerberos/Operational',
+          'Microsoft-Windows-DNS-Server/Analytical',
+          'Microsoft-Windows-LDAP-Client/Debug',
+          'System'
+        )
+        foreach ($c in $chs) {
+          try {
+            $n = (Get-WinEvent -ListLog $c -ErrorAction Stop).RecordCount
+            Write-Output ("{0}`t{1}`t{2}" -f $env:COMPUTERNAME, $c, $n)
+          } catch {
+            Write-Output ("{0}`t{1}`tNA" -f $env:COMPUTERNAME, $c)
+          }
+        }
+        $t = 0
+        if (Test-Path 'C:\PSTranscripts') {
+          $t = (Get-ChildItem 'C:\PSTranscripts' -Recurse -File -EA SilentlyContinue | Measure-Object).Count
+        }
+        Write-Output ("{0}`tPSTranscripts_files`t{1}" -f $env:COMPUTERNAME, $t)
+      register: counts
+      changed_when: false
+
+    - name: "Show channel counts (non-zero = live refill, OK)"
+      ansible.builtin.debug:
+        msg: "{{ counts.stdout_lines }}"
+
+- name: "Verify linux01 playbook log files"
+  hosts: linux01
+  gather_facts: false
+  become: true
+  tasks:
+    - name: "stat linux01 DFIR log files"
+      ansible.builtin.shell: |
+        for f in /var/log/auth.log /var/log/syslog /var/log/audit/audit.log \
+                 /var/log/sysmon.log /var/log/podman-events.log; do
+          if [ -f "$f" ]; then echo "$f $(stat -c%s "$f")"; else echo "$f MISSING"; fi
+        done
+        if [ -d /var/log/sssd ]; then
+          echo "sssd_logs $(find /var/log/sssd -type f -name '*.log' -printf '%s ' 2>/dev/null | awk '{s=0;for(i=1;i<=NF;i++)s+=$i; print s}')"
+        else
+          echo "sssd_logs MISSING"
+        fi
+        echo "mssql_audit_files $(ls /var/opt/mssql/audit/*.sqlaudit 2>/dev/null | wc -l)"
+        echo "journal $(journalctl --disk-usage 2>/dev/null | tr -d '\n')"
+      register: l1
+      changed_when: false
+
+    - name: "Show linux01 sizes (small leftover = refill, OK)"
+      ansible.builtin.debug:
+        msg: "{{ l1.stdout_lines }}"
+
+- name: "Verify monitor Suricata/Zeek files"
+  hosts: monitor
+  gather_facts: false
+  become: true
+  tasks:
+    - name: "stat eve.json + zeek current"
+      ansible.builtin.shell: |
+        [ -f /var/log/suricata/eve.json ] && echo "eve.json $(stat -c%s /var/log/suricata/eve.json)" || echo "eve.json MISSING"
+        echo "zeek current files: $(ls /opt/zeek/logs/current 2>/dev/null | wc -l)"
+        systemctl is-active suricata 2>/dev/null || true
+        /opt/zeek/bin/zeekctl status 2>/dev/null | head -5 || true
+      register: mon
+      changed_when: false
+
+    - name: "Show monitor status"
+      ansible.builtin.debug:
+        msg: "{{ mon.stdout_lines }}"
+
+- name: "Verify elk logs-* document count + Fleet still up"
+  hosts: elk
+  gather_facts: false
+  tasks:
+    - name: "Read persisted elastic password if available"
+      ansible.builtin.slurp:
+        src: /home/vagrant/es-generated-pw.txt
+      register: es_pw_file
+      ignore_errors: true
+
+    - name: "Override elastic_password from file"
+      ansible.builtin.set_fact:
+        es_pass: "{{ (es_pw_file.content | b64decode).strip() }}"
+      when: es_pw_file is succeeded
+
+    - name: "Fall back to group_vars elastic_password"
+      ansible.builtin.set_fact:
+        es_pass: "{{ elastic_password | default('elastic_CADRE_2026!') }}"
+      when: es_pw_file is failed
+
+    - name: "ES logs-* count and cluster health"
+      ansible.builtin.shell: |
+        echo "COUNT $(curl -s --max-time 30 -u elastic:{{ es_pass }} http://127.0.0.1:9200/logs-*/_count)"
+        echo "HEALTH $(curl -s --max-time 30 -u elastic:{{ es_pass }} http://127.0.0.1:9200/_cluster/health)"
+        echo "FLEET $(curl -s --max-time 15 -o /dev/null -w '%{http_code}' -u elastic:{{ es_pass }} http://127.0.0.1:5601/api/fleet/agents -H 'kbn-xsrf: true')"
+        echo "NOTE refill after wipe is expected; success is COUNT << pre-wipe tens-of-millions"
+      register: es
+      changed_when: false
+
+    - name: "Show ES verify"
+      ansible.builtin.debug:
+        msg: "{{ es.stdout_lines }}"

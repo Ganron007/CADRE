@@ -1,0 +1,156 @@
+diff --git a/redstrike/runtime/orchestrator.py b/redstrike/runtime/orchestrator.py
+index 98a5255..9916660 100644
+--- a/redstrike/runtime/orchestrator.py
++++ b/redstrike/runtime/orchestrator.py
+@@ -1,6 +1,7 @@
+ from __future__ import annotations
+ 
+ from dataclasses import dataclass
++from datetime import datetime, timezone
+ from pathlib import Path
+ from typing import Any
+ 
+@@ -28,6 +29,10 @@ from redstrike.runtime.preflight import preflight as run_preflight
+ from redstrike.runtime.ws01_transport import argv_for_plan
+ 
+ 
++def _utc_now() -> str:
++    return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
++
++
+ @dataclass
+ class StepResult:
+     plan: StepPlan
+@@ -39,6 +44,15 @@ class StepResult:
+     skip_reason: str | None = None
+     error: str | None = None
+     awaiting_approval: bool = False
++    started_at: str | None = None
++    finished_at: str | None = None
++
++    def __post_init__(self) -> None:
++        now = _utc_now()
++        if self.started_at is None:
++            self.started_at = now
++        if self.finished_at is None:
++            self.finished_at = self.started_at
+ 
+     def to_dict(self) -> dict[str, Any]:
+         return {
+@@ -66,6 +80,8 @@ class StepResult:
+             "stdout": self.stdout,
+             "stderr": self.stderr,
+             "exception_reason": self.plan.exception_reason,
++            "started_at": self.started_at,
++            "finished_at": self.finished_at,
+         }
+ 
+ 
+@@ -344,7 +360,9 @@ class CampaignOrchestrator:
+                 results.append(StepResult(plan=plan, dry_run=True, return_code=0))
+                 continue
+ 
++            started = _utc_now()
+             completed = self.runner.run(argv_for_plan(plan))
++            finished = _utc_now()
+             if completed.success and node.produces_cred and not self.ledger.has(node.produces_cred):
+                 self.ledger.put(
+                     Credential(
+@@ -362,6 +380,8 @@ class CampaignOrchestrator:
+                     stdout=completed.stdout,
+                     stderr=completed.stderr,
+                     error=None if completed.success else (completed.stderr or "step failed"),
++                    started_at=started,
++                    finished_at=finished,
+                 )
+             )
+ 
+@@ -375,6 +395,8 @@ class CampaignOrchestrator:
+         return results
+ 
+     def summary(self, results: list[StepResult]) -> dict[str, Any]:
++        starts = [r.started_at for r in results if r.started_at]
++        ends = [r.finished_at for r in results if r.finished_at]
+         return {
+             "engagement_id": self.engagement_id,
+             "profile": self.PROFILE,
+@@ -382,6 +404,8 @@ class CampaignOrchestrator:
+             "operator": self.operator.value,
+             "graph": str(self.graph_path),
+             "graph_name": self.graph.name,
++            "started_at": min(starts) if starts else None,
++            "finished_at": max(ends) if ends else None,
+             "allow_mbr01_stage": self.allow_mbr01_stage,
+             "ledger_creds": self.ledger.names(),
+             "state": self.state.to_dict(),
+diff --git a/redstrike/runtime/preflight.py b/redstrike/runtime/preflight.py
+index 2f5f6f7..dd52dd4 100644
+--- a/redstrike/runtime/preflight.py
++++ b/redstrike/runtime/preflight.py
+@@ -69,6 +69,7 @@ def resolve_profile_for_branches(
+     defaults = data.get("branch_defaults") or {}
+     # Highest-demand wins: P-FULL > P-FOREST > P-LINUX/P-NETDEF/P-SUPPLY > P-CHILD
+     rank = {
++        "P-DFIR": 5,
+         "P-FULL": 4,
+         "P-FOREST": 3,
+         "P-LINUX": 2,
+@@ -119,9 +120,9 @@ def preflight(
+     hosts = data.get("hosts") or {}
+     host_ips = {h: str(hosts[h]) for h in required if h in hosts}
+     warnings: list[str] = []
+-    if "C" in branches and chosen != "P-FOREST" and chosen != "P-FULL":
++    if "C" in branches and chosen not in {"P-FOREST", "P-FULL", "P-DFIR"}:
+         warnings.append("Branch C (SCCM) typically needs P-FOREST (dc03 + mbr02)")
+-    if "D" in branches and chosen not in {"P-LINUX", "P-FULL"}:
++    if "D" in branches and chosen not in {"P-LINUX", "P-FULL", "P-DFIR"}:
+         warnings.append("Branch D typically needs P-LINUX (linux01)")
+     notes = (
+         f"Power on required hosts for {chosen} before --execute. "
+diff --git a/tests/test_m1_campaign.py b/tests/test_m1_campaign.py
+index c8bb0cf..6ed15dd 100644
+--- a/tests/test_m1_campaign.py
++++ b/tests/test_m1_campaign.py
+@@ -70,6 +70,12 @@ def test_windows_beachhead_uses_ws01_exec(automation_root: Path, tmp_path: Path)
+         for r in results
+         if not r.skipped
+     )
++    payload = next(r.to_dict() for r in results if not r.skipped)
++    assert payload["started_at"] and payload["started_at"].endswith("Z")
++    assert payload["finished_at"] and payload["finished_at"].endswith("Z")
++    assert "T" in payload["started_at"]
++    assert summary["started_at"]
++    assert summary["finished_at"]
+ 
+ 
+ def test_ws01_operator_uses_local_mechanism(automation_root: Path, tmp_path: Path) -> None:
+diff --git a/tests/test_m3_branches.py b/tests/test_m3_branches.py
+index 5725699..5fa7045 100644
+--- a/tests/test_m3_branches.py
++++ b/tests/test_m3_branches.py
+@@ -105,6 +105,25 @@ def test_preflight_loads_cadre_profiles() -> None:
+     assert "linux01" in result.required_hosts
+ 
+ 
++PIN_CADRE_PROFILES = (
++    Path(__file__).resolve().parents[3]
++    / "attack-matrix"
++    / "Campaign"
++    / "automation"
++    / "lab-profiles.yaml"
++)
++
++
++@pytest.mark.skipif(not PIN_CADRE_PROFILES.is_file(), reason="in-tree CADRE lab-profiles missing")
++def test_preflight_p_dfir_requires_ws01_linux01_vr() -> None:
++    result = preflight({"spine"}, profile="P-DFIR", profiles_path=PIN_CADRE_PROFILES)
++    assert result.profile == "P-DFIR"
++    assert result.ok is True
++    for host in ("provisioning", "ws01", "dc03", "linux01", "elk", "monitor", "vr"):
++        assert host in result.required_hosts
++        assert host in result.host_ips
++
++
+ def test_branch_filter_excludes_spine_when_only_a_standalone(
+     automation_root: Path, tmp_path: Path
+ ) -> None:

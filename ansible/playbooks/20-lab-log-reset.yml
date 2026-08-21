@@ -1,0 +1,316 @@
+---
+# TYPE: OPS (config lane — vagrant / Ansible from provisioning)
+# 20-lab-log-reset.yml — Repeatable pre-run telemetry wipe for a fresh DFIR / campaign case.
+#
+# What this DOES (old logs only — live refill is expected and OK):
+#   - Windows: clear channels enabled by cadre-dfir-monitoring.ps1 + Sysmon
+#     (11-security-baseline / 17-ws01-deploy), including analytic/debug
+#     (DNS-Server/Analytical, LDAP-Client/Debug). Then a fast sweep of remaining
+#     operational logs. Security 1102 "log cleared" will appear.
+#     C:\PSTranscripts wiped (script OutputDirectory).
+#   - linux01 (from 07-linux-infra.yml + 07-linux-config.yml): journal, syslog/auth,
+#     auditd, sysmon.log, podman-events.log, SSSD debug logs, MSSQL errorlog +
+#     .sqlaudit. Does NOT wipe SSSD cache (/var/lib/sss) or keytabs.
+#   - monitor: Suricata eve, Zeek logs, Arkime pcaps, journal
+#   - elk: drop OLD logs-* backing indices via rollover (keeps data streams /
+#     Fleet / ILM / templates). New docs from agents after T0 are the case.
+#
+# Success is "bulk history gone", not "counts stay at 0". Sysmon/auditd/Fleet
+# will refill immediately with current activity.
+#
+# Run from provisioning (.60):
+#   bash ~/lab-log-reset.sh
+#   # or: ansible-playbook -i inventories/hosts playbooks/20-lab-log-reset.yml
+#
+# Host wrapper: tools/lab-log-reset.ps1
+# Verify: 20-lab-log-reset-verifyOnly.yml
+
+- name: "Windows — DFIR channels (cadre-dfir-monitoring.ps1) + Sysmon + transcripts"
+  hosts: windows_servers
+  gather_facts: false
+  vars:
+    ansible_user: vagrant
+    ansible_connection: winrm
+    ansible_winrm_transport: basic
+    ansible_winrm_scheme: http
+    ansible_winrm_port: 5985
+    ansible_winrm_server_cert_validation: ignore
+    ansible_winrm_connection_timeout: 30
+    ansible_winrm_operation_timeout_sec: 600
+    ansible_winrm_read_timeout_sec: 630
+  tasks:
+    - name: "Clear DFIR-enabled channels (incl. analytic/debug) then remaining logs"
+      ansible.windows.win_shell: |
+        $ErrorActionPreference = "Continue"
+        $ok = 0; $skip = 0
+        # Mirrors ansible/files/cadre-dfir-monitoring.ps1 §5a + §6 + §7, plus Sysmon.
+        $dfir = @(
+          'Security','System','Application',
+          'Microsoft-Windows-Sysmon/Operational',
+          'Microsoft-Windows-PowerShell/Operational',
+          'Windows PowerShell',
+          'Microsoft-Windows-TerminalServices-LocalSessionManager/Operational',
+          'Microsoft-Windows-TerminalServices-RemoteConnectionManager/Operational',
+          'Microsoft-Windows-WinRM/Operational',
+          'Microsoft-Windows-SmbClient/Security',
+          'Microsoft-Windows-SMBServer/Audit',
+          'Microsoft-Windows-SMBServer/Operational',
+          'Microsoft-Windows-TaskScheduler/Operational',
+          'Microsoft-Windows-WMI-Activity/Operational',
+          'Microsoft-Windows-DNS-Client/Operational',
+          'Microsoft-Windows-Bits-Client/Operational',
+          'Microsoft-Windows-PrintService/Operational',
+          'Microsoft-Windows-PrintService/Admin',
+          'Microsoft-Windows-NTLM/Operational',
+          'Microsoft-Windows-CodeIntegrity/Operational',
+          'Microsoft-Windows-AppLocker/EXE and DLL',
+          'Microsoft-Windows-AppLocker/MSI and Script',
+          'Microsoft-Windows-AppLocker/Packaged app-Execution',
+          'Microsoft-Windows-CertificationAuthority-CertSvc/Operational',
+          'Microsoft-Windows-AMSI/Operational',
+          'Microsoft-Windows-Windows Defender/Operational',
+          'Microsoft-Windows-Kerberos/Operational',
+          'Microsoft-Windows-Kerberos-Key-Distribution-Center/Operational',
+          'Microsoft-Windows-LDAP-Client/Debug',
+          'Microsoft-Windows-Security-Mitigations/UserMode',
+          'Microsoft-Windows-Credential-Guard/Operational',
+          'Microsoft-Windows-DNS-Server/Analytical'
+        )
+        foreach ($c in $dfir) {
+          wevtutil cl "$c" 2>$null | Out-Null
+          if ($LASTEXITCODE -eq 0) { $ok++ } else { $skip++ }
+        }
+        # Remaining enabled logs (no type skip — DFIR turns on analytic/debug).
+        wevtutil el | ForEach-Object {
+          wevtutil cl "$_" 2>$null | Out-Null
+          if ($LASTEXITCODE -eq 0) { $ok++ } else { $skip++ }
+        }
+        Write-Output "CLEARED_OK=$ok SKIP=$skip HOST=$env:COMPUTERNAME"
+      register: win_clear
+      changed_when: true
+
+    - name: "Remove PowerShell transcripts (C:\\PSTranscripts from DFIR script)"
+      ansible.windows.win_shell: |
+        $p = 'C:\PSTranscripts'
+        if (Test-Path $p) {
+          $n = (Get-ChildItem $p -Recurse -File -ErrorAction SilentlyContinue | Measure-Object).Count
+          Get-ChildItem $p -Recurse -File -ErrorAction SilentlyContinue | Remove-Item -Force -ErrorAction SilentlyContinue
+          Write-Output "PSTranscripts_removed=$n"
+        } else {
+          Write-Output "PSTranscripts_removed=0"
+        }
+      changed_when: true
+
+    - name: "Show Windows clear summary"
+      ansible.builtin.debug:
+        msg: "{{ win_clear.stdout | trim }}"
+
+- name: "linux01 — playbook telemetry files (07-linux-infra + 07-linux-config)"
+  hosts: linux01
+  gather_facts: false
+  become: true
+  tasks:
+    - name: "Rotate and vacuum journal"
+      ansible.builtin.shell: |
+        journalctl --rotate || true
+        journalctl --vacuum-time=1s
+      changed_when: true
+
+    - name: "Truncate rsyslog + auth + kern (incl. rotated)"
+      ansible.builtin.shell: |
+        shopt -s nullglob
+        for f in /var/log/syslog /var/log/syslog.* /var/log/auth.log /var/log/auth.log.* \
+                 /var/log/kern.log /var/log/kern.log.* /var/log/messages /var/log/messages.*; do
+          [ -f "$f" ] || continue
+          case "$f" in *.gz) rm -f "$f"; echo "removed $f"; continue ;; esac
+          : > "$f"
+          echo "truncated $f"
+        done
+      changed_when: true
+
+    - name: "Truncate auditd (07-linux-config.yml rules → /var/log/audit)"
+      ansible.builtin.shell: |
+        shopt -s nullglob
+        if [ -f /var/log/audit/audit.log ]; then
+          : > /var/log/audit/audit.log
+          for f in /var/log/audit/audit.log.*; do
+            [ -f "$f" ] || continue
+            rm -f "$f"
+            echo "removed $f"
+          done
+          systemctl kill -s USR1 auditd 2>/dev/null || true
+          echo "truncated audit.log"
+        else
+          echo "no audit.log"
+        fi
+      changed_when: true
+
+    - name: "Truncate Sysmon-for-Linux rsyslog file (07-linux-infra.yml)"
+      ansible.builtin.shell: |
+        shopt -s nullglob
+        for f in /var/log/sysmon.log /var/log/sysmon.log.*; do
+          [ -f "$f" ] || continue
+          case "$f" in *.gz) rm -f "$f"; echo "removed $f"; continue ;; esac
+          : > "$f"
+          echo "truncated $f"
+        done
+        [ -e /var/log/sysmon.log ] || echo "no sysmon.log (ok if Sysmon for Linux not installed)"
+      changed_when: true
+
+    - name: "Truncate podman-events.log (07-linux-config.yml unit)"
+      ansible.builtin.shell: |
+        shopt -s nullglob
+        for f in /var/log/podman-events.log /var/log/podman-events.log.*; do
+          [ -f "$f" ] || continue
+          case "$f" in *.gz) rm -f "$f"; echo "removed $f"; continue ;; esac
+          : > "$f"
+          echo "truncated $f"
+        done
+        [ -e /var/log/podman-events.log ] || echo "no podman-events.log"
+      changed_when: true
+
+    - name: "Truncate SSSD debug logs only (not /var/lib/sss cache)"
+      ansible.builtin.shell: |
+        shopt -s nullglob
+        if [ -d /var/log/sssd ]; then
+          for f in /var/log/sssd/*.log /var/log/sssd/*.log.*; do
+            [ -f "$f" ] || continue
+            case "$f" in *.gz) rm -f "$f"; echo "removed $f"; continue ;; esac
+            : > "$f"
+            echo "truncated $f"
+          done
+        else
+          echo "no /var/log/sssd"
+        fi
+      changed_when: true
+
+    - name: "Truncate MSSQL errorlog + remove old .sqlaudit files"
+      ansible.builtin.shell: |
+        shopt -s nullglob
+        for f in /var/opt/mssql/log/errorlog /var/opt/mssql/log/errorlog.*; do
+          [ -f "$f" ] || continue
+          truncate -s 0 "$f" 2>/dev/null || : > "$f" || echo "skip-open $f"
+          echo "truncated $f"
+        done
+        if [ -d /var/opt/mssql/audit ]; then
+          rm -f /var/opt/mssql/audit/*.sqlaudit /var/opt/mssql/audit/*.sqlaudit.* 2>/dev/null || true
+          echo "removed old sqlaudit files (SQL recreates on next audit event)"
+        else
+          echo "no /var/opt/mssql/audit"
+        fi
+      changed_when: true
+
+    - name: "Truncate wtmp/btmp"
+      ansible.builtin.shell: |
+        for f in /var/log/wtmp /var/log/btmp /var/log/lastlog; do
+          [ -f "$f" ] || continue
+          : > "$f"
+          echo "truncated $f"
+        done
+      changed_when: true
+
+- name: "monitor — Suricata / Zeek / Arkime files + journal"
+  hosts: monitor
+  gather_facts: false
+  become: true
+  tasks:
+    - name: "Truncate Suricata eve.json and rotated copies"
+      ansible.builtin.shell: |
+        shopt -s nullglob
+        for f in /var/log/suricata/eve.json /var/log/suricata/eve.json.* /var/log/suricata/*.log; do
+          [ -e "$f" ] || continue
+          : > "$f"
+          echo "truncated $f"
+        done
+      changed_when: true
+
+    - name: "Stop Zeek, wipe log dirs, start Zeek"
+      ansible.builtin.shell: |
+        export PATH="/opt/zeek/bin:$PATH"
+        if command -v zeekctl >/dev/null 2>&1; then
+          zeekctl stop || true
+          rm -rf /opt/zeek/logs/current/* /opt/zeek/spool/zeek/* 2>/dev/null || true
+          find /opt/zeek/logs -mindepth 1 -maxdepth 1 -type d ! -name current -exec rm -rf {} + 2>/dev/null || true
+          find /opt/zeek/logs \( -name '*.log' -o -name '*.log.gz' \) -delete 2>/dev/null || true
+          zeekctl start || zeekctl deploy || true
+          echo "zeek logs wiped + restarted"
+        else
+          echo "zeekctl missing — skipped"
+        fi
+      changed_when: true
+
+    - name: "Remove Arkime raw pcaps (keep viewer service)"
+      ansible.builtin.shell: |
+        if [ -d /opt/arkime/raw ]; then
+          find /opt/arkime/raw -type f -delete
+          echo "arkime raw pcaps deleted"
+        else
+          echo "no arkime raw dir"
+        fi
+      changed_when: true
+
+    - name: "Vacuum monitor journal"
+      ansible.builtin.shell: |
+        journalctl --rotate || true
+        journalctl --vacuum-time=1s
+      changed_when: true
+
+- name: "elk — drop old logs-* backing indices (keep streams / Fleet)"
+  hosts: elk
+  gather_facts: false
+  become: false
+  tasks:
+    - name: "Read persisted elastic password if available"
+      ansible.builtin.slurp:
+        src: /home/vagrant/es-generated-pw.txt
+      register: es_pw_file
+      ignore_errors: true
+
+    - name: "Override elastic_password from file"
+      ansible.builtin.set_fact:
+        es_pass: "{{ (es_pw_file.content | b64decode).strip() }}"
+      when: es_pw_file is succeeded
+
+    - name: "Fall back to group_vars elastic_password"
+      ansible.builtin.set_fact:
+        es_pass: "{{ elastic_password | default('elastic_CADRE_2026!') }}"
+      when: es_pw_file is failed
+
+    - name: "Count logs-* docs before wipe"
+      ansible.builtin.shell: |
+        curl -s --max-time 30 -u "elastic:{{ es_pass }}" "http://127.0.0.1:9200/logs-*/_count" || echo '{"count":-1}'
+      register: es_before
+      changed_when: false
+
+    - name: "Show ES count before"
+      ansible.builtin.debug:
+        msg: "ES logs-* before: {{ es_before.stdout }}"
+
+    - name: "Copy ES rollover helper"
+      ansible.builtin.copy:
+        src: ../files/lab-log-reset-es.py
+        dest: /tmp/lab-log-reset-es.py
+        mode: "0755"
+
+    - name: "Cancel stuck delete_by_query; rollover logs-* and delete old backing"
+      ansible.builtin.command:
+        argv:
+          - python3
+          - /tmp/lab-log-reset-es.py
+          - "{{ es_pass }}"
+      register: es_wipe
+      changed_when: true
+
+    - name: "Show rollover wipe output"
+      ansible.builtin.debug:
+        msg: "{{ es_wipe.stdout_lines }}"
+
+    - name: "Count logs-* docs after wipe (refill from agents is expected)"
+      ansible.builtin.shell: |
+        curl -s --max-time 30 -u "elastic:{{ es_pass }}" "http://127.0.0.1:9200/logs-*/_count"
+      register: es_after
+      changed_when: false
+
+    - name: "Show ES count after"
+      ansible.builtin.debug:
+        msg: "ES logs-* after (live refill OK): {{ es_after.stdout }}"

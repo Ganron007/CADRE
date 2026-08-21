@@ -29,6 +29,9 @@ profiles:
   P-FULL:
     required_hosts: [provisioning, dc01, dc02, dc03, mbr01, mbr02, linux01, ws01]
     for: [branch:G]
+  P-DFIR:
+    required_hosts: [provisioning, ws01, dc01, dc02, dc03, mbr01, mbr02, linux01, elk, monitor, vr]
+    for: [spine, branch:A, branch:B, branch:C, branch:D, branch:E, branch:F, branch:G, branch:H, branch:sql-ai]
 
 # Default profile if operator does not pass --profile
 branch_defaults:
@@ -40,6 +43,7 @@ branch_defaults:
   E: P-NETDEF
   F: P-SUPPLY
   G: P-FULL
+  H: P-BEACH
   sql-ai: P-CHILD
 
 # Host → expected lab IP (informational; live check optional)
@@ -52,4 +56,6 @@ hosts:
   mbr01: 192.168.77.22
   mbr02: 192.168.77.23
   linux01: 192.168.77.40
+  elk: 192.168.77.50
   monitor: 192.168.77.55
+  vr: 192.168.77.51
