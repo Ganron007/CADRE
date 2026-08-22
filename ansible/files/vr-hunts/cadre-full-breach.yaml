@@ -1,27 +1,33 @@
 name: CADRE.Hunts.FullBreach
 description: |
-  Comprehensive breach investigation — union of all CADRE hunt artifacts.
-  Collects every forensic artifact available in the lab in one collection.
-  Part of the CADRE pre-built hunt library.
+  Windows library union — every CADRE Windows hunt except IRTriage (already a subset)
+  and except ADCS/SCCM (host-specific). Not Stage 0 default. No memory, no disk image.
+  Nested Linux triage removed: run CADRE.Hunts.LinuxTriage on Linux clients instead.
 sources:
   - name: ProcessTree
     queries:
       - SELECT * FROM Artifact.CADRE.Hunts.ProcessTree()
-  - name: CredentialAccess
-    queries:
-      - SELECT * FROM Artifact.CADRE.Hunts.CredentialAccess()
   - name: NetworkState
     queries:
       - SELECT * FROM Artifact.CADRE.Hunts.NetworkState()
+  - name: Persistence
+    queries:
+      - SELECT * FROM Artifact.CADRE.Hunts.Persistence()
+  - name: CredentialAccess
+    queries:
+      - SELECT * FROM Artifact.CADRE.Hunts.CredentialAccess()
+  - name: EventLogs
+    queries:
+      - SELECT * FROM Artifact.CADRE.Hunts.EventLogs()
   - name: FilesystemTimeline
     queries:
       - SELECT * FROM Artifact.CADRE.Hunts.FilesystemTimeline()
   - name: RegistrySnapshot
     queries:
       - SELECT * FROM Artifact.CADRE.Hunts.RegistrySnapshot()
-  - name: EventLogs
+  - name: UserArtifacts
     queries:
-      - SELECT * FROM Artifact.CADRE.Hunts.EventLogs()
-  - name: LinuxTriage
+      - SELECT * FROM Artifact.CADRE.Hunts.UserArtifacts()
+  - name: Usage
     queries:
-      - SELECT * FROM Artifact.CADRE.Hunts.LinuxTriage()
+      - SELECT * FROM Artifact.CADRE.Hunts.Usage()

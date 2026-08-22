@@ -1,17 +1,33 @@
 name: CADRE.Hunts.EventLogs
 description: |
-  Export all Windows Event Logs (.evtx) for offline Hayabusa analysis.
-  Part of the CADRE pre-built hunt library.
+  High-signal Windows event log parse (library hunt). Not a raw EVTX file grab.
+  Path-filtered Evtx plus cleared-log, RDP, scriptblock, scheduled-task, Kerberoast, alternate logon.
+  Default collect uses CADRE.Hunts.IRTriage (smaller event set). KAPE/wevtutil on SSH hosts copies the files.
 sources:
-  - name: Security
+  - name: EvtxIRChannels
     queries:
-      - SELECT * FROM Artifact.Windows.EventLogs.Security()
-  - name: System
+      - SELECT * FROM Artifact.Windows.EventLogs.Evtx(PathRegex="Security|System|PowerShell|Sysmon|WinRM|TaskScheduler|LocalSessionManager")
+  - name: Cleared
     queries:
-      - SELECT * FROM Artifact.Windows.EventLogs.System()
-  - name: Powershell
+      - SELECT * FROM Artifact.Windows.EventLogs.Cleared()
+  - name: RDPAuth
     queries:
-      - SELECT * FROM Artifact.Windows.EventLogs.Powershell()
-  - name: Sysmon
+      - SELECT * FROM Artifact.Windows.EventLogs.RDPAuth()
+  - name: PowershellScriptblock
     queries:
-      - SELECT * FROM Artifact.Windows.EventLogs.Sysmon()
+      - SELECT * FROM Artifact.Windows.EventLogs.PowershellScriptblock()
+  - name: PowershellModule
+    queries:
+      - SELECT * FROM Artifact.Windows.EventLogs.PowershellModule()
+  - name: ScheduledTasks
+    queries:
+      - SELECT * FROM Artifact.Windows.EventLogs.ScheduledTasks()
+  - name: Kerberoasting
+    queries:
+      - SELECT * FROM Artifact.Windows.EventLogs.Kerberoasting()
+  - name: AlternateLogon
+    queries:
+      - SELECT * FROM Artifact.Windows.EventLogs.AlternateLogon()
+  - name: ExplicitLogon
+    queries:
+      - SELECT * FROM Artifact.Windows.EventLogs.ExplicitLogon()

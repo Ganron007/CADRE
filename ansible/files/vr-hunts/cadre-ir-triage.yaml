@@ -1,0 +1,70 @@
+name: CADRE.Hunts.IRTriage
+description: |
+  Minimum Windows live-response triage. No memory, no disk image, no MFT/USN.
+  This is what DFIR-Nexus Stage 0 collect runs on enrolled Windows clients.
+  Heavier packs stay in the CADRE.Hunts.* library for an explicit later hunt.
+  Stock Velociraptor 0.76 artifact names only.
+sources:
+  - name: Pslist
+    queries:
+      - SELECT * FROM Artifact.Windows.System.Pslist()
+  - name: Netstat
+    queries:
+      - SELECT * FROM Artifact.Windows.Network.NetstatEnriched()
+  - name: ListeningPorts
+    queries:
+      - SELECT * FROM Artifact.Windows.Network.ListeningPorts()
+  - name: DNSCache
+    queries:
+      - SELECT * FROM Artifact.Windows.System.DNSCache()
+  - name: ArpCache
+    queries:
+      - SELECT * FROM Artifact.Windows.Network.ArpCache()
+  - name: HostsFile
+    queries:
+      - SELECT * FROM Artifact.Windows.System.HostsFile()
+  - name: Users
+    queries:
+      - SELECT * FROM Artifact.Windows.Sys.Users()
+  - name: LocalAdmins
+    queries:
+      - SELECT * FROM Artifact.Windows.System.LocalAdmins()
+  - name: Services
+    queries:
+      - SELECT * FROM Artifact.Windows.System.Services()
+  - name: ScheduledTasks
+    queries:
+      - SELECT * FROM Artifact.Windows.System.TaskScheduler()
+  - name: StartupItems
+    queries:
+      - SELECT * FROM Artifact.Windows.Sys.StartupItems()
+  - name: WMIPersistence
+    queries:
+      - SELECT * FROM Artifact.Windows.Persistence.PermanentWMIEvents()
+  - name: Prefetch
+    queries:
+      - SELECT * FROM Artifact.Windows.Forensics.Prefetch()
+  - name: Amcache
+    queries:
+      - SELECT * FROM Artifact.Windows.Forensics.Amcache()
+  - name: ShimCache
+    queries:
+      - SELECT * FROM Artifact.Windows.Registry.AppCompatCache()
+  - name: PSReadline
+    queries:
+      - SELECT * FROM Artifact.Windows.System.Powershell.PSReadline()
+  - name: EvtxCleared
+    queries:
+      - SELECT * FROM Artifact.Windows.EventLogs.Cleared()
+  - name: EvtxRDPAuth
+    queries:
+      - SELECT * FROM Artifact.Windows.EventLogs.RDPAuth()
+  - name: EvtxScriptblock
+    queries:
+      - SELECT * FROM Artifact.Windows.EventLogs.PowershellScriptblock()
+  - name: EvtxScheduledTasks
+    queries:
+      - SELECT * FROM Artifact.Windows.EventLogs.ScheduledTasks()
+  - name: Shares
+    queries:
+      - SELECT * FROM Artifact.Windows.System.Shares()

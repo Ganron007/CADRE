@@ -127,7 +127,31 @@
       failed_when: result.rc == 1
       register: result
 
-    - name: Verify live catalog has CADRE.Hunts.FullBreach (no --definitions)
+    - name: Verify live catalog has CADRE.Hunts.IRTriage (Stage 0 default)
+      ansible.builtin.shell: |
+        /usr/local/bin/velociraptor --config /etc/velociraptor/server.config.yaml \
+          artifacts list 2>/dev/null | grep -qx 'CADRE.Hunts.IRTriage'
+      changed_when: false
+      failed_when: result.rc == 1
+      register: result
+
+    - name: Verify live catalog has CADRE.Hunts.LinuxIRTriage (Stage 0 default)
+      ansible.builtin.shell: |
+        /usr/local/bin/velociraptor --config /etc/velociraptor/server.config.yaml \
+          artifacts list 2>/dev/null | grep -qx 'CADRE.Hunts.LinuxIRTriage'
+      changed_when: false
+      failed_when: result.rc == 1
+      register: result
+
+    - name: Verify live catalog has CADRE.Hunts.Usage (library SRUM/UAL)
+      ansible.builtin.shell: |
+        /usr/local/bin/velociraptor --config /etc/velociraptor/server.config.yaml \
+          artifacts list 2>/dev/null | grep -qx 'CADRE.Hunts.Usage'
+      changed_when: false
+      failed_when: result.rc == 1
+      register: result
+
+    - name: Verify live catalog has CADRE.Hunts.FullBreach (library union)
       ansible.builtin.shell: |
         /usr/local/bin/velociraptor --config /etc/velociraptor/server.config.yaml \
           artifacts list 2>/dev/null | grep -qx 'CADRE.Hunts.FullBreach'

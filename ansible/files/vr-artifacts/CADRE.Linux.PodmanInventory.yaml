@@ -1,0 +1,17 @@
+name: CADRE.Linux.PodmanInventory
+description: |
+  Podman container and image inventory via execve. Empty if podman is not installed.
+  Metadata only — does not copy container filesystems.
+sources:
+  - name: Ps
+    precondition: |
+      SELECT OS FROM info() WHERE OS = 'linux'
+    query: |
+      SELECT Stdout, Stderr, ReturnCode
+      FROM execve(argv=["podman", "ps", "-a"])
+  - name: Images
+    precondition: |
+      SELECT OS FROM info() WHERE OS = 'linux'
+    query: |
+      SELECT Stdout, Stderr, ReturnCode
+      FROM execve(argv=["podman", "images"])

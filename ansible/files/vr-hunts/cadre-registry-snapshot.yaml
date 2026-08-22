@@ -1,14 +1,26 @@
 name: CADRE.Hunts.RegistrySnapshot
 description: |
-  Registry hive snapshot — SAM, SECURITY, SYSTEM.
-  Part of the CADRE pre-built hunt library.
+  Registry live-response (library hunt). Parsed artifacts, not hive file copies.
+  SAM parse, ShimCache, NTUser, RDP, MountPoints2, UserAssist, PortProxy.
 sources:
   - name: SAM
     queries:
-      - SELECT * FROM Artifact.Windows.Registry.SAM()
-  - name: SECURITY
+      - SELECT * FROM Artifact.Windows.Forensics.SAM()
+  - name: ShimCache
     queries:
-      - SELECT * FROM Artifact.Windows.Registry.SECURITY()
-  - name: SYSTEM
+      - SELECT * FROM Artifact.Windows.Registry.AppCompatCache()
+  - name: NTUser
     queries:
-      - SELECT * FROM Artifact.Windows.Registry.SYSTEM()
+      - SELECT * FROM Artifact.Windows.Registry.NTUser()
+  - name: RDP
+    queries:
+      - SELECT * FROM Artifact.Windows.Registry.RDP()
+  - name: MountPoints2
+    queries:
+      - SELECT * FROM Artifact.Windows.Registry.MountPoints2()
+  - name: UserAssist
+    queries:
+      - SELECT * FROM Artifact.Windows.Registry.UserAssist()
+  - name: PortProxy
+    queries:
+      - SELECT * FROM Artifact.Windows.Registry.PortProxy()

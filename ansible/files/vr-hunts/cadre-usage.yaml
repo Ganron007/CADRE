@@ -1,0 +1,12 @@
+name: CADRE.Hunts.Usage
+description: |
+  Application and network usage (library hunt — not Stage 0 default).
+  SRUM + User Access Logging. No memory, no disk image. Useful on VR-only DCs/mbrs
+  where KAPE is not run. Can be large; do not call from Stage 0 collect.
+sources:
+  - name: SRUM
+    queries:
+      - SELECT * FROM Artifact.Windows.Forensics.SRUM()
+  - name: UserAccessLogs
+    queries:
+      - SELECT * FROM Artifact.Windows.Forensics.UserAccessLogs()

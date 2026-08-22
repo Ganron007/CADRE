@@ -1,11 +1,29 @@
 name: CADRE.Hunts.NetworkState
 description: |
-  Network state snapshot — netstat, DNS cache, connections.
-  Part of the CADRE pre-built hunt library.
+  Network live-response snapshot (library hunt).
+  Netstat, listening ports, ARP, DNS cache, hosts, firewall, shares.
 sources:
   - name: Netstat
     queries:
-      - SELECT * FROM Artifact.Windows.Network.Netstat()
-  - name: DNS
+      - SELECT * FROM Artifact.Windows.Network.NetstatEnriched()
+  - name: ListeningPorts
     queries:
-      - SELECT * FROM Artifact.Windows.Network.DNS()
+      - SELECT * FROM Artifact.Windows.Network.ListeningPorts()
+  - name: ArpCache
+    queries:
+      - SELECT * FROM Artifact.Windows.Network.ArpCache()
+  - name: DNSCache
+    queries:
+      - SELECT * FROM Artifact.Windows.System.DNSCache()
+  - name: HostsFile
+    queries:
+      - SELECT * FROM Artifact.Windows.System.HostsFile()
+  - name: FirewallRules
+    queries:
+      - SELECT * FROM Artifact.Windows.Sys.FirewallRules()
+  - name: Shares
+    queries:
+      - SELECT * FROM Artifact.Windows.System.Shares()
+  - name: Interfaces
+    queries:
+      - SELECT * FROM Artifact.Windows.Network.InterfaceAddresses()

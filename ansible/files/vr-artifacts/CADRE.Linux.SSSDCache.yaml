@@ -1,0 +1,10 @@
+name: CADRE.Linux.SSSDCache
+description: |
+  SSSD cache file metadata under /var/lib/sss/db. Does not dump cache.db contents.
+sources:
+  - name: CacheFiles
+    precondition: |
+      SELECT OS FROM info() WHERE OS = 'linux'
+    query: |
+      SELECT OSPath, Size, Mtime, Mode
+      FROM glob(globs="/var/lib/sss/db/*")

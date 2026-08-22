@@ -1,0 +1,79 @@
+name: CADRE.Hunts.LinuxIRTriage
+description: |
+  Stage 0 Linux live-response triage (Windows IRTriage counterpart).
+  Stock Velociraptor 0.76 artifacts plus CADRE linux01 extras (keytab, SSSD, Podman).
+  No memory dump, no packet capture, no private keys, no full-disk FileFinder.
+  Journal dump stays on CADRE.Hunts.LinuxTriage (SSH collect already pulls journalctl).
+  Do not nest Linux.Users.InteractiveUsers or Linux.Users.RootUsers — those
+  artifacts reference Fqdn (or are missing on 0.76) and ERROR the whole flow
+  when called from a parent hunt.
+sources:
+  - name: Pslist
+    queries:
+      - SELECT * FROM Artifact.Linux.Sys.Pslist()
+  - name: Netstat
+    queries:
+      - SELECT * FROM Artifact.Linux.Network.NetstatEnriched()
+  - name: Arp
+    queries:
+      - SELECT * FROM Artifact.Linux.Proc.Arp()
+  - name: Modules
+    queries:
+      - SELECT * FROM Artifact.Linux.Proc.Modules()
+  - name: Users
+    queries:
+      - SELECT * FROM Artifact.Linux.Sys.Users()
+  - name: Groups
+    queries:
+      - SELECT * FROM Artifact.Linux.Sys.Groups()
+  - name: InteractiveUsers
+    queries:
+      - SELECT User, Description, Uid, Gid, Homedir, Shell FROM Artifact.Linux.Sys.Users() WHERE Shell =~ 'sh$|bash$|zsh$|fish$|ksh$'
+  - name: RootAndSudoUsers
+    queries:
+      - SELECT User, Description, Uid, Gid, Homedir, Shell FROM Artifact.Linux.Sys.Users() WHERE Uid = 0 OR User = 'root'
+  - name: LastUserLogin
+    queries:
+      - SELECT * FROM Artifact.Linux.Sys.LastUserLogin()
+  - name: BashHistory
+    queries:
+      - SELECT * FROM Artifact.Linux.Sys.BashHistory()
+  - name: Crontab
+    queries:
+      - SELECT * FROM Artifact.Linux.Sys.Crontab()
+  - name: SystemdServices
+    queries:
+      - SELECT * FROM Artifact.Linux.Sys.Services()
+  - name: AuthorizedKeys
+    queries:
+      - SELECT * FROM Artifact.Linux.Ssh.AuthorizedKeys()
+  - name: KnownHosts
+    queries:
+      - SELECT * FROM Artifact.Linux.Ssh.KnownHosts()
+  - name: SSHLogins
+    queries:
+      - SELECT * FROM Artifact.Linux.Syslog.SSHLogin()
+  - name: SUID
+    queries:
+      - SELECT * FROM Artifact.Linux.Sys.SUID()
+  - name: Mounts
+    queries:
+      - SELECT * FROM Artifact.Linux.Mounts()
+  - name: ImmutableFiles
+    queries:
+      - SELECT * FROM Artifact.Linux.Forensics.ImmutableFiles()
+  - name: DebianPackages
+    queries:
+      - SELECT * FROM Artifact.Linux.Debian.Packages()
+  - name: DockerInfo
+    queries:
+      - SELECT * FROM Artifact.Linux.Applications.Docker.Info()
+  - name: PodmanInventory
+    queries:
+      - SELECT * FROM Artifact.CADRE.Linux.PodmanInventory()
+  - name: SSSDCache
+    queries:
+      - SELECT * FROM Artifact.CADRE.Linux.SSSDCache()
+  - name: KeytabFingerprints
+    queries:
+      - SELECT * FROM Artifact.CADRE.Linux.KeytabFingerprints()

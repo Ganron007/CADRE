@@ -1,0 +1,32 @@
+name: CADRE.Hunts.Persistence
+description: |
+  Windows persistence live-response (library hunt — not Stage 0 default).
+  No memory, no disk image. Run keys / startup / WMI / PS profile / IFEO-class debug.
+sources:
+  - name: StartupItems
+    queries:
+      - SELECT * FROM Artifact.Windows.Sys.StartupItems()
+  - name: WMIPersistence
+    queries:
+      - SELECT * FROM Artifact.Windows.Persistence.PermanentWMIEvents()
+  - name: PowershellProfile
+    queries:
+      - SELECT * FROM Artifact.Windows.Persistence.PowershellProfile()
+  - name: PowershellRegistry
+    queries:
+      - SELECT * FROM Artifact.Windows.Persistence.PowershellRegistry()
+  - name: ImageFileExecution
+    queries:
+      - SELECT * FROM Artifact.Windows.Persistence.Debug()
+  - name: ScheduledTasks
+    queries:
+      - SELECT * FROM Artifact.Windows.System.TaskScheduler()
+  - name: Services
+    queries:
+      - SELECT * FROM Artifact.Windows.System.Services()
+  - name: Drivers
+    queries:
+      - SELECT * FROM Artifact.Windows.Sys.Drivers()
+  - name: RunMRU
+    queries:
+      - SELECT * FROM Artifact.Windows.Timeline.Registry.RunMRU()

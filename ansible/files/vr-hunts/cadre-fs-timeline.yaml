@@ -1,11 +1,11 @@
 name: CADRE.Hunts.FilesystemTimeline
 description: |
-  Filesystem timeline — MFT and USN journal.
-  Part of the CADRE pre-built hunt library.
+  NTFS MFT + USN (library hunt — heavy; not Stage 0 default).
+  No memory, no full disk image. Prefer KAPE on SSH targets; use this on VR-only hosts when needed.
 sources:
   - name: MFT
     queries:
-      - SELECT * FROM Artifact.Windows.Forensics.NTFS.MFT()
+      - SELECT * FROM Artifact.Windows.NTFS.MFT()
   - name: USN
     queries:
-      - SELECT * FROM Artifact.Windows.Forensics.USN()
+      - SELECT * FROM Artifact.Windows.Forensics.Usn()

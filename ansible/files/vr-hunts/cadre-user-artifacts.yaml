@@ -1,0 +1,27 @@
+name: CADRE.Hunts.UserArtifacts
+description: |
+  Windows user-activity artifacts (library hunt — not Stage 0 default).
+  LNK, JumpLists, Recycle Bin, Shellbags, RecentDocs, UserAssist.
+  KAPE !SANS_Triage on SSH targets covers this more thoroughly; this is for VR-only hosts.
+sources:
+  - name: Lnk
+    queries:
+      - SELECT * FROM Artifact.Windows.Forensics.Lnk()
+  - name: JumpLists
+    queries:
+      - SELECT * FROM Artifact.Windows.Forensics.JumpLists()
+  - name: RecycleBin
+    queries:
+      - SELECT * FROM Artifact.Windows.Forensics.RecycleBin()
+  - name: Shellbags
+    queries:
+      - SELECT * FROM Artifact.Windows.Forensics.Shellbags()
+  - name: RecentDocs
+    queries:
+      - SELECT * FROM Artifact.Windows.Registry.RecentDocs()
+  - name: UserAssist
+    queries:
+      - SELECT * FROM Artifact.Windows.Registry.UserAssist()
+  - name: Bam
+    queries:
+      - SELECT * FROM Artifact.Windows.Forensics.Bam()
