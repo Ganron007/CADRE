@@ -1,7 +1,7 @@
 # CAMPAIGNS v3 — Runbook Index
 
 > **Purpose:** One runbook per phase — **full narrative + commands** for learning and live testing.
-> **Campaign index:** [`CAMPAIGNS_v3.md`](../CAMPAIGNS_v3.md) (topology, coverage) · **Full reference (archived):** [`archive/CAMPAIGNS_v2.md`](../archive/CAMPAIGNS_v2.md)
+> **Campaign index:** [`CAMPAIGNS_v3.md`](../CAMPAIGNS_v3.md) (topology, coverage) · **Attack flow:** [`CAMPAIGNv3-ATTACK-FLOW.md`](../CAMPAIGNv3-ATTACK-FLOW.md)
 > **Per-attack metadata:** [`CAMPAIGNS-METADATA-v2.md`](../CAMPAIGNS-METADATA-v2.md) · **DFIR:** [`DFIR-Nexus-Pioneer-workflow.md`](../DFIR-Nexus-Pioneer-workflow.md)
 
 **Default host:** Kali / provisioning (`192.168.77.60`) unless a runbook says otherwise.

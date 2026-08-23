@@ -43,5 +43,6 @@ bash './scenario_${n}.sh'
       "${LINUX01_USER}@${LINUX01_HOST}" "$remote_cmd"
   fi
   ok "F scenario_${n} finished — check auditd / Zeek / Elastic npm-* rules"
+  echo "F$(printf '%02d' "$n")_OK"
   result 0 "${label} complete"
 }

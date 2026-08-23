@@ -17,7 +17,7 @@ else
   sudo mount -t nfs4 -o sec=krb5p localhost:/exports/secure-share /mnt/cadre-nfs 2>&1 || echo "MOUNT_FAIL"
   mount | grep cadre-nfs && echo "MOUNT_OK" || echo "MOUNT_FAIL"
 fi
-echo "T047_DONE"
+if mount | grep -q cadre-nfs; then echo "T047_OK"; else echo "T047_FAIL: NFS krb5p not mounted"; exit 1; fi
 EOF
 )
 bash "${LIB}/linux01-exec.sh" "${REMOTE}"

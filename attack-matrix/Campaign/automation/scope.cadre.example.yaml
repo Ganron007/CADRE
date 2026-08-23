@@ -1,0 +1,19 @@
+# CADRE lab scope for RedStrike --ungated
+# Copy/customize locally if needed. Not a credential file.
+# redstrike-api --ungated --scope <this file>
+# redstrike-campaign run --ungated --scope <this file> ...
+
+allowed_targets:
+  - 192.168.77.0/24
+  - dc01.cadre.local
+  - dc02.child.cadre.local
+  - dc03.range.local
+  - mbr01.cadre.local
+  - mbr02.range.local
+  - linux01.cadre.local
+  - ws01.child.cadre.local
+  - provisioning.cadre.local
+allowed_domains:
+  - cadre.local
+  - child.cadre.local
+  - range.local

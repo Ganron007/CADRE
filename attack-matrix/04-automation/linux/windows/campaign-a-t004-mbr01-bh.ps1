@@ -51,7 +51,7 @@ if (`$z) {
     icacls `$fixed /grant "Everyone:(R)" | Out-Null
 }
 Pop-Location
-Write-Output "BH_OK: SharpHound completed in `$dir"
+Write-Output "T004_MBR01_BH_OK: SharpHound completed in `$dir"
 "@
 
 & "$PSScriptRoot\campaign-a-t043-system-exec.ps1" -Server $Server -Username $Username -Password $Password -ScriptBlock $script

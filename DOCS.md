@@ -82,16 +82,22 @@ include a test plan and reference the relevant `docs/` section your change touch
 `docs/forensic-workflow.md` → `docs/extensions.md` for the tools you'll touch.
 
 **Cert student picking a path:**
-`docs/goals.md` → `docs/internal/cert-map/<your-cert>-path.md` → walkthroughs in listed order.
+`docs/goals.md` → walkthroughs in listed order (cert path maps are maintainer-local under `docs/internal/cert-map/`).
 
 ---
 
 ## What's Not Linked Here
 
-Internal planning material (roadmap, gap-vs-exists tables, spec drafts, naming-decision history,
-session-by-session work logs) lives in `docs/internal/` and `AGENTS.md`. Both paths are
-**gitignored** and are not part of the published repository. If you've cloned the project
-and don't see them, that's expected.
+Internal planning material (roadmap, gap-vs-exists tables, spec drafts, session-by-session work logs) lives in `docs/internal/` and `AGENTS.md`. Both paths are **gitignored** and are not part of the published repository.
+
+**Also gitignored (maintainer-local, may exist on your disk after cloning):**
+
+- Campaign pre-v3 archives under `attack-matrix/Campaign/archive/`
+- Live validation ledgers (`CAMPAIGNS-VALIDATION-REPORT.md`, `REDSTRIKE-VALIDATION-REPORT.md`, coverage audit)
+- Filled RedStrike seed (`automation/lab-seed-creds.json`) and spray wordlist (`ansible/files/cadre_passwords.txt`) — use the committed `*.example.*` templates
+- Operator SSH notes (`tools/vm-access.md`) and Plan 1 batch harness scripts (`tools/plan1-*`, `tools/es-*`)
+
+If you've cloned the project and don't see these paths in `git status`, that's expected.
 
 ---
 

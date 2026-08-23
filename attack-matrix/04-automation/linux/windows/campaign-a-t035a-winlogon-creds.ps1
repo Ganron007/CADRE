@@ -22,3 +22,4 @@ if (`$wp) { Write-Output "WINLOGON_PASSWORD `$wp" }
 "@
 
 & "$PSScriptRoot\campaign-a-t043-system-exec.ps1" -Server $Server -Username $Username -Password $Password -GpPath $GpPath -ScriptBlock $script
+Write-Output "T035A_WINLOGON_OK"

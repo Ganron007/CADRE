@@ -1,4 +1,50 @@
 
+## [Unreleased] — 2026-08-23 (public tree cleanup)
+
+- **Published vs maintainer-local boundary.** Extended `.gitignore` and removed from git index (files stay on disk locally): `attack-matrix/Campaign/archive/`, validation/coverage reports, `artifacts/`, filled `lab-seed-creds.json`, `cadre_passwords.txt`, Plan 1 batch harness under `tools/plan1-*` / `tools/es-*`, `tools/vm-access.md`, and related DFIR spine helpers. Added `lab-seed-creds.example.json` and `cadre_passwords.example.txt`. Scrubbed public markdown links to `archive/` and validation reports; updated `DOCS.md`, `Campaign/README.md`, runbook headers.
+
+## [Unreleased] — 2026-08-22 (VR hunt library + Stage 0 IR triage)
+
+- Expanded `ansible/files/vr-hunts/` for Velociraptor 0.76 stock names (old Security/Sysmon/MFT artifact names were not in the live catalog).
+- Stage 0 default hunts: `CADRE.Hunts.IRTriage` / `CADRE.Hunts.LinuxIRTriage` (no memory, no image, no MFT).
+- Library hunts remain: FullBreach (Windows union including Usage/SRUM), LinuxTriage, Persistence, UserArtifacts, EventLogs, FilesystemTimeline, ADCS, SCCM (`SiteCode=CAD`). Custom: PodmanInventory, SSSDCache metadata.
+- Verify-only checks IRTriage + LinuxIRTriage + Usage + FullBreach.
+
+## [Unreleased] — 2026-08-22 (RedStrike --ungated)
+
+- CADRE-integrated / LLM path: `redstrike-api --ungated --scope attack-matrix/Campaign/automation/scope.cadre.example.yaml` and `redstrike-campaign --ungated --scope …`. No HITL. Empty scope cannot run or pick a target.
+- Harness `redstrike-dfir-full.sh` exports `REDSTRIKE_UNGATED=1` and passes `--ungated --scope`.
+
+## [Unreleased] — 2026-08-22 (wrapper retry complete)
+
+- Union **79/83** in-engine verified. Closed: T013/T014/T016 PowerView `-TargetIdentity`, ESC Certify surface, T017 DA-hop MS-RPRN, T009 DCSync.
+- Still real: T102 no dc02$ TGT; T015 ACE#7 not usable via ADSI/bloodyAD; T-UNPAC ESC1 cert but Administrator `KDC_ERR_KEY_EXPIRED`; T039 RunScript with no client exec.
+
+## [Unreleased] — 2026-08-22 (retry remaining 11)
+
+- First `--nodes` retry: **21/32** verified (T009 DCSync live, T012, E-stream, T007/T035/T056/T099/T109/T035C).
+- Remaining wrapper bugs: PowerView `-Domain` aliases `-Server`; ESC/UnPAC probed `analyst_t1` Python (Access denied); T017 nxc as DA is not local-admin on ws01; T039 AdminService self-approve 500/403 without SQL `Scripts.ApprovalState=3`.
+- T102 left as real fail (`T102_DUMP_SIZE=54455`, `KIRBI_COUNT=0`).
+
+## [Unreleased] — 2026-08-22 (retry failed nodes)
+
+- Sister `redstrike-campaign run --nodes` selects exact graph ids. CADRE harness: `REDSTRIKE_NODES` / `redstrike-dfir-full.ps1 -Nodes`.
+- Wrapper fixes for the 32 unverified: PowerView Rights already `All`/`ResetPassword` (re-pack), T009 DN, Campaign E function, T035C expected Access-denied + marker, T102 no false `T102_OK`, certipy full path, T007 LDAP bind, T035 MP surface, T039 AdminService script.
+
+## [Unreleased] — 2026-08-22 (RedStrike in-engine attack verify)
+
+- Live `dfir-full-live-20260822` was **not** a completed campaign: most `rc=0` steps were banners or `[localhost] Access is denied`.
+- Sister engine now verifies every live step (`success_marker` / default `{id}_OK` + fail patterns). `--execute` exits 1 on unverified. Ledger creds only after verify.
+- `ws01-exec.sh` same-user path uses `-EncodedCommand` (stops quote-stripping). Other-user hop is a vagrant scheduled task after `SeBatchLogonRight` — `Invoke-Command localhost` is denied, `ProcessStartInfo` from SSH dies `0xC0000142`.
+- `dfir-full-ready-check.py --require-verified` is mandatory on DFIR `--execute`. Wiring-only `DFIR_FULL_READY=YES` is not attack success.
+- Pin overlay no longer carries timestamps (those are in standalone). Do not `--execute` until the pin is on provisioning.
+
+## [Unreleased] — 2026-08-22 (campaign reliability TEST)
+
+- Test runs (not DFIR): `campaign-test-20260822` 6/83 → `20260822b` 47/83 → `20260822d` 51/83 after hop + decode fixes.
+- `ws01-exec.sh` stages the payload as a file. Other-user hop is `ws01-exec-hop.ps1` (batch logon + scheduled task).
+- Sister `CommandRunner` decodes captured bytes with UTF-8 replace so mimikatz OEM output cannot abort a phase. Synced to pin + `~/RedStrike` (`KALI_PIN_SYNC_OK`).
+
 ## [Unreleased] — 2026-08-21 (Velociraptor MCP + ws01 client)
 
 - **Playbook 14** now loads CADRE hunts via `defaults.artifact_definitions_directories` (Velociraptor 0.76 has `artifacts`, not `artifact add`), generates `config api_client`, and starts `velociraptor-mcp` on `:8002` (`GET /health`, `POST /vql` Bearer). Windows MSI install is fail-closed.
@@ -10,7 +56,7 @@
 
 - **Sync rule:** standalone `RedStrike\` is the engine SSoT. Always adopt its HEAD into `CADRE/tools/red-strike/`, then onto provisioning. Script: `tools/sync-redstrike-pin.ps1` (`-PushKali` installs on `.60`).
 - **Adopted 2026-08-20:** sister `d39922e` (hostname/lab-IP decoupling) + overlay. Pin pytest 96 passed / 14 skipped. Provisioning pin `0.6.0` with `StepResult.started_at`; login wrappers exec the pin venv; `KALI_PIN_SYNC_OK`.
-- CADRE-only overlay (`tools/red-strike-pin-overlay.patch`): DFIR `StepResult` ISO timestamps + `P-DFIR` preflight. Re-applied after each copy so sister hostname decoupling is not reverted.
+- CADRE-only overlay (`tools/red-strike-pin-overlay.patch`): pin marker only. Engine verify + timestamps + P-DFIR rank live in standalone.
 
 ## [Unreleased] — 2026-08-20 (DFIR full graph v9)
 

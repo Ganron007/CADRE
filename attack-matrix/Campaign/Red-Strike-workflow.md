@@ -27,7 +27,7 @@ Fresh DFIR telemetry uses **graph v9, all 90 nodes**, from provisioning (hybrid 
 | Phased beachheads in `redstrike-dfir-full.sh` (`--profile P-DFIR --prefer-script`) | Native `--operator ws01` until the pin is installed on ws01 (it is not) |
 | `--execute` only after `DFIR_FULL_READY=YES` **and** reboot+wipe | Claim “say go” from docs or a second check-pass |
 
-HITL gates (execute wrapper pre-approves **all** of these for the 90-node collection): `dcsync`, `ticket`, `forest`, `persistence`, `acl_write`, `site_takeover`. Stubs still skip: T100, T103, T104, T107, T108, T-SQL-AI, WT093. Seed `krbtgt` hashes stay null until T009 actually dumps them.
+HITL gates: **off** for CADRE-integrated (`--ungated` + `CADRE_ROOT`). LLM/API live path is the same flag: `redstrike-api --ungated --scope attack-matrix/Campaign/automation/scope.cadre.example.yaml`. Empty scope cannot run. Standalone product (no `--ungated`) still pauses on HITL and defaults to read-only API. Stubs still skip: T100, T103, T104, T107, T108, T-SQL-AI, WT093. Seed `krbtgt` hashes stay null until T009 actually dumps them.
 
 **ws01 vs Kali:** Windows AD/SCCM/ACL/ADCS/Post-DA nodes originate on **ws01** (`analyst_t1`, `ws01-exec`). Provisioning simulates Kali **only** where the graph path is not ws01: T028, H-01..H-06 (Rule 4), T031, E/F, and linux01 T045–T048.
 
@@ -102,7 +102,7 @@ bash ~/CADRE/attack-matrix/04-automation/linux/redstrike-dfir-full.sh
 $env:CADRE_ROOT = "C:\path\to\CADRE"   # or clone/sync
 redstrike-campaign start --beachhead windows --operator ws01 --engage lab-native
 .\attack-matrix\04-automation\windows\redstrike-campaign-v3-ws01-native.ps1 -DryRun
-# then: -Execute  (HITL still required for privilege jumps)
+# then: -Execute  (CADRE_ROOT set → no HITL pause)
 ```
 
 **Beachhead** still selects attack identity / path preference (`windows`→ws01 path, `linux`→`.60` direct). **Operator** selects where the orchestrator itself runs.
@@ -240,7 +240,7 @@ bash ~/CADRE/attack-matrix/04-automation/linux/redstrike-dfir-full.sh
 
 **Known FAIL class (same as manual spine):** T102 coercion (KIRBI capture), T012 obfuscated Rubeus diamond, Branch D linux01 scripts (env/creds), T043 GodPotato path.
 
-**Final state:** `status: complete`, `pending_gate: null`. **Validation report:** [`REDSTRIKE-VALIDATION-REPORT.md`](REDSTRIKE-VALIDATION-REPORT.md). **Next:** Plan 1 telemetry (operator review).
+**Final state:** `status: complete`, `pending_gate: null`. Maintainer validation ledgers (`REDSTRIKE-VALIDATION-REPORT.md`, gitignored) hold run history. **Next:** Plan 1 telemetry (operator review).
 
 ## MCP tools
 

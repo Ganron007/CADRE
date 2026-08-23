@@ -22,6 +22,7 @@ try {
     }
     $reader.Close()
     $conn.Close()
+    Write-Output "T041_OK"
 } catch {
     Write-Output "SQL_FAIL: $($_.Exception.Message)"
     exit 1

@@ -6,6 +6,8 @@
 param(
     [switch]$Execute,
     [switch]$SkipSync,
+    [string]$Engage = "",
+    [string]$Nodes = "",
     [string]$ProvisioningHost = "192.168.77.60",
     [string]$SshKey = "$env:USERPROFILE\.ssh\cadre-provisioning-key",
     [string]$CadreRoot = (Resolve-Path (Join-Path $PSScriptRoot "..")).Path
@@ -49,14 +51,18 @@ if (-not $SkipSync) {
       (Join-Path $CadreRoot "attack-matrix\Campaign\automation\campaign-graph.yaml") `
       (Join-Path $CadreRoot "attack-matrix\Campaign\automation\lab-profiles.yaml") `
       (Join-Path $CadreRoot "attack-matrix\Campaign\automation\lab-seed-creds.json") `
+      (Join-Path $CadreRoot "attack-matrix\Campaign\automation\scope.cadre.example.yaml") `
       "${dest}:/tmp/"
     if ($LASTEXITCODE -ne 0) { throw "scp to provisioning failed" }
 }
 
 $remoteFlag = ""
 if ($Execute) { $remoteFlag = "--execute" }
+$engageExport = ""
+if ($Engage) { $engageExport += "REDSTRIKE_ENGAGE='$Engage' " }
+if ($Nodes) { $engageExport += "REDSTRIKE_NODES='$Nodes' " }
 
-ssh @ssh $dest "sed -i 's/\r`$//' /tmp/dfir-spine-bootstrap.sh; chmod +x /tmp/dfir-spine-bootstrap.sh; bash /tmp/dfir-spine-bootstrap.sh $remoteFlag"
+ssh @ssh $dest "sed -i 's/\r`$//' /tmp/dfir-spine-bootstrap.sh; chmod +x /tmp/dfir-spine-bootstrap.sh; ${engageExport}bash /tmp/dfir-spine-bootstrap.sh $remoteFlag"
 if ($LASTEXITCODE -ne 0) {
     throw "remote DFIR full harness failed (exit $LASTEXITCODE). Do not treat execute as ready."
 }

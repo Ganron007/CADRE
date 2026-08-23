@@ -9,4 +9,5 @@ h_require_artifact "H-04-smuggle.html"
 sz=$(wc -c < "${H_WWW}/H-04-smuggle.html" | tr -d ' ')
 [[ "${sz}" -gt 1000 ]] || { echo "H04_FAIL: html too small (${sz})" >&2; exit 1; }
 echo "H04_BUILDER_OK size=${sz}"
+echo "H_04_OK"
 echo "H04_DONE"

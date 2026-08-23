@@ -14,7 +14,7 @@ fi
 if [[ -f "${H_WWW}/${AU3}" ]]; then
   h_require_artifact "${AU3}"
 fi
-h_ws01_exec "
+OUT="$(h_ws01_exec "
 \$ErrorActionPreference='Continue'
 \$server='${H_WS01_HTTP}'
 \$marker='C:\Windows\Temp\H-PAYLOAD-MARKER.txt'
@@ -30,6 +30,8 @@ Set-Content -Path \"\$dir\H-05.au3\" -Value \$au3 -Encoding ASCII
 Start-Process -FilePath \"\$dir\AutoIt3.exe\" -ArgumentList \"\$dir\H-05.au3\" -Wait -ErrorAction SilentlyContinue
 Start-Sleep -Seconds 6
 if (Test-Path \$marker) { Write-Output 'H05_MARKER True'; Get-Content \$marker; Remove-Item \$marker -Force } else { Write-Output 'H05_MARKER False' }
-Write-Output 'H05_DONE'
-"
+")"
+printf '%s\n' "${OUT}"
+printf '%s' "${OUT}" | grep -q 'H05_MARKER True' || { echo "H-05 FAIL: payload marker missing" >&2; exit 1; }
+echo "H_05_OK"
 echo "H-05 complete"

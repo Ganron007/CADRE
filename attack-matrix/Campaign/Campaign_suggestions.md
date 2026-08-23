@@ -162,5 +162,5 @@
 
 ## Full item write-ups (separate file)
 
-Per-item sources, test plans, and integration notes are in **[archive/Campaign_suggestions-detail.md](archive/Campaign_suggestions-detail.md)** (~3.9k lines). Keep this index open for the summary table; open the detail file when researching a specific item.
+Per-item sources, test plans, and integration notes live in a maintainer-local detail file (`archive/Campaign_suggestions-detail.md`, gitignored). Keep this index open for the summary table; use your local copy when researching a specific item.
 

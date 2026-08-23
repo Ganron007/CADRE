@@ -14,7 +14,7 @@ if command -v ldbsearch >/dev/null 2>&1; then
 else
   strings /tmp/sssd_cache.ldb 2>/dev/null | grep -iE "cachedPassword|krbPrincipalName" | head -15 || true
 fi
-echo "T045_DONE"
+if [[ -f /tmp/sssd_cache.ldb ]]; then echo "T045_OK"; else echo "T045_FAIL: no SSSD cache"; exit 1; fi
 EOF
 )
 bash "${LIB}/linux01-exec.sh" "${REMOTE}"

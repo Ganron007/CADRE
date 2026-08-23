@@ -25,3 +25,9 @@ try {
 }
 
 Write-Output 'WT035C_PREREQ_DONE'
+if ($tnc.TcpTestSucceeded -and $ipcOk) {
+    Write-Output 'T035C_OK'
+} else {
+    Write-Output 'T035C_FAIL: RDP port or IPC$ auth not proved'
+    exit 1
+}

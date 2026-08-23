@@ -59,6 +59,10 @@ Get-ChildItem -LiteralPath $SisterRoot -Recurse -File -Force | ForEach-Object {
 if (-not $SkipOverlay) {
     if (-not (Test-Path $overlay)) { throw "missing overlay patch $overlay" }
     Write-Host "Applying CADRE pin overlay..."
+    $overlayMarker = Join-Path $pin "PIN-OVERLAY.txt"
+    if (Test-Path $overlayMarker) {
+        Remove-Item -LiteralPath $overlayMarker -Force
+    }
     git -C $pin apply --ignore-whitespace --recount $overlay
     if ($LASTEXITCODE -ne 0) { throw "overlay patch failed" }
 }

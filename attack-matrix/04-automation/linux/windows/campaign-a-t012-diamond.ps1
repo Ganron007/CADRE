@@ -48,3 +48,4 @@ if ($LASTEXITCODE -ne 0) {
 Write-Output "=== Rubeus describe ticket ==="
 & $Rubeus describe /ticket:$TicketFile /nowrap
 if ($LASTEXITCODE -ne 0) { throw "describe ticket failed RC=$LASTEXITCODE" }
+Write-Output "T012_OK"

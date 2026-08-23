@@ -98,7 +98,28 @@ foreach ($name in ($byName.Keys | Sort-Object)) {
     if ($reset -notcontains $name) { $reset += $name }
 }
 
+function Reset-GuestWs01 {
+    # Win11 + encrypted vTPM: vmrun reset/stop needs the encryption password.
+    Write-Host "reset guest ws01 via SSH (encrypted VMX - not vmrun)"
+    $key = Join-Path $env:USERPROFILE ".ssh\cadre-ws01-key"
+    $ssh = @(
+        "-i", $key,
+        "-o", "BatchMode=yes",
+        "-o", "StrictHostKeyChecking=accept-new",
+        "-o", "ConnectTimeout=10"
+    )
+    ssh @ssh vagrant@192.168.77.62 "shutdown /r /t 0 /f"
+    # ssh often dies when the guest drops; treat that as issued.
+    if ($LASTEXITCODE -gt 1) {
+        throw "ws01 guest reboot failed (ssh exit $LASTEXITCODE)"
+    }
+}
+
 foreach ($name in $reset) {
+    if ($name -eq "ws01") {
+        Reset-GuestWs01
+        continue
+    }
     $vmx = $byName[$name]
     Write-Host "reset $mode $name"
     & $vmrun -T ws reset $vmx $mode

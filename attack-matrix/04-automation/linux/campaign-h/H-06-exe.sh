@@ -5,7 +5,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "${SCRIPT_DIR}/h-common.sh"
 echo "=== H-06 Malicious EXE ==="
 h_require_artifact "payload.exe"
-h_ws01_exec "
+OUT="$(h_ws01_exec "
 \$ErrorActionPreference='Continue'
 \$server='${H_WS01_HTTP}'
 \$marker='C:\Windows\Temp\H-PAYLOAD-MARKER.txt'
@@ -17,6 +17,8 @@ Start-Process \$exe -ErrorAction SilentlyContinue
 Start-Sleep -Seconds 6
 if (Test-Path \$marker) { Write-Output 'H06_MARKER True'; Get-Content \$marker; Remove-Item \$marker -Force } else { Write-Output 'H06_MARKER False' }
 Remove-Item \$exe -ErrorAction SilentlyContinue
-Write-Output 'H06_DONE'
-"
+")"
+printf '%s\n' "${OUT}"
+printf '%s' "${OUT}" | grep -q 'H06_MARKER True' || { echo "H-06 FAIL: payload marker missing" >&2; exit 1; }
+echo "H_06_OK"
 echo "H-06 complete"

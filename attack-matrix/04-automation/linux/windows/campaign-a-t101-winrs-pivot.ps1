@@ -34,6 +34,7 @@ try {
 
     Write-Output "WINRS_OK: reached $Target from $Source"
     Write-Output ($result | Out-String)
+    Write-Output "T101_OK"
 } catch {
     Write-Output ("WINRS_FAIL: " + $_.Exception.Message)
     exit 1

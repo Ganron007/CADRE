@@ -6,6 +6,8 @@
 # pivot_to: target machine/role for lateral movement (ws01 -> mbr01 -> dc02 -> dc01 -> range.local)
 # produces_beachhead: credential or machine beachhead created by this node
 # Streams: E = phase 9 (network defense), F = phase 10 (supply-chain) — no ws01 routing
+# Verify (inside RedStrike): live success = rc==0 AND {id with '-'→'_'}_OK in output
+# AND no unexpected fail pattern. Override with success_marker / expected_errors.
 version: 9
 name: cadre-campaign-m5
 # M4+: prefer typed `intent` when set; `script` remains harness fallback (--prefer-script).
@@ -18,6 +20,10 @@ nodes:
     path: external60_phase0
     beachheads: [linux]
     script: campaign-a/T028-nullsession.sh
+    success_marker: T028_OK
+    expected_errors:
+      - NT_STATUS_ACCESS_DENIED
+      - NT_STATUS_LOGON_FAILURE
     requires_cred: null
     produces_cred: null
 
@@ -181,7 +187,7 @@ nodes:
     title: PrinterBug / MS-RPRN coercion
     path: ws01
     beachheads: [windows, linux]
-    script: attacks/WT017-printerbug-spoolsample.sh
+    script: campaign-a/T017-printerbug-ws01.sh
     requires_cred: svc_mssql
     produces_cred: null
     hitl_gate: persistence
@@ -470,7 +476,7 @@ nodes:
     title: LAPS bulk extraction (WT100) — deferred (LAPS not deployed)
     path: ws01
     beachheads: [windows, linux]
-    script: ""
+    script: campaign-a/T100-laps-deferred.sh
     stub: true
     requires_cred: null
     produces_cred: null
@@ -481,7 +487,7 @@ nodes:
     title: DPAPI-NG SID Protector (WT103) — deferred (no protected blob)
     path: ws01
     beachheads: [windows, linux]
-    script: ""
+    script: campaign-a/T103-dpapi-ng-deferred.sh
     stub: true
     requires_cred: chief_command
     produces_cred: null
@@ -492,7 +498,7 @@ nodes:
     title: DLL hijack persistence app (WT104) — deferred (app not staged)
     path: ws01
     beachheads: [windows, linux]
-    script: ""
+    script: campaign-a/T104-dll-hijack-deferred.sh
     stub: true
     requires_cred: null
     produces_cred: null
@@ -523,7 +529,7 @@ nodes:
     title: LSA SSP DLL (WT107) — deferred (SSP DLL not staged)
     path: ws01
     beachheads: [windows, linux]
-    script: ""
+    script: campaign-a/T107-lsa-ssp-deferred.sh
     stub: true
     requires_cred: null
     produces_cred: null
@@ -534,7 +540,7 @@ nodes:
     title: DCOMIllusionist lateral (WT108) — deferred (tool not staged)
     path: ws01
     beachheads: [windows, linux]
-    script: ""
+    script: campaign-a/T108-dcomillusionist-deferred.sh
     stub: true
     requires_cred: null
     produces_cred: null
@@ -556,6 +562,9 @@ nodes:
     path: ws01
     beachheads: [windows, linux]
     script: campaign-a/T035C-rdp-ws01.sh
+    success_marker: T035C_OK
+    expected_errors:
+      - Access is denied
     requires_cred: analyst_cloud
     produces_cred: null
 
@@ -732,7 +741,7 @@ nodes:
     title: SQL Server 2025 AI abuse (mbr02)
     path: ws01
     beachheads: [windows, linux]
-    script: ""
+    script: campaign-a/T-SQL-AI-deferred.sh
     stub: true
     requires_cred: analyst_t1
     produces_cred: null
@@ -898,7 +907,7 @@ nodes:
     title: Ransomware simulation (Windows host)
     path: external60_phase0
     beachheads: [windows, linux]
-    script: ""
+    script: campaign-e/wt093-ransomware-deferred.sh
     stub: true
     requires_cred: null
     produces_cred: null

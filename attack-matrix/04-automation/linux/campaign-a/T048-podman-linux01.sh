@@ -13,7 +13,7 @@ sudo podman exec cadre-monitor unshare -r id 2>&1 || echo "UNSHARE_FAIL"
 sudo podman exec cadre-monitor cat /proc/1/root/etc/shadow 2>/dev/null | head -3 || echo "SHADOW_READ_FAIL"
 sudo podman exec cadre-monitor sh -c "touch /proc/1/root/tmp/cadre-escape-proof && echo ESCAPE_PROOF_OK" 2>&1 || true
 ls -la /tmp/cadre-escape-proof 2>/dev/null && echo "HOST_FILE_CREATED" || true
-echo "T048_DONE"
+if [[ -f /tmp/cadre-escape-proof ]]; then echo "T048_OK"; else echo "T048_FAIL: host escape file missing"; exit 1; fi
 EOF
 )
 bash "${LIB}/linux01-exec.sh" "${REMOTE}"

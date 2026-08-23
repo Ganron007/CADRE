@@ -6,12 +6,19 @@
 set -euo pipefail
 
 EXECUTE=0
+NODES="${REDSTRIKE_NODES:-}"
 for arg in "$@"; do
   case "${arg}" in
     --execute) EXECUTE=1 ;;
+    --nodes=*) NODES="${arg#--nodes=}" ;;
+    --nodes)
+      echo "usage: --nodes=T009,T013 (equals form)" >&2
+      exit 2
+      ;;
     -h|--help)
-      echo "usage: redstrike-dfir-full.sh [--execute]"
-      echo "90-node graph v9, phased. Default dry-run. --execute pre-approves all HITL gates (DFIR collection)."
+      echo "usage: redstrike-dfir-full.sh [--execute] [--nodes=ID,ID]"
+      echo "90-node graph v9, phased. Default dry-run. --execute is ungated (no HITL); scope required."
+      echo "--nodes=... re-runs only those graph ids (beachhead windows; ids must allow windows)."
       exit 0
       ;;
     *)
@@ -27,6 +34,7 @@ PIN_VENV="${PIN_ROOT}/.venv"
 PIN_BIN="${PIN_VENV}/bin"
 GRAPH="${CADRE_ROOT}/attack-matrix/Campaign/automation/campaign-graph.yaml"
 SEED="${REDSTRIKE_SEED:-${CADRE_ROOT}/attack-matrix/Campaign/automation/lab-seed-creds.json}"
+SCOPE="${REDSTRIKE_SCOPE:-${CADRE_ROOT}/attack-matrix/Campaign/automation/scope.cadre.example.yaml}"
 AUTO_ROOT="${CADRE_AUTOMATION_ROOT:-${CADRE_ROOT}/attack-matrix/04-automation/linux}"
 WS01_KEY="${REDSTRIKE_WS01_SSH_KEY:-${HOME}/.ssh/cadre-ws01-key}"
 READY_CHECK="${CADRE_ROOT}/tools/dfir-full-ready-check.py"
@@ -45,6 +53,8 @@ export PATH="${PIN_BIN}:/usr/bin:/bin:${HOME}/.local/bin"
 export CADRE_ROOT
 export CADRE_AUTOMATION_ROOT="${AUTO_ROOT}"
 export REDSTRIKE_SEED="${SEED}"
+export REDSTRIKE_SCOPE="${SCOPE}"
+export REDSTRIKE_UNGATED=1
 export REDSTRIKE_OPERATOR="provisioning"
 export REDSTRIKE_WS01_SSH_KEY="${WS01_KEY}"
 unset PYTHONHOME || true
@@ -64,6 +74,7 @@ fail() { echo "DFIR_FULL_READY=NO" >&2; echo "FAIL: $*" >&2; exit 1; }
 [[ -x "${PIN_BIN}/redstrike-campaign" ]] || fail "pin venv missing ${PIN_BIN}/redstrike-campaign"
 [[ -f "${GRAPH}" ]] || fail "CADRE graph missing ${GRAPH}"
 [[ -f "${SEED}" ]] || fail "seed missing ${SEED}"
+[[ -f "${SCOPE}" ]] || fail "scope missing ${SCOPE} (ungated lab requires targets + domains)"
 [[ -d "${AUTO_ROOT}" ]] || fail "automation root missing ${AUTO_ROOT}"
 [[ -x "${AUTO_ROOT}/lib/ws01-exec.sh" ]] || fail "ws01-exec.sh missing"
 [[ -x "${AUTO_ROOT}/lib/linux01-exec.sh" ]] || fail "linux01-exec.sh missing (branch D)"
@@ -102,6 +113,8 @@ COMMON=(
   --cadre-root "${CADRE_ROOT}"
   --graph "${GRAPH}"
   --seed "${SEED}"
+  --scope "${SCOPE}"
+  --ungated
   --automation-root "${AUTO_ROOT}"
   --json
 )
@@ -110,8 +123,7 @@ echo "--- start ---"
 redstrike-campaign start --beachhead windows "${COMMON[@]}"
 
 if [[ "${EXECUTE}" -eq 1 ]]; then
-  echo "NOTE: --execute pre-approves ALL HITL gates for DFIR full collection (no snapshots)."
-  echo "NOTE: gates: dcsync ticket forest persistence acl_write site_takeover"
+  echo "NOTE: --execute uses --ungated (no HITL). Scope file is required (${SCOPE})."
   for gate in dcsync ticket forest persistence acl_write site_takeover; do
     redstrike-campaign approve --gate "${gate}" --note "dfir-full collection" --beachhead windows "${COMMON[@]}"
   done
@@ -162,6 +174,9 @@ run_phase() {
   if [[ "${EXECUTE}" -eq 1 ]]; then
     args+=(--execute --no-stop-on-hitl)
   fi
+  if [[ -n "${NODES}" ]]; then
+    args+=(--nodes "${NODES}")
+  fi
   set +e
   redstrike-campaign "${args[@]}" > "${out}.raw"
   local rc=$?
@@ -175,6 +190,10 @@ run_phase() {
 }
 
 # Phased calibration (graph v9). Windows = ws01-exec. linux = Kali/provisioning origin.
+if [[ -n "${NODES}" ]]; then
+  echo "--- node retry: ${NODES} ---"
+  run_phase "0-10" all windows
+else
 run_phase "0" spine linux              # T028 null-session from .60
 run_phase "0.5-3" spine windows        # H-ASSUME + roast + SQL
 run_phase "3.5-4" spine windows
@@ -190,6 +209,7 @@ run_phase "0.5" H linux                # H-01..H-06 Kali→ws01 (Rule 4)
 run_phase "9" E linux
 run_phase "10" F linux
 run_phase "3" sql-ai windows           # stub, still a graph node
+fi
 
 python3 - "${MERGED}" "${PHASE_FILES[@]}" <<'PY'
 import json, sys
@@ -230,6 +250,12 @@ merged = {
         1 for s in steps if s.get("mechanism") in ("direct-linux60", "external60_phase0") and not s.get("skipped")
     ),
     "stub_count": sum(1 for s in steps if s.get("stub") or (s.get("skipped") and "stub" in str(s.get("skip_reason") or ""))),
+    "verified_count": sum(1 for s in steps if s.get("verified")),
+    "unverified_count": sum(
+        1
+        for s in steps
+        if not s.get("dry_run") and not s.get("skipped") and not s.get("awaiting_approval") and not s.get("verified")
+    ),
     "node_count": len(steps),
 }
 out.write_text(json.dumps(merged, indent=2) + "\n", encoding="utf-8")
@@ -237,16 +263,27 @@ print(f"merged nodes={merged['node_count']} ws01_exec={merged['ws01_exec_count']
 PY
 
 echo "--- ready-check ---"
-python3 "${READY_CHECK}" "${MERGED}"
+READY_ARGS=()
+if [[ -n "${NODES}" ]]; then
+  READY_ARGS+=(--subset)
+fi
+if [[ "${EXECUTE}" -eq 1 ]]; then
+  READY_ARGS+=(--require-verified)
+fi
+python3 "${READY_CHECK}" "${READY_ARGS[@]}" "${MERGED}"
 READY_RC=$?
 echo "log=${LOG}"
 echo "json=${MERGED}"
 if [[ "${READY_RC}" -ne 0 ]]; then
-  echo "Wiring is not ready. Do not treat execute as done." >&2
+  if [[ "${EXECUTE}" -eq 1 ]]; then
+    echo "Execute dump failed verification. rc=0 banners are not attack success." >&2
+  else
+    echo "Wiring is not ready. Do not treat execute as done." >&2
+  fi
   exit 1
 fi
 if [[ "${EXECUTE}" -eq 1 ]]; then
-  echo "DFIR_FULL_EXECUTE finished (see phase WARNs). json=${MERGED}"
+  echo "DFIR_FULL_EXECUTE verified in-engine. json=${MERGED}"
   exit 0
 fi
 echo "Dry-run wiring proved for full graph. Wait for reboot+wipe then --execute."

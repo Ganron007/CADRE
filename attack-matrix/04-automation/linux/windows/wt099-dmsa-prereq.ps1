@@ -55,3 +55,4 @@ try {
 }
 
 Write-Output 'WT099_PS_DONE'
+if ($ok) { Write-Output 'T099_OK' } else { Write-Output 'T099_FAIL'; exit 1 }

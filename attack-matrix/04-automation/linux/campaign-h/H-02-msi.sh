@@ -6,7 +6,7 @@ source "${SCRIPT_DIR}/h-common.sh"
 echo "=== H-02 Malicious MSI ==="
 h_require_artifact "H-02-evil.msi"
 h_require_artifact "payload.exe"
-h_ws01_exec "
+OUT="$(h_ws01_exec "
 \$ErrorActionPreference='Continue'
 \$server='${H_WS01_HTTP}'
 \$marker='C:\Windows\Temp\H-PAYLOAD-MARKER.txt'
@@ -19,6 +19,8 @@ Start-Process msiexec -ArgumentList \"/i \`\"\$msi\`\"\",'/qn' -Wait -ErrorActio
 Start-Sleep -Seconds 8
 if (Test-Path \$marker) { Write-Output 'H02_MARKER True'; Get-Content \$marker; Remove-Item \$marker -Force } else { Write-Output 'H02_MARKER False' }
 Remove-Item \$msi -ErrorAction SilentlyContinue
-Write-Output 'H02_DONE'
-"
+")"
+printf '%s\n' "${OUT}"
+printf '%s' "${OUT}" | grep -q 'H02_MARKER True' || { echo "H-02 FAIL: payload marker missing" >&2; exit 1; }
+echo "H_02_OK"
 echo "H-02 complete"

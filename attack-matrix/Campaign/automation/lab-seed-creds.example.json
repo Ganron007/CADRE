@@ -1,0 +1,25 @@
+{
+  "credentials": {
+    "analyst_t1": {
+      "username": "analyst_t1",
+      "password": "REPLACE_FROM_PLAYBOOK",
+      "domain": "child.cadre.local",
+      "source": "seed",
+      "notes": "Assumed-breach identity on ws01"
+    },
+    "intern_blue": {
+      "username": "intern_blue",
+      "password": "REPLACE_FROM_PLAYBOOK",
+      "domain": "child.cadre.local",
+      "source": "seed",
+      "notes": "AS-REP roast target (Phase 1)"
+    },
+    "chief_command": {
+      "username": "chief_command",
+      "password": "REPLACE_FROM_PLAYBOOK",
+      "domain": "cadre.local",
+      "source": "spray",
+      "notes": "Fill after WT031 spray or from ansible/roles"
+    }
+  }
+}

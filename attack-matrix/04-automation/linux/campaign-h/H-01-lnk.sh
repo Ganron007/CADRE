@@ -6,7 +6,7 @@ source "${SCRIPT_DIR}/h-common.sh"
 echo "=== H-01 Malicious LNK ==="
 h_require_artifact "Invoice.lnk"
 h_require_artifact "payload.exe"
-h_ws01_exec "
+OUT="$(h_ws01_exec "
 \$ErrorActionPreference='Continue'
 \$server='${H_WS01_HTTP}'
 \$marker='C:\Windows\Temp\H-PAYLOAD-MARKER.txt'
@@ -23,6 +23,8 @@ Start-Process -FilePath 'C:\Windows\Temp\H-01-Invoice.lnk' -ErrorAction Silently
 Start-Sleep -Seconds 10
 if (Test-Path \$marker) { Write-Output 'H01_MARKER True'; Get-Content \$marker; Remove-Item \$marker -Force } else { Write-Output 'H01_MARKER False' }
 Remove-Item 'C:\Windows\Temp\H-01-Invoice.lnk','C:\Windows\Temp\h01-p.exe' -ErrorAction SilentlyContinue
-Write-Output 'H01_DONE'
-"
+")"
+printf '%s\n' "${OUT}"
+printf '%s' "${OUT}" | grep -q 'H01_MARKER True' || { echo "H-01 FAIL: payload marker missing" >&2; exit 1; }
+echo "H_01_OK"
 echo "H-01 complete"

