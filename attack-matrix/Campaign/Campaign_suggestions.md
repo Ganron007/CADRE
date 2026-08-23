@@ -78,7 +78,13 @@
 | **Branch C — SCCM** | Ludus SCCM Lab | ✅ |
 | **Branch D — Linux** | GTFOBins (python, perl, find, vim, awk, curl, env, tee) | ✅ |
 | **Branch F — Supply-Chain** | Shai-Hulud 2.0 / NPMHound | ✅ |
-| **Campaign H — Initial Access** | Device Code Phishing (OAuth) | ⏳ |
+| **Campaign H — Initial Access** | Device Code Phishing (OAuth) | PENDING |
+| **Campaign H — Initial Access** | ISO/IMG mount + LNK (MOTW bypass) | PENDING |
+| **Campaign H — Initial Access** | OneNote attachment abuse | PENDING |
+| **Campaign H — Initial Access** | ClickOnce `.application` | PENDING |
+| **Campaign H — Initial Access** | Excel 4.0 / VBA / XLL | PENDING |
+| **Campaign H — Initial Access** | Edge WebView2 packaged app | PENDING |
+| **Campaign H — Initial Access** | Windows Search `.search-ms` connector | PENDING |
 | **Plan 11 — Cloud/Entra ID** | Pass-the-Cert (Entra ID lateral movement) | ⏳ |
 | | Actor Tokens → Global Admin (Dirk-jan 2025) | ⏳ |
 | | Cloud Kerberos Trust → Domain Admin (Dirk-jan 2023) | ⏳ |
@@ -128,7 +134,7 @@
 | | dirkjanm.io — AD/Azure Research Blog | — |
 | **Skip** | Don't Jump the Turnstile | ⏭️ |
 
-**Counts:** ✅ Adopted: 57 | ⏳ Pending: 45 | 🔬 Research: 4 | ⏭️ Skip: 1 | 📋 Tracked: 1 | Reference: 3 | **Total: 111**
+**Counts:** ✅ Adopted: 57 | PENDING: 51 | 🔬 Research: 4 | ⏭️ Skip: 1 | 📋 Tracked: 1 | Reference: 3 | **Total: 117**
 
 ---
 
@@ -157,6 +163,31 @@
 | DPAPI-NG SID Protector Decryption | T1555 | Post-DA, after KDS Root Key | KDS key ✅ |
 
 **Status:** 🔬 Suggested 2026-08-02 — **not yet adopted** into `CAMPAIGNS_v3.md`. Adopt per operator decision.
+
+---
+
+## Campaign H — Initial Access Modernization (proposed 2026-08-23)
+
+> Source: `CADRE-AD2025-Real-World-Vectors-Decision-Draft.md` §3.1
+> Status: PENDING — test under ws01 MDE P2 before promotion to `CAMPAIGNS_v3.md`.
+
+The current Campaign H covers LNK, MSI, CHM, HTML smuggling, AutoIt3, and EXE. These are valid but aging. The following six vectors are dominant in 2024-2025 real-world phishing and should be tested as additions:
+
+| Candidate | Delivery Mechanism | Expected User Action | MDE P2 Telemetry Target |
+|---|---|---|---|
+| H-07 | ISO/IMG mount + LNK inside | User mounts image, double-clicks LNK | MOTW/Zone.Identifier bypass; Explorer → LNK → powershell |
+| H-08 | OneNote attachment / embedded HTML | User opens OneNote page | OneNote.exe → child process; HTML/JavaScript execution |
+| H-09 | ClickOnce `.application` file | User opens/allows ClickOnce app | `dfsvc.exe` → `iexplore.exe` or custom app; network beacon |
+| H-10 | Excel 4.0 / VBA / XLL | User enables/edits document | `EXCEL.exe` → `.xll`/macro; MDE macro/AMSI alert |
+| H-11 | Edge WebView2 packaged app | User runs "signed" app | WebView2 runtime → .NET/C2; trusted app abuse |
+| H-12 | Windows Search `.search-ms` connector | User opens folder/search file | Search connector triggers payload with no direct click |
+
+**Prerequisites for testing:**
+- ws01: OneNote for Desktop, Office, .NET Framework, Edge WebView2 runtime, ClickOnce.
+- provisioning: builders for .iso, .one, .application, .xll, WebView2 package, .search-ms.
+- Telemetry: monitor (`monitor .55`) and elk (`elk .50`) online to capture the new initial-access vectors.
+
+**Adoption criteria:** A vector is promoted to `CAMPAIGNS_v3.md` only if it runs under the real `CADRE-WS01` MDE policy and produces a verifiable marker on ws01 without disabling MDE real-time protection.
 
 ---
 
