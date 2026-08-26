@@ -1620,10 +1620,8 @@
           enabled: true
           interval: 5m
           from: now-360s
-        # NOTE: cadre-l10 (MSSQL xp_cmdshell) removed — xp_cmdshell is impossible on
-        # SQL Server Linux (xpstar.dll absent), so neither the attack nor a meaningful
-        # "blocked attempt" detection is valid. L-numbering keeps the gap; slot reserved
-        # for a future real Linux technique (e.g. SUID/copy-based privilege escalation).
+        # NOTE: cadre-l10 slot retired (L-number gap kept). Do not add SQL OS-exec
+        # detection against linux01 — Branch D linked hop is SQL query/BULK only.
         - rule_id: cadre-l11-nfs-krb5
           name: "L11 — NFS Mount with Kerberos"
           description: "Mount syscall with sec=krb5p from non-root user"

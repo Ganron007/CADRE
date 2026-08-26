@@ -371,7 +371,7 @@ detection_rules:
     index: [logs-mssql.audit.linux-*]
     query: mssql.audit.event_type:FAILED_LOGIN_GROUP (threshold)
     mitre: T1110
-  # cadre-l10 removed — xp_cmdshell impossible on SQL Server Linux (xpstar.dll absent). L-numbering gap reserved.
+  # cadre-l10 removed — L-numbering gap reserved (do not map OS-exec via SQL to linux01).
   - rule_id: cadre-l11-nfs-krb5
     name: NFS Mount with Kerberos
     index: [logs-auditd.log-*]

@@ -360,7 +360,7 @@
 | **Starting point** | kali -> linux01 (via mbr01 linked server to LINUX01) |
 | **Target** | linux01 MSSQL (cadre.local) |
 | **Tool** | `OPENQUERY("LINUX01", 'SELECT name FROM sys.databases')` |
-| **What you gain** | Database reconnaissance on linux01 (xp_cmdshell unavailable on SQL Linux) |
+| **What you gain** | Database reconnaissance on linux01 (SQL linked hop only; OS shell via Kerberoast/`mssql-linux01` SSH) |
 | **Lateral chain** | Database recon -> SSSD ticket extraction (#45), keytab abuse (#46), Podman escape (#48) |
 | **Status** | CONFIGURED |
 

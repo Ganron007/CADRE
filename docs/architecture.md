@@ -176,7 +176,7 @@ this is greenfield instrumentation — the first open-source lab to instrument a
 |-------|--------|-------|---------|
 | Kernel auditd (`/etc/audit/rules.d/cadre.rules`, immutable, ≥45 rules) | `/var/log/audit/audit.log` | `logs-auditd.log-*` | execve, keytab reads, sssd cache access, realmd join/leave, mount syscalls, container escape (`setns`/`unshare`/`pivot_root`), kernel modules, SUID changes, cron/systemd persistence, PAM/NSS hijack |
 | SSSD debug | `/var/log/sssd/*.log` (`debug_level=5`) | `logs-sssd-*` | AD authentication chain, Kerberos child errors, PAM stack |
-| MSSQL Server Audit | `/var/opt/mssql/audit/*.sqlaudit` | `logs-mssql.audit.linux-*` | Failed/successful logins, role changes, xp_cmdshell, impersonation, backup/restore |
+| MSSQL Server Audit | `/var/opt/mssql/audit/*.sqlaudit` | `logs-mssql.audit.linux-*` | Failed/successful logins, role changes, impersonation, backup/restore |
 | Podman events | `/var/log/podman-events.log` (`podman events --format=json`) | `logs-podman-*` | container lifecycle, privileged/`--pid=host` flags, bind mounts, exec |
 | System / auth | `/var/log/auth.log`, `/var/log/syslog` | `logs-system.auth-*`, `logs-system.syslog-*` | sudo, sshd, rpc.gssd (NFS Kerberos GSS context), systemd |
 | osquery (`osquery_manager` Fleet integration) | scheduled pack on CADRE-Linux policy | `logs-osquery_manager.result-*` | SUID inventory diff, listening ports, kernel modules, authorized_keys, in-memory exec |

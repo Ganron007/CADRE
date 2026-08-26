@@ -137,7 +137,7 @@ sudo systemctl enable --now mssql-server          # WT#45: service running
 ```
 Install tools for verification: `sudo apt-get install -y mssql-tools18 unixodbc-dev python3-pymssql`.
 
-> **Note — Linux audit binary format limitation:** `.sqlaudit` files are UTF-16 LE XML (binary format). Elastic's filestream log integration cannot parse them into structured `mssql.audit.*` fields on Linux (the microsoft_sqlserver integration's audit log stream is Windows-only via `winlog`). Detection for failed logins relies on the errorlog instead (`/var/opt/mssql/log/errorlog`), collected by the `microsoft_sqlserver.log` input. The audit spec is still created because it's a manual install dependency; the errorlog captures login failures (error 18456). Seed rule **L09** (MSSQL failed-login burst) targets `logs-microsoft_sqlserver.log-*` accordingly. (Note: `xp_cmdshell` is **impossible** on SQL Server Linux — `xpstar.dll` is absent — so there is no xp_cmdshell attack or detection on linux01.)
+> **Note — Linux audit binary format limitation:** `.sqlaudit` files are UTF-16 LE XML (binary format). Elastic's filestream log integration cannot parse them into structured `mssql.audit.*` fields on Linux (the microsoft_sqlserver integration's audit log stream is Windows-only via `winlog`). Detection for failed logins relies on the errorlog instead (`/var/opt/mssql/log/errorlog`), collected by the `microsoft_sqlserver.log` input. The audit spec is still created because it's a manual install dependency; the errorlog captures login failures (error 18456). Seed rule **L09** (MSSQL failed-login burst) targets `logs-microsoft_sqlserver.log-*` accordingly.
 
 ### 3.2 Audit directory + server audit specification  *(WT#45/47)*
 ```bash
@@ -190,7 +190,7 @@ echo 'mssql-linux01 ALL=(ALL) NOPASSWD:ALL' | sudo tee /etc/sudoers.d/cadre-doma
 sudo chmod 440 /etc/sudoers.d/cadre-domain-users
 ```
 
-Then the Branch D chain: `SSH mssql-linux01 → sudo podman start cadre-monitor → sudo podman exec cadre-monitor unshare -r id` (privileged container escape → **root**) → read SSSD cache / `mssql.keytab` / NFS mount from root. (Note: `xp_cmdshell` is **impossible** on SQL Server Linux — `xpstar.dll` absent — so SQL-side OS exec on linux01 is NOT available; the pivot is SSH-based. Also note `adcli join` recreates the keytab with `host/LINUX01@CADRE.LOCAL` — the AD-side `host` SPN registration must match for NFS `krb5p` server-side GSS validation.)
+Then the Branch D chain: `SSH mssql-linux01 → sudo podman start cadre-monitor → sudo podman exec cadre-monitor unshare -r id` (privileged container escape → **root**) → read SSSD cache / `mssql.keytab` / NFS mount from root. (Linked-server hop from mbr01 is SQL recon/BULK only; OS pivot is SSH-based. Also note `adcli join` recreates the keytab with `host/LINUX01@CADRE.LOCAL` — the AD-side `host` SPN registration must match for NFS `krb5p` server-side GSS validation.)
 
 ### 3.5 NFS `krb5p` mount (WT#47) — required fixes
 

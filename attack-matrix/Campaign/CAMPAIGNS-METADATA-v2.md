@@ -1322,16 +1322,16 @@ We have `nt authority\system` on mbr01 via GodPotato. `analyst_cloud` has an act
 |-------|-------|
 | **Status** | ✅ Verified — MSSQL linked-server pivot from `mbr01` to `linux01` works via `impacket-mssqlclient` as `analyst_t1`; 4-part name query `SELECT name FROM LINUX01.master.sys.databases` returned linux01 databases. |
 | **Stream** | Branch D |
-| **Att&ck** | T1071 (Application Layer Protocol), T1550 (Use Alternate Auth Material), T1059 (Command and Scripting Interpreter) |
-| **Technique** | Pivot from Windows compromise to linux01 via MSSQL linked server, SSH, or NFS Kerberos |
+| **Att&ck** | T1071 (Application Layer Protocol), T1550 (Use Alternate Auth Material), T1021 (Remote Services — SSH after Kerberoast) |
+| **Technique** | Pivot from Windows compromise to linux01 via MSSQL linked-server **SQL recon**, then SSH as `mssql-linux01` (Kerberoast), NFS Kerberos, or Podman |
 | **Playbook** | `07-linux-config.yml` — deploys SSSD, NFS krb5p, Podman on linux01; `08-sql-sccm-wsus-verify.yml` verifies linked server `LINUX01` on `mbr01` |
 | **Prerequisite** | Domain credential or Kerberos ticket valid for `linux01` |
 | **Source machine** | `ws01` or mbr01/mbr02 |
 | **Target machine** | linux01 (`192.168.77.40`) — Ubuntu 24.04 domain-joined |
 | **Domain** | `cadre.local` |
 | **Starting credential** | `analyst_t1` / `T13r_An@lyst!` (or `svc_mssql` / `s3rv1c3_MSSQL!`) |
-| **What it earns** | SQL execution context on linux01; foundation for SSSD ticket / keytab / NFS / Podman escalation |
-| **RedStrike Intent** | `sql.mssqlclient` / `sql.xp_cmdshell` |
+| **What it earns** | SQL query context on linux01 (linked hop); foundation for SSH / SSSD / keytab / NFS / Podman escalation |
+| **RedStrike Intent** | `sql.mssqlclient` (linked-server SQL recon only) |
 | **State Output** | SET_STATE(creds.linux01.pivot = "mssql_linked_server") |
 | **Key telemetry** | Linux auditd; SSSD logs; Zeek ssh.log / nfs.log; Suricata SID for linux01 traffic |
 | **Script** | `T040-mssql-linked-server-hop-ws01.sh`, `T044-linux-sssd-ticket-ws01.sh`, `T045-linux-keytab-ws01.sh`, `T046-linux-mssql-keytab-ws01.sh`, `T047-linux-nfs-ws01.sh`, `T048-linux-podman-escape-ws01.sh` |
@@ -1344,7 +1344,7 @@ We have `nt authority\system` on mbr01 via GodPotato. `analyst_cloud` has an act
 | **Status** | ✅ Verified live |
 | **Technique** | Query linked server from mbr01/mbr02 to linux01 MSSQL |
 | **Command** | `impacket-mssqlclient child/analyst_t1:'T13r_An@lyst!'@mbr01.child.cadre.local -db master` then `EXECUTE('SELECT name FROM LINUX01.master.sys.databases')` |
-| **What it earns** | SQL execution context on linux01; list of databases returned |
+| **What it earns** | SQL recon on linux01 (database list / optional BULK read of mssql-owned files) — **not** an OS shell |
 | **RedStrike Intent** | `sql.mssqlclient` |
 | **State Output** | SET_STATE(creds.linux01.pivot = "mssql_linked_server") |
 | **Automation note** | Do **not** use a multi-line `<<EOF` heredoc with `impacket-mssqlclient`; the interpreter treats the terminator as a stored procedure name and loops. Use the `-query` flag (single-line) or a Python `pymssql` wrapper for scripted execution. |

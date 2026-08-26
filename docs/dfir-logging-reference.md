@@ -398,7 +398,7 @@ Elastic Agent's `mssql` integration → `logs-mssql.audit-*`.
 | `SERVER_PRINCIPAL_IMPERSONATION_GROUP` | `EXECUTE AS LOGIN = …` — **MSSQL impersonation chain** |
 
 Standalone MSSQL **errorlog** (`/var/opt/mssql/log/errorlog`) → `logs-mssql.errorlog-*`
-catches connection errors, xp_cmdshell hits, CLR loads, login failures.
+catches connection errors, login failures, and related service messages.
 
 ---
 

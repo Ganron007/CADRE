@@ -1,4 +1,10 @@
 
+## [Unreleased] — 2026-08-26 (Branch D: remove linux01 xp_cmdshell fallacy)
+
+- Deleted dead Branch D probes that tried to enable/run `xp_cmdshell` on SQL Server Linux (`branchd-exec.ps1`, `branchd-exec2.ps1`, `branchd-entry.ps1`, `branchd-probe.ps1`).
+- `WT044-mssql-linux-lateral.sh` and `branchd-surface.ps1` are SQL-query/recon only.
+- Scrubbed `sql.xp_cmdshell` from Branch D METADATA; clarified CAMPAIGNS_v3 / runbook / validation / walkthrough / guides: linked hop = query/BULK; OS shell = Kerberoast → SSH as `mssql-linux01`.
+
 ## [Unreleased] — 2026-08-23 (public tree cleanup)
 
 - **Published vs maintainer-local boundary.** Extended `.gitignore` and removed from git index (files stay on disk locally): `attack-matrix/Campaign/archive/`, validation/coverage reports, `artifacts/`, filled `lab-seed-creds.json`, `cadre_passwords.txt`, Plan 1 batch harness under `tools/plan1-*` / `tools/es-*`, `tools/vm-access.md`, and related DFIR spine helpers. Added `lab-seed-creds.example.json` and `cadre_passwords.example.txt`. Scrubbed public markdown links to `archive/` and validation reports; updated `DOCS.md`, `Campaign/README.md`, runbook headers.

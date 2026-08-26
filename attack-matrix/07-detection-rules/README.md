@@ -24,7 +24,7 @@ Elastic detection rules mapped to CADRE walkthroughs. Full **Detection-as-Code**
 
 ### Linux (14 seed rules)
 
-`L01`–`L09`, `L11`–`L15` ship via the ELK-Fleet `linux-seed.ndjson` and cover auditd keys for credential access, Kerberos/SSSD, keytabs, NFS-krb5 mounts, podman, cron/systemd persistence, and home-dir access. Mapped to WT#044–048. (**L10 retired** — it detected blocked `xp_cmdshell`, which is impossible on SQL Server Linux; the L-number gap is reserved for a future real Linux technique.) Full mapping table is added in Plan 1 (Telemetry Catalog).
+`L01`–`L09`, `L11`–`L15` ship via the ELK-Fleet `linux-seed.ndjson` and cover auditd keys for credential access, Kerberos/SSSD, keytabs, NFS-krb5 mounts, podman, cron/systemd persistence, and home-dir access. Mapped to WT#044–048. (**L10 retired** — number gap reserved.) Full mapping table is added in Plan 1 (Telemetry Catalog).
 
 ## Coverage gaps (Plan 5 backlog)
 

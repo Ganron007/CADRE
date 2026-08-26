@@ -23,7 +23,7 @@
 
 | Hop | Identity | What you get | What you do **not** get |
 |-----|----------|----------------|-------------------------|
-| **WT044** | `child\analyst_t1` → mbr01 SQL → linked `LINUX01` | Database list / optional `sa` **BULK** read of `mssql.keytab` | **No OS shell.** SQL Server Linux has no `xpstar.dll` / `xp_cmdshell`. |
+| **WT044** | `child\analyst_t1` → mbr01 SQL → linked `LINUX01` | Database list / optional `sa` **BULK** read of `mssql.keytab` | **No OS shell via SQL.** Linked hop is query/BULK only. |
 | **OS** | `cadre.local\mssql-linux01` (SPN `MSSQLSvc/linux01.cadre.local:1433`) | SSH via SSSD → **`NOPASSWD:ALL` sudo → root** (`07-linux-config.yml`) | Not `analyst_t1` SSH. Not local `vagrant`. |
 
 Root on the host is then: **(1) sudo as `mssql-linux01`** (primary, live 2026-08-22) or **(2) privileged Podman escape** (WT048 — LPE if sudo were absent). WT045/046/047 run **after** that shell.

@@ -1,6 +1,6 @@
 # WT#044 — MSSQL-on-Linux Lateral Reconnaissance (sub-technique)
 
-> **Role:** This is a **reconnaissance sub-technique of the MSSQL lateral-movement chain (WT#040–043)**, not a standalone attack vector. It enumerates linux01 over the linked server (no OS command execution — `xp_cmdshell` is impossible on SQL Server Linux) and hands off to the credential-abuse paths WT#045/WT#046. Counted as part of the MSSQL chain, not as a separate vector.
+> **Role:** This is a **reconnaissance sub-technique of the MSSQL lateral-movement chain (WT#040–043)**, not a standalone attack vector. It enumerates linux01 over the linked server with **SQL queries only**, then hands off to SSH / credential-abuse paths WT#045/WT#046. Counted as part of the MSSQL chain, not as a separate vector.
 
 ## Metadata
 | Field | Value |
@@ -18,7 +18,7 @@
 - SA access on mbr01 MSSQL instance
 - Linked server "LINUX01" configured pointing to linux01 MSSQL (cadre.local)
 
-> **Note — xp_cmdshell unavailable on SQL Server Linux:** The `xpstar.dll` extended stored procedure DLL does not exist in the SQL Server Linux build. `xp_cmdshell` cannot be enabled or executed on linux01. For OS command execution on linux01, pivot to credential abuse paths: WT#045 (SSSD ticket extraction) or WT#046 (keytab abuse).
+> **Note:** The linked-server hop is SQL recon / optional BULK read of mssql-owned files only. For an OS shell on linux01, use Kerberoast → SSH as `mssql-linux01` (WT#045/WT#046 paths), not SQL-side OS exec.
 
 ## Attack Steps
 
