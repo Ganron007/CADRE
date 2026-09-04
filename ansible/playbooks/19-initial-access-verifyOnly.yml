@@ -33,18 +33,18 @@
         fail_msg: "H artifact presence/size mismatch on provisioning ~/www"
         success_msg: "All 6 H artifacts present on provisioning ~/www"
 
-    - name: "Verify HTTP server :8081 listening"
-      ansible.builtin.command: "ss -ltn | grep ':8081 '"
+    - name: "Verify HTTP server :8081 responding"
+      ansible.builtin.command: "curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:8081/payload.exe"
       register: h_listen
       changed_when: false
       failed_when: false
 
-    - name: "Assert :8081 listening"
+    - name: "Assert :8081 listening and serving"
       ansible.builtin.assert:
         that:
-          - h_listen.stdout | length > 0
-        fail_msg: "python3 http.server :8081 not listening on provisioning"
-        success_msg: "HTTP :8081 listening on provisioning"
+          - h_listen.stdout | trim == "200"
+        fail_msg: "python3 http.server :8081 not responding on provisioning — run 19-initial-access.yml or tools/start-h-server.sh"
+        success_msg: "HTTP :8081 listening and serving on provisioning"
 
     - name: "HTTP 200 check per artifact (from provisioning itself)"
       ansible.builtin.command: "curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:8081/{{ item }}"

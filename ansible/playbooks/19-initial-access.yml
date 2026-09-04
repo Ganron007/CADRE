@@ -47,14 +47,35 @@
         - "campaign-h/H-03-evil.chm"      # H-03 CHM (Shortcut object; exec blocked on modern hh.exe)
         - "campaign-h/H-04-smuggle.html"  # H-04 HTML-smuggling page (embedded payload)
 
+    - name: "Check if AutoIt3.exe already in ~/www (manually staged binary)"
+      ansible.builtin.stat:
+        path: "/home/vagrant/www/AutoIt3.exe"
+      register: h_autoit_check
+
+    - name: "Copy AutoIt3.exe from ~/www staging if missing (H-05 delivery binary)"
+      ansible.builtin.copy:
+        src: "/home/vagrant/www/AutoIt3.exe"
+        dest: "/home/vagrant/www/AutoIt3.exe"
+        remote_src: true
+        owner: vagrant
+        group: vagrant
+        mode: "0644"
+      when: not h_autoit_check.stat.exists
+
+    - name: "Warn if AutoIt3.exe not found (manual staging required)"
+      ansible.builtin.debug:
+        msg: "WARNING: AutoIt3.exe (980064B) not found on provisioning. Manually stage to ~/www/ for H-05. See CAMPAIGNS-RUNBOOK-H.md."
+      when: not h_autoit_check.stat.exists
+
 - name: "provisioning — ensure HTTP delivery server on :8081"
   hosts: provisioning
   gather_facts: false
   become: false
   tasks:
-    - name: "Check if python3 http.server :8081 is already listening"
-      ansible.builtin.command: "ss -ltn | grep -c ':8081 '"
-      register: h_listen
+    - name: "Kill any stale python3 http.server on :8081"
+      ansible.builtin.shell: "pkill -f 'http.server 8081' || true"
+      args:
+        executable: /bin/bash
       changed_when: false
       failed_when: false
 
@@ -64,14 +85,24 @@
         && nohup python3 -m http.server 8081 --bind 0.0.0.0 > /home/vagrant/www-server.log 2>&1 &
       args:
         executable: /bin/bash
-      when: h_listen.stdout | int == 0
 
     - name: "Wait for :8081 to accept connections"
       ansible.builtin.wait_for:
         port: 8081
         host: 127.0.0.1
         timeout: 10
-      when: h_listen.stdout | int == 0
+
+    - name: "Verify :8081 serves payload.exe (HTTP 200)"
+      ansible.builtin.command: "curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:8081/payload.exe"
+      register: h_http_check
+      changed_when: false
+
+    - name: "Assert :8081 is serving artifacts"
+      ansible.builtin.assert:
+        that:
+          - h_http_check.stdout | trim == "200"
+        fail_msg: "HTTP :8081 started but payload.exe not served — check ~/www contents"
+        success_msg: "HTTP :8081 serving artifacts from ~/www"
 
 - name: "ws01 — ensure Campaign H staging root"
   hosts: ws01
