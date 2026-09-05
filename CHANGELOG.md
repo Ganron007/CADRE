@@ -1,4 +1,21 @@
 
+## [Unreleased] — 2026-09-05 (Campaign H C2: full redirector beacon chain verified)
+
+- **Full C2 chain verified through C2Stack redirector:** ws01 beacon → `:80` (Apache, `X-Request-ID: cadre-c2` header) → Sliver teamserver → operator tasks → beacon executes → result returned.
+- **Root cause found for single check-in:** original implant was generated as session (`IsBeacon=False`), not beacon. Session implants connect once over HTTP and never poll. Fixed by generating with `IsBeacon=True` + 5s `BeaconInterval` via sliver-py gRPC API.
+- **Defender fully disabled on ws01 (as vagrant):** `windows-defender-remover` script + `DisableAntiSpyware=1` GPO registry key via SYSTEM scheduled task. After reboot: MsMpEng gone, WinDefend stopped, WMI provider broken.
+- **SSH detachment fix:** Windows kills child processes when SSH sessions end (job object cleanup). Use `cmd /c "start /b ..."` to detach implants from SSH.
+- **Corrected Defender attribution:** original report said "MDE P2 killed implant." MDE P2 is NOT installed on ws01. Local Windows Defender Antivirus with Tamper Protection was responsible.
+- **C2Stack permanent support confirmed:** redirector is the production path in C2Stack `.env` (`C2_HEADER_NAME=X-Request-ID`, `C2_HEADER_VALUE=cadre-c2`, `SLIVER_URI_PREFIX=/cloud/storage/objects`). The `docker-compose.override.yml` was only for the Phase 1 smoke test.
+- **Beacon `26a09054` (MAGENTA_SOURWOOD):** recurring check-ins, task `47d6b67f` (`whoami`) queued → sent → completed.
+- **Runbook updated:** `CAMPAIGNS-RUNBOOK-H.md` — 3-phase verification tables, lessons learned, corrected Defender facts, C2Stack permanent support documented.
+
+## [Unreleased] — 2026-08-31 (RedStrike pin sync from standalone 447ad08)
+
+- Adopted standalone **447ad08** into `tools/red-strike/` via `sync-redstrike-pin.ps1` (151 pytest green).
+- **New in pin:** Phase 7 modern AD builders (coerce, impacket, kerbrute, manifest), Phase 8 **C2** (`redstrike/c2/` Sliver + Meridian, `--c2` / MCP `c2_*`), certipy argv fixes, CallSpec dual-mode.
+- **Unchanged in CADRE:** `campaign-graph.yaml`, `04-automation/` wrappers, `--prefer-script` campaign path (standalone de-emphasizes scripted graphs; CADRE keeps both scripted + LLM + future C2).
+
 ## [Unreleased] — 2026-08-26 (Branch D: remove linux01 xp_cmdshell fallacy)
 
 - Deleted dead Branch D probes that tried to enable/run `xp_cmdshell` on SQL Server Linux (`branchd-exec.ps1`, `branchd-exec2.ps1`, `branchd-entry.ps1`, `branchd-probe.ps1`).

